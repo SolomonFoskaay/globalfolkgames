@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GlobalFolkGames</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Navigation Header -->
+    <header class="mobile-header">
+        <div class="brand">🌍 GlobalFolkGames</div>
+        <div class="user-pill"><span id="display-points">⭐ 0 Pts</span></div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="mobile-container">
+        <!-- Horizontal Scrollable Tabs -->
+        <nav class="level-tabs-scroll">
+            <button class="tab-btn active" data-level="1">L1: Training</button>
+            <button class="tab-btn" data-level="2">L2: Daily</button>
+            <button class="tab-btn" data-level="3">L3: Weekly</button>
+        </nav>
+
+        <!-- Campaign Filter Sub-Tabs -->
+        <div class="campaign-status-tabs">
+            <button class="sub-tab-btn active" data-status="current">Active Now</button>
+            <button class="sub-tab-btn" data-status="upcoming">Upcoming</button>
+            <button class="sub-tab-btn" data-status="past">Past Results</button>
+        </div>
+
+        <!-- Dynamic Output Box -->
+        <section id="campaign-display-box" class="content-viewport">
+            <!-- Content will be injected here by main.js -->
+        </section>
+    </main>
+
+    <script src="main.js"></script>
+</body>
+</html>
