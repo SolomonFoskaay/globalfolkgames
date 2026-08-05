@@ -2,9 +2,8 @@ let canvas;
 let ctx;
 
 const GRID_SIZE = 15;
-let CELL_SIZE; // computed after canvas is available
+let CELL_SIZE; 
 
-// Traditional Ludo Theme Hex Code Color Palette Matrices
 const COLORS = {
     green: '#2ecc71',
     yellow: '#f1c40f',
@@ -15,7 +14,7 @@ const COLORS = {
     dark: '#1a1a1a'
 };
 
-// Starting token coordinate indices positions inside home yard islands
+// Fixed alignment coordinates to position Red in the Bottom-Left and Yellow in the Top-Right
 let tokens = {
     green:  [{c: 2, r: 2}, {c: 3, r: 2}, {c: 2, r: 3}, {c: 3, r: 3}],
     yellow: [{c: 11, r: 2}, {c: 12, r: 2}, {c: 11, r: 3}, {c: 12, r: 3}],
@@ -26,7 +25,7 @@ let tokens = {
 function drawLudoLayout() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw Global Pathway Tracks (Cells)
+    // 1. Grid lines
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             ctx.strokeStyle = COLORS.gray;
@@ -35,29 +34,31 @@ function drawLudoLayout() {
         }
     }
 
-    // 2. Color Specific Player Home Yards
+    // 2. Corner Base Yards
     drawBigYard(0, 0, COLORS.green);      // Top Left
-    drawBigYard(9, 0, COLORS.red);        // Bottom Left
-    drawBigYard(0, 9, COLORS.yellow);     // Top Right
+    drawBigYard(0, 9, COLORS.red);        // Bottom Left (Corrected)
+    drawBigYard(9, 0, COLORS.yellow);     // Top Right (Corrected)
     drawBigYard(9, 9, COLORS.blue);       // Bottom Right
 
-    // 3. Color Specific Individual Shared Tracks and Safety Zones
+    // 3. Track Pathways and Safety Zones
     for (let c = 1; c < 6; c++) drawCell(c, 7, COLORS.green);
     drawCell(1, 6, COLORS.green); 
 
+    // Top Track center points to Yellow Home
     for (let r = 1; r < 6; r++) drawCell(7, r, COLORS.yellow);
     drawCell(8, 1, COLORS.yellow); 
 
     for (let c = 9; c < 14; c++) drawCell(c, 7, COLORS.blue);
     drawCell(13, 8, COLORS.blue); 
 
+    // Bottom Track center points to Red Home
     for (let r = 9; r < 14; r++) drawCell(7, r, COLORS.red);
     drawCell(6, 13, COLORS.red); 
 
-    // 4. Draw Center Home Goal Triangles (Re-activated)
+    // 4. Goal Triangles
     drawCenterTriangles();
 
-    // 5. Render Tokens on top of the layout board mapping
+    // 5. Render Tokens
     drawAllTokens();
 }
 
@@ -86,6 +87,7 @@ function drawCenterTriangles() {
     const centerEnd = 9 * CELL_SIZE;
     const mid = 7.5 * CELL_SIZE;
 
+    // Green Center Triangle (Left)
     ctx.fillStyle = COLORS.green;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerStart);
@@ -93,6 +95,7 @@ function drawCenterTriangles() {
     ctx.lineTo(centerStart, centerEnd);
     ctx.fill();
 
+    // Yellow Center Triangle (Top)
     ctx.fillStyle = COLORS.yellow;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerStart);
@@ -100,6 +103,7 @@ function drawCenterTriangles() {
     ctx.lineTo(centerEnd, centerStart);
     ctx.fill();
 
+    // Blue Center Triangle (Right)
     ctx.fillStyle = COLORS.blue;
     ctx.beginPath();
     ctx.moveTo(centerEnd, centerStart);
@@ -107,6 +111,7 @@ function drawCenterTriangles() {
     ctx.lineTo(centerEnd, centerEnd);
     ctx.fill();
 
+    // Red Center Triangle (Bottom)
     ctx.fillStyle = COLORS.red;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerEnd);
@@ -122,13 +127,11 @@ function drawAllTokens() {
             const centerY = (token.r * CELL_SIZE) + (CELL_SIZE / 2);
             const radius = CELL_SIZE * 0.35;
 
-            // Draw Token Base Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath();
             ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw Physical Token Outer Body Ring
             ctx.fillStyle = COLORS[color];
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -137,7 +140,6 @@ function drawAllTokens() {
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Draw Inner Crown Dot Core
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius * 0.4, 0, Math.PI * 2);
@@ -155,3 +157,7 @@ function initBoard() {
 }
 
 document.addEventListener('DOMContentLoaded', initBoard);
+
+setTimeout(() => {
+    passTurnSequence();
+}, 10000);
