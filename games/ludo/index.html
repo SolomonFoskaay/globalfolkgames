@@ -24,12 +24,21 @@
         <div style="font-weight: bold; color: #f39c12; margin-top: 5px;">🇳🇬 Native Ludo (Beta)</div>
     </header>
 
-    <div id="canvas-wrapper">
+        <div id="canvas-wrapper">
         <canvas id="ludoCanvas" width="600" height="600"></canvas>
+        
+    <!-- Floating Interactive Dice Panel Controller -->
+    <div id="dice-container" style="position: absolute; bottom: 20px; display: flex; align-items: center; gap: 15px; background: rgba(30,30,30,0.9); padding: 12px 20px; border-radius: 50px; border: 1px solid #333; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+        <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
+            <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 45px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">⚀</button>
+            <div id="diceResult" style="font-size: 1.1rem; font-weight: bold; min-width: 20px; text-align: center;">-</div>
+        </div>
     </div>
 
+
     <!-- Script assets for game processing rendering -->
-    <script src="board.js"></script>
-    <script src="game.js"></script>
+    <script src="/games/ludo/board.js"></script>
+    <script src="/games/ludo/game.js"></script>
+    <script>console.log('Ludo scripts requested');</script>
 </body>
 </html>
