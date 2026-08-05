@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Native Ludo Matrix | GlobalFolkGames</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #121212; color: #fff;
+            font-family: system-ui, sans-serif; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; min-height: 100vh;
+            overflow: hidden;
+        }
+        header { width: 100%; display: flex; justify-content: space-between; padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; position: absolute; top: 0; }
+        .back-btn { background: #333; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 0.9rem;}
+        #canvas-wrapper { margin-top: 60px; display: flex; justify-content: center; align-items: center; width: 100vw; height: calc(100vh - 60px); }
+        canvas { background: #1a1a1a; max-width: 95vw; max-height: 95vw; aspect-ratio: 1/1; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="../../index.html" class="back-btn">⬅ Leave Arena</a>
+        <div style="font-weight: bold; color: #f39c12; margin-top: 5px;">🇳🇬 Native Ludo (Beta)</div>
+    </header>
+
+    <div id="canvas-wrapper">
+        <canvas id="ludoCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <!-- Script assets for game processing rendering -->
+    <script src="board.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

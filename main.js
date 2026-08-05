@@ -28,14 +28,16 @@ function drawDashboardContent() {
         cardElement.innerHTML = `
             <h3>${campaign.title}</h3>
             <p>${campaign.desc}</p>
-            <button class="launch-btn" onclick="goToLudoWorkspace()">Enter Arena</button>
+            <button class="launch-btn" onclick="goToLudoWorkspace()">Enter Game Arena</button>
         `;
         outputBox.appendChild(cardElement);
     });
 }
 
 function goToLudoWorkspace() {
-    alert("System Route Alert: Launching games/ludo/index.html engine canvas!");
+    // alert("Preping Game: Launching game now.... tab okay!");
+    // Redirects user directly into the isolated Ludo game folder architecture
+    window.location.href = "games/ludo/index.html";
 }
 
 // Click event loops for tab controls
