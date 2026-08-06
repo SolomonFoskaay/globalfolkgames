@@ -37,6 +37,13 @@ function isTokenInHomeYard(color, token) {
 
 function isTokenMovable(color, token, index) {
     if (color !== currentTurn || !isDiceRolled || currentTurnMoves.length === 0) return false;
+
+    if (token.stepsWalked >= 57) return false;
+
     const inYard = isTokenInHomeYard(color, token);
-    return currentTurnMoves.some(m => inYard ? m === 6 : true);
+    if (inYard) {
+        return currentTurnMoves.includes(6);
+    }
+
+    return currentTurnMoves.some((moveValue) => token.stepsWalked + moveValue <= 57);
 }

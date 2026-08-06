@@ -38,12 +38,14 @@ function finalizeDiceScores() {
 
     setTimeout(() => {
         displayDiceOnBoard = false;
-        let activeTokensList = tokens[currentTurn];
-        let hasAnyValidMove = activeTokensList.some((t, idx) => isTokenMovable(currentTurn, t, idx));
 
-        if (!hasAnyValidMove) {
+        if (!hasAnyValidMoveForCurrentTurn()) {
             displayEducationalLog(`${upperColor}: No valid options available. Auto-passing turn.`);
             setTimeout(passTurnSequence, 1200);
         }
     }, 3500);
+}
+
+function hasAnyValidMoveForCurrentTurn() {
+    return tokens[currentTurn].some((token, index) => isTokenMovable(currentTurn, token, index));
 }
