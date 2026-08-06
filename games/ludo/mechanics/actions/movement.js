@@ -1,10 +1,14 @@
-function handleCanvasClick(event) {
+function handleInputInteraction(clientX, clientY) {
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
 
+    // Get exact canvas dimensions relative to layout bounding box viewports
     const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
+    
+    // Normalize coordinates to map physical CSS pixel ratios accurately back to our 600x600 grid size
+    const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
+    const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
 
+    // Convert pixel coordinate mappings directly back into 0-14 grid cell indices
     const clickedCol = Math.floor(mouseX / CELL_SIZE);
     const clickedRow = Math.floor(mouseY / CELL_SIZE);
 
@@ -85,5 +89,19 @@ function handleCanvasClick(event) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const ludoCanvasElement = document.getElementById('ludoCanvas');
-    if (ludoCanvasElement) ludoCanvasElement.addEventListener('click', handleCanvasClick);
+    if (ludoCanvasElement) {
+        // Desktop mouse tracking event hook
+        ludoCanvasElement.addEventListener('click', (event) => {
+            handleInputInteraction(event.clientX, event.clientY);
+        });
+
+        // Mobile touchscreen interface event hook
+        ludoCanvasElement.addEventListener('touchstart', (event) => {
+            // Block physical mobile double-tap view zoom shifts or native browser scrolling
+            event.preventDefault();
+            if (event.touches.length > 0) {
+                handleInputInteraction(event.touches[0].clientX, event.touches[0].clientY);
+            }
+        }, { passive: false });
+    }
 });
