@@ -14,14 +14,6 @@ const COLORS = {
     dark: '#1a1a1a'
 };
 
-// Initial base coordinate layout definitions
-let tokens = {
-    green:  [{c: 2, r: 2}, {c: 3, r: 2}, {c: 2, r: 3}, {c: 3, r: 3}],
-    yellow: [{c: 11, r: 2}, {c: 12, r: 2}, {c: 11, r: 3}, {c: 12, r: 3}],
-    blue:   [{c: 11, r: 11}, {c: 12, r: 11}, {c: 11, r: 12}, {c: 12, r: 12}],
-    red:    [{c: 2, r: 11}, {c: 3, r: 11}, {c: 2, r: 12}, {c: 3, r: 12}]
-};
-
 // Animation clock variables to control blinking states of valid targets
 let globalBlinkAlpha = 1.0;
 let blinkGrowing = false;
