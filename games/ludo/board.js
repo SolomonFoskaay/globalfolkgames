@@ -14,7 +14,7 @@ const COLORS = {
     dark: '#1a1a1a'
 };
 
-// Fixed alignment coordinates to position Red in the Bottom-Left and Yellow in the Top-Right
+// Initial base coordinate layout definitions
 let tokens = {
     green:  [{c: 2, r: 2}, {c: 3, r: 2}, {c: 2, r: 3}, {c: 3, r: 3}],
     yellow: [{c: 11, r: 2}, {c: 12, r: 2}, {c: 11, r: 3}, {c: 12, r: 3}],
@@ -22,10 +22,14 @@ let tokens = {
     red:    [{c: 2, r: 11}, {c: 3, r: 11}, {c: 2, r: 12}, {c: 3, r: 12}]
 };
 
+// Animation clock variables to control blinking states of valid targets
+let globalBlinkAlpha = 1.0;
+let blinkGrowing = false;
+
 function drawLudoLayout() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Grid lines
+    // 1. Structural pathway grids
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
             ctx.strokeStyle = COLORS.gray;
@@ -35,30 +39,28 @@ function drawLudoLayout() {
     }
 
     // 2. Corner Base Yards
-    drawBigYard(0, 0, COLORS.green);      // Top Left
-    drawBigYard(0, 9, COLORS.red);        // Bottom Left (Corrected)
-    drawBigYard(9, 0, COLORS.yellow);     // Top Right (Corrected)
-    drawBigYard(9, 9, COLORS.blue);       // Bottom Right
+    drawBigYard(0, 0, COLORS.green);      
+    drawBigYard(0, 9, COLORS.red);        
+    drawBigYard(9, 0, COLORS.yellow);     
+    drawBigYard(9, 9, COLORS.blue);       
 
-    // 3. Track Pathways and Safety Zones
+    // 3. Pathways lines
     for (let c = 1; c < 6; c++) drawCell(c, 7, COLORS.green);
     drawCell(1, 6, COLORS.green); 
 
-    // Top Track center points to Yellow Home
     for (let r = 1; r < 6; r++) drawCell(7, r, COLORS.yellow);
     drawCell(8, 1, COLORS.yellow); 
 
     for (let c = 9; c < 14; c++) drawCell(c, 7, COLORS.blue);
     drawCell(13, 8, COLORS.blue); 
 
-    // Bottom Track center points to Red Home
     for (let r = 9; r < 14; r++) drawCell(7, r, COLORS.red);
     drawCell(6, 13, COLORS.red); 
 
-    // 4. Goal Triangles
+    // 4. Draw Center Goal Triangles (Re-activated)
     drawCenterTriangles();
 
-    // 5. Render Tokens
+    // 5. Draw All Tokens on board layout layers
     drawAllTokens();
 }
 
@@ -87,7 +89,6 @@ function drawCenterTriangles() {
     const centerEnd = 9 * CELL_SIZE;
     const mid = 7.5 * CELL_SIZE;
 
-    // Green Center Triangle (Left)
     ctx.fillStyle = COLORS.green;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerStart);
@@ -95,7 +96,6 @@ function drawCenterTriangles() {
     ctx.lineTo(centerStart, centerEnd);
     ctx.fill();
 
-    // Yellow Center Triangle (Top)
     ctx.fillStyle = COLORS.yellow;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerStart);
@@ -103,7 +103,6 @@ function drawCenterTriangles() {
     ctx.lineTo(centerEnd, centerStart);
     ctx.fill();
 
-    // Blue Center Triangle (Right)
     ctx.fillStyle = COLORS.blue;
     ctx.beginPath();
     ctx.moveTo(centerEnd, centerStart);
@@ -111,7 +110,6 @@ function drawCenterTriangles() {
     ctx.lineTo(centerEnd, centerEnd);
     ctx.fill();
 
-    // Red Center Triangle (Bottom)
     ctx.fillStyle = COLORS.red;
     ctx.beginPath();
     ctx.moveTo(centerStart, centerEnd);
@@ -122,16 +120,35 @@ function drawCenterTriangles() {
 
 function drawAllTokens() {
     Object.keys(tokens).forEach(color => {
-        tokens[color].forEach(token => {
+        tokens[color].forEach((token, index) => {
             const centerX = (token.c * CELL_SIZE) + (CELL_SIZE / 2);
             const centerY = (token.r * CELL_SIZE) + (CELL_SIZE / 2);
             const radius = CELL_SIZE * 0.35;
 
+            // Check if this token belongs to the active turn player and is eligible to be moved
+            let canThisPieceMove = false;
+            if (typeof isTokenMovable === 'function') {
+                canThisPieceMove = isTokenMovable(color, token, index);
+            }
+
+            ctx.save();
+            // Apply pulsating opacity effect only to playable selections
+            if (canThisPieceMove) {
+                ctx.globalAlpha = globalBlinkAlpha;
+                // Draw a glowing exterior circle halo vector ring
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw Token Base Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath();
             ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
             ctx.fill();
 
+            // Draw Token Core Body
             ctx.fillStyle = COLORS[color];
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -140,12 +157,31 @@ function drawAllTokens() {
             ctx.lineWidth = 2;
             ctx.stroke();
 
+            // Crown center point dot
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius * 0.4, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
         });
     });
+}
+
+// 60FPS background clock engine loop specifically to animate blinking styles smoothly
+function runBlinkAnimationEngine() {
+    if (blinkGrowing) {
+        globalBlinkAlpha += 0.04;
+        if (globalBlinkAlpha >= 1.0) blinkGrowing = false;
+    } else {
+        globalBlinkAlpha -= 0.04;
+        if (globalBlinkAlpha <= 0.3) blinkGrowing = true;
+    }
+    
+    // Request canvas layout refresh updates if context is running
+    if (canvas && ctx) {
+        drawLudoLayout();
+    }
+    requestAnimationFrame(runBlinkAnimationEngine);
 }
 
 function initBoard() {
@@ -156,8 +192,7 @@ function initBoard() {
     drawLudoLayout();
 }
 
-document.addEventListener('DOMContentLoaded', initBoard);
-
-setTimeout(() => {
-    passTurnSequence();
-}, 10000);
+document.addEventListener('DOMContentLoaded', () => {
+    initBoard();
+    runBlinkAnimationEngine(); // Kick off animation processing ticks
+});

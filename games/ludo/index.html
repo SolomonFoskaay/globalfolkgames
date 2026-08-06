@@ -11,9 +11,9 @@
             align-items: center; justify-content: center; min-height: 100vh;
             overflow: hidden;
         }
-        header { width: 100%; display: flex; justify-content: space-between; padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; position: absolute; top: 0; }
+        header { width: 100%; display: flex; justify-content: space-between; padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; position: absolute; top: 0; z-index: 10; }
         .back-btn { background: #333; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 0.9rem;}
-        #canvas-wrapper { margin-top: 60px; display: flex; justify-content: center; align-items: center; width: 100vw; height: calc(100vh - 60px); }
+        #canvas-wrapper { margin-top: 60px; display: flex; justify-content: center; align-items: center; width: 100vw; height: calc(100vh - 60px); position: relative; }
         canvas { background: #1a1a1a; max-width: 95vw; max-height: 95vw; aspect-ratio: 1/1; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-radius: 8px; }
     </style>
 </head>
@@ -24,21 +24,27 @@
         <div style="font-weight: bold; color: #f39c12; margin-top: 5px;">🇳🇬 Native Ludo (Beta)</div>
     </header>
 
-        <div id="canvas-wrapper">
+    <div id="canvas-wrapper">
         <canvas id="ludoCanvas" width="600" height="600"></canvas>
         
-    <!-- Floating Interactive Dice Panel Controller -->
-    <div id="dice-container" style="position: absolute; bottom: 20px; display: flex; align-items: center; gap: 15px; background: rgba(30,30,30,0.9); padding: 12px 20px; border-radius: 50px; border: 1px solid #333; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-        <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
-            <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 45px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">⚀</button>
-            <div id="diceResult" style="font-size: 1.1rem; font-weight: bold; min-width: 20px; text-align: center;">-</div>
+        <!-- Persistent Floating Control Center -->
+        <div id="dice-container" style="position: absolute; bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(20,20,20,0.95); padding: 12px 20px; border-radius: 16px; border: 1px solid #333; box-shadow: 0 6px 20px rgba(0,0,0,0.7); min-width: 250px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <div id="turn-indicator" style="font-size: 1rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
+                <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 50px; height: 45px; border-radius: 8px; font-size: 1.6rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">🎲</button>
+            </div>
+            
+            <!-- Persistent Scoreboard HUD that stays completely static while players think -->
+            <div id="persistent-scores" style="display: flex; gap: 10px; font-size: 0.9rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 12px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222;">
+                <div>Die 1: <span id="val-d1" style="color: #fff;">-</span></div>
+                <div>Die 2: <span id="val-d2" style="color: #fff;">-</span></div>
+                <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
+            </div>
         </div>
     </div>
-
 
     <!-- Script assets for game processing rendering -->
     <script src="/games/ludo/board.js"></script>
     <script src="/games/ludo/game.js"></script>
-    <script>console.log('Ludo scripts requested');</script>
 </body>
 </html>
