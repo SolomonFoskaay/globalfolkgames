@@ -14,29 +14,24 @@ const COLORS = {
     dark: '#1a1a1a'
 };
 
-// Animation clock variables to control blinking states of valid targets
 let globalBlinkAlpha = 1.0;
 let blinkGrowing = false;
 
 function drawLudoLayout() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Structural pathway grids
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            ctx.strokeStyle = COLORS.gray;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = COLORS.gray; ctx.lineWidth = 1;
             ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
     }
 
-    // 2. Corner Base Yards
     drawBigYard(0, 0, COLORS.green);      
     drawBigYard(0, 9, COLORS.red);        
     drawBigYard(9, 0, COLORS.yellow);     
     drawBigYard(9, 9, COLORS.blue);       
 
-    // 3. Pathways lines
     for (let c = 1; c < 6; c++) drawCell(c, 7, COLORS.green);
     drawCell(1, 6, COLORS.green); 
 
@@ -49,142 +44,102 @@ function drawLudoLayout() {
     for (let r = 9; r < 14; r++) drawCell(7, r, COLORS.red);
     drawCell(6, 13, COLORS.red); 
 
-    // 4. Draw Center Goal Triangles (Re-activated)
     drawCenterTriangles();
-
-    // 5. Draw All Tokens on board layout layers
     drawAllTokens();
 }
 
 function drawCell(col, row, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    ctx.strokeStyle = COLORS.gray;
-    ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    ctx.fillStyle = color; ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    ctx.strokeStyle = COLORS.gray; ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
 function drawBigYard(startCol, startRow, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
-    ctx.strokeStyle = COLORS.white;
-    ctx.lineWidth = 2;
+    ctx.fillStyle = color; ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
+    ctx.strokeStyle = COLORS.white; ctx.lineWidth = 2;
     ctx.strokeRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
-
-    ctx.fillStyle = COLORS.white;
-    ctx.beginPath();
-    ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = COLORS.white; ctx.beginPath();
+    ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2); ctx.fill();
 }
 
 function drawCenterTriangles() {
-    const centerStart = 6 * CELL_SIZE;
-    const centerEnd = 9 * CELL_SIZE;
-    const mid = 7.5 * CELL_SIZE;
-
-    ctx.fillStyle = COLORS.green;
-    ctx.beginPath();
-    ctx.moveTo(centerStart, centerStart);
-    ctx.lineTo(mid, mid);
-    ctx.lineTo(centerStart, centerEnd);
-    ctx.fill();
-
-    ctx.fillStyle = COLORS.yellow;
-    ctx.beginPath();
-    ctx.moveTo(centerStart, centerStart);
-    ctx.lineTo(mid, mid);
-    ctx.lineTo(centerEnd, centerStart);
-    ctx.fill();
-
-    ctx.fillStyle = COLORS.blue;
-    ctx.beginPath();
-    ctx.moveTo(centerEnd, centerStart);
-    ctx.lineTo(mid, mid);
-    ctx.lineTo(centerEnd, centerEnd);
-    ctx.fill();
-
-    ctx.fillStyle = COLORS.red;
-    ctx.beginPath();
-    ctx.moveTo(centerStart, centerEnd);
-    ctx.lineTo(mid, mid);
-    ctx.lineTo(centerEnd, centerEnd);
-    ctx.fill();
+    const centerStart = 6 * CELL_SIZE; const centerEnd = 9 * CELL_SIZE; const mid = 7.5 * CELL_SIZE;
+    ctx.fillStyle = COLORS.green; ctx.beginPath(); ctx.moveTo(centerStart, centerStart); ctx.lineTo(mid, mid); ctx.lineTo(centerStart, centerEnd); ctx.fill();
+    ctx.fillStyle = COLORS.yellow; ctx.beginPath(); ctx.moveTo(centerStart, centerStart); ctx.lineTo(mid, mid); ctx.lineTo(centerEnd, centerStart); ctx.fill();
+    ctx.fillStyle = COLORS.blue; ctx.beginPath(); ctx.moveTo(centerEnd, centerStart); ctx.lineTo(mid, mid); ctx.lineTo(centerEnd, centerEnd); ctx.fill();
+    ctx.fillStyle = COLORS.red; ctx.beginPath(); ctx.moveTo(centerStart, centerEnd); ctx.lineTo(mid, mid); ctx.lineTo(centerEnd, centerEnd); ctx.fill();
 }
 
 function drawAllTokens() {
+    // 1. Cluster all active pieces by their current grid cell position
+    let gridOccupancyMap = {};
+
     Object.keys(tokens).forEach(color => {
         tokens[color].forEach((token, index) => {
-            const centerX = (token.c * CELL_SIZE) + (CELL_SIZE / 2);
-            const centerY = (token.r * CELL_SIZE) + (CELL_SIZE / 2);
-            const radius = CELL_SIZE * 0.35;
+            if (token.stepsWalked >= 57) return; // Hide completed tokens that reached the center
 
-            // Check if this token belongs to the active turn player and is eligible to be moved
+            const coordKey = `${token.c}_${token.r}`;
+            if (!gridOccupancyMap[coordKey]) gridOccupancyMap[coordKey] = [];
+            gridOccupancyMap[coordKey].push({ color: color, token: token, index: index });
+        });
+    });
+
+    // 2. Render clustered pieces with dynamic side-by-side offsets
+    Object.keys(gridOccupancyMap).forEach(coordKey => {
+        let occupants = gridOccupancyMap[coordKey];
+        let totalOccupantsCount = occupants.length;
+
+        occupants.forEach((piece, subIndex) => {
+            let baseCenterX = (piece.token.c * CELL_SIZE) + (CELL_SIZE / 2);
+            let baseCenterY = (piece.token.r * CELL_SIZE) + (CELL_SIZE / 2);
+            let radius = CELL_SIZE * 0.35;
+
+            // Apply dynamic rendering offsets if multiple tokens occupy the same cell
+            if (totalOccupantsCount > 1 && piece.token.pathIndex !== -1) {
+                radius = CELL_SIZE * 0.18; // Shrink pawn radius
+                
+                // Distribute layout coordinates symmetrically in a 2x2 grid format inside the cell square
+                let offsetShift = CELL_SIZE * 0.22;
+                if (subIndex === 0) { baseCenterX -= offsetShift; baseCenterY -= offsetShift; }
+                if (subIndex === 1) { baseCenterX += offsetShift; baseCenterY -= offsetShift; }
+                if (subIndex === 2) { baseCenterX -= offsetShift; baseCenterY += offsetShift; }
+                if (subIndex === 3) { baseCenterX += offsetShift; baseCenterY += offsetShift; }
+            }
+
             let canThisPieceMove = false;
             if (typeof isTokenMovable === 'function') {
-                canThisPieceMove = isTokenMovable(color, token, index);
+                canThisPieceMove = isTokenMovable(piece.color, piece.token, piece.index);
             }
 
             ctx.save();
-            // Apply pulsating opacity effect only to playable selections
             if (canThisPieceMove) {
                 ctx.globalAlpha = globalBlinkAlpha;
-                // Draw a glowing exterior circle halo vector ring
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.beginPath();
+                ctx.arc(baseCenterX, baseCenterY, radius + 3, 0, Math.PI * 2); ctx.fill();
             }
 
-            // Draw Token Base Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.beginPath();
-            ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Draw Token Core Body
-            ctx.fillStyle = COLORS[color];
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Crown center point dot
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius * 0.4, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(baseCenterX + 1, baseCenterY + 1, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = COLORS[piece.color]; ctx.beginPath(); ctx.arc(baseCenterX, baseCenterY, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(baseCenterX, baseCenterY, radius * 0.4, 0, Math.PI * 2); ctx.fill();
             ctx.restore();
         });
     });
 }
 
-// 60FPS background clock engine loop specifically to animate blinking styles smoothly
 function runBlinkAnimationEngine() {
     if (blinkGrowing) {
-        globalBlinkAlpha += 0.04;
-        if (globalBlinkAlpha >= 1.0) blinkGrowing = false;
+        globalBlinkAlpha += 0.05; if (globalBlinkAlpha >= 1.0) blinkGrowing = false;
     } else {
-        globalBlinkAlpha -= 0.04;
-        if (globalBlinkAlpha <= 0.3) blinkGrowing = true;
+        globalBlinkAlpha -= 0.05; if (globalBlinkAlpha <= 0.3) blinkGrowing = true;
     }
-    
-    // Request canvas layout refresh updates if context is running
-    if (canvas && ctx) {
-        drawLudoLayout();
-    }
+    if (canvas && ctx) drawLudoLayout();
     requestAnimationFrame(runBlinkAnimationEngine);
 }
 
 function initBoard() {
-    canvas = document.getElementById('ludoCanvas');
-    if (!canvas) return; 
-    ctx = canvas.getContext('2d');
-    CELL_SIZE = canvas.width / GRID_SIZE; 
+    canvas = document.getElementById('ludoCanvas'); if (!canvas) return;
+    ctx = canvas.getContext('2d'); CELL_SIZE = canvas.width / GRID_SIZE;
     drawLudoLayout();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initBoard();
-    runBlinkAnimationEngine(); // Kick off animation processing ticks
-});
+document.addEventListener('DOMContentLoaded', () => { initBoard(); runBlinkAnimationEngine(); });

@@ -13,9 +13,20 @@ const turnSequence = ['green', 'yellow', 'blue', 'red'];
 const colorsMap = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
 
 function displayEducationalLog(message) {
-    const logBox = document.getElementById('ludo-log');
-    if (logBox) logBox.innerHTML = message;
+    // Print to the backend debugger console instantly
     console.log(message);
+    
+    // Safely verify if browser has parsed the text line element before writing
+    const logBox = document.getElementById('ludo-log');
+    if (logBox) {
+        logBox.innerText = message;
+    } else {
+        // Fallback: If elements aren't ready yet, queue the text load
+        document.addEventListener('DOMContentLoaded', () => {
+            const retryBox = document.getElementById('ludo-log');
+            if (retryBox) retryBox.innerText = message;
+        });
+    }
 }
 
 function passTurnSequence() {
