@@ -4,7 +4,6 @@ function rollDiceEngine(source) {
         return;
     }
 
-    // Intercept if user suspended the active arena engine
     if (isGamePaused) {
         displayEducationalLog("PAUSED: Match is suspended. Click 'Resume' to continue.");
         return;
@@ -57,8 +56,11 @@ function finalizeDiceScores() {
         displayEducationalLog(`${upperColor}: Rolled ${lastDiceRoll1} and ${lastDiceRoll2}. Select a blinking token.`);
     }
 
+    // Save state once dice scores are finalized
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
     setTimeout(() => {
-        if (isGamePaused) return; // Suspend processing if paused during the roll sequence
+        if (isGamePaused) return; 
         displayDiceOnBoard = false;
 
         if (!hasAnyValidMoveForCurrentTurn()) {
@@ -68,9 +70,7 @@ function finalizeDiceScores() {
             if (playerProfiles[currentTurn].mode === 'computer') {
                 setTimeout(() => {
                     if (isGamePaused) return;
-                    if (typeof executeAutomatedComputerMove === 'function') {
-                        executeAutomatedComputerMove();
-                    }
+                    if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
                 }, 1500);
             }
         }

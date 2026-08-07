@@ -4,13 +4,13 @@
  */
 
 function triggerAutomatedComputerDiceRoll() {
-    if (isGamePaused) return; // Prevent AI rolls if the game is paused
+    if (isGamePaused) return; 
     if (currentTurnMoves.length > 0 || isDiceRolled) return;
     rollDiceEngine('AI_CONFIRMED');
 }
 
 function executeAutomatedComputerMove() {
-    if (isGamePaused) return; // Prevent AI moves if the game is paused
+    if (isGamePaused) return; 
     if (currentTurnMoves.length === 0) return;
 
     let activeTokens = tokens[currentTurn];
@@ -64,9 +64,7 @@ function selectBestStrategicAIToken(indices, activeTokens) {
 
             if (!isDestinationSafeBox) {
                 let matchFound = tokens[enemyColor].some(enemyToken => enemyToken.c === projectedCell.c && enemyToken.r === projectedCell.r && enemyToken.stepsWalked < 52);
-                if (matchFound) {
-                    return index; 
-                }
+                if (matchFound) return index; 
             }
         }
     }
@@ -74,18 +72,14 @@ function selectBestStrategicAIToken(indices, activeTokens) {
     // STRATEGY 2: Prioritise releasing pieces from the yard when a 6 is rolled
     if (currentDiceValue === 6) {
         for (let index of indices) {
-            if (isTokenInHomeYard(currentTurn, activeTokens[index])) {
-                return index;
-            }
+            if (isTokenInHomeYard(currentTurn, activeTokens[index])) return index;
         }
     }
 
     // STRATEGY 3: Prioritise scoring a piece into the center goal
     for (let index of indices) {
         let token = activeTokens[index];
-        if (token.stepsWalked + currentDiceValue === 57) {
-            return index;
-        }
+        if (token.stepsWalked + currentDiceValue === 57) return index;
     }
 
     // STRATEGY 4: Default to advancing the piece furthest along the board

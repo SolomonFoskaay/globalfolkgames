@@ -1,5 +1,5 @@
 function handleInputInteraction(clientX, clientY) {
-    if (isGamePaused) return; // Block human moves if the game is paused
+    if (isGamePaused) return; 
     if (playerProfiles[currentTurn].mode === 'computer') return;
 
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
@@ -73,7 +73,10 @@ function processTokenMovementExecution(selectedTokenIndex) {
     let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
     if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
 
-    drawLudoLayout();
+    if (typeof drawLudoLayout === 'function') drawLudoLayout();
+
+    // Commit token placement transformations directly to LocalStorage
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
 
     if (currentTurnMoves.length > 0) {
         displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
@@ -100,6 +103,7 @@ function processTokenMovementExecution(selectedTokenIndex) {
         displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
         isDiceRolled = false; 
         hasRolledThisTurn = false;
+        if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
         
         if (playerProfiles[currentTurn].mode === 'computer') {
             setTimeout(() => {

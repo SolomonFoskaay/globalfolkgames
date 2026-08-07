@@ -47,8 +47,8 @@
             display: flex;
             justify-content: space-around;
             align-items: center;
-            width: 90vw;
-            max-width: 550px;
+            width: 95vw;
+            max-width: 580px;
             background: #1e1e1e;
             padding: 8px;
             border-radius: 8px;
@@ -79,9 +79,8 @@
             cursor: not-allowed;
         }
         
-        /* Pause Trigger Layout Button Design */
-        #pauseBtn {
-            background: #e67e22;
+        /* Persistent Action Panel Controls */
+        .panel-control-btn {
             color: #fff;
             border: none;
             padding: 6px 10px;
@@ -93,9 +92,10 @@
             align-self: center;
             transition: background 0.2s ease;
         }
-        #pauseBtn.paused-state {
-            background: #2ecc71;
-        }
+        #pauseBtn { background: #e67e22; }
+        #pauseBtn.paused-state { background: #2ecc71; }
+        #resetBtn { background: #c0392b; }
+        #resetBtn:hover { background: #e74c3c; }
 
         canvas { background: #1a1a1a; max-width: 90vw; max-height: 90vw; aspect-ratio: 1/1; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-radius: 8px; }
     </style>
@@ -143,8 +143,9 @@
                 </select>
             </div>
             
-            <!-- Pause Action Control Option Trigger Block -->
-            <button id="pauseBtn" onclick="toggleArenaPauseState()">⏸ Pause</button>
+            <!-- Structural Control Toggles Panel -->
+            <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
+            <button id="resetBtn" class="panel-control-btn" onclick="triggerManualArenaReset()">🔄 Reset</button>
         </div>
 
         <canvas id="ludoCanvas" width="600" height="600"></canvas>
