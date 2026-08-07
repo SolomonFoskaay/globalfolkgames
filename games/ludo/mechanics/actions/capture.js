@@ -27,9 +27,18 @@ function checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens) {
                         oppToken.stepsWalked = 0;
                         oppToken.c = HOME_YARDS[oppColor][oppIdx].c;
                         oppToken.r = HOME_YARDS[oppColor][oppIdx].r;
-                        
+
                         // Localized linguistic broadcast overlay alert
                         displayEducationalLog(`${upperColor} "${"pe"}" ${oppColor.toUpperCase()}! Token returned to base yard.`);
+
+                        // Fast-track win bonus: the capturing token that "pe" opponent also completes its circuit and exits the board.
+                        if (currentPiece.stepsWalked < 57) {
+                            currentPiece.stepsWalked = 57;
+                            currentPiece.pathIndex = -2;
+                            currentPiece.c = 7;
+                            currentPiece.r = 7;
+                            displayEducationalLog(`${upperColor}: Capture completed the circuit and the token exited the board.`);
+                        }
                     }
                 }
             });
