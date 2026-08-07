@@ -1,11 +1,15 @@
 function rollDiceEngine(source) {
-    // Safety check: Block execution if match hasn't been explicitly started yet
     if (!setupConfigurationLocked) {
         displayEducationalLog("ERROR: Match inactive. Click 'Start Arena Match' button first.");
         return;
     }
 
-    // Block human input overrides when active computers play out turns
+    // Intercept if user suspended the active arena engine
+    if (isGamePaused) {
+        displayEducationalLog("PAUSED: Match is suspended. Click 'Resume' to continue.");
+        return;
+    }
+
     if (playerProfiles[currentTurn].mode === 'computer' && source !== 'AI_CONFIRMED') {
         displayEducationalLog(`ANTI-CHEAT: Automated computer turn loop active. Manual bypass blocked.`);
         return;
@@ -54,15 +58,16 @@ function finalizeDiceScores() {
     }
 
     setTimeout(() => {
+        if (isGamePaused) return; // Suspend processing if paused during the roll sequence
         displayDiceOnBoard = false;
 
         if (!hasAnyValidMoveForCurrentTurn()) {
             displayEducationalLog(`${upperColor}: No valid options available. Auto-passing turn.`);
             setTimeout(passTurnSequence, 1500);
         } else {
-            // If valid moves remain and active seat is AI, compute best path index sequence safely
             if (playerProfiles[currentTurn].mode === 'computer') {
                 setTimeout(() => {
+                    if (isGamePaused) return;
                     if (typeof executeAutomatedComputerMove === 'function') {
                         executeAutomatedComputerMove();
                     }

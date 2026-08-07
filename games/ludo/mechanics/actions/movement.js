@@ -1,19 +1,13 @@
 function handleInputInteraction(clientX, clientY) {
-    // Lock manual interactions if current seat control type is configured to computer bot processing
-    if (playerProfiles[currentTurn].mode === 'computer') {
-        return;
-    }
+    if (isGamePaused) return; // Block human moves if the game is paused
+    if (playerProfiles[currentTurn].mode === 'computer') return;
 
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
 
-    // Get exact canvas dimensions relative to layout bounding box viewports
     const rect = canvas.getBoundingClientRect();
-    
-    // Normalize coordinates to map physical CSS pixel ratios accurately back to our 600x600 grid size
     const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
     const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
 
-    // Convert pixel coordinate mappings directly back into 0-14 grid cell indices
     const clickedCol = Math.floor(mouseX / CELL_SIZE);
     const clickedRow = Math.floor(mouseY / CELL_SIZE);
 
@@ -86,14 +80,17 @@ function processTokenMovementExecution(selectedTokenIndex) {
         let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
         if (!hasValidRemainingMove) {
             displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
-            setTimeout(passTurnSequence, 1500);
+            setTimeout(() => {
+                if (isGamePaused) return;
+                passTurnSequence();
+            }, 1500);
             return;
         }
 
-        // If computer has another valid move split, loop automation back inside safely with structural pacing
         if (playerProfiles[currentTurn].mode === 'computer') {
             setTimeout(() => {
-                executeAutomatedComputerMove();
+                if (isGamePaused) return;
+                if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
             }, 1500);
         }
         return;
@@ -106,25 +103,26 @@ function processTokenMovementExecution(selectedTokenIndex) {
         
         if (playerProfiles[currentTurn].mode === 'computer') {
             setTimeout(() => {
-                triggerAutomatedComputerDiceRoll();
+                if (isGamePaused) return;
+                if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
             }, 1500);
         }
     } else {
-        setTimeout(passTurnSequence, 500);
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 500);
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const ludoCanvasElement = document.getElementById('ludoCanvas');
     if (ludoCanvasElement) {
-        // Desktop mouse tracking event hook
         ludoCanvasElement.addEventListener('click', (event) => {
             handleInputInteraction(event.clientX, event.clientY);
         });
 
-        // Mobile touchscreen interface event hook
         ludoCanvasElement.addEventListener('touchstart', (event) => {
-            // Block physical mobile double-tap view zoom shifts or native browser scrolling
             event.preventDefault();
             if (event.touches.length > 0) {
                 handleInputInteraction(event.touches[0].clientX, event.touches[0].clientY);

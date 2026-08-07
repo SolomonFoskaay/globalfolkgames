@@ -9,6 +9,9 @@ let currentTurnMoves = [];
 let consecutiveDoubleSixes = 0; 
 let hasRolledThisTurn = false;
 
+// Pause Loop Execution Control States
+let isGamePaused = false;
+
 // Anti-Cheat Automation Settings Engine States
 let setupConfigurationLocked = false;
 const playerProfiles = {
@@ -22,19 +25,51 @@ const turnSequence = ['green', 'yellow', 'blue', 'red'];
 const colorsMap = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
 
 function displayEducationalLog(message) {
-    // Print to the backend debugger console instantly
     console.log(message);
-    
-    // Safely verify if browser has parsed the text line element before writing
     const logBox = document.getElementById('ludo-log');
     if (logBox) {
         logBox.innerText = message;
     } else {
-        // Fallback: If elements aren't ready yet, queue the text load
         document.addEventListener('DOMContentLoaded', () => {
             const retryBox = document.getElementById('ludo-log');
             if (retryBox) retryBox.innerText = message;
         });
+    }
+}
+
+function toggleArenaPauseState() {
+    if (!setupConfigurationLocked) {
+        displayEducationalLog("ERROR: Match has not started yet. Cannot pause an inactive arena.");
+        return;
+    }
+
+    isGamePaused = !isGamePaused;
+    const pauseBtnElement = document.getElementById('pauseBtn');
+
+    if (isGamePaused) {
+        if (pauseBtnElement) {
+            pauseBtnElement.innerText = '▶ Resume';
+            pauseBtnElement.classList.add('paused-state');
+        }
+        displayEducationalLog("GAME PAUSED: Actions are suspended. Click 'Resume' to continue.");
+    } else {
+        if (pauseBtnElement) {
+            pauseBtnElement.innerText = '⏸ Pause';
+            pauseBtnElement.classList.remove('paused-state');
+        }
+        displayEducationalLog(`GAME RESUMED: Returning to active turn for ${currentTurn.toUpperCase()}.`);
+        
+        // If the game is resumed during a computer player's turn, re-evaluate and trigger its actions
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                if (isGamePaused) return; // Guard check against rapid clicking
+                if (!isDiceRolled) {
+                    if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
+                } else if (currentTurnMoves.length > 0) {
+                    if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
+                }
+            }, 1000);
+        }
     }
 }
 
@@ -50,7 +85,6 @@ function lockSetupDropdowns() {
         }
     });
 
-    // Disable the start button and enable the dice button layout
     const startBtn = document.getElementById('startMatchBtn');
     if (startBtn) {
         startBtn.disabled = true;
@@ -85,9 +119,9 @@ function initiateArenaMatch() {
     lockSetupDropdowns();
     displayEducationalLog(`${currentTurn.toUpperCase()}: Arena match successfully initiated. Roll dice.`);
 
-    // If Green is a computer player, immediately invoke the AI rolling sequence safely
     if (playerProfiles[currentTurn].mode === 'computer') {
         setTimeout(() => {
+            if (isGamePaused) return;
             if (typeof triggerAutomatedComputerDiceRoll === 'function') {
                 triggerAutomatedComputerDiceRoll();
             }
@@ -96,6 +130,8 @@ function initiateArenaMatch() {
 }
 
 function passTurnSequence() {
+    if (isGamePaused) return; // Freeze turn cycling if game is paused
+
     let nextIndex = (turnSequence.indexOf(currentTurn) + 1) % turnSequence.length;
     currentTurn = turnSequence[nextIndex];
     
@@ -116,9 +152,9 @@ function passTurnSequence() {
     displayEducationalLog(`${currentTurn.toUpperCase()}: New turn sequence initiated. Roll dice.`);
     drawLudoLayout(); 
 
-    // Hand over control execution loops to the automation system if active
     if (playerProfiles[currentTurn].mode === 'computer') {
         setTimeout(() => {
+            if (isGamePaused) return;
             if (typeof triggerAutomatedComputerDiceRoll === 'function') {
                 triggerAutomatedComputerDiceRoll();
             }
@@ -126,7 +162,6 @@ function passTurnSequence() {
     }
 }
 
-// Synchronize profile mapping states if human toggles configuration values early
 document.addEventListener('DOMContentLoaded', () => {
     turnSequence.forEach(color => {
         const selectElement = document.getElementById(`type-${color}`);

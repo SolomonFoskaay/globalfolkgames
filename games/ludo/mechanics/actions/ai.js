@@ -4,18 +4,18 @@
  */
 
 function triggerAutomatedComputerDiceRoll() {
+    if (isGamePaused) return; // Prevent AI rolls if the game is paused
     if (currentTurnMoves.length > 0 || isDiceRolled) return;
-    // Pass verification string keyword bypass to clear human-blocker locks safely
     rollDiceEngine('AI_CONFIRMED');
 }
 
 function executeAutomatedComputerMove() {
+    if (isGamePaused) return; // Prevent AI moves if the game is paused
     if (currentTurnMoves.length === 0) return;
 
     let activeTokens = tokens[currentTurn];
     let movableTokenIndices = [];
 
-    // Filter down array to pinpoint index addresses of movable tokens
     activeTokens.forEach((token, index) => {
         if (isTokenMovable(currentTurn, token, index)) {
             movableTokenIndices.push(index);
@@ -24,7 +24,10 @@ function executeAutomatedComputerMove() {
 
     if (movableTokenIndices.length === 0) {
         displayEducationalLog(`${currentTurn.toUpperCase()}: No valid options available for computer. Passing.`);
-        setTimeout(passTurnSequence, 1500);
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 1500);
         return;
     }
 
@@ -49,11 +52,9 @@ function selectBestStrategicAIToken(indices, activeTokens) {
         let projectedPathIndex = (token.pathIndex + currentDiceValue) % 52;
         let projectedCell = COMMON_PATH[projectedPathIndex];
 
-        // Check if an opponent token occupies the target destination
         for (let enemyColor in tokens) {
             if (enemyColor === currentTurn) continue;
             
-            // Safe Box Base Release zones grant complete capture immunity
             let isDestinationSafeBox = false;
             for (let startKey in START_INDEX) {
                 if (COMMON_PATH[START_INDEX[startKey]].c === projectedCell.c && COMMON_PATH[START_INDEX[startKey]].r === projectedCell.r) {
@@ -64,7 +65,7 @@ function selectBestStrategicAIToken(indices, activeTokens) {
             if (!isDestinationSafeBox) {
                 let matchFound = tokens[enemyColor].some(enemyToken => enemyToken.c === projectedCell.c && enemyToken.r === projectedCell.r && enemyToken.stepsWalked < 52);
                 if (matchFound) {
-                    return index; // Instantly trigger the "Pè" attack
+                    return index; 
                 }
             }
         }
