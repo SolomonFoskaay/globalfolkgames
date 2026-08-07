@@ -1,4 +1,9 @@
 function handleInputInteraction(clientX, clientY) {
+    // Lock manual interactions if current seat control type is configured to computer bot processing
+    if (playerProfiles[currentTurn].mode === 'computer') {
+        return;
+    }
+
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
 
     // Get exact canvas dimensions relative to layout bounding box viewports
@@ -20,70 +25,92 @@ function handleInputInteraction(clientX, clientY) {
     });
 
     if (selectedTokenIndex !== -1) {
-        const upperColor = currentTurn.toUpperCase();
-        let currentPiece = activeTokens[selectedTokenIndex];
-        let isInsideYard = isTokenInHomeYard(currentTurn, currentPiece);
-        let appliedMoveValue = isInsideYard ? 6 : (currentTurnMoves.includes(6) ? 6 : currentTurnMoves[0]);
+        processTokenMovementExecution(selectedTokenIndex);
+    }
+}
 
-        if (isInsideYard) {
-            currentPiece.pathIndex = START_INDEX[currentTurn];
-            currentPiece.stepsWalked = 0;
-            currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
-            currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
-            displayEducationalLog(`${upperColor}: Released token out onto safe tracking tile.`);
-        } else {
-            if (currentPiece.stepsWalked + appliedMoveValue > 57) {
-                displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
-                return; 
-            }
+function processTokenMovementExecution(selectedTokenIndex) {
+    const upperColor = currentTurn.toUpperCase();
+    let activeTokens = tokens[currentTurn];
+    let currentPiece = activeTokens[selectedTokenIndex];
+    let isInsideYard = isTokenInHomeYard(currentTurn, currentPiece);
+    let appliedMoveValue = isInsideYard ? 6 : (currentTurnMoves.includes(6) ? 6 : currentTurnMoves[0]);
 
-            currentPiece.stepsWalked += appliedMoveValue;
-            
-            if (currentPiece.stepsWalked >= 52) {
-                currentPiece.pathIndex = -2; 
-                let laneOffset = currentPiece.stepsWalked - 51;
-
-                if (currentTurn === 'green') { currentPiece.c = laneOffset; currentPiece.r = 7; }
-                if (currentTurn === 'yellow') { currentPiece.c = 7; currentPiece.r = laneOffset; }
-                if (currentTurn === 'blue') { currentPiece.c = 14 - laneOffset; currentPiece.r = 7; }
-                if (currentTurn === 'red') { currentPiece.c = 7; currentPiece.r = 14 - laneOffset; }
-
-                if (currentPiece.stepsWalked === 57) {
-                    displayEducationalLog(`${upperColor}: Token reached absolute home center goal!`);
-                } else {
-                    displayEducationalLog(`${upperColor}: Token advanced inside safe home lane.`);
-                }
-            } else {
-                currentPiece.pathIndex = (currentPiece.pathIndex + appliedMoveValue) % 52;
-                currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
-                currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
-                displayEducationalLog(`${upperColor}: Token advanced clockwise along track.`);
-            }
+    if (isInsideYard) {
+        currentPiece.pathIndex = START_INDEX[currentTurn];
+        currentPiece.stepsWalked = 0;
+        currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
+        currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
+        displayEducationalLog(`${upperColor}: Released token out onto safe tracking tile.`);
+    } else {
+        if (currentPiece.stepsWalked + appliedMoveValue > 57) {
+            displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+            return; 
         }
 
-        checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens);
+        currentPiece.stepsWalked += appliedMoveValue;
+        
+        if (currentPiece.stepsWalked >= 52) {
+            currentPiece.pathIndex = -2; 
+            let laneOffset = currentPiece.stepsWalked - 51;
 
-        let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
-        if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+            if (currentTurn === 'green') { currentPiece.c = laneOffset; currentPiece.r = 7; }
+            if (currentTurn === 'yellow') { currentPiece.c = 7; currentPiece.r = laneOffset; }
+            if (currentTurn === 'blue') { currentPiece.c = 14 - laneOffset; currentPiece.r = 7; }
+            if (currentTurn === 'red') { currentPiece.c = 7; currentPiece.r = 14 - laneOffset; }
 
-        drawLudoLayout();
-
-        if (currentTurnMoves.length > 0) {
-            displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
-            let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
-            if (!hasValidRemainingMove) {
-                displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
-                setTimeout(passTurnSequence, 1200);
+            if (currentPiece.stepsWalked === 57) {
+                displayEducationalLog(`${upperColor}: Token reached absolute home center goal!`);
+            } else {
+                displayEducationalLog(`${upperColor}: Token advanced inside safe home lane.`);
             }
+        } else {
+            currentPiece.pathIndex = (currentPiece.pathIndex + appliedMoveValue) % 52;
+            currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
+            currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
+            displayEducationalLog(`${upperColor}: Token advanced clockwise along track.`);
+        }
+    }
+
+    if (typeof checkCaptureMechanic === 'function') {
+        checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens);
+    }
+
+    let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+    if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+
+    drawLudoLayout();
+
+    if (currentTurnMoves.length > 0) {
+        displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
+        let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+        if (!hasValidRemainingMove) {
+            displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
+            setTimeout(passTurnSequence, 1500);
             return;
         }
 
-        if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
-            displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
-            isDiceRolled = false; hasRolledThisTurn = false;
-        } else {
-            passTurnSequence();
+        // If computer has another valid move split, loop automation back inside safely with structural pacing
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                executeAutomatedComputerMove();
+            }, 1500);
         }
+        return;
+    }
+
+    if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
+        displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
+        isDiceRolled = false; 
+        hasRolledThisTurn = false;
+        
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                triggerAutomatedComputerDiceRoll();
+            }, 1500);
+        }
+    } else {
+        setTimeout(passTurnSequence, 500);
     }
 }
 

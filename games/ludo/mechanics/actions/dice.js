@@ -1,10 +1,23 @@
-function rollDiceEngine() {
+function rollDiceEngine(source) {
+    // Safety check: Block execution if match hasn't been explicitly started yet
+    if (!setupConfigurationLocked) {
+        displayEducationalLog("ERROR: Match inactive. Click 'Start Arena Match' button first.");
+        return;
+    }
+
+    // Block human input overrides when active computers play out turns
+    if (playerProfiles[currentTurn].mode === 'computer' && source !== 'AI_CONFIRMED') {
+        displayEducationalLog(`ANTI-CHEAT: Automated computer turn loop active. Manual bypass blocked.`);
+        return;
+    }
+
     if (isDiceRolled && hasRolledThisTurn) return;
     isDiceRolled = true;
     hasRolledThisTurn = true;
     displayDiceOnBoard = true;
 
-    document.getElementById('val-total').innerText = 'Rolling...';
+    const totalDisplay = document.getElementById('val-total');
+    if (totalDisplay) totalDisplay.innerText = 'Rolling...';
     displayEducationalLog(`${currentTurn.toUpperCase()}: Rolling dice...`);
 
     physicalDice = [
@@ -21,9 +34,13 @@ function finalizeDiceScores() {
     lastDiceRoll2 = physicalDice[1].value;
     let totalSum = lastDiceRoll1 + lastDiceRoll2;
 
-    document.getElementById('val-d1').innerText = lastDiceRoll1;
-    document.getElementById('val-d2').innerText = lastDiceRoll2;
-    document.getElementById('val-total').innerText = `= Total: ${totalSum}`;
+    const d1Box = document.getElementById('val-d1');
+    const d2Box = document.getElementById('val-d2');
+    const totalBox = document.getElementById('val-total');
+
+    if (d1Box) d1Box.innerText = lastDiceRoll1;
+    if (d2Box) d2Box.innerText = lastDiceRoll2;
+    if (totalBox) totalBox.innerText = `= Total: ${totalSum}`;
 
     currentTurnMoves = [lastDiceRoll1, lastDiceRoll2];
     const upperColor = currentTurn.toUpperCase();
@@ -41,11 +58,21 @@ function finalizeDiceScores() {
 
         if (!hasAnyValidMoveForCurrentTurn()) {
             displayEducationalLog(`${upperColor}: No valid options available. Auto-passing turn.`);
-            setTimeout(passTurnSequence, 1200);
+            setTimeout(passTurnSequence, 1500);
+        } else {
+            // If valid moves remain and active seat is AI, compute best path index sequence safely
+            if (playerProfiles[currentTurn].mode === 'computer') {
+                setTimeout(() => {
+                    if (typeof executeAutomatedComputerMove === 'function') {
+                        executeAutomatedComputerMove();
+                    }
+                }, 1500);
+            }
         }
     }, 3500);
 }
 
 function hasAnyValidMoveForCurrentTurn() {
+    if (!tokens || !tokens[currentTurn]) return false;
     return tokens[currentTurn].some((token, index) => isTokenMovable(currentTurn, token, index));
 }

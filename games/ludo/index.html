@@ -42,6 +42,42 @@
             border-radius: 4px;
         }
 
+        /* Anti-Cheat Configuration Selector Panel Grid */
+        #player-setup-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 90vw;
+            max-width: 550px;
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            gap: 4px;
+        }
+        .setup-slot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .setup-slot select {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 4px;
+            margin-top: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .setup-slot select:disabled {
+            background: #151515;
+            color: #666;
+            border-color: #222;
+            cursor: not-allowed;
+        }
+
         canvas { background: #1a1a1a; max-width: 90vw; max-height: 90vw; aspect-ratio: 1/1; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-radius: 8px; }
     </style>
 </head>
@@ -55,15 +91,53 @@
     <div id="game-arena-wrapper">
         
         <!-- Native Educational Text Display Line (Placed perfectly right above the board) -->
-        <div id="ludo-log">GREEN: New turn sequence initiated. Roll dice.</div>
+        <div id="ludo-log">Setup players below then click "Start Arena Match" to lock choices.</div>
+
+        <!-- Anti-Cheat Tournament Setup Panel Matrix -->
+        <div id="player-setup-panel">
+            <div class="setup-slot" style="color: #2ecc71;">
+                <span>GREEN</span>
+                <select id="type-green">
+                    <option value="human" selected>Human</option>
+                    <option value="computer">Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #f1c40f;">
+                <span>YELLOW</span>
+                <select id="type-yellow">
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #3498db;">
+                <span>BLUE</span>
+                <select id="type-blue">
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #e74c3c;">
+                <span>RED</span>
+                <select id="type-red">
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+        </div>
 
         <canvas id="ludoCanvas" width="600" height="600"></canvas>
         
         <!-- Persistent Floating Control Center -->
         <div id="dice-container" style="display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(20,20,20,0.95); padding: 12px 20px; border-radius: 16px; border: 1px solid #333; box-shadow: 0 6px 20px rgba(0,0,0,0.7); min-width: 250px; margin-top: 5px;">
-            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 20px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 12px;">
                 <div id="turn-indicator" style="font-size: 1rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
-                <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 50px; height: 45px; border-radius: 8px; font-size: 1.6rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">🎲</button>
+                
+                <div style="display: flex; gap: 8px;">
+                    <!-- New Decoupled Launch Action Hook -->
+                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 12px; height: 45px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">Start Arena Match</button>
+                    
+                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 50px; height: 45px; border-radius: 8px; font-size: 1.6rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+                </div>
             </div>
             
             <div id="persistent-scores" style="display: flex; gap: 10px; font-size: 0.9rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 12px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222;">
@@ -82,5 +156,6 @@
     <script src="/games/ludo/mechanics/actions/dice.js"></script>
     <script src="/games/ludo/mechanics/actions/movement.js"></script>
     <script src="/games/ludo/mechanics/actions/capture.js"></script>
+    <script src="/games/ludo/mechanics/actions/ai.js"></script>
 </body>
 </html>
