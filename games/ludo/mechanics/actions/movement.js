@@ -1,3 +1,8 @@
+/**
+ * GlobalFolkGames Ludo Module - Token Transformation & Movement Vector Engine
+ * Handles user touch inputs, coordinate transformations, and AI move exceptions.
+ */
+
 function handleInputInteraction(clientX, clientY) {
     if (isGamePaused) return; 
     if (playerProfiles[currentTurn].mode === 'computer') return;
@@ -37,8 +42,40 @@ function processTokenMovementExecution(selectedTokenIndex) {
         currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
         displayEducationalLog(`${upperColor}: Released token out onto safe tracking tile.`);
     } else {
+        // EXCEPTION HANDLER: Handle dice overflow requirements smoothly
         if (currentPiece.stepsWalked + appliedMoveValue > 57) {
             displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+            
+            // If the current slot is a computer player, automate recovery to prevent freezes
+            if (playerProfiles[currentTurn].mode === 'computer') {
+                let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+                if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+                
+                if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
+                if (currentTurnMoves.length > 0) {
+                    let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+                    if (!hasValidRemainingMove) {
+                        displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
+                        setTimeout(() => {
+                            if (isGamePaused) return;
+                            passTurnSequence();
+                        }, 1500);
+                        return;
+                    }
+                    // Retry automated loop execution with the remaining valid die value
+                    setTimeout(() => {
+                        if (isGamePaused) return;
+                        if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
+                    }, 1500);
+                } else {
+                    // Wiped out all moves via overflow, cycle turn smoothly
+                    setTimeout(() => {
+                        if (isGamePaused) return;
+                        passTurnSequence();
+                    }, 1500);
+                }
+            }
             return; 
         }
 
