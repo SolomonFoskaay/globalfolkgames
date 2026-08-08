@@ -124,12 +124,30 @@ function loadGameStateFromStorage() {
     }
 }
 
+/**
+ * Triggers the custom mobile warning confirmation overlay modal panel view
+ */
 function triggerManualArenaReset() {
-    const userConfirmed = confirm("⚠️ ATTENTION: Are you sure you want to abandon this match? All current progress will be lost permanently.");
-    if (!userConfirmed) {
-        displayEducationalLog("RESET CANCELLED: Returning to match arena.");
+    const customConfirmBox = document.getElementById('custom-confirm-overlay');
+    if (customConfirmBox) {
+        customConfirmBox.style.display = 'flex';
+    }
+}
+
+/**
+ * Handles action callbacks derived from clicking choice buttons in the warning dialogue portal box
+ */
+function handleConfirmationCallback(userApproved) {
+    const customConfirmBox = document.getElementById('custom-confirm-overlay');
+    if (customConfirmBox) {
+        customConfirmBox.style.display = 'none'; // Clear window layout view out right away
+    }
+
+    if (!userApproved) {
+        displayEducationalLog("RESET ABORTED: Match sequence preserved safely.");
         return;
     }
+
     localStorage.removeItem('gfg_ludo_persistence_state');
     displayEducationalLog("SYSTEM RESET: Persistent cache cleared. Re-initializing arena canvas...");
     setTimeout(() => {

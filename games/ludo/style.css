@@ -1,0 +1,168 @@
+/* GlobalFolkGames Ludo Module Responsive Stylesheet */
+
+body {
+    margin: 0; padding: 0; background-color: #121212; color: #fff;
+    font-family: system-ui, sans-serif; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; min-height: 100vh;
+    overflow-y: auto; overflow-x: hidden; box-sizing: border-box;
+}
+
+header { 
+    width: 100%; display: flex; justify-content: space-between; 
+    padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; 
+    position: sticky; top: 0; z-index: 10; height: 50px;
+}
+
+.back-btn { 
+    background: #333; color: #fff; border: none; padding: 8px 12px; 
+    border-radius: 6px; font-weight: bold; cursor: pointer; 
+    text-decoration: none; font-size: 0.9rem;
+}
+
+/* Master Game Layout Arena Wrapper */
+#game-arena-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100vw;
+    padding: 4px 0;
+    box-sizing: border-box;
+    gap: 4px;
+}
+
+/* Dedicated On-Screen Cultural Notification Banner Line */
+#ludo-log {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #f39c12;
+    text-align: center;
+    width: 94vw;
+    max-width: 550px;
+    min-height: 20px;
+    letter-spacing: 0.3px;
+    background: rgba(30,30,30,0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* Anti-Cheat Configuration Selector Panel Grid */
+#player-setup-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 94vw;
+    max-width: 550px;
+    background: #1e1e1e;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    box-sizing: border-box;
+}
+
+.setup-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+
+.setup-slot select {
+    background: #2a2a2a;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.setup-slot select:disabled {
+    background: #151515;
+    color: #666;
+    border-color: #222;
+    cursor: not-allowed;
+}
+
+/* Persistent Action Panel Controls */
+.panel-control-btn {
+    color: #fff;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    cursor: pointer;
+    height: fit-content;
+    align-self: center;
+    transition: background 0.2s ease;
+}
+
+#pauseBtn { background: #e67e22; }
+#pauseBtn.paused-state { background: #2ecc71; }
+
+#resetBtn { 
+    background: #c0392b; 
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px;
+    font-size: 0.8rem;
+}
+#resetBtn:hover { background: #e74c3c; }
+
+/* FIX: Control container scaling safely without squashing the canvas element properties */
+canvas { 
+    background: #1a1a1a; 
+    max-width: 94vw; 
+    max-height: 94vw; 
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6); 
+    border-radius: 8px; 
+    display: block;
+}
+
+/* Persistent Console Control Center Container */
+#dice-container {
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 4px; 
+    background: rgba(20,20,20,0.95); 
+    padding: 8px 14px; 
+    border-radius: 14px; 
+    border: 1px solid #333; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.7); 
+    width: 94vw;
+    max-width: 550px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+}
+
+/* Pure Vanilla Mobile Warning Confirmation Modal Popup Overlay Styles */
+#custom-confirm-overlay {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85); display: none; align-items: center;
+    justify-content: center; z-index: 9999; padding: 20px; box-sizing: border-box;
+}
+
+.confirm-modal-box {
+    background: #1e1e1e; border: 1px solid #c0392b; padding: 20px;
+    border-radius: 12px; width: 100%; max-width: 400px; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+.confirm-modal-box h3 { margin-top: 0; color: #e74c3c; font-size: 1.15rem; }
+.confirm-modal-box p { font-size: 0.9rem; color: #ccc; line-height: 1.4; margin-bottom: 20px; }
+.confirm-action-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; }
+
+.confirm-modal-btn {
+    flex: 1; padding: 10px; border-radius: 6px; font-weight: bold;
+    font-size: 0.9rem; border: none; cursor: pointer; transition: opacity 0.2s;
+}
+
+.confirm-modal-btn:active { opacity: 0.8; }
+#confirm-ok-btn { background: #2ecc71; color: #fff; text-align: center; }
+#confirm-cancel-btn { background: #555; color: #fff; text-align: center; }

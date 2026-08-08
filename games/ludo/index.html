@@ -4,101 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Native Ludo Matrix | GlobalFolkGames</title>
-    <style>
-        body {
-            margin: 0; padding: 0; background-color: #121212; color: #fff;
-            font-family: system-ui, sans-serif; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; min-height: 100vh;
-            overflow: hidden;
-        }
-        header { width: 100%; display: flex; justify-content: space-between; padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; position: absolute; top: 0; z-index: 10; }
-        .back-btn { background: #333; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 0.9rem;}
-        
-        /* Master Game Layout Arena Wrapper */
-        #game-arena-wrapper {
-            margin-top: 50px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100vw;
-            height: calc(100vh - 50px);
-            position: relative;
-            gap: 8px; /* Safe space margin gap between log text and board canvas */
-        }
-
-        /* Dedicated On-Screen Cultural Notification Banner Line */
-        #ludo-log {
-            font-size: 0.95rem;
-            font-weight: bold;
-            color: #f39c12;
-            text-align: center;
-            width: 90vw;
-            max-width: 550px;
-            min-height: 22px; /* Holds layout shape even when empty */
-            letter-spacing: 0.3px;
-            background: rgba(30,30,30,0.3);
-            padding: 4px 10px;
-            border-radius: 4px;
-        }
-
-        /* Anti-Cheat Configuration Selector Panel Grid */
-        #player-setup-panel {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            width: 95vw;
-            max-width: 580px;
-            background: #1e1e1e;
-            padding: 8px;
-            border-radius: 8px;
-            border: 1px solid #333;
-            gap: 4px;
-        }
-        .setup-slot {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
-        .setup-slot select {
-            background: #2a2a2a;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 4px;
-            margin-top: 4px;
-            font-size: 0.8rem;
-            cursor: pointer;
-        }
-        .setup-slot select:disabled {
-            background: #151515;
-            color: #666;
-            border-color: #222;
-            cursor: not-allowed;
-        }
-        
-        /* Persistent Action Panel Controls */
-        .panel-control-btn {
-            color: #fff;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            cursor: pointer;
-            height: fit-content;
-            align-self: center;
-            transition: background 0.2s ease;
-        }
-        #pauseBtn { background: #e67e22; }
-        #pauseBtn.paused-state { background: #2ecc71; }
-        #resetBtn { background: #c0392b; }
-        #resetBtn:hover { background: #e74c3c; }
-
-        canvas { background: #1a1a1a; max-width: 90vw; max-height: 90vw; aspect-ratio: 1/1; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border-radius: 8px; }
-    </style>
+    <!-- Import decoupled layout stylesheet asset -->
+    <link rel="stylesheet" href="/games/ludo/style.css">
 </head>
 <body>
 
@@ -109,7 +16,7 @@
 
     <div id="game-arena-wrapper">
         
-        <!-- Native Educational Text Display Line (Placed perfectly right above the board) -->
+        <!-- Native Educational Text Display Line -->
         <div id="ludo-log">Setup players below then click "Start Arena Match" to lock choices.</div>
 
         <!-- Anti-Cheat Tournament Setup Panel Matrix -->
@@ -143,33 +50,46 @@
                 </select>
             </div>
             
-            <!-- Structural Control Toggles Panel -->
             <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
-            <button id="resetBtn" class="panel-control-btn" onclick="triggerManualArenaReset()">🔄 Reset</button>
         </div>
 
+        <!-- Keep layout dimensions at 600x600 grid pixels to restore graphic rendering -->
         <canvas id="ludoCanvas" width="600" height="600"></canvas>
         
-        <!-- Persistent Floating Control Center -->
-        <div id="dice-container" style="display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(20,20,20,0.95); padding: 12px 20px; border-radius: 16px; border: 1px solid #333; box-shadow: 0 6px 20px rgba(0,0,0,0.7); min-width: 250px; margin-top: 5px;">
+        <!-- Persistent Control Center Layout -->
+        <div id="dice-container">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 12px;">
-                <div id="turn-indicator" style="font-size: 1rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
+                <div id="turn-indicator" style="font-size: 0.95rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
                 
-                <div style="display: flex; gap: 8px;">
-                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 12px; height: 45px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">Start Arena Match</button>
-                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 50px; height: 45px; border-radius: 8px; font-size: 1.6rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+                <div style="display: flex; gap: 6px;">
+                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">Start Arena Match</button>
+                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
                 </div>
             </div>
             
-            <div id="persistent-scores" style="display: flex; gap: 10px; font-size: 0.9rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 12px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222;">
+            <div id="persistent-scores" style="display: flex; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222; box-sizing: border-box;">
                 <div>Dice 1: <span id="val-d1" style="color: #fff;">-</span></div>
                 <div>Dice 2: <span id="val-d2" style="color: #fff;">-</span></div>
                 <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
             </div>
+
+            <!-- Protected Reset Button Layout Box Component -->
+            <button id="resetBtn" class="panel-control-btn" onclick="triggerManualArenaReset()">🔄 Reset Arena Match</button>
         </div>
     </div>
 
-    <!-- Script assets for ultra-modular ludo processing micro-layers -->
+    <!-- On-Screen Custom Modal Warning Dialogue Portal Box Container -->
+    <div id="custom-confirm-overlay">
+        <div class="confirm-modal-box">
+            <h3>⚠️ ABANDON MATCH?</h3>
+            <p>Are you sure you want to completely end this match? Your active board data and persistence cache tracking states will be wiped out permanently.</p>
+            <div class="confirm-action-row">
+                <button id="confirm-ok-btn" class="confirm-modal-btn" onclick="handleConfirmationCallback(true)">OK</button>
+                <button id="confirm-cancel-btn" class="confirm-modal-btn" onclick="handleConfirmationCallback(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/games/ludo/board.js"></script>
     <script src="/games/ludo/physics.js"></script>
     <script src="/games/ludo/mechanics/state/persistence.js"></script>
