@@ -49,8 +49,6 @@
                     <option value="computer" selected>Computer</option>
                 </select>
             </div>
-            
-            <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
         </div>
 
         <!-- Keep layout dimensions at 600x600 grid pixels to restore graphic rendering -->
@@ -58,12 +56,19 @@
         
         <!-- Persistent Control Center Layout -->
         <div id="dice-container">
-            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 12px;">
-                <div id="turn-indicator" style="font-size: 0.95rem; font-weight: bold; color: #2ecc71;">Green's Turn</div>
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 8px;">
+                <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
                 
-                <div style="display: flex; gap: 6px;">
-                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">Start Arena Match</button>
+                <!-- Rearranged Mobile Action Dashboard Row Grid -->
+                <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
+                    <!-- 1. Dice Button First -->
                     <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+                    
+                    <!-- 2. Start Match / Match Active Button Second -->
+                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Start Arena Match</button>
+                    
+                    <!-- 3. Pause/Resume Button Last -->
+                    <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
                 </div>
             </div>
             
