@@ -11,7 +11,10 @@
     <!-- Top Navigation Header -->
     <header class="mobile-header">
         <div class="brand">🌍 GlobalFolkGames</div>
-        <div class="user-pill"><span id="display-points">⭐ 0 Pts</span></div>
+        <div class="user-pill">
+            <span id="display-points">⭐ 0 Pts</span>
+            <!-- Auth buttons are injected here by auth.js -->
+        </div>
     </header>
 
     <!-- Main Container -->
@@ -36,6 +39,30 @@
         </section>
     </main>
 
+    <!-- ══════════════════════════════════════════════
+         AUTH MODAL (custom – no browser alerts)
+         ══════════════════════════════════════════════ -->
+    <div id="auth-modal" class="auth-modal">
+        <div class="auth-modal-content">
+            <button id="auth-modal-close" class="auth-modal-close">×</button>
+            <h2>Account</h2>
+            <p class="auth-hint">Simple email + password. No wallet needed.</p>
+
+            <input type="email" id="auth-email" placeholder="Email address" autocomplete="email">
+            <input type="password" id="auth-password" placeholder="Password (min 6 chars)" autocomplete="current-password">
+
+            <div class="auth-actions">
+                <button id="btn-signin" class="auth-btn primary">Sign In</button>
+                <button id="btn-signup" class="auth-btn secondary">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS SDK (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Our auth layer (must load after the SDK) -->
+    <script src="auth.js"></script>
+    <!-- Dashboard logic -->
     <script src="main.js"></script>
 </body>
 </html>
