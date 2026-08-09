@@ -43,41 +43,79 @@ function processTokenMovementExecution(selectedTokenIndex) {
         displayEducationalLog(`${upperColor}: Released token out onto safe tracking tile.`);
     } else {
         // EXCEPTION HANDLER: Handle dice overflow requirements smoothly
-        if (currentPiece.stepsWalked + appliedMoveValue > 57) {
-            displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+        // if (currentPiece.stepsWalked + appliedMoveValue > 57) {
+        //     displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
             
-            // If the current slot is a computer player, automate recovery to prevent freezes
-            if (playerProfiles[currentTurn].mode === 'computer') {
-                let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
-                if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+        //     // If the current slot is a computer player, automate recovery to prevent freezes
+        //     if (playerProfiles[currentTurn].mode === 'computer') {
+        //         let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+        //         if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
                 
-                if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+        //         if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
 
-                if (currentTurnMoves.length > 0) {
-                    let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
-                    if (!hasValidRemainingMove) {
-                        displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
-                        setTimeout(() => {
-                            if (isGamePaused) return;
-                            passTurnSequence();
-                        }, 1500);
-                        return;
-                    }
-                    // Retry automated loop execution with the remaining valid die value
-                    setTimeout(() => {
-                        if (isGamePaused) return;
-                        if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
-                    }, 1500);
-                } else {
-                    // Wiped out all moves via overflow, cycle turn smoothly
-                    setTimeout(() => {
-                        if (isGamePaused) return;
-                        passTurnSequence();
-                    }, 1500);
-                }
+        //         if (currentTurnMoves.length > 0) {
+        //             let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+        //             if (!hasValidRemainingMove) {
+        //                 displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
+        //                 setTimeout(() => {
+        //                     if (isGamePaused) return;
+        //                     passTurnSequence();
+        //                 }, 1500);
+        //                 return;
+        //             }
+        //             // Retry automated loop execution with the remaining valid die value
+        //             setTimeout(() => {
+        //                 if (isGamePaused) return;
+        //                 if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
+        //             }, 1500);
+        //         } else {
+        //             // Wiped out all moves via overflow, cycle turn smoothly
+        //             setTimeout(() => {
+        //                 if (isGamePaused) return;
+        //                 passTurnSequence();
+        //             }, 1500);
+        //         }
+        //     }
+        //     return; 
+        // }
+        if (currentPiece.stepsWalked + appliedMoveValue > 57) {
+    displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+
+    // Remove the unusable die
+    let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+    if (spentIndex !== -1) {
+        currentTurnMoves.splice(spentIndex, 1);
+    }
+
+    if (typeof saveGameStateToStorage === 'function') {
+        saveGameStateToStorage();
+    }
+
+    // ===== PRAGMATIC RULE =====
+    // If there are still usable moves left, try them.
+    // Otherwise just pass the turn so the game never freezes.
+    let hasValidRemainingMove = currentTurnMoves.length > 0 &&
+        activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+
+    if (hasValidRemainingMove && playerProfiles[currentTurn].mode === 'computer') {
+        // Computer can still try the remaining die
+        setTimeout(() => {
+            if (isGamePaused) return;
+            if (typeof executeAutomatedComputerMove === 'function') {
+                executeAutomatedComputerMove();
             }
-            return; 
-        }
+        }, 1000);
+    } else {
+        // No clean move left → pass turn (works for both human & computer)
+        displayEducationalLog(`${upperColor}: No valid remaining moves. Passing turn.`);
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 1000);
+    }
+
+    return;
+}
 
         currentPiece.stepsWalked += appliedMoveValue;
         

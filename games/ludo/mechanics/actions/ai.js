@@ -46,13 +46,19 @@ function selectBestStrategicAIToken(indices, activeTokens) {
 
     // STRATEGY 1: Scan for Yoruba "Pè" instant-win capture moves
     for (let index of indices) {
-        let token = activeTokens[index];
-        if (isTokenInHomeYard(currentTurn, token)) continue;
+    let token = activeTokens[index];
+    if (isTokenInHomeYard(currentTurn, token)) continue;
 
-        let projectedPathIndex = (token.pathIndex + currentDiceValue) % 52;
-        let projectedCell = COMMON_PATH[projectedPathIndex];
+    // Safety: only project when the token is on the common path
+    if (typeof token.pathIndex !== 'number' || token.pathIndex < 0) continue;
 
-        for (let enemyColor in tokens) {
+    let projectedPathIndex = (token.pathIndex + currentDiceValue) % 52;
+    let projectedCell = COMMON_PATH[projectedPathIndex];
+
+    // Extra safety – never read .c from undefined
+    if (!projectedCell) continue;
+
+    for (let enemyColor in tokens) {
             if (enemyColor === currentTurn) continue;
             
             let isDestinationSafeBox = false;
