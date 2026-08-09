@@ -92,6 +92,10 @@ function processTokenMovementExecution(selectedTokenIndex) {
 
             if (currentPiece.stepsWalked === 57) {
                 displayEducationalLog(`${upperColor}: Token reached absolute home center goal!`);
+                // Check if this player has now finished all 4 tokens
+                if (typeof window.checkForMatchWinner === 'function') {
+                    window.checkForMatchWinner(currentTurn);
+                }
             } else {
                 displayEducationalLog(`${upperColor}: Token advanced inside safe home lane.`);
             }

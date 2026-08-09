@@ -38,6 +38,11 @@ function checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens) {
                             currentPiece.c = 7;
                             currentPiece.r = 7;
                             displayEducationalLog(`${upperColor}: Capture completed the circuit and the token exited the board.`);
+                            
+                            // Check if this player has now finished all 4 tokens
+                            if (typeof window.checkForMatchWinner === 'function') {
+                                window.checkForMatchWinner(currentTurn);
+                            }
                         }
                     }
                 }

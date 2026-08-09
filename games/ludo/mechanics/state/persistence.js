@@ -148,6 +148,12 @@ function handleConfirmationCallback(userApproved) {
         return;
     }
 
+    // ===== RESET WIN DETECTION: Reset only the win-detection flag (so a new match can award points again) =====
+    if (typeof window.resetWinDetection === 'function') {
+        window.resetWinDetection();
+    }
+    // =============================================
+
     localStorage.removeItem('gfg_ludo_persistence_state');
     displayEducationalLog("SYSTEM RESET: Persistent cache cleared. Re-initializing arena canvas...");
     setTimeout(() => {

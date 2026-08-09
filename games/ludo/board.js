@@ -27,10 +27,14 @@ function drawLudoLayout() {
         }
     }
 
-    drawBigYard(0, 0, COLORS.green);      
-    drawBigYard(0, 9, COLORS.red);        
-    drawBigYard(9, 0, COLORS.yellow);     
-    drawBigYard(9, 9, COLORS.blue);       
+    // drawBigYard(0, 0, COLORS.green);      
+    // drawBigYard(0, 9, COLORS.red);        
+    // drawBigYard(9, 0, COLORS.yellow);     
+    // drawBigYard(9, 9, COLORS.blue);
+    drawBigYard(0, 0, 'green');      
+    drawBigYard(0, 9, 'red');        
+    drawBigYard(9, 0, 'yellow');     
+    drawBigYard(9, 9, 'blue');       
 
     for (let c = 1; c < 6; c++) drawCell(c, 7, COLORS.green);
     drawCell(1, 6, COLORS.green); 
@@ -53,12 +57,48 @@ function drawCell(col, row, color) {
     ctx.strokeStyle = COLORS.gray; ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
-function drawBigYard(startCol, startRow, color) {
-    ctx.fillStyle = color; ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
-    ctx.strokeStyle = COLORS.white; ctx.lineWidth = 2;
+// function drawBigYard(startCol, startRow, color) {
+//     ctx.fillStyle = color; ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
+//     ctx.strokeStyle = COLORS.white; ctx.lineWidth = 2;
+//     ctx.strokeRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
+//     ctx.fillStyle = COLORS.white; ctx.beginPath();
+//     ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2); ctx.fill();
+// }
+
+function drawBigYard(startCol, startRow, colorName) {
+    const color = COLORS[colorName];
+    ctx.fillStyle = color;
+    ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
+
+    ctx.strokeStyle = COLORS.white;
+    ctx.lineWidth = 2;
     ctx.strokeRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
-    ctx.fillStyle = COLORS.white; ctx.beginPath();
-    ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2); ctx.fill();
+
+    // White circle in the middle of the yard
+    ctx.fillStyle = COLORS.white;
+    ctx.beginPath();
+    ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ===== CROWN for finished players =====
+    if (typeof window.getPlayerRank === 'function') {
+        const rank = window.getPlayerRank(colorName);
+        if (rank > 0) {
+            const centerX = (startCol + 3) * CELL_SIZE;
+            const centerY = (startRow + 3) * CELL_SIZE;
+
+            // Crown emoji
+            ctx.font = `${CELL_SIZE * 1.8}px serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('👑', centerX, centerY - CELL_SIZE * 0.3);
+
+            // Position number under the crown
+            ctx.font = `bold ${CELL_SIZE * 0.9}px system-ui`;
+            ctx.fillStyle = rank === 1 ? '#f39c12' : '#333';
+            ctx.fillText(rank + (rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'), centerX, centerY + CELL_SIZE * 1.1);
+        }
+    }
 }
 
 function drawCenterTriangles() {
