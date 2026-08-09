@@ -78,6 +78,9 @@
     // Expose only what other files need
     window.openAuthModal = openAuthModal;
     window.handleSignOut = handleSignOut;
+    // Expose for header.js (so modal buttons work on any page)
+    window.handleSignIn = handleSignIn;
+    window.handleSignUp = handleSignUp;
 
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('auth-modal-close')?.addEventListener('click', closeAuthModal);

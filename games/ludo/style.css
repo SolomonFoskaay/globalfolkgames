@@ -173,3 +173,43 @@ canvas {
 .confirm-modal-btn:active { opacity: 0.8; }
 #confirm-ok-btn { background: #2ecc71; color: #fff; text-align: center; }
 #confirm-cancel-btn { background: #555; color: #fff; text-align: center; }
+
+/* ===== Local Ludo Header (sits under the global header) ===== */
+.ludo-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    box-sizing: border-box;
+    background: #1a1a24;
+    border-bottom: 1px solid #2c2c3a;
+    height: 48px;
+}
+
+.ludo-header-center {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: #f39c12;
+    font-size: 0.95rem;
+}
+
+.ludo-flag {
+    font-size: 1.1rem;
+}
+
+.ludo-local-points {
+    background: #2a2a3a;
+    color: #9b59b6;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.ludo-local-points span {
+    color: #ffffff;
+}
