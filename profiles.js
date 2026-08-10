@@ -1,5 +1,6 @@
 // profiles.js
 // Handles profile loading, 500 signup points, and header display
+// Dynamic is primary login • Supabase is backup store
 
 (function () {
 
@@ -7,15 +8,63 @@
         return document.getElementById('gfg-user-pill') || document.querySelector('.gfg-user-pill');
     }
 
-    // Create or load profile. New users get 500 points.
-    async function ensureProfile(user) {
-        if (!user) return null;
+    // Get current Dynamic user (works with current headless SDK)
+    function getDynamicUser() {
+        try {
+            if (!window.dynamicClient) return null;
 
-        // Try to load existing profile
+            const user = window.dynamicClient.auth?.currentUser
+                || window.dynamicClient.user
+                || window.dynamicClient.auth?.user
+                || null;
+
+            if (!user) return null;
+
+            // Try to get the Solana wallet address
+            let solanaWallet = null;
+            try {
+                const wallets = window.dynamicClient.auth?.walletAccounts
+                    || window.dynamicClient.walletAccounts
+                    || user.walletAccounts
+                    || [];
+
+                // Find a Solana wallet
+                const solWallet = wallets.find(w =>
+                    w.chain === 'solana' ||
+                    w.chainName === 'solana' ||
+                    (w.address && w.address.length >= 32 && w.address.length <= 44)
+                );
+
+                if (solWallet) {
+                    solanaWallet = solWallet.address || solWallet.publicKey || null;
+                }
+            } catch (e) {
+                console.warn('Could not read Solana wallet', e);
+            }
+
+            return {
+                dynamicId: user.userId || user.id || user.user_id,
+                email: user.email
+                    || (user.verifiedCredentials && user.verifiedCredentials[0]?.email)
+                    || user.emailAddress
+                    || null,
+                solanaWallet: solanaWallet
+            };
+        } catch (e) {
+            console.warn('Could not read Dynamic user', e);
+            return null;
+        }
+    }
+
+    // Create or load profile using dynamic_user_id
+    async function ensureProfile(dynamicUser) {
+        if (!dynamicUser || !dynamicUser.dynamicId) return null;
+
+        // 1. Try to find existing profile by dynamic_user_id
         let { data: profile, error } = await window.supabaseClient
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
+            .eq('dynamic_user_id', dynamicUser.dynamicId)
             .maybeSingle();
 
         if (error) {
@@ -23,67 +72,69 @@
             return null;
         }
 
-        // Profile does not exist yet → create it with signup bonus
-        if (!profile) {
-            // Read current signup bonus from config (default 500)
-            let bonus = 500;
-            const { data: config } = await window.supabaseClient
-                .from('point_config')
-                .select('value')
-                .eq('key', 'signup_bonus')
-                .maybeSingle();
+        // 2. Profile already exists
+        if (profile) return profile;
 
-            if (config && config.value) bonus = config.value;
+        // 3. Create new profile
+        let bonus = 500;
+        const { data: config } = await window.supabaseClient
+            .from('point_config')
+            .select('value')
+            .eq('key', 'signup_bonus')
+            .maybeSingle();
 
-            // Generate a simple referral code
-            const code = 'GF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        if (config && config.value) bonus = config.value;
 
-            const username = (user.email || 'player').split('@')[0].slice(0, 20);
+        const code = 'GF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const username = (dynamicUser.email || 'player').split('@')[0].slice(0, 20);
 
-            const { data: created, error: insertError } = await window.supabaseClient
-                .from('profiles')
-                .insert({
-                    id: user.id,
-                    username: username,
-                    display_name: username,
-                    global_points: bonus,
-                    lifetime_points: bonus,
-                    level: 1,
-                    referral_code: code
-                })
-                .select()
-                .single();
+        // Generate a normal UUID for the primary key
+        const newId = crypto.randomUUID();
 
-            if (insertError) {
-                console.error('Profile create error:', insertError);
-                return null;
-            }
+        const { data: created, error: insertError } = await window.supabaseClient
+        .from('profiles')
+        .insert({
+            id: newId,
+            dynamic_user_id: dynamicUser.dynamicId,
+            email: dynamicUser.email || null,
+            solana_wallet: dynamicUser.solanaWallet || null,
+            username: username,
+            display_name: username,
+            global_points: bonus,
+            lifetime_points: bonus,
+            level: 1,
+            referral_code: code
+        })
+        .select()
+        .single();
 
-            // Record the bonus in the audit table
-            await window.supabaseClient.from('point_transactions').insert({
-                user_id: user.id,
-                game_id: 'system',
-                points: bonus,
-                reason: 'signup_bonus'
-            });
-
-            profile = created;
-
-            if (window.showAuthBanner) {
-                window.showAuthBanner('Welcome! +' + bonus + ' signup points added');
-            }
+        if (insertError) {
+            console.error('Profile create error:', insertError);
+            return null;
         }
 
-        return profile;
+        // Record signup bonus
+        await window.supabaseClient.from('point_transactions').insert({
+            user_id: newId,
+            game_id: 'system',
+            points: bonus,
+            reason: 'signup_bonus'
+        });
+
+        if (window.showAuthBanner) {
+            window.showAuthBanner('Welcome! +' + bonus + ' signup points added');
+        }
+
+        return created;
     }
 
-    // Update the header with real points + Sign in / Sign out button
-    async function updateHeader(session) {
+    // Update the header UI
+    async function updateHeader(dynamicUser) {
         const pill = getPill();
         if (!pill) return;
 
-        if (session && session.user) {
-            const profile = await ensureProfile(session.user);
+        if (dynamicUser) {
+            const profile = await ensureProfile(dynamicUser);
             const points = profile ? profile.global_points : 0;
             const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
 
@@ -95,15 +146,24 @@
 
             const btn = document.getElementById('btn-signout');
             if (btn) {
-                btn.onclick = function () {
-                    if (window.handleSignOut) window.handleSignOut();
+                btn.onclick = async function () {
+                    if (window.logoutDynamic) {
+                        await window.logoutDynamic();
+                    }
+                    updateHeader(null);
                 };
             }
 
-            window.currentUser = session.user;
+            window.currentUser = {
+                id: profile?.id,
+                dynamicId: dynamicUser.dynamicId,
+                email: dynamicUser.email,
+                source: 'dynamic'
+            };
             window.currentProfile = profile;
 
         } else {
+            // Logged out state
             pill.innerHTML = `
                 <span id="display-points">⭐ 0 Pts</span>
                 <button id="btn-open-auth" class="auth-btn-small">Sign in</button>
@@ -112,7 +172,9 @@
             const btn = document.getElementById('btn-open-auth');
             if (btn) {
                 btn.onclick = function () {
-                    if (window.openAuthModal) window.openAuthModal();
+                    if (window.openDynamicLogin) {
+                        window.openDynamicLogin();
+                    }
                 };
             }
 
@@ -121,14 +183,13 @@
         }
     }
 
-    // Called by header.js after the header is created
+    // Main refresh – Dynamic only (primary)
     window.refreshAuthHeader = async function () {
-        if (!window.supabaseClient) return;
-        const { data: { session } } = await window.supabaseClient.auth.getSession();
-        updateHeader(session);
+        const dynamicUser = getDynamicUser();
+        await updateHeader(dynamicUser);
     };
 
-    // Public function for games to award points later
+    // Award points (used by Ludo later)
     window.awardGlobalPoints = async function (points, gameId, reason, matchId = null) {
         if (!window.currentUser || !window.currentProfile) {
             if (window.showAuthBanner) window.showAuthBanner('Sign in to earn points', true);
@@ -136,7 +197,6 @@
         }
         if (points <= 0) return false;
 
-        // 1. Write audit record
         await window.supabaseClient.from('point_transactions').insert({
             user_id: window.currentUser.id,
             game_id: gameId,
@@ -145,7 +205,6 @@
             match_id: matchId
         });
 
-        // 2. Update both global and lifetime points
         const newGlobal = window.currentProfile.global_points + points;
         const newLifetime = window.currentProfile.lifetime_points + points;
 
@@ -178,16 +237,11 @@
         return false;
     };
 
-    // Listen for login / logout
+    // On page load
     document.addEventListener('DOMContentLoaded', function () {
-        if (!window.supabaseClient) return;
-
-        window.supabaseClient.auth.onAuthStateChange(function (event, session) {
-            updateHeader(session);
-        });
-
-        window.supabaseClient.auth.getSession().then(function (result) {
-            updateHeader(result.data.session);
-        });
+        // Give Dynamic a short moment to restore session
+        setTimeout(() => {
+            window.refreshAuthHeader();
+        }, 900);
     });
 })();
