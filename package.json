@@ -1,0 +1,21 @@
+{
+  "name": "globalfolkgames",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.32.1",
+  "devDependencies": {
+    "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "@dynamic-labs-sdk/client": "^1.26.0",
+    "@dynamic-labs-sdk/solana": "^1.26.0",
+    "pnpm": "^11.21.0"
+  }
+}
