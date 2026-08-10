@@ -37,7 +37,7 @@ function drawDashboardContent() {
 function goToLudoWorkspace() {
     // alert("Preping Game: Launching game now.... tab okay!");
     // Redirects user directly into the isolated Ludo game folder architecture
-    window.location.href = "games/ludo/index.html";
+    window.location.href = "/games/ludo/index.html";
 }
 
 // Click event loops for tab controls
