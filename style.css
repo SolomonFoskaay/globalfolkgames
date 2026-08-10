@@ -327,3 +327,10 @@ body {
 }
 .auth-banner.success { background: var(--success); color: white; }
 .auth-banner.error { background: var(--danger); color: white; }
+
+#auth-otp {
+  letter-spacing: 4px;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
