@@ -13,6 +13,6 @@
     "@dynamic-labs-sdk/solana": "^1.26.0"
   },
   "devDependencies": {
-    "vite": "^5.4.21"
+    "vite": "^8.2.1"
   }
 }
