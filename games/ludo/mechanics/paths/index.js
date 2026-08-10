@@ -17,7 +17,7 @@ const COMMON_PATH = [
 const START_INDEX = { green: 0, yellow: 13, blue: 26, red: 39 };
 const MAX_COMMON_STEPS = 52; // Updated to match full 52-cell track rules
 
-let tokens = {
+window.tokens = {
     green:  [{c:2, r:2, pathIndex: -1, stepsWalked: 0}, {c:3, r:2, pathIndex: -1, stepsWalked: 0}, {c:2, r:3, pathIndex: -1, stepsWalked: 0}, {c:3, r:3, pathIndex: -1, stepsWalked: 0}],
     yellow: [{c:11, r:2, pathIndex: -1, stepsWalked: 0}, {c:12, r:2, pathIndex: -1, stepsWalked: 0}, {c:11, r:3, pathIndex: -1, stepsWalked: 0}, {c:12, r:3, pathIndex: -1, stepsWalked: 0}],
     blue:   [{c:11, r:11, pathIndex: -1, stepsWalked: 0}, {c:12, r:11, pathIndex: -1, stepsWalked: 0}, {c:11, r:12, pathIndex: -1, stepsWalked: 0}, {c:12, r:12, pathIndex: -1, stepsWalked: 0}],

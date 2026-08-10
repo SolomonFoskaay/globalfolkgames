@@ -19,7 +19,7 @@ let isGamePaused = false;
 
 // Anti-Cheat Automation Settings Engine States
 let setupConfigurationLocked = false;
-const playerProfiles = {
+window.playerProfiles = {
     green: { mode: 'human' },
     yellow: { mode: 'computer' },
     blue: { mode: 'computer' },
