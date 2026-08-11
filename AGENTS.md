@@ -100,10 +100,18 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] Sponsor relay (local + Vercel fn) built and tested.
 - [x] Client rewritten for ER (`src/magicblock-vrf.js`, `src/gfg-dice-config.js`).
 - [x] AI/computer turns skip VRF (`public/games/ludo/mechanics/actions/dice.js`).
-- [ ] Browser end-to-end test (login → sponsored first roll → gasless ER rolls).
+- [x] Player-account feature: mandatory sign-in to start a match; exactly one
+      seat is the signed-in user ("You" via `playerProfiles[color].isUser`);
+      reward requires 1st-place user seat AND a valid on-chain proof roll
+      (the first user roll of the match). `getOnchainProofUsedThisMatch()` +
+      `getLastProofRollSignature()` gate the +100 reward in
+      `win-detection.js`.
+- [ ] Browser end-to-end test (login → pick "You" seat → sponsored first roll
+      → gasless ER rolls → 1st-place reward gating).
 - [ ] Commit a safe checkpoint.
 - [ ] Vercel deploy: `api/delegate.mjs` + `GFG_SPONSOR_KEYPAIR` env + functions
-      config in `vercel.json`; consider a per-player sponsor spend cap.
+      config in `vercel.json` (function config added); consider a per-player
+      sponsor spend cap.
 - [ ] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
 
 ## Product direction

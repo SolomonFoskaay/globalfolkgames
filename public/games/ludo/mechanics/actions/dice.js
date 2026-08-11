@@ -1,12 +1,19 @@
 // Dice source indicator: 'onchain' (MagicBlock VRF on Solana) or 'offchain' (local)
 let activeDiceSource = 'offchain';
 
-// Provably-fair roll policy: only ONE on-chain roll per match (the first human
-// turn) — that transaction is the untamperable proof of play. Every later roll
-// (human or computer) resolves instantly off-chain. The flag is set only when an
-// on-chain roll actually SUCCEEDS, so a failed VRF attempt does not consume the
-// proof and the next human turn retries on-chain.
+// Provably-fair roll policy: only the logged-in player's seat ("You") triggers
+// on-chain rolls, and only ONE on-chain roll per match (the first user turn) —
+// that transaction is the untamperable proof of play. Every later roll and every
+// other seat (computer or local pass-and-play human) resolves instantly off-chain.
+// The flag is set only when an on-chain roll actually SUCCEEDS, so a failed VRF
+// attempt does not consume the proof and the next user turn retries on-chain.
 let onchainProofRollUsedThisMatch = false;
+let lastProofRollSignature = null;
+
+// Reward gates: the Ludo win-detector uses these to confirm the proof-of-play
+// before awarding the +100 points for a 1st-place user finish.
+window.getOnchainProofUsedThisMatch = () => onchainProofRollUsedThisMatch;
+window.getLastProofRollSignature = () => lastProofRollSignature;
 
 // Called by the match-start flow (turn.js lockSetupDropdowns) when a NEW match
 // begins, so each match gets exactly one fresh proof roll.
@@ -49,12 +56,15 @@ async function rollDiceEngine(source) {
     displayEducationalLog(`${currentTurn.toUpperCase()}: Rolling dice...`);
 
     // === PROVABLY-FAIR DICE (optional) ===
-    // Only the FIRST human roll of a match goes on-chain (the proof roll) — that
-    // tx is the verifiable proof of play. Computer turns and all later human
-    // turns roll locally so the game never stalls on a blockchain round trip.
+    // Only the signed-in player's seat ("You") can roll on-chain, and only for
+    // the FIRST user roll of a match (the proof roll) — that tx is the verifiable
+    // proof of play. Computer turns, local pass-and-play human seats, and all
+    // later user turns roll locally so the game never stalls on a blockchain
+    // round trip.
     const isComputerTurn = playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'computer';
+    const isUserSeat = playerProfiles[currentTurn] && playerProfiles[currentTurn].isUser === true;
     let rollValues = null;
-    if (!isComputerTurn && !onchainProofRollUsedThisMatch && window.magicblockDice && window.magicblockDice.available()) {
+    if (isUserSeat && !onchainProofRollUsedThisMatch && window.magicblockDice && window.magicblockDice.available()) {
         try {
             if (totalDisplay) totalDisplay.innerText = 'VRF proof roll...';
             displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair proof roll [MagicBlock VRF on Solana Blockchain]...`);
@@ -62,7 +72,9 @@ async function rollDiceEngine(source) {
             if (Array.isArray(rollValues) && rollValues.length === 2) {
                 activeDiceSource = 'onchain';
                 onchainProofRollUsedThisMatch = true;
-                console.log(`[MagicBlock VRF on Solana Blockchain] Proof roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
+                lastProofRollSignature = (window.magicblockDice && window.magicblockDice.getLastProofRollSignature)
+                    ? window.magicblockDice.getLastProofRollSignature() : null;
+                console.log(`[MagicBlock VRF on Solana Blockchain] Proof roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]} sig=${lastProofRollSignature}`);
                 displayEducationalLog(`${currentTurn.toUpperCase()}: VRF proof roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
             }
         } catch (err) {
@@ -75,12 +87,15 @@ async function rollDiceEngine(source) {
     } else if (isComputerTurn) {
         activeDiceSource = 'offchain';
         console.log('[Off-Chain Local Randomness] Computer turn — rolling locally (VRF is human-only).');
-    } else if (onchainProofRollUsedThisMatch) {
+    } else if (isUserSeat) {
         activeDiceSource = 'offchain';
-        console.log('[Off-Chain Local Randomness] Human turn — rolling locally (proof roll already recorded on-chain this match).');
+        console.log('[Off-Chain Local Randomness] Your turn — rolling locally (proof roll already recorded on-chain this match).');
     } else if (!window.magicblockDice || !window.magicblockDice.available()) {
         activeDiceSource = 'offchain';
         console.log('[Off-Chain Local Randomness] MagicBlock VRF on Solana not active — rolling locally.');
+    } else if (!isUserSeat) {
+        activeDiceSource = 'offchain';
+        console.log('[Off-Chain Local Randomness] Local human seat — rolling locally (only the signed-in player rolls on-chain).');
     }
 
     if (physicsAnimationLoop) cancelAnimationFrame(physicsAnimationLoop);

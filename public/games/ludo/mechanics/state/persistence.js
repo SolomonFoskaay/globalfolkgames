@@ -44,7 +44,9 @@ function loadGameStateFromStorage() {
         setupConfigurationLocked = savedState.setupConfigurationLocked;
         
         for (let color in savedState.playerProfiles) {
-            playerProfiles[color].mode = savedState.playerProfiles[color].mode;
+            if (!playerProfiles[color]) continue;
+            playerProfiles[color].mode = savedState.playerProfiles[color].mode || 'human';
+            playerProfiles[color].isUser = savedState.playerProfiles[color].isUser === true;
         }
 
         if (savedState.tokensSnapshot && typeof tokens !== 'undefined') {
@@ -80,7 +82,7 @@ function loadGameStateFromStorage() {
         turnSequence.forEach(color => {
             const selectElement = document.getElementById(`type-${color}`);
             if (selectElement) {
-                selectElement.value = playerProfiles[color].mode;
+                selectElement.value = playerProfiles[color].isUser ? 'you' : playerProfiles[color].mode;
                 selectElement.disabled = setupConfigurationLocked;
             }
         });

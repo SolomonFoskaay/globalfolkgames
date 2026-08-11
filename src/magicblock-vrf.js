@@ -101,6 +101,10 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Signature of the most recent on-chain proof roll. Consumed by the Ludo reward
+// logic (win-detection.js) so a 1st-place user finish can reference the tx.
+let lastProofRollSignature = null;
+
 // True once the ER validator has the delegated account in its state.
 async function waitForErPickup(pda) {
   const conn = new Connection(config.erRpcUrl, 'confirmed');
@@ -160,7 +164,7 @@ async function rollOnce() {
   // Unique entropy commitment for this roll (included in the VRF proof).
   const clientSeed = Math.floor(Math.random() * 256);
 
-  await program.methods
+  const proofResult = await program.methods
     .rollDice(clientSeed)
     .accounts({
       player: pda,
@@ -169,6 +173,9 @@ async function rollOnce() {
       oracleQueue: new PublicKey(config.oracleQueue),
     })
     .rpc();
+  lastProofRollSignature = (typeof proofResult === 'string' && proofResult)
+    ? proofResult
+    : (proofResult && (proofResult.signature || proofResult.txSig)) || null;
 
   // Wait for the VRF oracle to fulfill and callback into our program.
   const deadline = Date.now() + config.requestTimeoutMs;
@@ -213,6 +220,10 @@ export function initMagicBlockDice() {
     // Returns a Promise<[d1, d2]>, each 1..=6.
     roll() {
       return rollOnce();
+    },
+
+    getLastProofRollSignature() {
+      return lastProofRollSignature;
     },
   };
 }

@@ -26,18 +26,40 @@
 
         console.log(`Position ${position}: ${color.toUpperCase()}`);
 
-        // Award points only to the FIRST human
-        const isHuman = window.playerProfiles[color]?.mode === 'human';
+        // Reward policy (first place only, and only the signed-in user's seat):
+        // - A non-user seat finishing 1st gets NO reward (it's a local/AI seat).
+        // - The user finishing 1st gets +100 ONLY if the match had a valid
+        //   on-chain proof roll (the untamperable proof of play). Otherwise the
+        //   run still counts but earns no points, so users can't farm rewards
+        //   off-chain.
+        const isUserSeat = window.playerProfiles[color]?.isUser === true;
+        const proofRollUsed = typeof window.getOnchainProofUsedThisMatch === 'function'
+            && window.getOnchainProofUsedThisMatch();
 
-        if (isHuman && !pointsAwardedThisMatch) {
-            pointsAwardedThisMatch = true;
+        if (position === 1) {
+            if (!isUserSeat) {
+                if (typeof window.showAuthBanner === 'function') {
+                    window.showAuthBanner(`${color.toUpperCase()} finished 1st — no reward (only the signed-in player earns rewards).`);
+                }
+            } else if (!proofRollUsed) {
+                if (typeof window.showAuthBanner === 'function') {
+                    window.showAuthBanner(`You finished 1st! But no on-chain proof roll ran this match — no reward.`);
+                }
+                console.warn('[REWARD] 1st place (you) skipped: no valid on-chain proof roll this match.');
+            } else if (!pointsAwardedThisMatch) {
+                pointsAwardedThisMatch = true;
 
-            if (typeof window.awardLocalLudoPoints === 'function') {
-                window.awardLocalLudoPoints(100);
-            }
+                if (typeof window.awardLocalLudoPoints === 'function') {
+                    window.awardLocalLudoPoints(100);
+                }
 
-            if (typeof window.showAuthBanner === 'function') {
-                window.showAuthBanner(`🎉 ${color.toUpperCase()} finished 1st! +100 points`);
+                const proofSig = typeof window.getLastProofRollSignature === 'function'
+                    ? window.getLastProofRollSignature() : null;
+                console.log(`[REWARD] 1st place (you) +100 — proof roll sig: ${proofSig}`);
+
+                if (typeof window.showAuthBanner === 'function') {
+                    window.showAuthBanner(`🎉 You finished 1st! +100 points`);
+                }
             }
         }
 
