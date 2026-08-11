@@ -1,6 +1,19 @@
 // Dice source indicator: 'onchain' (MagicBlock VRF on Solana) or 'offchain' (local)
 let activeDiceSource = 'offchain';
 
+// Provably-fair roll policy: only ONE on-chain roll per match (the first human
+// turn) — that transaction is the untamperable proof of play. Every later roll
+// (human or computer) resolves instantly off-chain. The flag is set only when an
+// on-chain roll actually SUCCEEDS, so a failed VRF attempt does not consume the
+// proof and the next human turn retries on-chain.
+let onchainProofRollUsedThisMatch = false;
+
+// Called by the match-start flow (turn.js lockSetupDropdowns) when a NEW match
+// begins, so each match gets exactly one fresh proof roll.
+function resetOnchainProofRollUsed() {
+    onchainProofRollUsedThisMatch = false;
+}
+
 // Bracket tag shown in the Ludo log + console so players know where the
 // CURRENT dice click was resolved: on-chain (MagicBlock VRF on Solana) or not.
 function currentDiceSourceTag() {
@@ -36,21 +49,21 @@ async function rollDiceEngine(source) {
     displayEducationalLog(`${currentTurn.toUpperCase()}: Rolling dice...`);
 
     // === PROVABLY-FAIR DICE (optional) ===
-    // When the MagicBlock VRF module is configured + a wallet is connected,
-    // request the true on-chain roll. Otherwise fall back to the existing
-    // local randomness so the game keeps working identically.
-    // Only HUMAN turns roll on-chain — computer turns always use local rolls.
+    // Only the FIRST human roll of a match goes on-chain (the proof roll) — that
+    // tx is the verifiable proof of play. Computer turns and all later human
+    // turns roll locally so the game never stalls on a blockchain round trip.
     const isComputerTurn = playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'computer';
     let rollValues = null;
-    if (!isComputerTurn && window.magicblockDice && window.magicblockDice.available()) {
+    if (!isComputerTurn && !onchainProofRollUsedThisMatch && window.magicblockDice && window.magicblockDice.available()) {
         try {
-            if (totalDisplay) totalDisplay.innerText = 'VRF rolling...';
-            displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting on-chain randomness [MagicBlock VRF on Solana Blockchain]...`);
+            if (totalDisplay) totalDisplay.innerText = 'VRF proof roll...';
+            displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair proof roll [MagicBlock VRF on Solana Blockchain]...`);
             rollValues = await window.magicblockDice.roll();
             if (Array.isArray(rollValues) && rollValues.length === 2) {
                 activeDiceSource = 'onchain';
-                console.log(`[MagicBlock VRF on Solana Blockchain] Dice roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
-                displayEducationalLog(`${currentTurn.toUpperCase()}: VRF result ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
+                onchainProofRollUsedThisMatch = true;
+                console.log(`[MagicBlock VRF on Solana Blockchain] Proof roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
+                displayEducationalLog(`${currentTurn.toUpperCase()}: VRF proof roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
             }
         } catch (err) {
             console.error('[VRF] roll failed, using local fallback:', err);
@@ -62,6 +75,9 @@ async function rollDiceEngine(source) {
     } else if (isComputerTurn) {
         activeDiceSource = 'offchain';
         console.log('[Off-Chain Local Randomness] Computer turn — rolling locally (VRF is human-only).');
+    } else if (onchainProofRollUsedThisMatch) {
+        activeDiceSource = 'offchain';
+        console.log('[Off-Chain Local Randomness] Human turn — rolling locally (proof roll already recorded on-chain this match).');
     } else if (!window.magicblockDice || !window.magicblockDice.available()) {
         activeDiceSource = 'offchain';
         console.log('[Off-Chain Local Randomness] MagicBlock VRF on Solana not active — rolling locally.');

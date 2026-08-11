@@ -68,6 +68,9 @@ function toggleArenaPauseState() {
 function lockSetupDropdowns() {
     if (setupConfigurationLocked) return;
     setupConfigurationLocked = true;
+
+    // New match: arm exactly one fresh provably-fair proof roll (first human turn).
+    if (typeof resetOnchainProofRollUsed === 'function') resetOnchainProofRollUsed();
     
     turnSequence.forEach(color => {
         const selectElement = document.getElementById(`type-${color}`);
