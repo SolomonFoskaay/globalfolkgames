@@ -1,0 +1,21 @@
+[package]
+name = "gfg-dice"
+version = "0.1.0"
+description = "GlobalFolkGames provably-fair dice via MagicBlock VRF"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "gfg_dice"
+
+[features]
+anchor-debug = []
+default = []
+
+[dependencies]
+anchor-lang = "0.32.1"
+# VRF module ships with the ephemeral-rollups-sdk crate.
+# Match the version pinned in the MagicBlock quickstart at build time.
+ephemeral-rollups-sdk = { version = "0.6", features = ["anchor", "vrf"] }
+
+[dev-dependencies]

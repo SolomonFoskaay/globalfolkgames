@@ -23,3 +23,10 @@ pnpm-debug.log*
 .vscode/
 .idea/
 .DS_Store
+
+# Solana / Anchor keys & artifacts (NEVER commit a wallet keypair)
+.anchor/
+**/target/
+*.keypair.json
+id.json
+~/.config/solana/

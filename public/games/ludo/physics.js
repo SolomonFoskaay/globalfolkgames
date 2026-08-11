@@ -12,9 +12,13 @@ function runDicePhysicsCalculations() {
         die.vy *= 0.94;
 
         // Shuffle temporary face numbers while velocity vectors are active
+        // (unless this die is locked to a provably-fair VRF result)
         if (Math.abs(die.vx) > 0.15 || Math.abs(die.vy) > 0.15) {
-            die.value = Math.floor(Math.random() * 6) + 1;
+            if (die.finalValue == null) die.value = Math.floor(Math.random() * 6) + 1;
             piecesStillMoving = true;
+        } else if (die.finalValue != null) {
+            // Velocity stopped -> snap to the VRF-locked face
+            die.value = die.finalValue;
         }
 
         // Boundary Collisions: Bounce off 600x600 canvas parameters

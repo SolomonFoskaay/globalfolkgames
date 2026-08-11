@@ -3,6 +3,7 @@
 // Supabase is backup only
 
 import { createDynamicClient, sendEmailOTP, verifyOTP, logout, getWalletAccounts } from '@dynamic-labs-sdk/client';
+import { generateSessionKeys, getSessionKeys, getSignedSessionId } from '@dynamic-labs-sdk/client/core';
 import { addSolanaExtension } from '@dynamic-labs-sdk/solana';
 import { createWaasWalletAccounts, getChainsMissingWaasWalletAccounts } from '@dynamic-labs-sdk/client/waas';
 
@@ -52,6 +53,44 @@ async function waitForSolanaWallet(timeoutMs = 10000) {
 
 // Expose for profiles.js so it reads the wallet through the same reliable path
 window.getDynamicSolanaWallet = getSolanaWallet;
+
+// ---------- Session keys ----------
+// Session keys let the embedded wallet sign on-chain actions (VRF dice rolls,
+// settlements) during this session without prompting the user each time.
+// The SDK auto-generates keys on init; we ensure they exist after login too.
+
+async function ensureSessionKeys() {
+    try {
+        if (!getSessionKeys(dynamicClient)) {
+            await generateSessionKeys(dynamicClient);
+            console.log('Dynamic session keys generated');
+        }
+        return getSessionKeys(dynamicClient) || null;
+    } catch (e) {
+        console.error('Session key generation error:', e);
+        return null;
+    }
+}
+
+// Public getter for the current session public key (used by later stages)
+window.getDynamicSessionKeys = function () {
+    try {
+        return getSessionKeys(dynamicClient) || null;
+    } catch (e) {
+        return null;
+    }
+};
+
+// Sign the session id — proves the session-key signing path works.
+// Later on-chain transactions rely on this same signing flow.
+window.verifyDynamicSession = async function () {
+    try {
+        return await getSignedSessionId(dynamicClient);
+    } catch (e) {
+        console.error('Session signing error:', e);
+        return null;
+    }
+};
 
 window.openDynamicLogin = function () {
   const modal = document.getElementById('auth-modal');
@@ -171,6 +210,10 @@ async function handleVerifyOTP() {
   // saved with the real address instead of null.
   const walletAddress = await waitForSolanaWallet();
   console.log('Solana wallet ready:', walletAddress || 'not yet available');
+
+  // Ensure session keys exist so future on-chain actions sign without prompts
+  const sessionKeys = await ensureSessionKeys();
+  console.log('Session keys ready:', sessionKeys ? sessionKeys.publicKey : null);
 
   closeModal();
   if (window.showAuthBanner) window.showAuthBanner('Signed in successfully!');

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@dynamic-labs-sdk/client": "^1.26.0",
     "@dynamic-labs-sdk/solana": "^1.26.0"
   },
