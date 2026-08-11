@@ -18,7 +18,7 @@ use ephemeral_rollups_sdk::vrf::{
     types::SerializableAccountMeta,
 };
 
-declare_id!("GFGDiceProgram1111111111111111111111111111111");
+declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
 pub const PLAYER: &[u8] = b"gfgplayerd";
 
@@ -60,10 +60,16 @@ pub mod gfg_dice {
         randomness: [u8; 32],
         client_seed: u8,
     ) -> Result<()> {
-        // NOTE: validate exact `random_u8_with_range` signature against the
-        // ephemeral-rollups-sdk version used during `anchor build`.
-        let roll1 = vrf::rnd::random_u8_with_range(&randomness[0..8], 1, 6);
-        let roll2 = vrf::rnd::random_u8_with_range(&randomness[8..16], 1, 6);
+        // Derive two INDEPENDENT dice from the 32 VRF bytes. `random_u8_with_range`
+        // requires a full [u8; 32] and scans it uniformly, so passing the same
+        // array twice would yield correlated rolls. Split the halves instead.
+        let mut seed1 = [0u8; 32];
+        seed1[..16].copy_from_slice(&randomness[..16]);
+        let mut seed2 = [0u8; 32];
+        seed2[..16].copy_from_slice(&randomness[16..]);
+
+        let roll1 = vrf::rnd::random_u8_with_range(&seed1, 1, 6);
+        let roll2 = vrf::rnd::random_u8_with_range(&seed2, 1, 6);
 
         ctx.accounts.player.last_roll1 = roll1;
         ctx.accounts.player.last_roll2 = roll2;

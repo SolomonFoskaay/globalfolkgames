@@ -1,0 +1,244 @@
+{
+  "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ",
+  "metadata": {
+    "name": "gfg_dice",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "GlobalFolkGames provably-fair dice via MagicBlock VRF"
+  },
+  "instructions": [
+    {
+      "name": "callback_roll_dice",
+      "docs": [
+        "Called by the VRF program (oracle-verified) with the randomness."
+      ],
+      "discriminator": [
+        129,
+        76,
+        217,
+        160,
+        252,
+        234,
+        19,
+        238
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "Scoped VRF identity PDA, bound to this program. Its presence as a signer proves",
+            "the callback was issued by the VRF program for this program."
+          ],
+          "signer": true
+        },
+        {
+          "name": "player",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "client_seed",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Idempotent: creates the payer's dice PDA if it does not exist yet."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "roll_dice",
+      "docs": [
+        "Requests verifiable randomness from the MagicBlock VRF program.",
+        "The result is delivered asynchronously via `callback_roll_dice`."
+      ],
+      "discriminator": [
+        27,
+        140,
+        230,
+        215,
+        37,
+        178,
+        226,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "client_seed",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PlayerDice",
+      "discriminator": [
+        251,
+        191,
+        236,
+        64,
+        38,
+        169,
+        51,
+        101
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "PlayerDice",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "last_roll1",
+            "type": "u8"
+          },
+          {
+            "name": "last_roll2",
+            "type": "u8"
+          },
+          {
+            "name": "last_client_seed",
+            "type": "u8"
+          },
+          {
+            "name": "last_request_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

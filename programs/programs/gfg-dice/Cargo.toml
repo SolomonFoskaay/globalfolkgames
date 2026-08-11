@@ -11,11 +11,11 @@ name = "gfg_dice"
 [features]
 anchor-debug = []
 default = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = "0.32.1"
+anchor-lang = { version = "1.0.2", features = ["init-if-needed"] }
 # VRF module ships with the ephemeral-rollups-sdk crate.
-# Match the version pinned in the MagicBlock quickstart at build time.
-ephemeral-rollups-sdk = { version = "0.6", features = ["anchor", "vrf"] }
+ephemeral-rollups-sdk = { version = "0.16.2", features = ["anchor", "vrf"] }
 
 [dev-dependencies]
