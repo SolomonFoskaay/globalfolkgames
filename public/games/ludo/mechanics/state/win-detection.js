@@ -26,6 +26,12 @@
 
         console.log(`Position ${position}: ${color.toUpperCase()}`);
 
+        // Persist immediately so a page reload keeps the crowns (finish order)
+        // for in-progress matches.
+        if (typeof saveGameStateToStorage === 'function') {
+            saveGameStateToStorage();
+        }
+
         // Reward policy (first place only, and only the signed-in user's seat):
         // - A non-user seat finishing 1st gets NO reward (it's a local/AI seat).
         // - The user finishing 1st gets +100 ONLY if the match had a valid
@@ -49,13 +55,22 @@
             } else if (!pointsAwardedThisMatch) {
                 pointsAwardedThisMatch = true;
 
-                if (typeof window.awardLocalLudoPoints === 'function') {
-                    window.awardLocalLudoPoints(100);
-                }
-
                 const proofSig = typeof window.getLastProofRollSignature === 'function'
                     ? window.getLastProofRollSignature() : null;
-                console.log(`[REWARD] 1st place (you) +100 — proof roll sig: ${proofSig}`);
+
+                if (typeof window.awardLocalLudoPoints === 'function') {
+                    // The proof-roll signature becomes the match_id in Supabase,
+                    // tying the reward to the verifiable on-chain roll.
+                    window.awardLocalLudoPoints(100, proofSig);
+                }
+
+                const explorerUrl = proofSig
+                    ? `https://explorer.solana.com/tx/${proofSig}?cluster=devnet`
+                    : null;
+                console.log(`[REWARD] 1st place (you) +100 — proof roll: ${proofSig}`);
+                if (explorerUrl) {
+                    console.log(`[REWARD] Verify on-chain → ${explorerUrl}`);
+                }
 
                 if (typeof window.showAuthBanner === 'function') {
                     window.showAuthBanner(`🎉 You finished 1st! +100 points`);
@@ -77,6 +92,23 @@
     window.getPlayerRank = function (color) {
         const index = finishOrder.indexOf(color);
         return index === -1 ? 0 : index + 1; // 0 = not finished, 1 = 1st, etc.
+    };
+
+    // Used by persistence.js to restore crowns after a reload.
+    window.serializeWinState = function () {
+        return {
+            finishOrder: finishOrder.slice(),
+            pointsAwardedThisMatch: pointsAwardedThisMatch
+        };
+    };
+
+    // Used by persistence.js to restore crowns after a reload.
+    window.hydrateWinState = function (state) {
+        if (!state) return;
+        if (Array.isArray(state.finishOrder)) {
+            finishOrder = state.finishOrder.filter(c => typeof c === 'string');
+        }
+        pointsAwardedThisMatch = !!state.pointsAwardedThisMatch;
     };
 
     // Reset only the match flags (Local points stay permanent)

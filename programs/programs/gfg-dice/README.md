@@ -71,3 +71,63 @@ and IDL are already baked into `src/gfg-dice-config.js` + `src/gfg-dice-idl.json
 `request`'s `caller_seed` uses `client_seed` (1 byte) repeated across 32 bytes.
 Keep `client_seed` unique per roll — it is the client-side entropy commitment
 included in the VRF proof.
+
+---
+
+## Gasless model — MagicBlock Ephemeral Rollup (ER)
+
+Players hold **0 SOL** by design. The app (a sponsor relay) pays the only two
+base-layer transactions a player ever needs, on first roll:
+
+1. `initialize` — creates the player's dice PDA (sponsor pays rent).
+2. `delegate` — pins the PDA into an ER session on a devnet ER validator
+   (sponsor pays the one-time session cost). Total onboarding ≈ 0.0013 SOL.
+
+After delegation, every `roll_dice` runs **gasless on the ER** and VRF is free
+(ER VRF queue). The player's session key signs; no wallet popup, no balance.
+
+### ER key addresses (devnet)
+
+| Item                  | Value                                                              |
+| --------------------- | ------------------------------------------------------------------ |
+| Delegation program    | `DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh`                     |
+| ER validator (US)     | `MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd`                      |
+| ER VRF queue (free)   | `5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc`                     |
+| Base VRF queue (paid) | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh`                     |
+| ER RPC                | `https://devnet-us.magicblock.app/` (CORS `*`, wss ok)              |
+| Magic program         | `Magic11111111111111111111111111111111111111`                       |
+| Magic context         | `MagicContext1111111111111111111111111111111`                       |
+
+Take the ER RPC URL **with a trailing slash** — some clients 404 without it.
+
+Base-layer rolls via the paid queue (0.0005–0.0008 SOL) remain as a fallback if
+the ER validator is unreachable.
+
+## PDA schema & delegation
+
+- Seed: `[b"gfgplayerd", player_authority.key()]` — keyed to the **player's
+  wallet**, NOT the payer, so any sponsor can fund it.
+- `delegate` passes the ER validator as a remaining account; the delegation
+  program pins the PDA to that validator for the session.
+
+## Sponsor relay
+
+`scripts/delegate-relay.mjs` exports `handleDelegate(playerPubkey)`, which is
+idempotent: if the PDA's owner already equals the delegation program
+(`info.owner.equals(DELEGATION_PROGRAM)`) it returns `{ delegated: true,
+steps: [] }` immediately; otherwise it runs `initialize` (+ `delegate`) and
+returns the signatures. Runs locally as `relay-server.mjs` on `:8787` (Vite
+proxies `/api` → it) and as the Vercel function `api/delegate.mjs` in prod.
+
+Gotchas (fixed):
+
+- Compare `PublicKey`s with `.equals()`, never `string === publicKeyObject`.
+  `info.owner.toBase58() === DELEGATION_PROGRAM` was silently false and caused
+  the relay to re-delegate every roll.
+- The public devnet RPC intermittently returns `null` for existing accounts, so
+  the relay retries the account read before deciding the PDA is missing.
+
+## Instructions
+
+`initialize, delegate, roll_dice, callback_roll_dice, undelegate, commit,
+process_undelegation`.

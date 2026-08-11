@@ -10,6 +10,10 @@ function displayEducationalLog(message) {
 }
 
 function saveGameStateToStorage() {
+    const winState = (typeof window.serializeWinState === 'function')
+        ? window.serializeWinState()
+        : null;
+
     const statePayload = {
         currentTurn,
         lastDiceRoll1,
@@ -21,6 +25,7 @@ function saveGameStateToStorage() {
         isGamePaused,
         setupConfigurationLocked,
         playerProfiles,
+        winState,
         tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null
     };
     localStorage.setItem('gfg_ludo_persistence_state', JSON.stringify(statePayload));
@@ -47,6 +52,11 @@ function loadGameStateFromStorage() {
             if (!playerProfiles[color]) continue;
             playerProfiles[color].mode = savedState.playerProfiles[color].mode || 'human';
             playerProfiles[color].isUser = savedState.playerProfiles[color].isUser === true;
+        }
+
+        // Restore crowns / finishing order so they survive page reloads.
+        if (typeof window.hydrateWinState === 'function' && savedState.winState) {
+            window.hydrateWinState(savedState.winState);
         }
 
         if (savedState.tokensSnapshot && typeof tokens !== 'undefined') {

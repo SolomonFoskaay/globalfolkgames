@@ -106,13 +106,41 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       (the first user roll of the match). `getOnchainProofUsedThisMatch()` +
       `getLastProofRollSignature()` gate the +100 reward in
       `win-detection.js`.
+- [x] Points flow fixed + hardened (`public/profiles.js`: `awardGlobalPoints`):
+      optimistic header bump, audit row in `point_transactions`, profile totals +
+      level update, and a device-level pending-award queue
+      (`gfg_pending_awards_<userId>`) that re-syncs on the next `refreshAuthHeader`
+      if Supabase was unreachable. RLS gap fixed via `supabase/rls_fix.sql`
+      (RUN IT ONCE) — Dynamic users have no `auth.uid()`, so the original
+      `auth.uid() = id` / `auth.uid() = user_id` policies 401/406-blocked all
+      writes. New policies trust the anon key for profiles UPDATE and
+      point_transactions SELECT/INSERT. The ludo award passes the on-chain
+      proof-roll signature as `match_id`, tying the Supabase record to the
+      verifiable roll. `syncPendingPointAwards()` de-dupes by `match_id`.
+- [x] Crowns persist: `win-detection.js` exposes `serializeWinState()` /
+      `hydrateWinState()` (finishOrder + reward-flag); `persistence.js` stores
+      `winState` in the saved payload so crowns/positions survive reloads.
+- [x] Proof-roll + reward tx IDs log a clickable Solana explorer link
+      (`https://explorer.solana.com/tx/<sig>?cluster=devnet`).
+- [x] Ludo page scroll: `100vw` gone on `#game-arena-wrapper`; body keeps
+      `overflow-y:auto`/`overflow-x:hidden` + `touch-action:pan-y` +
+      smooth `overscroll-behavior` for fluid up/down scrolling, no horizontal.
+- [x] MagicBlock research: **VRF = randomness primitive** (dice — correct tool,
+      used via the delegated VRF queue); **ER = gasless execution/runtime layer** for
+      game state incl. points/rewards ("Rewards (Delegated VRF)" is an official
+      MagicBlock example). Future on-chain points = a `record_*` instruction on
+      the ER (same delegated program), NOT the VRF itself.
 - [ ] Browser end-to-end test (login → pick "You" seat → sponsored first roll
-      → gasless ER rolls → 1st-place reward gating).
+      → gasless ER rolls → 1st-place reward gating → points appear in header +
+      local display + Supabase profile).
 - [ ] Commit a safe checkpoint.
 - [ ] Vercel deploy: `api/delegate.mjs` + `GFG_SPONSOR_KEYPAIR` env + functions
       config in `vercel.json` (function config added); consider a per-player
       sponsor spend cap.
 - [ ] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
+- [ ] On-chain points mirror (future): a `record_points`-style instruction on the
+      ER keyed to the proof roll; Supabase stays the fallback source of truth
+      across devnet wipes (re-sync on redeploy).
 
 ## Product direction
 

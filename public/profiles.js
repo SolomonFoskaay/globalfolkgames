@@ -210,7 +210,10 @@
         await updateHeader(dynamicUser);
     };
 
-    // Award points (used by Ludo later)
+    // Award points (used by Ludo later). Optimistic: the header + in-session
+    // profile update immediately; the Supabase write is attempted and, if it
+    // fails (network hiccup, RLS, devnet-side schedules), the award is queued
+    // to localStorage and re-synced on the next page load / auth refresh.
     window.awardGlobalPoints = async function (points, gameId, reason, matchId = null) {
         if (!window.currentUser || !window.currentProfile) {
             if (window.showAuthBanner) window.showAuthBanner('Sign in to earn points', true);
@@ -218,51 +221,220 @@
         }
         if (points <= 0) return false;
 
-        await window.supabaseClient.from('point_transactions').insert({
+        const oldGlobal = window.currentProfile.global_points || 0;
+        const newGlobal = oldGlobal + points;
+        const newLifetime = (window.currentProfile.lifetime_points || 0) + points;
+        const newLevel = computeLevelFromLifetime(newLifetime);
+
+        // Optimistic in-session bump so the player immediately sees the reward
+        // even when the DB is unreachable (points still persist to Supabase on
+        // the next successful sync).
+        window.currentProfile.global_points = newGlobal;
+        window.currentProfile.lifetime_points = newLifetime;
+        window.currentProfile.level = newLevel;
+        const pill = getPill();
+        const pointsEl = pill ? pill.querySelector('#display-points') : null;
+        if (pointsEl) pointsEl.textContent = `⭐ ${newGlobal.toLocaleString()} Pts`;
+        if (window.showAuthBanner) {
+            window.showAuthBanner(`+${points} pts! Total: ${newGlobal}`);
+        }
+
+        const award = {
             user_id: window.currentUser.id,
             game_id: gameId,
             points: points,
             reason: reason,
-            match_id: matchId
+            match_id: matchId,
+            created_at: new Date().toISOString()
+        };
+
+        let saved = await persistAwardToSupabase(award, {
+            global: newGlobal,
+            lifetime: newLifetime,
+            level: newLevel
         });
-
-        const newGlobal = window.currentProfile.global_points + points;
-        const newLifetime = window.currentProfile.lifetime_points + points;
-
-        let newLevel = 1;
-        if (newLifetime >= 5000) newLevel = 5;
-        else if (newLifetime >= 3000) newLevel = 4;
-        else if (newLifetime >= 1000) newLevel = 3;
-        else if (newLifetime >= 500) newLevel = 2;
-
-        const { data } = await window.supabaseClient
-            .from('profiles')
-            .update({
-                global_points: newGlobal,
-                lifetime_points: newLifetime,
-                level: newLevel
-            })
-            .eq('id', window.currentUser.id)
-            .select()
-            .single();
-
-        if (data) {
-            window.currentProfile = data;
-            const el = document.getElementById('display-points');
-            if (el) el.textContent = `⭐ ${data.global_points.toLocaleString()} Pts`;
-            if (window.showAuthBanner) {
-                window.showAuthBanner(`+${points} pts! Total: ${data.global_points}`);
-            }
-            return true;
+        if (!saved) {
+            queuePendingAward(award);
+            console.warn('[points] Supabase unavailable — reward queued on device for later sync', award);
         }
-        return false;
+        return saved;
+    };
+
+    // Level ladder used for the global spendable points.
+    function computeLevelFromLifetime(lifetimePoints) {
+        if (lifetimePoints >= 5000) return 5;
+        if (lifetimePoints >= 3000) return 4;
+        if (lifetimePoints >= 1000) return 3;
+        if (lifetimePoints >= 500) return 2;
+        return 1;
+    }
+
+    // Best-effort write of one award: insert the audit row, then write the
+    // given profile totals (the caller supplies the authoritative numbers —
+    // in the live path they already include the optimistic bump).
+    async function persistAwardToSupabase(award, totals) {
+        if (!window.supabaseClient) return false;
+        try {
+            const insert = await window.supabaseClient
+                .from('point_transactions')
+                .insert({
+                    user_id: award.user_id,
+                    game_id: award.game_id,
+                    points: award.points,
+                    reason: award.reason,
+                    match_id: award.match_id || null
+                })
+                .select('id')
+                .single();
+
+            if (insert.error) {
+                console.error('[points] point_transactions insert failed:', insert.error);
+                return false;
+            }
+
+            const update = await window.supabaseClient
+                .from('profiles')
+                .update({
+                    global_points: totals.global,
+                    lifetime_points: totals.lifetime,
+                    level: totals.level
+                })
+                .eq('id', award.user_id)
+                .select()
+                .single();
+
+            if (update.error) {
+                console.error('[points] profiles update failed:', update.error);
+                return false;
+            }
+            if (update.data) window.currentProfile = update.data;
+            return true;
+        } catch (err) {
+            console.error('[points] unexpected Supabase error:', err);
+            return false;
+        }
+    }
+
+    // Bumps the authenticated profile's global/lifetime/level by the award,
+    // recomputing FROM the CURRENT in-memory profile (not double counting).
+    // Returns true when the update round-trips a row from the DB.
+    async function updateProfileTotalsForAward(award) {
+        if (!window.supabaseClient) return false;
+        try {
+            const newGlobal = (window.currentProfile?.global_points || 0) + award.points;
+            const newLifetime = (window.currentProfile?.lifetime_points || 0) + award.points;
+            const newLevel = computeLevelFromLifetime(newLifetime);
+
+            const update = await window.supabaseClient
+                .from('profiles')
+                .update({
+                    global_points: newGlobal,
+                    lifetime_points: newLifetime,
+                    level: newLevel
+                })
+                .eq('id', award.user_id)
+                .select()
+                .single();
+
+            if (update.error) {
+                console.error('[points] profiles update failed:', update.error);
+                return false;
+            }
+            if (update.data) window.currentProfile = update.data;
+            return true;
+        } catch (err) {
+            console.error('[points] unexpected profile update error:', err);
+            return false;
+        }
+    }
+
+    // ---- pending-award queue (device-level backup of the backup) ----
+    function pendingAwardKey() {
+        return `gfg_pending_awards_${window.currentUser ? window.currentUser.id : 'anon'}`;
+    }
+
+    function queuePendingAward(award) {
+        try {
+            const key = pendingAwardKey();
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            list.push(award);
+            localStorage.setItem(key, JSON.stringify(list));
+        } catch (e) {
+            console.error('[points] failed to queue pending award', e);
+        }
+    }
+
+    window.getPendingPointAwards = function () {
+        try {
+            const key = pendingAwardKey();
+            return JSON.parse(localStorage.getItem(key) || '[]');
+        } catch (e) { return []; }
+    };
+
+    // Retry earlier queued awards. Called after auth refresh; de-dupes by
+    // match_id so a partially-applied award is never double-counted.
+    window.syncPendingPointAwards = async function () {
+        if (!window.currentUser || !window.currentProfile) return 0;
+        const key = pendingAwardKey();
+        const queued = window.getPendingPointAwards();
+        if (!queued.length) return 0;
+
+        let synced = 0;
+        const remaining = [];
+
+        for (const award of queued) {
+            let ok = false;
+            // If the same award (match) already landed in Supabase (e.g. the
+            // insert succeeded earlier but the profile bump was interrupted),
+            // only apply the missing profile bump — never double-insert.
+            if (award.match_id) {
+                const { data: existing, error } = await window.supabaseClient
+                    .from('point_transactions')
+                    .select('id')
+                    .eq('user_id', award.user_id)
+                    .eq('match_id', award.match_id)
+                    .maybeSingle();
+                if (!error && existing) {
+                    ok = await updateProfileTotalsForAward(award);
+                } else {
+                    ok = await persistAwardToSupabase(award, {
+                        global: (window.currentProfile?.global_points || 0) + award.points,
+                        lifetime: (window.currentProfile?.lifetime_points || 0) + award.points,
+                        level: computeLevelFromLifetime((window.currentProfile?.lifetime_points || 0) + award.points)
+                    });
+                }
+            } else {
+                ok = await persistAwardToSupabase(award, {
+                    global: (window.currentProfile?.global_points || 0) + award.points,
+                    lifetime: (window.currentProfile?.lifetime_points || 0) + award.points,
+                    level: computeLevelFromLifetime((window.currentProfile?.lifetime_points || 0) + award.points)
+                });
+            }
+
+            if (ok) synced++;
+            else remaining.push(award);
+        }
+
+        localStorage.setItem(key, JSON.stringify(remaining));
+        if (synced && typeof window.refreshAuthHeader === 'function') {
+            window.refreshAuthHeader();
+        }
+        if (synced && window.showAuthBanner) {
+            window.showAuthBanner(`☁️ ${synced} pending reward${synced > 1 ? 's' : ''} synced`);
+        }
+        return synced;
     };
 
     // On page load
     document.addEventListener('DOMContentLoaded', function () {
         // Give Dynamic a short moment to restore session
         setTimeout(() => {
-            window.refreshAuthHeader();
+            window.refreshAuthHeader().then(() => {
+                // Re-sync any awards queued while Supabase was unreachable.
+                if (typeof window.syncPendingPointAwards === 'function') {
+                    window.syncPendingPointAwards();
+                }
+            });
         }, 900);
     });
 })();

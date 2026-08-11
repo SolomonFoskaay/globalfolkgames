@@ -43,8 +43,10 @@
         }
     }
 
-    // Called when a human wins a match
-    window.awardLocalLudoPoints = async function (points) {
+    // Called when a human wins a match. matchId is the on-chain proof-roll
+    // tx signature, so the Supabase award row is linked to the verifiable
+    // on-chain proof (the two sources of truth stay aligned).
+    window.awardLocalLudoPoints = async function (points, matchId = null) {
         if (points <= 0) return false;
         if (!window.currentUser) {
             if (window.showAuthBanner) {
@@ -55,7 +57,7 @@
 
         // Add to Global spendable points + write audit record
         // (awardGlobalPoints already inserts into point_transactions with game_id)
-        const success = await window.awardGlobalPoints(points, 'ludo', 'human_match_win');
+        const success = await window.awardGlobalPoints(points, 'ludo', 'human_match_win', matchId);
 
         if (success) {
             // Refresh the Local points display from the database

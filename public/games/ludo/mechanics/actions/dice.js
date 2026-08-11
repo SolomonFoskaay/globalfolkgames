@@ -74,7 +74,11 @@ async function rollDiceEngine(source) {
                 onchainProofRollUsedThisMatch = true;
                 lastProofRollSignature = (window.magicblockDice && window.magicblockDice.getLastProofRollSignature)
                     ? window.magicblockDice.getLastProofRollSignature() : null;
-                console.log(`[MagicBlock VRF on Solana Blockchain] Proof roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]} sig=${lastProofRollSignature}`);
+                const explorerUrl = lastProofRollSignature
+                    ? `https://explorer.solana.com/tx/${lastProofRollSignature}?cluster=devnet`
+                    : null;
+                console.log(`[MagicBlock VRF on Solana Blockchain] Proof roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
+                console.log(`[Proof roll TX] ${explorerUrl ? explorerUrl : lastProofRollSignature}`);
                 displayEducationalLog(`${currentTurn.toUpperCase()}: VRF proof roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
             }
         } catch (err) {
