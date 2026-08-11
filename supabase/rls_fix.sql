@@ -1,2 +1,0 @@
--- For supabase table/rls sql file, you can use the following SQL code to set up Row Level Security (RLS) policies for your table. 
--- This example assumes you have a table named "your_table" and you want to restrict access based on user roles.
