@@ -13,6 +13,10 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000
+    port: 3000,
+    proxy: {
+      // App-sponsored delegation relay (scripts/relay-server.mjs)
+      '/api': 'http://localhost:8787'
+    }
   }
 });

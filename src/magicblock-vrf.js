@@ -1,31 +1,43 @@
 // src/magicblock-vrf.js
-// Provably-fair dice for the Ludo game via MagicBlock VRF (Solana devnet).
+// Provably-fair, GASLESS dice for the Ludo game via MagicBlock VRF + Ephemeral
+// Rollup (Solana devnet).
 //
-// Flow: the game calls window.magicblockDice.roll(). The module:
-//   1. ensures the player's dice PDA exists (initialize),
-//   2. sends `rollDice(clientSeed)` — signed by the Dynamic embedded wallet,
-//   3. waits for the VRF program to callback into `callback_roll_dice`,
-//   4. reads [last_roll1, last_roll2] from the PDA and returns them.
+// Why gasless: players are Web2-native and never hold SOL. On their first roll
+// the app-sponsored relay (POST config.relayUrl) creates + delegates the
+// player's dice PDA to a MagicBlock Ephemeral Rollup (the only base-layer txs,
+// paid by us). Every roll then runs on the ER:
+//   - the transaction is FREE (ER is gasless for end users),
+//   - the VRF request on the ER queue is FREE,
+//   - the player's Dynamic session key signs silently (no popup).
 //
-// The module ONLY activates once configure() has been called with a deployed
-// programId + IDL. Until then available() returns false and the game keeps
-// using its existing client-side randomness (nothing breaks).
+// Flow (roll()):
+//   1. ensure the player's dice PDA exists and is delegated (via the relay),
+//   2. send rollDice(clientSeed) on the ER, signed by the session key,
+//   3. wait for the VRF program to callback into callback_roll_dice,
+//   4. read [last_roll1, last_roll2] from the PDA and return them.
+//
+// The module ONLY activates once configure() has been called. Until then
+// available() returns false and the game keeps using local randomness.
 
 import { Connection, PublicKey } from '@solana/web3.js';
-import { AnchorProvider, Program } from '@coral-xyz/anchor';
+import { AnchorProvider, Program } from '@anchor-lang/core';
 import { getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { signTransaction, signAllTransactions } from '@dynamic-labs-sdk/solana';
 
-// Devnet base-layer VRF oracle queue (see MagicBlock VRF docs).
-const DEVNET_ORACLE_QUEUE = 'Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh';
+const DELEGATION_PROGRAM = 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 
 const config = {
-  rpcUrl: 'https://api.devnet.solana.com',
-  programId: null,   // base58 // set by configure()
-  idl: null,         // object // set by configure()
-  oracleQueue: DEVNET_ORACLE_QUEUE,
-  requestTimeoutMs: 15000,
+  baseRpcUrl: 'https://api.devnet.solana.com',
+  erRpcUrl: 'https://devnet-us.magicblock.app/',
+  erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
+  // Devnet ER VRF queue (free VRF). Base-layer queue: Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh
+  oracleQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc',
+  relayUrl: '/api/delegate',
+  programId: null,   // set by configure()
+  idl: null,         // set by configure()
+  requestTimeoutMs: 20000,
+  erPickupWaitMs: 10000,
 };
 
 function getSolanaWalletAccount() {
@@ -41,15 +53,14 @@ function getSolanaWalletAccount() {
   }
 }
 
-function getProgram() {
+// Provider pointed at the Ephemeral Rollup. Transactions here are gasless, so
+// the player's wallet (session key) can be the fee payer with zero SOL.
+function getErProgram() {
   if (!config.programId || !config.idl) return null;
   const wallet = getSolanaWalletAccount();
   if (!wallet) return null;
 
-  const connection = new Connection(config.rpcUrl, 'confirmed');
-
-  // Adapter: lets Anchor build/send transactions using the Dynamic embedded
-  // wallet for signing (session keys make this non-interactive).
+  const connection = new Connection(config.erRpcUrl, 'confirmed');
   const walletAdapter = {
     publicKey: wallet.publicKey,
     async signTransaction(transaction) {
@@ -74,7 +85,7 @@ function getProgram() {
   });
 
   return {
-    program: new Program(config.idl, new PublicKey(config.programId), provider),
+    program: new Program(config.idl, provider),
     wallet,
   };
 }
@@ -86,27 +97,65 @@ function playerPda(payerPubkey) {
   );
 }
 
-async function ensurePlayerPda(program, pda, payerPubkey) {
-  try {
-    const info = await program.provider.connection.getAccountInfo(pda);
-    if (info) return;
-  } catch (e) {
-    // getAccountInfo failure: fall through and try to create anyway.
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// True once the ER validator has the delegated account in its state.
+async function waitForErPickup(pda) {
+  const conn = new Connection(config.erRpcUrl, 'confirmed');
+  const deadline = Date.now() + config.erPickupWaitMs;
+  while (Date.now() < deadline) {
+    try {
+      const info = await conn.getAccountInfo(pda);
+      if (info && info.owner.toBase58() === DELEGATION_PROGRAM && info.data.length > 0) {
+        return true;
+      }
+    } catch (e) {
+      // ER not ready yet; keep polling.
+    }
+    await sleep(500);
   }
-  await program.methods
-    .initialize()
-    .accounts({ player: pda, payer: payerPubkey })
-    .rpc();
+  return false;
+}
+
+// App-sponsored onboarding: creates the PDA + delegates it to the ER. The
+// relay holds our devnet sponsor key, so the player never needs SOL.
+async function ensureDelegated(pda, playerPubkey) {
+  const baseConn = new Connection(config.baseRpcUrl, 'confirmed');
+  const info = await baseConn.getAccountInfo(pda);
+  if (info && info.owner.toBase58() === DELEGATION_PROGRAM) {
+    return true;
+  }
+
+  console.log('[VRF] Delegating player dice account (sponsored by GlobalFolkGames)...');
+  const res = await fetch(config.relayUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player: playerPubkey.toString() }),
+  });
+  if (!res.ok) {
+    let msg = `relay error ${res.status}`;
+    try { msg += ': ' + (await res.text()); } catch (e) { /* ignore */ }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  if (!data.delegated) throw new Error('delegation relay did not delegate the account');
+
+  return waitForErPickup(pda);
 }
 
 async function rollOnce() {
-  const ctx = getProgram();
+  const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { program, wallet } = ctx;
   const [pda] = playerPda(wallet.publicKey);
 
-  await ensurePlayerPda(program, pda, wallet.publicKey);
+  await ensureDelegated(pda, wallet.publicKey);
+
+  // The ER validator may need a moment to include the freshly delegated PDA.
+  await waitForErPickup(pda);
 
   // Unique entropy commitment for this roll (included in the VRF proof).
   const clientSeed = Math.floor(Math.random() * 256);
@@ -116,6 +165,7 @@ async function rollOnce() {
     .accounts({
       player: pda,
       payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
       oracleQueue: new PublicKey(config.oracleQueue),
     })
     .rpc();
@@ -123,7 +173,7 @@ async function rollOnce() {
   // Wait for the VRF oracle to fulfill and callback into our program.
   const deadline = Date.now() + config.requestTimeoutMs;
   while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await sleep(500);
     try {
       const account = await program.account.playerDice.fetch(pda);
       if (account.lastClientSeed === clientSeed) {
@@ -143,8 +193,11 @@ export function initMagicBlockDice() {
     configure(opts = {}) {
       if (opts.programId) config.programId = opts.programId;
       if (opts.idl) config.idl = opts.idl;
-      if (opts.rpcUrl) config.rpcUrl = opts.rpcUrl;
+      if (opts.baseRpcUrl) config.baseRpcUrl = opts.baseRpcUrl;
+      if (opts.erRpcUrl) config.erRpcUrl = opts.erRpcUrl;
+      if (opts.erValidator) config.erValidator = opts.erValidator;
       if (opts.oracleQueue) config.oracleQueue = opts.oracleQueue;
+      if (opts.relayUrl) config.relayUrl = opts.relayUrl;
     },
 
     isConfigured() {

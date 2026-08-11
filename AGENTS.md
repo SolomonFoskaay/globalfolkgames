@@ -1,0 +1,113 @@
+# GlobalFolkGames — Agent Project State
+
+This file is the source of truth for future coding sessions. If your context is
+stale, read this first, then verify with `git status` and `git log --oneline -5`.
+
+## What this project is
+
+Classic folk games (Ludo first) played in the browser, with a **provably-fair,
+GASLESS on-chain dice** powered by MagicBlock VRF. Players are onboarded
+Web2-style: they sign in with email OTP (Dynamic), never hold or pay SOL, and
+every dice roll is a cryptographically verifiable on-chain roll.
+
+## Core architecture (current)
+
+- **Player identity:** Solana wallet via Dynamic wallet (email OTP). Session-key
+  signing means no wallet popups. Player wallets hold 0 SOL by design.
+- **VRF dice:** MagicBlock VRF + gfg-dice Solana program on **devnet**.
+  Provably fair: two independent 16-byte VRF halves produce two 6-sided rolls.
+- **Gasless model — MagicBlock Ephemeral Rollup (ER):** players never pay.
+  1. On a player's first roll, a **sponsor relay** (the app) runs two base-layer
+     transactions on the player's behalf:
+     `initialize` (creates the dice PDA, sponsor pays rent) + `delegate` (moves
+     the PDA into an ER session, sponsor pays the one-time session cost).
+     Total onboarding cost ~0.0013 SOL.
+  2. After delegation, every roll runs **free** on the ER (public ER nodes are
+     gasless; VRF on the ER queue is free). Player's session key signs.
+  3. Base-layer rolls via the paid queue (0.0005–0.0008 SOL) remain available as
+     a fallback if the ER validator is unreachable.
+
+## Key addresses (devnet)
+
+| Item | Value |
+| --- | --- |
+| gfg-dice program | `CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ` (upgrade authority = deployer) |
+| Deployer/sponsor wallet | `5ec9bYwVJVSfM3xnrzpg9jkoepX58pY1tWoGDsMdhdTQ` (~12.8 SOL) |
+| Delegation program | `DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh` |
+| ER validator (US) | `MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd` |
+| ER VRF queue (free) | `5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc` |
+| Base VRF queue (paid) | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh` |
+| ER RPC | `https://devnet-us.magicblock.app/` (CORS `*`, wss ok) |
+| Magic program | `Magic11111111111111111111111111111111111111` |
+| Magic context | `MagicContext1111111111111111111111111111111` |
+
+Dice PDA seed: `[b"gfgplayerd", player_authority.key()]` (the player's wallet,
+NOT the payer — so any sponsor can fund it).
+
+Program instructions: `callback_roll_dice, commit, delegate, initialize,
+process_undelegation, roll_dice, undelegate`.
+
+## Sponsor relay
+
+Players' accounts are funded by an app-owned sponsor key through a relay:
+
+- `scripts/delegate-relay.mjs` — core `handleDelegate(playerPubkey)`. Idempotent:
+  returns `{pda, delegated: true, steps: []}` if already delegated; otherwise
+  initializes + delegates and returns the signatures. Retries the account read
+  (public devnet RPC is flaky) and recovers if the delegate tx loses a race.
+- `scripts/relay-server.mjs` — local HTTP server on `:8787`, `POST /api/delegate`
+  with `{player}`. Vite dev proxies `/api` → it.
+- `api/delegate.mjs` — the same handler as a Vercel serverless function.
+
+Sponsor key: env `GFG_SPONSOR_KEYPAIR` (JSON array of 64 ints, solana CLI
+keypair format) or fallback `~/.config/solana/id.json`.
+
+Important gotcha (fixed): always compare `PublicKey` with `.equals()`, never
+`someString === publicKeyObject`. `info.owner.toBase58() === DELEGATION_PROGRAM`
+was silently false and made the relay re-delegate every time, failing with
+web3.js's opaque `Unknown action 'undefined'` error.
+
+## How to run
+
+- Toolchain: Rust 1.97.1, solana-cli 3.1.10, anchor-cli 1.0.2, **Node 18.19.1**.
+  `concurrently` requires Node 20, so dev uses `scripts/dev.mjs` instead.
+- `npm install` then `npm run dev` → starts the sponsor relay (:8787) + Vite
+  (:3000). Open http://localhost:3000.
+- Sign in with an email OTP (Dynamic). Play Ludo (Human vs 3 computers).
+  First human roll logs `[VRF] Delegating player dice account (sponsored by
+  GlobalFolkGames)...` then resolves instantly on-chain. Computer turns log
+  `[Off-Chain Local Randomness] Computer turn — rolling locally`.
+- `npm run relay` runs just the relay.
+- Program work: `cd programs && anchor build && anchor deploy`.
+- Build: `npm run build` (vite).
+
+Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
+(nested uuid v9 is ESM and breaks web3's CJS `require`).
+
+## Verified
+
+- Full ER VRF flow proven via harness (`/tmp/opencode/er-test/er-test.mjs`):
+  init (base) → delegate (base) → roll on ER gasless (player fee payer with 0
+  SOL) → VRF callback (`{roll1:1, roll2:1, seed:234}`) → undelegate.
+- Relay: fresh player → sponsored init+delegate; already-delegated → no-op.
+- Vite proxy `/api` → relay → on-chain: working.
+- `npm run build` green.
+
+## Status / next steps
+
+- [x] Program upgraded to ER (ephemeral/delegate/commit/undelegate), deployed.
+- [x] IDL synced to `src/gfg-dice-idl.json`.
+- [x] Sponsor relay (local + Vercel fn) built and tested.
+- [x] Client rewritten for ER (`src/magicblock-vrf.js`, `src/gfg-dice-config.js`).
+- [x] AI/computer turns skip VRF (`public/games/ludo/mechanics/actions/dice.js`).
+- [ ] Browser end-to-end test (login → sponsored first roll → gasless ER rolls).
+- [ ] Commit a safe checkpoint.
+- [ ] Vercel deploy: `api/delegate.mjs` + `GFG_SPONSOR_KEYPAIR` env + functions
+      config in `vercel.json`; consider a per-player sponsor spend cap.
+- [ ] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
+
+## Product direction
+
+- Devnet now, mainnet later. App pays all fees; players never fund wallets.
+- Showcase/grant-ready: folk games with Web2 onboarding + real on-chain
+  verifiable fairness. Competition-based earn, no token launch.

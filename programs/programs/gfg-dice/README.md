@@ -54,7 +54,14 @@ If you want to bump the program ID, instead generate a new keypair and update
 `declare_id!` in `src/lib.rs` + `[programs.devnet]` in `Anchor.toml`, then build
 and deploy.
 
-## Vercel / client note
+## Client note (important)
+
+The program is built with **Anchor 1.x**, which emits the new "spec" IDL format.
+The browser client MUST use the matching 1.x SDK — `@anchor-lang/core` (NOT the
+old `@coral-xyz/anchor` 0.32 client, which crashes parsing spec IDLs).
+`src/magicblock-vrf.js` imports `Program`/`AnchorProvider` from
+`@anchor-lang/core` and constructs it as `new Program(idl, provider)` (the
+program ID is read from `idl.address`, not passed separately).
 
 `programs/` is not built by Vercel — the site only ships `src/`. The program ID
 and IDL are already baked into `src/gfg-dice-config.js` + `src/gfg-dice-idl.json`.

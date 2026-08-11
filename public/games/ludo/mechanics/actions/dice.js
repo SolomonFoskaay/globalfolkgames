@@ -39,8 +39,10 @@ async function rollDiceEngine(source) {
     // When the MagicBlock VRF module is configured + a wallet is connected,
     // request the true on-chain roll. Otherwise fall back to the existing
     // local randomness so the game keeps working identically.
+    // Only HUMAN turns roll on-chain — computer turns always use local rolls.
+    const isComputerTurn = playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'computer';
     let rollValues = null;
-    if (window.magicblockDice && window.magicblockDice.available()) {
+    if (!isComputerTurn && window.magicblockDice && window.magicblockDice.available()) {
         try {
             if (totalDisplay) totalDisplay.innerText = 'VRF rolling...';
             displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting on-chain randomness [MagicBlock VRF on Solana Blockchain]...`);
@@ -57,6 +59,9 @@ async function rollDiceEngine(source) {
             }
             rollValues = null;
         }
+    } else if (isComputerTurn) {
+        activeDiceSource = 'offchain';
+        console.log('[Off-Chain Local Randomness] Computer turn — rolling locally (VRF is human-only).');
     } else if (!window.magicblockDice || !window.magicblockDice.available()) {
         activeDiceSource = 'offchain';
         console.log('[Off-Chain Local Randomness] MagicBlock VRF on Solana not active — rolling locally.');
