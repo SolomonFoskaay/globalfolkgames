@@ -23,20 +23,25 @@
             // Try to get the Solana wallet address
             let solanaWallet = null;
             try {
-                const wallets = window.dynamicClient.auth?.walletAccounts
-                    || window.dynamicClient.walletAccounts
-                    || user.walletAccounts
-                    || [];
+                // Preferred: read via the SDK helper exposed by src/dynamic-auth.js
+                if (window.getDynamicSolanaWallet) {
+                    solanaWallet = window.getDynamicSolanaWallet();
+                }
+                if (!solanaWallet) {
+                    const wallets = window.dynamicClient?.walletAccounts
+                        || user.walletAccounts
+                        || [];
 
-                // Find a Solana wallet
-                const solWallet = wallets.find(w =>
-                    w.chain === 'solana' ||
-                    w.chainName === 'solana' ||
-                    (w.address && w.address.length >= 32 && w.address.length <= 44)
-                );
+                    // Find a Solana wallet
+                    const solWallet = wallets.find(w =>
+                        w.chain === 'solana' ||
+                        w.chain === 'SOL' ||
+                        (w.address && w.address.length >= 32 && w.address.length <= 44)
+                    );
 
-                if (solWallet) {
-                    solanaWallet = solWallet.address || solWallet.publicKey || null;
+                    if (solWallet) {
+                        solanaWallet = solWallet.address || solWallet.publicKey || null;
+                    }
                 }
             } catch (e) {
                 console.warn('Could not read Solana wallet', e);
@@ -73,7 +78,23 @@
         }
 
         // 2. Profile already exists
-        if (profile) return profile;
+        if (profile) {
+            // Backfill the wallet if it was captured as null earlier
+            // (e.g. signup happened before Dynamic finished creating the wallet)
+            if (!profile.solana_wallet && dynamicUser.solanaWallet) {
+                const { error: backfillError } = await window.supabaseClient
+                    .from('profiles')
+                    .update({ solana_wallet: dynamicUser.solanaWallet })
+                    .eq('dynamic_user_id', dynamicUser.dynamicId);
+
+                if (backfillError) {
+                    console.error('Profile wallet backfill error:', backfillError);
+                } else {
+                    profile.solana_wallet = dynamicUser.solanaWallet;
+                }
+            }
+            return profile;
+        }
 
         // 3. Create new profile
         let bonus = 500;

@@ -2,7 +2,7 @@
 // Primary login via Dynamic (email OTP → self-custody Solana wallet)
 // Supabase is backup only
 
-import { createDynamicClient, sendEmailOTP, verifyOTP, logout } from '@dynamic-labs-sdk/client';
+import { createDynamicClient, sendEmailOTP, verifyOTP, logout, getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { addSolanaExtension } from '@dynamic-labs-sdk/solana';
 import { createWaasWalletAccounts, getChainsMissingWaasWalletAccounts } from '@dynamic-labs-sdk/client/waas';
 
@@ -22,6 +22,36 @@ window.dynamicClient = dynamicClient;
 console.log('Dynamic client initialized');
 
 let currentOtpVerification = null;
+
+// Read the current session's embedded Solana wallet address via the SDK.
+// The client exposes wallet accounts through getWalletAccounts(), not via
+// dynamicClient.auth.walletAccounts as older SDK versions did.
+function getSolanaWallet() {
+    try {
+        const accounts = getWalletAccounts(dynamicClient);
+        const sol = accounts.find(w => w.chain === 'SOL' && w.address);
+        return sol ? sol.address : null;
+    } catch (e) {
+        console.warn('Could not read Solana wallet', e);
+        return null;
+    }
+}
+
+// Poll until Dynamic has actually registered the created wallet account.
+// createWaasWalletAccounts() can resolve before the account is queryable,
+// so we must wait for it before persisting the profile.
+async function waitForSolanaWallet(timeoutMs = 10000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const address = getSolanaWallet();
+        if (address) return address;
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    return null;
+}
+
+// Expose for profiles.js so it reads the wallet through the same reliable path
+window.getDynamicSolanaWallet = getSolanaWallet;
 
 window.openDynamicLogin = function () {
   const modal = document.getElementById('auth-modal');
@@ -128,22 +158,25 @@ async function handleVerifyOTP() {
     if (missingChains && missingChains.length > 0) {
       await createWaasWalletAccounts({ chains: missingChains });
       console.log('Embedded Solana wallet created');
-    } else {
-      // Force creation for Solana if the helper returns empty
-      await createWaasWalletAccounts({ chains: ['solana'] });
+    } else if (!getSolanaWallet()) {
+      // No missing chains reported but wallet not visible yet — create for Solana
+      await createWaasWalletAccounts({ chains: ['SOL'] });
       console.log('Embedded Solana wallet created (forced)');
     }
   } catch (walletErr) {
     console.error('Wallet creation error:', walletErr);
   }
 
+  // Wait until Dynamic exposes the created wallet account, so the profile is
+  // saved with the real address instead of null.
+  const walletAddress = await waitForSolanaWallet();
+  console.log('Solana wallet ready:', walletAddress || 'not yet available');
+
   closeModal();
   if (window.showAuthBanner) window.showAuthBanner('Signed in successfully!');
 
-  // Refresh header after a short delay so the wallet is available
-  setTimeout(() => {
-    if (window.refreshAuthHeader) window.refreshAuthHeader();
-  }, 800);
+  // Refresh header now that the wallet is guaranteed available
+  if (window.refreshAuthHeader) await window.refreshAuthHeader();
 
   } catch (err) {
     console.error('Verify OTP error:', err);
