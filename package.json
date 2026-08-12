@@ -15,6 +15,9 @@
     "@dynamic-labs-sdk/solana": "^1.26.0",
     "@solana/web3.js": "^1.98.1"
   },
+  "engines": {
+    "node": "20.x"
+  },
   "devDependencies": {
     "vite": "^5.4.21"
   },
