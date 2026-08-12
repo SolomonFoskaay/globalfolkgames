@@ -10,9 +10,13 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'POST only' });
     return;
   }
+  // Vercel auto-parses JSON request bodies into an object; local relay sends
+  // a raw string. Accept either so the client's application/json fetch works.
   let body = {};
   try {
-    body = JSON.parse(req.body || '{}');
+    body = typeof req.body === 'string' && req.body.length
+      ? JSON.parse(req.body)
+      : (req.body || {});
   } catch (e) {
     res.status(400).json({ error: 'invalid JSON body' });
     return;
