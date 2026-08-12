@@ -147,20 +147,27 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] Checkpoint committed (`23cf30b` points+RLS hardening, `256cd47` removed
       `rls_fix.sql` from the repo). Repo is now **private** (personal GitHub
       account on purpose — a GitHub org would force a paid Vercel plan).
-- [ ] **Vercel deploy (current focus):** repo link (private personal repo is
-      fine on the free plan), then `GFG_SPONSOR_KEYPAIR` env var = the raw
-      contents of `~/.config/solana/id.json` (JSON array of 64 ints — verified
-      it IS the sponsor wallet `5ec9bY...`, devnet, ~12.8 SOL). After deploy,
-      add `https://globalfolkgames.fun` to Dynamic's allowed origins (OTP
-      sign-in breaks otherwise); Supabase needs nothing. Test: first user roll
-      must log the sponsored `initialize + delegate`. Consider a per-player
-      sponsor spend cap (matters on mainnet).
-      Vercel function config is already in `vercel.json`
-      (`api/delegate.mjs`, nodejs20, maxDuration 30).
+- [ ] **Vercel deploy (near-done):** domain `https://globalfolkgames.fun` live
+      (personal repo + free plan works). `GFG_SPONSOR_KEYPAIR` env set (raw
+      contents of `~/.config/solana/id.json`). Dynamic CORS origin added
+      (`https://globalfolkgames.fun`, plus localhost in sandbox). Remaining:
+      final deploy (fix already made: `api/delegate.mjs` accepts Vercel's
+      pre-parsed JSON body; `vercel.json` drops invalid `runtime` and pins node
+      via `engines` — pushed by owner) then the on-chain onboarding probe
+      (first roll must log sponsored `initialize + delegate`). Add
+      `https://globalfolkgames.fun` to Dynamic allowed origins if OTP breaks.
+      Per-player sponsor spend cap still pending (matters on mainnet).
 - [x] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
 - [ ] On-chain points mirror (future): a `record_points`-style instruction on the
       ER keyed to the proof roll; Supabase stays the fallback source of truth
       across devnet wipes (re-sync on redeploy).
+- [ ] **Analytics (LAST STEP, after rewards are stable):** add usage tracking.
+      Google Analytics 4 (free) + gravity/event-based option for game events,
+      hotjar/ms clarity (free) for session replays/funnels, and a free
+      game-testing/analytics layer if needed. Also research ad monetization:
+      player-friendly rewarded-ads (not intrusive) for ads platforms that pair
+      with webgames. Log the 1 add platform per-game. Keep GDPR/consent light
+      (email-OTP users) and avoid selling/anonymizing on-chain data.
 
 ## Product direction
 
