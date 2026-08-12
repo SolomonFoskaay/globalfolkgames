@@ -140,6 +140,7 @@ canvas {
     box-shadow: 0 6px 18px rgba(0,0,0,0.6); 
     border-radius: 8px; 
     display: block;
+    touch-action: pan-y; /* VERTICAL SCROLL GESTURES ON THE BOARD ITSELF; BLOCKS HORIZONTAL */
 }
 
 /* Persistent Console Control Center Container */

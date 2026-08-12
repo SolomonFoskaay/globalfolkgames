@@ -204,12 +204,5 @@ document.addEventListener('DOMContentLoaded', () => {
         ludoCanvasElement.addEventListener('click', (event) => {
             handleInputInteraction(event.clientX, event.clientY);
         });
-
-        ludoCanvasElement.addEventListener('touchstart', (event) => {
-            event.preventDefault();
-            if (event.touches.length > 0) {
-                handleInputInteraction(event.touches[0].clientX, event.touches[0].clientY);
-            }
-        }, { passive: false });
     }
 });
