@@ -10,6 +10,17 @@ GASLESS on-chain dice** powered by MagicBlock VRF. Players are onboarded
 Web2-style: they sign in with email OTP (Dynamic), never hold or pay SOL, and
 every dice roll is a cryptographically verifiable on-chain roll.
 
+## Terminology (IMPORTANT — do not confuse these)
+
+- **VRF** = the randomness primitive. All dice randomness comes from MagicBlock
+  **VRF** (on-chain, verifiable). When talking about dice/randomness, use
+  "VRF" — never "ER".
+- **ER (Ephemeral Rollup)** = the gasless execution/points/rewards LAYER. The
+  ER is where future on-chain rewards live (`record_points`-style instruction on
+  the same delegated program) and where rolls are executed gaslessly. Do NOT
+  call dice randomness "ER randomness"; calls it the "ER VRF queue" only when
+  describing WHERE the VRF runs. When discussing rewards/points, use "ER".
+
 ## Core architecture (current)
 
 - **Player identity:** Solana wallet via Dynamic wallet (email OTP). Session-key
@@ -110,11 +121,11 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       optimistic header bump, audit row in `point_transactions`, profile totals +
       level update, and a device-level pending-award queue
       (`gfg_pending_awards_<userId>`) that re-syncs on the next `refreshAuthHeader`
-      if Supabase was unreachable. RLS gap fixed via `supabase/rls_fix.sql`
-      (RUN IT ONCE) — Dynamic users have no `auth.uid()`, so the original
-      `auth.uid() = id` / `auth.uid() = user_id` policies 401/406-blocked all
-      writes. New policies trust the anon key for profiles UPDATE and
-      point_transactions SELECT/INSERT. The ludo award passes the on-chain
+      if Supabase was unreachable. RLS gap fixed — Dynamic users have no
+      `auth.uid()`, so the original `auth.uid() = id` / `auth.uid() = user_id`
+      policies 401/406-blocked all writes. The fix was a one-time Supabase SQL
+      script (already RUN in the Supabase project; kept OUT of the repo on
+      purpose — do not re-add it). The ludo award passes the on-chain
       proof-roll signature as `match_id`, tying the Supabase record to the
       verifiable roll. `syncPendingPointAwards()` de-dupes by `match_id`.
 - [x] Crowns persist: `win-detection.js` exposes `serializeWinState()` /
@@ -133,11 +144,20 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [ ] Browser end-to-end test (login → pick "You" seat → sponsored first roll
       → gasless ER rolls → 1st-place reward gating → points appear in header +
       local display + Supabase profile).
-- [ ] Commit a safe checkpoint.
-- [ ] Vercel deploy: `api/delegate.mjs` + `GFG_SPONSOR_KEYPAIR` env + functions
-      config in `vercel.json` (function config added); consider a per-player
-      sponsor spend cap.
-- [ ] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
+- [x] Checkpoint committed (`23cf30b` points+RLS hardening, `256cd47` removed
+      `rls_fix.sql` from the repo). Repo is now **private** (personal GitHub
+      account on purpose — a GitHub org would force a paid Vercel plan).
+- [ ] **Vercel deploy (current focus):** repo link (private personal repo is
+      fine on the free plan), then `GFG_SPONSOR_KEYPAIR` env var = the raw
+      contents of `~/.config/solana/id.json` (JSON array of 64 ints — verified
+      it IS the sponsor wallet `5ec9bY...`, devnet, ~12.8 SOL). After deploy,
+      add `https://globalfolkgames.fun` to Dynamic's allowed origins (OTP
+      sign-in breaks otherwise); Supabase needs nothing. Test: first user roll
+      must log the sponsored `initialize + delegate`. Consider a per-player
+      sponsor spend cap (matters on mainnet).
+      Vercel function config is already in `vercel.json`
+      (`api/delegate.mjs`, nodejs20, maxDuration 30).
+- [x] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
 - [ ] On-chain points mirror (future): a `record_points`-style instruction on the
       ER keyed to the proof roll; Supabase stays the fallback source of truth
       across devnet wipes (re-sync on redeploy).
