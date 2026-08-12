@@ -1,0 +1,208 @@
+/**
+ * GlobalFolkGames Ludo Module - Token Transformation & Movement Vector Engine
+ * Handles user touch inputs, coordinate transformations, and AI move exceptions.
+ */
+
+function handleInputInteraction(clientX, clientY) {
+    if (isGamePaused) return; 
+    if (playerProfiles[currentTurn].mode === 'computer') return;
+
+    if (!isDiceRolled || currentTurnMoves.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
+    const mouseY = ((clientY - rect.top) / rect.height) * canvas.height;
+
+    const clickedCol = Math.floor(mouseX / CELL_SIZE);
+    const clickedRow = Math.floor(mouseY / CELL_SIZE);
+
+    let activeTokens = tokens[currentTurn];
+    
+    let selectedTokenIndex = activeTokens.findIndex((token, idx) => {
+        if (token.stepsWalked >= 57) return false; 
+        return token.c === clickedCol && token.r === clickedRow && isTokenMovable(currentTurn, token, idx);
+    });
+
+    if (selectedTokenIndex !== -1) {
+        processTokenMovementExecution(selectedTokenIndex);
+    }
+}
+
+function processTokenMovementExecution(selectedTokenIndex) {
+    const upperColor = currentTurn.toUpperCase();
+    let activeTokens = tokens[currentTurn];
+    let currentPiece = activeTokens[selectedTokenIndex];
+    let isInsideYard = isTokenInHomeYard(currentTurn, currentPiece);
+    let appliedMoveValue = isInsideYard ? 6 : (currentTurnMoves.includes(6) ? 6 : currentTurnMoves[0]);
+
+    if (isInsideYard) {
+        currentPiece.pathIndex = START_INDEX[currentTurn];
+        currentPiece.stepsWalked = 0;
+        currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
+        currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
+        displayEducationalLog(`${upperColor}: Released token out onto safe tracking tile.`);
+    } else {
+        // EXCEPTION HANDLER: Handle dice overflow requirements smoothly
+        // if (currentPiece.stepsWalked + appliedMoveValue > 57) {
+        //     displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+            
+        //     // If the current slot is a computer player, automate recovery to prevent freezes
+        //     if (playerProfiles[currentTurn].mode === 'computer') {
+        //         let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+        //         if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+                
+        //         if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
+        //         if (currentTurnMoves.length > 0) {
+        //             let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+        //             if (!hasValidRemainingMove) {
+        //                 displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
+        //                 setTimeout(() => {
+        //                     if (isGamePaused) return;
+        //                     passTurnSequence();
+        //                 }, 1500);
+        //                 return;
+        //             }
+        //             // Retry automated loop execution with the remaining valid die value
+        //             setTimeout(() => {
+        //                 if (isGamePaused) return;
+        //                 if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
+        //             }, 1500);
+        //         } else {
+        //             // Wiped out all moves via overflow, cycle turn smoothly
+        //             setTimeout(() => {
+        //                 if (isGamePaused) return;
+        //                 passTurnSequence();
+        //             }, 1500);
+        //         }
+        //     }
+        //     return; 
+        // }
+        if (currentPiece.stepsWalked + appliedMoveValue > 57) {
+    displayEducationalLog(`${upperColor}: Dice value overflows home center requirements.`);
+
+    // Remove the unusable die
+    let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+    if (spentIndex !== -1) {
+        currentTurnMoves.splice(spentIndex, 1);
+    }
+
+    if (typeof saveGameStateToStorage === 'function') {
+        saveGameStateToStorage();
+    }
+
+    // ===== PRAGMATIC RULE =====
+    // If there are still usable moves left, try them.
+    // Otherwise just pass the turn so the game never freezes.
+    let hasValidRemainingMove = currentTurnMoves.length > 0 &&
+        activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+
+    if (hasValidRemainingMove && playerProfiles[currentTurn].mode === 'computer') {
+        // Computer can still try the remaining die
+        setTimeout(() => {
+            if (isGamePaused) return;
+            if (typeof executeAutomatedComputerMove === 'function') {
+                executeAutomatedComputerMove();
+            }
+        }, 1000);
+    } else {
+        // No clean move left → pass turn (works for both human & computer)
+        displayEducationalLog(`${upperColor}: No valid remaining moves. Passing turn.`);
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 1000);
+    }
+
+    return;
+}
+
+        currentPiece.stepsWalked += appliedMoveValue;
+        
+        if (currentPiece.stepsWalked >= 52) {
+            currentPiece.pathIndex = -2; 
+            let laneOffset = currentPiece.stepsWalked - 51;
+
+            if (currentTurn === 'green') { currentPiece.c = laneOffset; currentPiece.r = 7; }
+            if (currentTurn === 'yellow') { currentPiece.c = 7; currentPiece.r = laneOffset; }
+            if (currentTurn === 'blue') { currentPiece.c = 14 - laneOffset; currentPiece.r = 7; }
+            if (currentTurn === 'red') { currentPiece.c = 7; currentPiece.r = 14 - laneOffset; }
+
+            if (currentPiece.stepsWalked === 57) {
+                displayEducationalLog(`${upperColor}: Token reached absolute home center goal!`);
+                // Check if this player has now finished all 4 tokens
+                if (typeof window.checkForMatchWinner === 'function') {
+                    window.checkForMatchWinner(currentTurn);
+                }
+            } else {
+                displayEducationalLog(`${upperColor}: Token advanced inside safe home lane.`);
+            }
+        } else {
+            currentPiece.pathIndex = (currentPiece.pathIndex + appliedMoveValue) % 52;
+            currentPiece.c = COMMON_PATH[currentPiece.pathIndex].c;
+            currentPiece.r = COMMON_PATH[currentPiece.pathIndex].r;
+            displayEducationalLog(`${upperColor}: Token advanced clockwise along track.`);
+        }
+    }
+
+    if (typeof checkCaptureMechanic === 'function') {
+        checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens);
+    }
+
+    let spentIndex = currentTurnMoves.indexOf(appliedMoveValue);
+    if (spentIndex !== -1) currentTurnMoves.splice(spentIndex, 1);
+
+    if (typeof drawLudoLayout === 'function') drawLudoLayout();
+
+    // Commit token placement transformations directly to LocalStorage
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
+    if (currentTurnMoves.length > 0) {
+        displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
+        let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
+        if (!hasValidRemainingMove) {
+            displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
+            setTimeout(() => {
+                if (isGamePaused) return;
+                passTurnSequence();
+            }, 1500);
+            return;
+        }
+
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                if (isGamePaused) return;
+                if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
+            }, 1500);
+        }
+        return;
+    }
+
+    if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
+        displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
+        isDiceRolled = false; 
+        hasRolledThisTurn = false;
+        if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+        
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                if (isGamePaused) return;
+                if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
+            }, 1500);
+        }
+    } else {
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 500);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ludoCanvasElement = document.getElementById('ludoCanvas');
+    if (ludoCanvasElement) {
+        ludoCanvasElement.addEventListener('click', (event) => {
+            handleInputInteraction(event.clientX, event.clientY);
+        });
+    }
+});

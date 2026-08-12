@@ -23,6 +23,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { signTransaction, signAllTransactions } from '@dynamic-labs-sdk/solana';
+import { getDelegationStatus } from './gfg-rpc.js';
 
 const DELEGATION_PROGRAM = 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
@@ -106,13 +107,17 @@ function sleep(ms) {
 let lastProofRollSignature = null;
 
 // True once the ER validator has the delegated account in its state.
+// The ER hosts the account under its ORIGINAL program owner (getAccountInfo on
+// the ER RPC returns owner=our program once picked up), so existence of the
+// account with data on the ER RPC is the correct "picked up" signal — NOT
+// owner===DELEGATION_PROGRAM (that would never match on an ER RPC).
 async function waitForErPickup(pda) {
   const conn = new Connection(config.erRpcUrl, 'confirmed');
   const deadline = Date.now() + config.erPickupWaitMs;
   while (Date.now() < deadline) {
     try {
       const info = await conn.getAccountInfo(pda);
-      if (info && info.owner.toBase58() === DELEGATION_PROGRAM && info.data.length > 0) {
+      if (info && info.owner.toBase58() === config.programId && info.data.length > 0) {
         return true;
       }
     } catch (e) {
@@ -125,11 +130,17 @@ async function waitForErPickup(pda) {
 
 // App-sponsored onboarding: creates the PDA + delegates it to the ER. The
 // relay holds our devnet sponsor key, so the player never needs SOL.
+// Delegation is checked via the Magic Router's getDelegationStatus (not
+// getAccountInfo.owner): with the Router as the base RPC, getAccountInfo
+// returns the ER-side view where the account is owned by OUR program, so the
+// owner can never equal the delegation program even when delegated.
 async function ensureDelegated(pda, playerPubkey) {
   const baseConn = new Connection(config.baseRpcUrl, 'confirmed');
-  const info = await baseConn.getAccountInfo(pda);
-  if (info && info.owner.toBase58() === DELEGATION_PROGRAM) {
-    return true;
+  try {
+    const status = await getDelegationStatus(baseConn, pda);
+    if (status && status.isDelegated) return true;
+  } catch (e) {
+    // Router not reachable; fall back to the relay (it is idempotent).
   }
 
   console.log('[VRF] Delegating player dice account (sponsored by GlobalFolkGames)...');

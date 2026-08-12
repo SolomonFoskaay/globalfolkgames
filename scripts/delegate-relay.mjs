@@ -21,6 +21,8 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
+import './load-env.mjs'; // load .env (Alchemy key) before resolving the RPC chain
+import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus } from '../src/gfg-rpc.js';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 
@@ -28,7 +30,11 @@ const PROGRAM_ID = new PublicKey(idl.address);
 const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 // Devnet ER validator this player PDA is pinned to (US region).
 const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
-const BASE_URL = 'https://api.devnet.solana.com';
+// Base-layer devnet RPC (Router-first). The gfg-dice client, the sponsor relay
+// and the lab harnesses all read their devnet RPC here. See src/gfg-rpc.js for
+// the full chain: Magic Router (primary) -> GFG_DEVNET_RPC (Alchemy key) ->
+// keyless OnFinality public -> api.devnet.solana.com (last resort).
+const BASE_URL = baseRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 
 export function loadSponsor() {
@@ -53,32 +59,44 @@ function mkWallet(kp) {
 export async function handleDelegate(playerPubkey) {
   const player = new PublicKey(playerPubkey);
   const sponsor = loadSponsor();
-  const conn = new Connection(BASE_URL, 'confirmed');
+  // Polling confirm: Alchemy's devnet endpoint doesn't implement the
+  // signatureSubscribe websocket method, so web3's default confirm would hang
+  // even when the tx landed. createConnection polls getSignatureStatuses.
+  const conn = createConnection(BASE_URL, 'confirmed');
   const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
   const program = new Program(idl, provider);
 
   const [pda] = PublicKey.findProgramAddressSync([PLAYER_SEED, player.toBytes()], PROGRAM_ID);
 
-  // The public devnet RPC intermittently returns null for existing accounts;
-  // retry before concluding the PDA is missing.
-  let info = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    info = await conn.getAccountInfo(pda);
-    if (info) break;
-    await new Promise(r => setTimeout(r, 400));
-  }
-  const delegated = !!info && info.owner.equals(DELEGATION_PROGRAM);
-  if (delegated) {
+  // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
+  // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
+  // returns the ER-side view of the account (owner = OUR program, because the
+  // ER hosts the account's state), which never equals the delegation program.
+  // getDelegationStatus is the authoritative answer and also tells us WHICH
+  // region the account lives on.
+  const retry = async (fn, n = 4, delay = 400) => {
+    for (let i = 0; i < n; i++) {
+      try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); }
+    }
+    return null;
+  };
+  const status = await retry(() => getDelegationStatus(conn, pda));
+  if (status && status.isDelegated) {
     return { pda: pda.toString(), delegated: true, steps: [] };
   }
 
+  // The PDA needs to exist on the base layer before we can delegate it. Read
+  // via the Router (ER-side view is fine for existence checking).
+  const info = await retry(() => conn.getAccountInfo(pda));
   const steps = [];
 
   // 1) Create the PDA if it does not exist yet.
   if (!info) {
-    const sig = await program.methods.initialize()
-      .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player })
-      .rpc();
+    const sig = await sendAndConfirmBase(conn, sponsor,
+      program.methods.initialize()
+        .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player })
+        .transaction()
+    );
     steps.push({ step: 'initialize', sig });
   }
 
@@ -87,27 +105,29 @@ export async function handleDelegate(playerPubkey) {
   const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pda.toBytes()], DELEGATION_PROGRAM);
   const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBytes()], DELEGATION_PROGRAM);
 
-  const sig = await program.methods.delegate()
-    .accounts({
-      payer: sponsor.publicKey,
-      playerAuthority: player,
-      player: pda,
-      bufferPlayer: buffer,
-      delegationRecordPlayer: record,
-      delegationMetadataPlayer: metadata,
-      ownerProgram: PROGRAM_ID,
-      delegationProgram: DELEGATION_PROGRAM,
-      systemProgram: SystemProgram.programId,
-    })
-    .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
-    .rpc()
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      program.methods.delegate()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          player: pda,
+          bufferPlayer: buffer,
+          delegationRecordPlayer: record,
+          delegationMetadataPlayer: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
     .catch(async (err) => {
       // If delegation failed (e.g. the account was already delegated a moment
       // ago), confirm the account really is delegated now and treat it as
       // success. Otherwise rethrow with the on-chain error details.
       await new Promise(r => setTimeout(r, 600));
-      const after = await conn.getAccountInfo(pda);
-      if (after && after.owner.equals(DELEGATION_PROGRAM)) {
+      const after = await getDelegationStatus(conn, pda);
+      if (after && after.isDelegated) {
         return { alreadyDelegated: true };
       }
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
@@ -116,4 +136,15 @@ export async function handleDelegate(playerPubkey) {
   if (!sig.alreadyDelegated) steps.push({ step: 'delegate', sig });
 
   return { pda: pda.toString(), delegated: true, steps };
+}
+
+// Send a base-layer tx through the Magic Router with the correct per-layer
+// blockhash (getBlockhashForAccounts), then confirm by polling the Router.
+// Anchor's `.rpc()` uses getLatestBlockhash, which the Router answers with its
+// OWN layer blockhash — invalid on base Solana. Must NOT be used here.
+async function sendAndConfirmBase(conn, sponsor, transaction) {
+  transaction.feePayer = sponsor.publicKey;
+  const sig = await sendMagicTx(conn, transaction, [sponsor], { skipPreflight: true });
+  await conn.confirmTransaction({ signature: sig }, 'confirmed');
+  return sig;
 }

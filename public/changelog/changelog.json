@@ -1,0 +1,206 @@
+{
+  "current": "0.8.0",
+  "repo": "https://github.com/foskaay/globalfolkgames",
+  "entries": [
+    {
+      "version": "0.8.0",
+      "date": "2026-08-12",
+      "type": "minor",
+      "title": "Feature Tracker roadmap goes live",
+      "summary": "You can now watch what we're building before it ships — every upcoming feature gets a status badge (Planned → In progress → Shipped) so you see the platform take shape live.",
+      "details": [
+        "Author a real \"Coming next\" roadmap section on /changelog/: features get a",
+        "two-view entry (light public summary + precise dev details) and a lifecycle",
+        "status badge (planned → in-progress → shipped).",
+        "add-roadmap.mjs records agreed features BEFORE any implementation starts;",
+        "set-roadmap-status.mjs marks progress; bump-version.mjs promotes the matching",
+        "roadmap item into a released changelog entry (keeps summary/details).",
+        "AGENTS.md now documents the plan-first workflow so future sessions add the",
+        "roadmap entry before coding."
+      ],
+      "git": {
+        "head": "96dbed7",
+        "message": "fix(mobile): game board page scroll fixed"
+      }
+    },
+    {
+      "version": "0.7.1",
+      "date": "2026-08-12",
+      "type": "patch",
+      "title": "Feature tracker + versioned changelog",
+      "summary": "GlobalFolkGames now ships a 'What's New' section — every release records a version number and a plain-language summary; your connected web3 wallet is recognized.",
+      "details": [
+        "# Engineering notes for release <next>.md",
+        "# Append technical bullets (one per line, \"- \" or plain text) that the next",
+        "# `node scripts/bump-version.mjs` run will fold into the changelog entry as",
+        "# the ADMIN-only raw details. Keep secrets out. Test tables welcome.",
+        "Added a versioned changelog + Feature Tracker system.",
+        "scripts/bump-version.mjs reads the current version from package.json (single",
+        "numeric source), bumps major/minor/patch, prepends an entry to",
+        "public/changelog/changelog.json and clears docs/changelog/unreleased.md for",
+        "the next cycle.",
+        "Changelog entries carry a public `summary` plus admin-only `details` (folded",
+        "from unreleased.md) and a `git` ref (commit id + message).",
+        "Two pages built as Vite inputs: /changelog/ (user-facing summaries, always",
+        "readable) and /changelog/admin.html (raw engineer view). Both load the",
+        "standard Dynamic/JDynamic auth stack via /src/main.js.",
+        "Staff gating is web3-native: public/changelog/roles.json maps Solana wallets",
+        "to admin/moderator. render.js resolves the connected Dynamic wallet",
+        "(window.getDynamicSolanaWallet) and bounces non-staff on the admin page.",
+        "Global header now shows a \"What's New\" link (public/header.js) pointing to",
+        "/changelog/.",
+        "Seed data: public/changelog/changelog.json with real project milestones",
+        "v0.1.0 (Dynamic sign-in) through v0.7.0 (latency benchmark).",
+        "build-emitted pages verified: npm run build renders dist/changelog/index.html",
+        "and dist/changelog/admin.html green."
+      ],
+      "git": {
+        "head": "96dbed7",
+        "message": "fix(mobile): game board page scroll fixed"
+      }
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-08-12",
+      "type": "minor",
+      "title": "Latency benchmark: ER is the playable path",
+      "summary": "Measured real dice-roll latency on devnet. MagicBlock's Ephemeral Rollup handles dice at ~1.7s (gasless) vs ~4.8s for the paid base-chain queue — and board moves run on the ER at ~10-20ms, invisible to players.",
+      "details": [
+        "built scripts/lab/bench-roll-comparison.mjs (LEG=base|er|web2|all) measuring send->VRF-result on real devnet transactions",
+        "ER VRF queue 5hBR57...: avg ~1.7s, p95 ~2.0s (devnet oracle callback dominates)",
+        "Base paid queue Cuj97...: avg ~4.8s, p95 ~5.1s — 2.8x slower than ER",
+        "Web2 local Math.random: 0.0ms (5000 samples) — the honest baseline row",
+        "root cause of earlier bench failure: rollOn passed sponsor as playerAuthority for a PDA keyed to a fresh keypair => ConstraintSeeds(2006); fixed by separating payer vs authority",
+        "client already uses the fast ER queue (src/gfg-dice-config.js:25) — no code change needed for the fast path",
+        "benchmarks.html added at /games/ludo-lab/benchmarks.html for the marketing/3-way comparison story",
+        "Solana mainnet NOW ~75ms avg response (Jonas Hahn, Solana Fdn DevRel, Aug 11 2026); FluxRPC YellowSockets is a base-layer RPC optimization only — does not speed ER rolls"
+      ],
+      "git": {
+        "head": "uncommitted",
+        "message": "bench-roll-comparison + benchmarks.html (lab, not shipped)"
+      }
+    },
+    {
+      "version": "0.6.0",
+      "date": "2026-08-12",
+      "type": "minor",
+      "title": "Anti-cheat architecture decided: chain-authoritative earn mode",
+      "summary": "Decided the Play-to-Earn version will validate every move on-chain (consensus-enforced, ~10-20ms), so cheaters can't fake wins or farm rewards. A separate 'Play for Fun' mode stays lightweight for casual players.",
+      "details": [
+        "client-authoritative is a milk-the-sponsor risk once real rewards launch -> chain-authoritative for ALL state-changing moves in earn mode",
+        "pattern proven by live open-source projects: Magic UNO (every card play on ER, sub-10ms), DesiDash (every tap 8-18ms, batch commits), WhoRugUs (moves/tasks/votes as signed ER txs, VRF roles, PER for secrets), rock-paper-scissor official example",
+        "dice must stay ER VRF (~1.7s) — provability IS the product; hide it inside the existing 3.5s dice animation window",
+        "computer turns are just another signer; automation does not create a trust gap",
+        "two-version plan: fun (client authority, no financial impact) vs earn (on-chain authority, reward gated on on-chain state)",
+        "revert rule if felt latency >~2.5s p95: fall back to local AI rolls + keep ER only for proof roll + final record"
+      ],
+      "git": {
+        "head": "uncommitted",
+        "message": "design decision (research-backed)"
+      }
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-08-11",
+      "type": "major",
+      "title": "Sponsor relay: players never hold SOL",
+      "summary": "Signed in with email OTP (Dynamic) then the app sponsored the on-chain dice setup — the player's wallet holds zero SOL, proving the gasless onboarding works end to end.",
+      "details": [
+        "api/delegate.mjs (Vercel fn) + scripts/relay-server.mjs (local :8787) run initialize+delegate on the player's behalf",
+        "idempotent via getDelegationStatus router check; retries account reads on flaky public RPC",
+        "fixed relay gotcha: PublicKey.equals() not === (owner comparison was silently false, causing re-delegate every time)",
+        "Vercel domain globalfolkgames.fun live; GFG_SPONSOR_KEYPAIR env set; node pin via engines + removed invalid vercel runtime"
+      ],
+      "git": {
+        "head": "23cf30b",
+        "message": "points+RLS hardening"
+      }
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-08-10",
+      "type": "minor",
+      "title": "Points, levels and the +100 proof-roll reward",
+      "summary": "Winning now pays +100 points, but only if your signed-in seat finished 1st AND you made at least one verifiable on-chain dice roll that match.",
+      "details": [
+        "playerProfiles[color].isUser() gates the reward in win-detection.js together with getOnchainProofUsedThisMatch()/getLastProofRollSignature()",
+        "profiles.js awardGlobalPoints: optimistic header bump + point_transactions audit row + profile totals/level + device pending-award queue (gfg_pending_awards_<userId>) that resyncs if Supabase is unreachable",
+        "RLS fix was a one-time Supabase SQL script (auth.uid() is empty for Dynamic users) — intentionally OUT of repo; do NOT re-add",
+        "ludo award passes the on-chain proof-roll signature as match_id, tying the Supabase record to the verifiable roll; syncPendingPointAwards de-dupes by match_id",
+        "crowns/finish order survive reload via serializeWinState/hydrateWinState in persistence.js"
+      ],
+      "git": {
+        "head": "23cf30b",
+        "message": "points+RLS hardening"
+      }
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-08-09",
+      "type": "major",
+      "title": "MagicBlock ER VRF proven end to end",
+      "summary": "The full flow works on devnet: init (sponsor pays) → delegate to Ephemeral Rollup → gasless rolls signed by a session key → VRF callback returns real dice → undelegate. Players pay nothing.",
+      "details": [
+        "harness /tmp/opencode/er-test proved init->delegate->roll gasless (fee payer with 0 SOL)->VRF callback {roll1,roll2,seed}->undelegate",
+        "program upgraded + redeployed with delegate/commit/undelegate; IDL synced to src/gfg-dice-idl.json",
+        "client rewritten for ER (src/magicblock-vrf.js, src/gfg-dice-config.js)",
+        "PlayerDice account = 8B disc + 3 u8 + i64 (19 bytes); coder.accounts.decode throws -> manual byte parse",
+        "Account/board state is a delegated PDA — the 'space' lives on-chain while the ER hosts it"
+      ],
+      "git": {
+        "head": "256cd47",
+        "message": "removed rls_fix.sql from repo"
+      }
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-08-08",
+      "type": "minor",
+      "title": "Ludo playable against AI",
+      "summary": "Classic Ludo with a full local board: human vs 3 computer players, capture mechanics, safe boxes, double-six bonus turns and persistent progress.",
+      "details": [
+        "board.js + physics.js + mechanics/{actions,paths,state} implement movement, capture, AI strategy, persistence",
+        "AI rolls/steps are deterministic-xs local; token selection uses 4 strategies (capture > release-on-6 > goal > furthest)"
+      ],
+      "git": {
+        "head": "e1f9c77",
+        "message": "ludo core playable"
+      }
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-08-07",
+      "type": "major",
+      "title": "Foundations: Dynamic wallet sign-in",
+      "summary": "Players sign in with an email one-time code (Dynamic) which mints a self-custody Solana wallet — no seed phrase, no extension, no SOL required.",
+      "details": [
+        "Dynamic email OTP -> embedded Solana wallet (WaaS) -> session keys sign on-chain actions without popups",
+        "Supabase profiles/point_transactions as the backup store",
+        "header.js/profiles.js/refreshAuthHeader drive the points pill"
+      ],
+      "git": {
+        "head": "a17b3d1",
+        "message": "initial scaffold"
+      }
+    }
+  ],
+  "roadmap": [
+    {
+      "title": "Server-side staff gate (stop wallet spoofing)",
+      "summary": "The staff-only changelog view will be locked by a verifiable wallet signature checked by our own server — so no one can fake admin access from the browser anymore.",
+      "details": [
+        "Server-side staff gate so the changelog admin page cannot be spoofed from the",
+        "browser. Current gate (client-side render.js + roles.json) is cosmetic only.",
+        "Server issues a nonce; client signs it with the Dynamic wallet; server",
+        "verifies the signature recovers the claimed wallet and checks it against a",
+        "server-side staff list (env/secret, not public/). Only verified staff receive",
+        "the raw changelog details.",
+        "Rework render.js/require-staff page flow to POST proof to the server instead",
+        "of trusting window.getDynamicSolanaWallet.",
+        "Keep roles.json in public/ as a fallback UX hint only; never authoritative."
+      ],
+      "status": "planned",
+      "added": "2026-08-12"
+    }
+  ]
+}

@@ -28,5 +28,6 @@ pnpm-debug.log*
 .anchor/
 **/target/
 *.keypair.json
+*-keypair.json
 id.json
 ~/.config/solana/

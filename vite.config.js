@@ -8,7 +8,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        ludo: './games/ludo/index.html'
+        ludo: './games/ludo/index.html',
+        changelog: './changelog/index.html',
+        'changelog-admin': './changelog/admin.html'
       }
     }
   },

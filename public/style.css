@@ -79,6 +79,18 @@ body {
     font-weight: 600;
 }
 
+.gfg-changelog-link {
+    font-size: 0.8rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.gfg-changelog-link:hover {
+    text-decoration: underline;
+}
+
 .gfg-user-pill {
     display: flex;
     align-items: center;

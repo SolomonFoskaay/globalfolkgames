@@ -104,6 +104,83 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - Vite proxy `/api` → relay → on-chain: working.
 - `npm run build` green.
 
+## Feature workflow — READ BEFORE CODING (agreed process)
+
+- **Plan first, code second.** When the owner agrees a feature (or several), the
+  FIRST step of the task is to record it in the changelog Feature Tracker —
+  before any implementation. Never start coding a new agreed feature without
+  first adding its roadmap entry.
+- **Two views of every feature, always:**
+  - *Dev view (admin):* precise, technical details (bullets) — what's changing
+    under the hood, files, trade-offs, remaining work.
+  - *User view (public):* a light, watered-down summary of the same feature —
+    the benefit to the player in plain language.
+- **Add it with:** `node scripts/add-roadmap.mjs "<title>" "<user summary>"`
+  It folds the technical bullets from `docs/changelog/unreleased.md` into the
+  item's dev-only `details`, and the public page shows only the summary. Keep
+  the unreleased.md bullets precise (engineer-facing).
+- **Mark it as it lives:** each roadmap item carries a status:
+  `planned` → `in-progress` → `shipped`.
+  - Agreed but not started: leave or set `planned`.
+  - Currently building: set `node scripts/set-roadmap-status.mjs <title> in-progress`
+    (or edit `public/changelog/changelog.json` `roadmap[].status` directly).
+  - Done and released: `node scripts/bump-version.mjs <major|minor|patch> "<title>" "<summary>"`
+    promotes the matching roadmap item into a shipped changelog entry (with its
+    version, date, git ref; existing summaries/details are preserved).
+- **Public page shows the shape:** `/changelog/` lists a "Coming next" roadmap
+  (user-view summaries of what's being built and where it stands) above the
+  shipped release history — so users watch the platform take shape live. All
+  dev detail stays on `/changelog/admin.html` (staff only).
+- **Golden rule:** if an agreed feature has no roadmap entry, the task is being
+  done wrong — add it first, then do it, then mark it.
+
+## Versioning + changelog (Feature Tracker)
+
+- **Single numeric source:** `package.json` `version`. The bump script reads it,
+  so npm, the site header and the changelog always agree.
+- **Bump a release:** write engineer notes to `docs/changelog/unreleased.md`
+  (one bullet per line), then:
+  `node scripts/bump-version.mjs <major|minor|patch> "<title>" "<user summary>"`
+  The script bumps package.json, prepends an entry to
+  `public/changelog/changelog.json` (`summary` = public-facing watered-down
+  text; `details` = admin-only bullets folded from unreleased.md; `git` = commit
+  ref) and clears unreleased.md for the next cycle.
+- **Pages (Vite inputs):** `/changelog/` = public changelog (v0.7.1+ entries,
+  summaries always readable); `/changelog/admin.html` = raw engineer view
+  (details + git refs), gated to staff. Both load the standard auth stack via
+  `/src/main.js` → Dynamic wallet resolution.
+- **Web3 roles, not DB roles:** `public/changelog/roles.json` maps Solana
+  wallets → `admin` / `moderator`. `public/changelog/render.js` resolves the
+  connected wallet (`window.getDynamicSolanaWallet`) and bounces non-staff off
+  the admin page. Admin wallet = sponsor `5ec9bYw...MdhdTQ`.
+- **Gotcha (fixed):** Solana base58 addresses are case-sensitive on-chain but
+  `roleForWallet` normalizes BOTH the wallet and the role lists to lowercase
+  before matching — a mixed-case admin list otherwise never matches.
+- Global header shows a **"What's New"** link → `/changelog/`
+  (`public/header.js`, styled in `public/style.css`).
+- Seed data: `public/changelog/changelog.json` holds real milestones v0.1.0
+  (Dynamic sign-in) → v0.8.0 (roadmap live). Current deployed version: 0.8.0.
+- Seeded/versioned docs: `docs/changelog/`; new engines notes land in
+  `docs/changelog/unreleased.md`.
+
+## Security / anti-exploit rules (READ BEFORE CODING — non-negotiable)
+
+- **Golden rule:** NEVER build a security boundary that the client can fake.
+  Any gate enforced only in browser JS is cosmetic, not a gate. Always flag
+  designs where the client declares its own identity/roles/access (self-reported
+  wallet = no proof of control).
+- **Known gap (accepted, interim):** the changelog admin page's "staff-only"
+  gate is client-side (`public/changelog/render.js` + public `roles.json`). It
+  is readable/bypassable via DevTools (mock `window.getDynamicSolanaWallet`, the
+  roles fetch, or just call `window.renderChangelog('admin')`). Treat it as a
+  UX convenience for the owner, NOT security — never put real secrets behind it.
+- **Real fix (future roadmap item):** server-side challenge signature — the
+  server issues a nonce, the client signs it with the Dynamic wallet, the server
+  verifies the recovered pubkey against a SERVER-side staff list, and only then
+  serves staff data. Never trust the client's wallet claim.
+- Keep all secrets out of client bundles and out of `public/`. If a role check
+  can be edited from the browser, it protects nothing.
+
 ## Status / next steps
 
 - [x] Program upgraded to ER (ephemeral/delegate/commit/undelegate), deployed.
@@ -158,6 +235,19 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       `https://globalfolkgames.fun` to Dynamic allowed origins if OTP breaks.
       Per-player sponsor spend cap still pending (matters on mainnet).
 - [x] Extend `programs/programs/gfg-dice/README.md` with the ER/gasless notes.
+- [x] **Versioning + Feature Tracker:** `scripts/bump-version.mjs` bumps
+      `package.json` and prepends a changelog entry (public `summary` +
+      admin-only `details` from `docs/changelog/unreleased.md` + git ref);
+      `/changelog/` public page + `/changelog/admin.html` staff-only raw view
+      (both Vite inputs), web3 roles via `roles.json`, "What's New" header link.
+- [x] **Plan-first workflow (agreed):** agreed features are recorded in the
+      Feature Tracker BEFORE any code. `scripts/add-roadmap.mjs` creates a
+      two-view roadmap item (public `summary` + dev-only `details` folded from
+      unreleased.md); `scripts/set-roadmap-status.mjs` marks it
+      `planned` → `in-progress`; `scripts/bump-version.mjs` promotes the
+      matching item into a shipped entry (version, git ref; summary + details
+      preserved). Roadmap renders as a live "Coming next" section above
+      the release history on `/changelog/`.
 - [ ] On-chain points mirror (future): a `record_points`-style instruction on the
       ER keyed to the proof roll; Supabase stays the fallback source of truth
       across devnet wipes (re-sync on redeploy).

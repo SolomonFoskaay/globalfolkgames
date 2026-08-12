@@ -65,6 +65,7 @@
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
+                    <a href="/changelog/" class="gfg-changelog-link">What's New</a>
                     ${showLocal ? `<span class="gfg-local-pts">Local: ${localPoints}</span>` : ''}
                     <div class="gfg-user-pill" id="gfg-user-pill">
                         <span id="display-points">⭐ 0 Pts</span>

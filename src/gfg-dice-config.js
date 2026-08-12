@@ -1,5 +1,7 @@
 // src/gfg-dice-config.js
 // One-off deployment config for the gfg-dice MagicBlock VRF program.
+// baseRpcUrl is resolved via src/gfg-rpc.js (provider key env override with
+// keyless failover) — see THAT file for the endpoint priority order.
 // programId + idl filled in AFTER `anchor build && anchor deploy`
 // (see programs/README.md for the deploy steps).
 //
@@ -12,11 +14,12 @@
 //                    in dev, api/delegate.mjs on Vercel). Players hold no SOL.
 
 import idl from './gfg-dice-idl.json';
+import { baseRpcUrl } from './gfg-rpc.js';
 
 export const GFG_DICE = {
   programId: 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ',
   idl,
-  baseRpcUrl: 'https://api.devnet.solana.com',
+  baseRpcUrl: baseRpcUrl(),
   erRpcUrl: 'https://devnet-us.magicblock.app/',
   erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
   oracleQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc', // devnet ER VRF queue

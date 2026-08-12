@@ -3,6 +3,12 @@
 import { readFileSync } from 'fs';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
+import './scripts/load-env.mjs'; // load .env before resolving the RPC chain
+import { baseRpcUrl, createConnection, sendMagicTx } from './src/gfg-rpc.js';
+// NOTE: baseRpcUrl() returns the Magic Router (MagicBlock-first): init+delegate
+// auto-route through it to base Solana. ER rolls stay pinned to the US region
+// ER RPC (that is where the PDA is delegated); roll results are only readable
+// on that region endpoint until undelegate commits state back to base.
 
 const idl = JSON.parse(readFileSync(new URL('./src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 
@@ -11,14 +17,14 @@ const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMAR
 const ER_VRF_QUEUE = new PublicKey('5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc');
 const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
 
-const BASE_URL = 'https://api.devnet.solana.com';
+const BASE_URL = baseRpcUrl();
 const ER_URL = 'https://devnet-us.magicblock.app/';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const lamports = (n) => (Number(n) / 1e9).toFixed(4);
 
-const sponsor = Keypair.fromSecretKey(JSON.parse(readFileSync('/home/foskaay/.config/solana/id.json', 'utf8')));
+const sponsor = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync('/home/foskaay/.config/solana/id.json', 'utf8'))));
 
 function mkWallet(kp) {
   return {
@@ -28,7 +34,7 @@ function mkWallet(kp) {
   };
 }
 
-const baseConn = new Connection(BASE_URL, 'confirmed');
+const baseConn = createConnection(BASE_URL, 'confirmed');
 const baseProvider = new AnchorProvider(baseConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
 const baseProgram = new Program(idl, baseProvider);
 
@@ -45,19 +51,27 @@ console.log('PlayerPDA:', pda.toString());
 async function main() {
   const bal0 = await baseConn.getBalance(sponsor.publicKey);
 
+  // Base-layer txs MUST be sent via sendMagicTx: the Router answers plain
+  // getLatestBlockhash with ITS OWN layer blockhash (invalid on base Solana).
+  // sendMagicTx uses getBlockhashForAccounts, which returns the correct
+  // base-layer blockhash (see src/gfg-rpc.js).
+
   // 1) initialize (base layer, sponsor pays rent+fee)
   console.log('\n--- initialize (base) ---');
   try {
-    const sig = await baseProgram.methods.initialize()
+    const tx = await baseProgram.methods.initialize()
       .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player.publicKey })
-      .rpc();
+      .transaction();
+    tx.feePayer = sponsor.publicKey;
+    const sig = await sendMagicTx(baseConn, tx, [sponsor], { skipPreflight: true });
+    await baseConn.confirmTransaction({ signature: sig }, 'confirmed');
     console.log('init OK:', sig);
-  } catch (e) { console.log('init ERR:', e.message.slice(0, 200)); return; }
+  } catch (e) { console.log('init ERR:', e.message.slice(0, 300)); return; }
 
   // 2) delegate (base layer, sponsor pays; pin devnet ER validator)
   console.log('\n--- delegate (base) ---');
   try {
-    const sig = await baseProgram.methods.delegate()
+    const tx = await baseProgram.methods.delegate()
       .accounts({
         payer: sponsor.publicKey,
         playerAuthority: player.publicKey,
@@ -70,7 +84,10 @@ async function main() {
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
-      .rpc();
+      .transaction();
+    tx.feePayer = sponsor.publicKey;
+    const sig = await sendMagicTx(baseConn, tx, [sponsor], { skipPreflight: true });
+    await baseConn.confirmTransaction({ signature: sig }, 'confirmed');
     console.log('delegate OK:', sig);
   } catch (e) { console.log('delegate ERR:', e.message.slice(0, 300)); return; }
 

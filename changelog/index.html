@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>What's New | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+</head>
+<body>
+
+    <main class="changelog-page">
+        <section class="changelog-head">
+            <a href="/" class="changelog-back">← Home</a>
+            <h2>What's New</h2>
+            <p class="changelog-sub">Game updates, new levels and fairness improvements.</p>
+            <div class="changelog-meta">
+                <span class="changelog-current">Current version <b>v<span id="changelog-version">—</span></b></span>
+                <span id="changelog-role" class="changelog-role"></span>
+                <a id="changelog-admin-link" href="/changelog/admin.html" class="changelog-admin-link" hidden>Staff: raw view →</a>
+            </div>
+        </section>
+
+        <div id="changelog-entries" class="changelog-entries">
+            <p class="empty">Loading changelog…</p>
+        </div>
+    </main>
+
+    <!-- Global scripts (needed for points + auth → wallet role) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script type="module" src="/src/main.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            // Staff (admin/moderator by Solana wallet) get a link to the raw view.
+            if (window.getChangelogRole) {
+                const role = await window.getChangelogRole();
+                const link = document.getElementById('changelog-admin-link');
+                if (link && role && role !== 'user') link.hidden = false;
+            }
+
+            if (window.renderChangelog) window.renderChangelog('user');
+        });
+    </script>
+</body>
+</html>
