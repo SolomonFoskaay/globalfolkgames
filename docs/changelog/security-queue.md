@@ -16,6 +16,33 @@ in `public/changelog/changelog.json` or any client-delivered payload:
 
 ## Queue (unfixed — do not ship to client)
 
+### Free-with-limits value model — anti-abuse hardening (mainnet phase)
+
+- Status: agreed shape; being designed — added 2026-08-13
+- Context: the agreed value model gives every player a daily renewing
+  sponsor-cost allowance ("free plays left today"), purchasable top-up via
+  spendable points, and free refills during the early phase. On mainnet the
+  per-player daily allowance is a real funding obligation for the sponsor, so
+  it becomes a target: an attacker who can mint fresh wallets or farm refills
+  drains the allowance/refill budget and, at worst, the sponsor reserve.
+- Hardening plan (do NOT ship anything here to client-served data):
+  - Allowance metering must be SERVER-side and authoritative (the spend ledger
+    is the meter; the client only ever *displays* a server-provided
+    "free plays left today" value — never computes or mints its own).
+  - Refills in the early phase go through a server endpoint that requires the
+    requester's verified signature (same challenge-signature gate as the staff
+    route), so one identity can't farm unlimited refills. Funnel-refill
+    detection (same email/IP/device minting many wallets) is a server audit
+    task, tracked here, never public.
+  - Points purchases mint points server-side after a verified on-chain payment
+    (embedded wallet funds). Never accept a client-claimed "paid" flag that
+    isn't backed by an on-chain tx the server confirmed.
+  - Competition fairness guards are product rules (never pay-to-enter, finish
+    allowance bundled), tracked on the public roadmap; the anti-cheat rails
+    (leaderboard bracketing vs volume-grinding, cap-circumvention) are here.
+  - Supabase mirrors stay fallback only (same pattern as points: ledger is
+    authoritative; a wipe of devnet never grants free allowance).
+
 ### Server-side staff gate (stop wallet spoofing)
 
 - Status: waiting (agreed; not started) — added 2026-08-12

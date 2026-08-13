@@ -334,7 +334,35 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] Checkpoint committed (`23cf30b` points+RLS hardening, `256cd47` removed
       `rls_fix.sql` from the repo). Repo is now **private** (personal GitHub
       account on purpose — a GitHub org would force a paid Vercel plan).
-- [ ] **Vercel deploy (near-done):** domain `https://globalfolkgames.fun` live
+- [x] **Sponsor spend caps + ledger (shipped `036c34d`):** the relay now enforces
+      per-player (0.005 SOL default) + global (1.0 SOL) spend caps plus a
+      sponsor reserve floor, authorized against the ESTIMATED budget before any
+      SOL moves, with the REAL balance delta recorded to a durable file ledger
+      (`scripts/spend-ledger.mjs`, `.gfg-spend-ledger.json`, gitignored,
+      env-tunable). Also fixed a pre-existing relay bug: Anchor `.transaction()`
+      is async under @anchor-lang/core 1.1.2; it was passed unawaited and every
+      delegate threw 'transaction.instructions is not iterable'. Both call
+      sites now `await`. Verified live on devnet (fresh player init+delegate
+      0.0042 SOL recorded; idempotent re-call spent nothing).
+- [ ] **Value model "free today, honest about limits" (recorded, planned, admin-only):**
+      free tier = daily renewing sponsor-cost allowance metered from the spend
+      ledger (shown as "free plays left today"); top-up via spendable points
+      bought with the embedded wallet (Dynamic on-ramp); free refills during
+      early phase via profile request, removed later without surprise.
+      Tracked as roadmap item "Free-with-limits value model (spendable points)"
+      (admin-only until owner approves). Anti-abuse hardening (server-side
+      allowance metering, refill farming, verified purchase) is in
+      `docs/changelog/security-queue.md` — never client-served. Devnet today is
+      free money, so this is a mainnet-phase build.
+- [ ] **Robust admin dashboard (imminent build):** endpoint watchlist via a
+      server-side probe function (`api/endpoints.mjs`) that returns status /
+      latency / user-accessible vs staff-only / leak flags (leak results stay
+      server-side per AGENTS.md rules); user stats with On-chain / Off-chain
+      sub-tabs (wallets, last login, gameplay, points); project ops panel
+      (Vercel env, Dynamic origins, sponsor balance/ledger totals, version,
+      roadmap counts, git refs, ER/on-chain account inventory). Owner approved
+      both scope options: server-side probe + "everything incl. usage analytics".
+- [ ] Vercel deploy (near-done): domain `https://globalfolkgames.fun` live
       (personal repo + free plan works). `GFG_SPONSOR_KEYPAIR` env set (raw
       contents of `~/.config/solana/id.json`). Dynamic CORS origin added
       (`https://globalfolkgames.fun`, plus localhost in sandbox). Remaining:
