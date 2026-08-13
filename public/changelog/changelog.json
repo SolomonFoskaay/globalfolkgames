@@ -294,6 +294,31 @@
       "status": "planned",
       "added": "2026-08-13",
       "approved": true
+    },
+    {
+      "title": "Full on-chain Ludo upgrade",
+      "summary": "Your Ludo match — every roll, move, turn and win — runs and is recorded fully on the blockchain, so nothing can be tampered with while keeping the smooth, instant experience you have now.",
+      "details": [
+        "Migrate Ludo match state fully on-chain: dice rolls, turns, moves, win/detection",
+        "Explore ER record_points for points/rewards mirroring game decisions",
+        "Goal: no client-side state a bad actor could fake; server/chain is source of truth",
+        "Keep web2 feel: instant moves, no per-action wallet pops, human-speed AI turns"
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Sponsor spend cap + relay monitoring",
+      "summary": "We cap spending on players' behalf and give you a live view of costs, so the sponsor wallet stays safe as the game grows.",
+      "details": [
+        "Per-player sponsor spend cap on the deployer wallet (anti-abuse, cost control)",
+        "Relay/relay-server expose sponsor totals + per-player spend so owner can monitor",
+        "Reminder: sponsor key 5ec9bYw...MdhdTQ holds ~12.8 SOL; cap prevents drain"
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-13"
     }
   ]
 }

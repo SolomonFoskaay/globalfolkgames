@@ -30,3 +30,43 @@ in `public/changelog/changelog.json` or any client-delivered payload:
 - Work: rework render.js page flow to POST the signed proof to the server
   instead of trusting `window.getDynamicSolanaWallet`; keep `roles.json` in
   `public/` as a UX hint only, never authoritative.
+
+### Match-state authority is client-fakeable (the "full on-chain" upgrade rationale)
+
+- Status: agreed; being designed — added 2026-08-13
+- Problem: today only the FIRST human roll is provably on-chain (MagicBlock
+  VRF). Everything else in a live match — roll values (local `Math.random()`),
+  turn sequence, token movements, captures, win/finish order, point awards —
+  is authored by the browser's game engine. A determined bad actor can inject
+  their own local rolls, advance tokens, or report a win, and the app has no
+  server/chain state to contradict them.
+- Fix (the "Full on-chain Ludo upgrade" roadmap item): move match-state
+  authority on-chain so the ER/conttract is the ONLY writer. The browser
+  becomes a pure presenter: it sends intended actions (roll request, token
+  move, capture) and the delegated program validates rules, computes the next
+  state, and records it. Client-authored state can then never be trusted,
+  because the client never writes state — there is no input vector for a bad
+  actor to exploit. Points likewise move to a `record_points`-style ER
+  instruction keyed to the proof roll, so Supabase stays a fallback mirror,
+  not an authoritative claim.
+- Hard requirements already locked in (do NOT trade these away for
+  decentralization):
+  - Human-pace AI: unchanged timing (~1.2–1.5s dice, ~1.5s move, ~3.5s post-roll,
+    ~1.5s pass). Never make the AI faster/instant — it breaks playability.
+  - Web2 UX: gasless via ER, no wallet popups mid-match, no per-action signing
+    delay beyond the current feel.
+  - Roll latency acceptable on devnet; if on-chain match state causes visible
+    lag, keep the CURRENT UX and ship gradual (proof roll on-chain now; moves
+    on-chain when no-lag on the ER is verified).
+- Work: design ER state account layout + instruction set for moves/captures/
+  wins; verify no-lag roll experience on the ER before committing the UX;
+  keep the sponsor relay and human-pace AI intact.
+
+### Local off-chain roll values are browser-controlled
+
+- Status: known; deliberately kept until the match-state-upgrade ships (human
+  turns after the first roll, and all computer/local seat rolls, use
+  `Math.random()` in the client). Not exploitable for *rewards* today (reward
+  gated on the on-chain proof roll), but it is a fairness gap for casual
+  play. The match-state upgrade above closes this client-side gap entirely.
+- Work: none now (superseded by the match-state authority fix).

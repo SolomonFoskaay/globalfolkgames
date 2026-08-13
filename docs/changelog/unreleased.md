@@ -1,4 +1,3 @@
-# Engineering notes for release <next>.md
-# Append technical bullets (one per line, "- " or plain text) that the next
-# `node scripts/bump-version.mjs` run will fold into the changelog entry as
-# the ADMIN-only raw details. Keep secrets out. Test tables welcome.
+- Per-player sponsor spend cap on the deployer wallet (anti-abuse, cost control)
+- Relay/relay-server expose sponsor totals + per-player spend so owner can monitor
+- Reminder: sponsor key 5ec9bYw...MdhdTQ holds ~12.8 SOL; cap prevents drain

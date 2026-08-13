@@ -221,6 +221,17 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] Sponsor relay (local + Vercel fn) built and tested.
 - [x] Client rewritten for ER (`src/magicblock-vrf.js`, `src/gfg-dice-config.js`).
 - [x] AI/computer turns skip VRF (`public/games/ludo/mechanics/actions/dice.js`).
+- [x] **Timing + AI speed (HARD CONSTRAINT — do not change):** the owner
+      deliberately slowed the AI to human-level playing speed (early versions
+      were too fast, made the game hard, and felt like the AI hijacked the
+      user's turn). Preserve current timing: computer dice roll ~1.2–1.5s
+      after turn start, move execution ~1.5s delay, post-roll ~3.5s before
+      pass/next, pass-sequence ~1.5s. Never speed these up.
+- [x] **Board dice rendering (improved):** `public/games/ludo/physics.js`
+      `renderPhysicalDiceCubes` now draws 46px rounded white dice with real
+      pip dots (not unicode glyphs that render inconsistently on mobile),
+      drop shadow + bevel for depth. Physics boundary size bumped to 46 to
+      match. Keep dice big/readable — do not regress to tiny 2D glyphs.
 - [x] Player-account feature: mandatory sign-in to start a match; exactly one
       seat is the signed-in user ("You" via `playerProfiles[color].isUser`);
       reward requires 1st-place user seat AND a valid on-chain proof roll
