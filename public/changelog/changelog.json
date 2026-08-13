@@ -186,21 +186,105 @@
   ],
   "roadmap": [
     {
-      "title": "Server-side staff gate (stop wallet spoofing)",
-      "summary": "The staff-only changelog view will be locked by a verifiable wallet signature checked by our own server — so no one can fake admin access from the browser anymore.",
+      "title": "Changelog tabs + pagination",
+      "summary": "The What's New page gets three clean tabs (Planned · In progress · Shipped, starting with Shipped) so you can browse updates without endless scrolling — long lists split into numbered pages.",
       "details": [
-        "Server-side staff gate so the changelog admin page cannot be spoofed from the",
-        "browser. Current gate (client-side render.js + roles.json) is cosmetic only.",
-        "Server issues a nonce; client signs it with the Dynamic wallet; server",
-        "verifies the signature recovers the claimed wallet and checks it against a",
-        "server-side staff list (env/secret, not public/). Only verified staff receive",
-        "the raw changelog details.",
-        "Rework render.js/require-staff page flow to POST proof to the server instead",
-        "of trusting window.getDynamicSolanaWallet.",
-        "Keep roles.json in public/ as a fallback UX hint only; never authoritative."
+        "Changelog pages get 3 status tabs at the top: Planned / In progress / Shipped.",
+        "Clicking a tab filters the list; the current (v0.8.0) item lands under Shipped.",
+        "Tabs are flex-row with nowrap + horizontal scroll so they never wrap/break on",
+        "mobile single-line.",
+        "Pagination added to both /changelog/ and /changelog/admin.html: Prev / page",
+        "numbers / Next, per-status pagination (PAGE_SIZE=6) so long update lists break",
+        "into pages naturally instead of one endless scroll.",
+        "Admin (dev) view: the DEV Plan details list becomes an ordered list",
+        "(1. 2. 3. ...) for easy scanning, replacing bullet dots. Only affects the",
+        "admin page list rendering."
+      ],
+      "status": "in-progress",
+      "added": "2026-08-12"
+    },
+    {
+      "title": "Only user-safe updates appear publicly",
+      "summary": "Security work stays fully off the public 'What's New' page — it is planned and tracked privately, and only appears publicly once it is fixed and released.",
+      "details": [
+        "User-facing changelog contains no unfixed security/anti-exploit detail — not even behind a flag.",
+        "Unfixed security work is tracked outside every browser-served asset (private git only).",
+        "Nothing security-related enters changelog.json until a fix ships.",
+        "Once shipped, the fix is a normal, user-friendly changelog entry announcing it.",
+        "No hide-by-flag machinery — the bytes are simply not in the client payload."
+      ],
+      "status": "in-progress",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Full on-chain gaming",
+      "summary": "Every Ludo match you play becomes a permanent on-chain record you can verify — your wins, streaks and history live on-chain forever, provable by anyone, anytime.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "Vision: every match played becomes a permanent, verifiable on-chain record."
       ],
       "status": "planned",
-      "added": "2026-08-12"
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Earn competitions",
+      "summary": "Compete in daily, weekly and monthly challenges for real reward pools — play to earn, climb the leaderboard, and turn your wins into points that never expire.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "Expansion of competition-based earn: daily, weekly, monthly competitions with reward pools."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Referral program",
+      "summary": "Invite friends to GlobalFolkGames and earn bonus points when they join and play — good games are better shared.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "New referral loop to grow the player base; rewarding existing players for growing the community."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Community forum",
+      "summary": "A place for the GlobalFolkGames community to connect — share strategies, discuss native games, and help each other get better.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "Community space for players; knowledge sharing and game discussion."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Giveaways & events",
+      "summary": "Periodic giveaways and community events — win bonus points and prizes just for being part of the platform.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "Periodic giveaways and events to reward active players and celebrate milestones."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "More native games from the world",
+      "summary": "GlobalFolkGames is expanding — more traditional games from more countries, starting with Nigeria (Ludo is live, Ayo Olopon coming) and more announced soon.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "More native games from multiple countries. Current: Nigeria — Ludo ludo (shipped). Upcoming: Nigeria — Ayo Olopon. More countries' games to be announced as confirmed."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Mainnet launch",
+      "summary": "GlobalFolkGames moves to the real Solana network — your games and points become fully permanent on-chain records as the platform goes live for everyone.",
+      "details": [
+        "Player-facing milestone item. No security/technical detail here.",
+        "Move from devnet to mainnet: real, permanent on-chain records."
+      ],
+      "status": "planned",
+      "added": "2026-08-13"
     }
   ]
 }

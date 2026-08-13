@@ -127,10 +127,22 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   - Done and released: `node scripts/bump-version.mjs <major|minor|patch> "<title>" "<summary>"`
     promotes the matching roadmap item into a shipped changelog entry (with its
     version, date, git ref; existing summaries/details are preserved).
-- **Public page shows the shape:** `/changelog/` lists a "Coming next" roadmap
-  (user-view summaries of what's being built and where it stands) above the
-  shipped release history — so users watch the platform take shape live. All
-  dev detail stays on `/changelog/admin.html` (staff only).
+- **Public page shows the shape:** `/changelog/` organizes everything by
+  3 status tabs — **Planned / In progress / Shipped** (user-view summaries of
+  what's being built and where it stands) — plus per-tab pagination
+  (Prev / pages / Next, ~6 per page) so history stays browsable as it grows.
+  All dev detail (numbered DEV Plan lists + git refs) stays on
+  `/changelog/admin.html` (staff only).
+- **Public vs sensitive (hard rule):** the user-facing page must NEVER contain
+  unfixed security/anti-exploit details — not even behind a flag or filter.
+  A browser actor can read whatever bytes are in the client payload; hiding them
+  with JS is theater. So security work is tracked ONLY in
+  `docs/changelog/security-queue.md` (private git, never served) and NEVER added
+  to `changelog.json` (client-served) until the fix ships. A shipped fix becomes
+  a normal user-friendly changelog entry announcing it (the exploit no longer
+  exists). Only user-relevant updates — new features, non-exploit UX/bug fixes
+  — belong on the public roadmap. Never reintroduce a `sensitive` flag that
+  ships the data and tries to hide it.
 - **Golden rule:** if an agreed feature has no roadmap entry, the task is being
   done wrong — add it first, then do it, then mark it.
 
@@ -178,6 +190,10 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   server issues a nonce, the client signs it with the Dynamic wallet, the server
   verifies the recovered pubkey against a SERVER-side staff list, and only then
   serves staff data. Never trust the client's wallet claim.
+- **Never advertise live weaknesses:** security/anti-exploit work is never put
+  in client-served data at all — no flag, no filter, no hidden bytes. It is
+  tracked only in `docs/changelog/security-queue.md` (private git, never
+  served) and becomes a public changelog entry only after it ships (fixed).
 - Keep all secrets out of client bundles and out of `public/`. If a role check
   can be edited from the browser, it protects nothing.
 
@@ -246,8 +262,14 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       unreleased.md); `scripts/set-roadmap-status.mjs` marks it
       `planned` → `in-progress`; `scripts/bump-version.mjs` promotes the
       matching item into a shipped entry (version, git ref; summary + details
-      preserved). Roadmap renders as a live "Coming next" section above
-      the release history on `/changelog/`.
+      preserved). Roadmap renders as 3 status tabs (Planned / In progress /
+      Shipped) with per-tab pagination on `/changelog/`.
+- [x] **Roadmap seeded with the user-facing USP:** Planned tab now carries 7
+      exciting, user-safe items players look forward to — Full on-chain gaming,
+      Earn competitions, Referral program, Community forum, Giveaways & events,
+      More native games from the world (current: Nigeria Ludo live, Ayo Olopon
+      upcoming), Mainnet launch. Purely marketing/user-relevant — zero security
+      or technical downside detail in the public payload.
 - [ ] On-chain points mirror (future): a `record_points`-style instruction on the
       ER keyed to the proof roll; Supabase stays the fallback source of truth
       across devnet wipes (re-sync on redeploy).

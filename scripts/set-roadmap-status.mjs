@@ -5,6 +5,10 @@
 // Usage:
 //   node scripts/set-roadmap-status.mjs "<title>" <planned|in-progress>
 //
+// Security note: changelog.json is public, browser-served data. Unfixed
+// security/anti-exploit work must NOT be added here — track it in
+// docs/changelog/security-queue.md instead (see add-roadmap.mjs).
+//
 // Statuses: planned -> in-progress -> shipped (shipped happens via
 // scripts/bump-version.mjs, which promotes the item into a changelog entry).
 

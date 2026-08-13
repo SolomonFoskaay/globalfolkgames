@@ -91,6 +91,11 @@ const mergedDetails = roadmapItem
   ? [...(roadmapItem.details || []), ...details].filter((v, i, arr) => arr.indexOf(v) === i)
   : details;
 
+// SECURITY: nothing sensitive is ever stored in changelog.json (client-served
+// data) — security/anti-exploit work is tracked only in
+// docs/changelog/security-queue.md (private git, never served). So a shipped
+// entry here is always safe to show publicly. Do NOT reintroduce a flag to
+// hide entries; keep the bytes out of the client payload entirely.
 const entry = {
   version: nextVersion,
   date: new Date().toISOString().slice(0, 10),

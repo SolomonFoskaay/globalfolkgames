@@ -54,27 +54,116 @@
 .changelog-meta .changelog-admin-link { color: #2ecc71; text-decoration: none; }
 .changelog-meta .changelog-admin-link:hover { text-decoration: underline; }
 
+/* ----- Always-on intro banner (user view, before the tabs) ----- */
+.changelog-intro {
+    margin: 0 0 24px;
+    padding: 16px 18px;
+    background: #171717;
+    border: 1px solid var(--border, #333);
+    border-left: 3px solid var(--accent, #f39c12);
+    border-radius: 10px;
+}
+
+.changelog-intro h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.changelog-intro p {
+    margin: 0;
+    color: #ccc;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
 .changelog-entries { display: flex; flex-direction: column; gap: 18px; }
 
-/* ----- Roadmap (Feature Tracker: planned / in-progress) ----- */
-.roadmap {
+/* ----- Status tabs (Planned / In progress / Shipped) ----- */
+.changelog-tabs {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-bottom: 8px;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    margin-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
 }
 
-.roadmap-title {
-    padding: 14px 16px;
-    background: linear-gradient(135deg, #1a1a24 0%, #2a1a3a 100%);
-    border: 1px solid var(--accent-purple, #8b5cf6);
+.changelog-tabs::-webkit-scrollbar { display: none; }
+
+.changelog-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 9px 18px;
+    background: #252535;
+    border: 1px solid var(--border, #333);
+    color: var(--muted, #aaa);
     border-radius: 10px;
-    margin-bottom: 2px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
 }
 
-.roadmap-title h3 { margin: 0 0 4px; font-size: 1.15rem; color: #f5f5ff; }
-.roadmap-title p { margin: 0; color: #aaa; font-size: 0.85rem; }
+.changelog-tab:hover { color: #fff; }
 
+.changelog-tab.active {
+    background: var(--accent, #f39c12);
+    border-color: var(--accent, #f39c12);
+    color: #1a1a1a;
+}
+
+/* ----- Pagination ----- */
+.changelog-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid #2a2a2a;
+}
+
+.page-btn {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 12px;
+    background: #252535;
+    border: 1px solid var(--border, #333);
+    color: var(--muted, #aaa);
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.page-btn:hover:not(:disabled):not(.active) { color: #fff; }
+
+.page-btn.active {
+    background: var(--accent, #f39c12);
+    border-color: var(--accent, #f39c12);
+    color: #1a1a1a;
+}
+
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ----- Admin-only numbered dev plan ----- */
+.dev-plan-list {
+    margin: 0;
+    padding-left: 22px;
+}
+
+.dev-plan-list li {
+    color: #bbb;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    list-style: decimal;
+}
+
+/* ----- Roadmap items (Planned / In progress) ----- */
 .roadmap-entry {
     border-style: dashed;
     /* Planned items feel 'draft' vs shipped solid cards */
@@ -93,14 +182,6 @@
 .b-status.in-progress {
     background: #2ecc71;
     color: #1a1a1a;
-}
-
-.releases-title {
-    margin: 10px 0 2px;
-    font-size: 1.1rem;
-    color: #ccc;
-    border-bottom: 1px solid #2a2a2a;
-    padding-bottom: 8px;
 }
 
 .entry {

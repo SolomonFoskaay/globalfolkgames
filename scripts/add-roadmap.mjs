@@ -5,6 +5,11 @@
 // Usage:
 //   node scripts/add-roadmap.mjs "<title>" "<user summary>"
 //
+// SECURITY NOTE: do NOT record security/anti-exploit work here. Anything in
+// changelog.json is served to browsers and is public data. Track unfixed
+// security work ONLY in docs/changelog/security-queue.md (private git, never
+// served). When a security fix ships, add it here as a normal shipped feature.
+//
 // What it does:
 //   1. Appends a roadmap item to public/changelog/changelog.json under the
 //      `roadmap` array with status "planned".
@@ -83,6 +88,6 @@ writeFileSync(CHANGELOG, JSON.stringify(data, null, 2) + '\n');
 console.log(`\nroadmap added (status: planned): "${item.title}"`);
 console.log(`user view  : ${item.summary || '(none)'}`);
 console.log(`dev view   : ${item.details.length} bullet(s) folded from unreleased.md`);
-console.log(`shown on   : /changelog/ under "Coming next" · raw on /changelog/admin.html\n`);
+console.log(`shown on   : /changelog/ · raw on /changelog/admin.html\n`);
 console.log('Now mark progress with: node scripts/set-roadmap-status.mjs "<title>" in-progress');
 console.log('Ship it with         : node scripts/bump-version.mjs patch "<title>" "<summary>"');
