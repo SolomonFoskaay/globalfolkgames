@@ -8,6 +8,9 @@
     },
     "api/endpoints.mjs": {
       "maxDuration": 30
+    },
+    "api/roll.mjs": {
+      "maxDuration": 30
     }
   }
 }

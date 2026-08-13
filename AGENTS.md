@@ -299,13 +299,31 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] IDL synced to `src/gfg-dice-idl.json`.
 - [x] Sponsor relay (local + Vercel fn) built and tested.
 - [x] Client rewritten for ER (`src/magicblock-vrf.js`, `src/gfg-dice-config.js`).
-- [x] AI/computer turns skip VRF (`public/games/ludo/mechanics/actions/dice.js`).
+- [x] **ALL dice on-chain (Scope A, shipped):** every dice roll in the Ludo
+      game now resolves on the MagicBlock ER VRF (fast/gasless queue
+      `5hBR…`) — not just a one-off proof roll.
+      * Human "You" seat: every turn rolls via the player's delegated dice
+        PDA (`src/magicblock-vrf.js`; session key signs silently).
+      * Computer seats: new server-side house-roll route
+        (`scripts/roll-relay.mjs`, `POST /api/roll` on the local relay and
+        `api/roll.mjs` on Vercel). The house = the sponsor key; its dice PDA
+        is sponsored+delegated once (~0.0013 SOL, idempotent), then every
+        computer roll runs FREE on the ER queue. The key never leaves the
+        server. Rolls are serialized in-process (single-flight queue) so the
+        shared house PDA can't race; delegation state is cached ~4min so warm
+        rolls are ~1.3s (cold first ~3.1s), staying under the 2.5s p95 revert
+        rule in the shipped anti-cheat decision.
+      * Any seat falls back to local randomness (`[Off-Chain Local
+        Randomness]`) only if VRF / relay is unreachable, so play never
+        hard-stalls. Computer "move" timing constants are unchanged.
 - [x] **Timing + AI speed (HARD CONSTRAINT — do not change):** the owner
       deliberately slowed the AI to human-level playing speed (early versions
       were too fast, made the game hard, and felt like the AI hijacked the
       user's turn). Preserve current timing: computer dice roll ~1.2–1.5s
       after turn start, move execution ~1.5s delay, post-roll ~3.5s before
-      pass/next, pass-sequence ~1.5s. Never speed these up.
+      pass/next, pass-sequence ~1.5s. Never speed these up. Note: the on-chain
+      computer roll awaits the ER round trip (~1.3s warm) before that
+      post-roll pause, which is the accepted cost of provably-fair AI dice.
 - [x] **Board dice rendering (improved):** `public/games/ludo/physics.js`
       `renderPhysicalDiceCubes` now draws 46px rounded white dice with real
       pip dots (not unicode glyphs that render inconsistently on mobile),
@@ -313,10 +331,10 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       match. Keep dice big/readable — do not regress to tiny 2D glyphs.
 - [x] Player-account feature: mandatory sign-in to start a match; exactly one
       seat is the signed-in user ("You" via `playerProfiles[color].isUser`);
-      reward requires 1st-place user seat AND a valid on-chain proof roll
-      (the first user roll of the match). `getOnchainProofUsedThisMatch()` +
-      `getLastProofRollSignature()` gate the +100 reward in
-      `win-detection.js`.
+      reward requires 1st-place user seat AND a valid on-chain roll (every
+      user roll is on-chain since Scope A; the flag is set once any roll
+      succeeds). `getOnchainProofUsedThisMatch()` + `getLastProofRollSignature()`
+      gate the +100 reward in `win-detection.js`.
 - [x] Points flow fixed + hardened (`public/profiles.js`: `awardGlobalPoints`):
       optimistic header bump, audit row in `point_transactions`, profile totals +
       level update, and a device-level pending-award queue
