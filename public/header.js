@@ -242,11 +242,70 @@
 
         // Make sure the auth modal also exists on this page
         ensureAuthModal();
+        ensureConfirmDialog();
 
         // Tell profiles.js the header is ready
         if (typeof window.refreshAuthHeader === 'function') {
             window.refreshAuthHeader();
         }
+    }
+
+    // ---------- Generic confirm dialog (platform-styled, thumb-safe) ----------
+    // Used across the platform for destructive actions (sign out, etc.).
+    // Button order: OK on the LEFT, Cancel on the RIGHT. On mobile the right
+    // side is where a thumb naturally lands when reaching for the menu, so a
+    // stray tap hits Cancel and nothing happens; signing out (OK) is a
+    // deliberate, careful tap.
+    function ensureConfirmDialog() {
+        if (document.getElementById('gfg-confirm-dialog')) return;
+
+        const html = `
+            <div id="gfg-confirm-dialog" class="auth-modal">
+                <div class="auth-modal-content">
+                    <h2 id="gfg-confirm-title">${String.fromCharCode(63)}</h2>
+                    <p id="gfg-confirm-message" class="auth-hint" style="margin-bottom:16px;"></p>
+                    <div class="auth-actions gfg-confirm-actions">
+                        <button id="gfg-confirm-ok" class="auth-btn primary">Okay</button>
+                        <button id="gfg-confirm-cancel" class="auth-btn secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', html);
+
+        const dialog = document.getElementById('gfg-confirm-dialog');
+        let onOk = null;
+
+        function close() {
+            dialog?.classList.remove('visible');
+            onOk = null;
+        }
+
+        document.getElementById('gfg-confirm-ok')?.addEventListener('click', () => {
+            const cb = onOk;
+            close();
+            if (cb) cb();
+        });
+        document.getElementById('gfg-confirm-cancel')?.addEventListener('click', close);
+        // Clicking the dark background also cancels (safe default).
+        dialog?.addEventListener('click', (e) => {
+            if (e.target.id === 'gfg-confirm-dialog') close();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('gfg-confirm-dialog')?.classList.contains('visible')) close();
+        });
+
+        // Public: window.showConfirmDialog({ title, message, okText, cancelText, onOk })
+        window.showConfirmDialog = function (opts = {}) {
+            const dlg = document.getElementById('gfg-confirm-dialog');
+            if (!dlg) return;
+            document.getElementById('gfg-confirm-title').textContent = opts.title || 'Are you sure?';
+            document.getElementById('gfg-confirm-message').textContent = opts.message || '';
+            document.getElementById('gfg-confirm-ok').textContent = opts.okText || 'Okay';
+            document.getElementById('gfg-confirm-cancel').textContent = opts.cancelText || 'Cancel';
+            onOk = opts.onOk || null;
+            dlg.classList.add('visible');
+        };
     }
 
     // Public function used by every page

@@ -159,19 +159,38 @@
             const points = profile ? profile.global_points : 0;
             const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
 
+            // Order matters on mobile: the SIGN OUT button comes FIRST, and the
+            // points sit at the far right, directly beside the ☰ menu. A thumb
+            // reaching for the menu lands on the (harmless) points text, not the
+            // sign-out button, so tapping the menu can no longer log you out.
             pill.innerHTML = `
-                <span id="display-points">⭐ ${points.toLocaleString()} Pts</span>
-                <span class="auth-user">· ${name}</span>
                 <button id="btn-signout" class="auth-btn-small">Sign out</button>
+                <span class="auth-user">· ${name}</span>
+                <span id="display-points">⭐ ${points.toLocaleString()} Pts</span>
             `;
 
             const btn = document.getElementById('btn-signout');
             if (btn) {
-                btn.onclick = async function () {
-                    if (window.logoutDynamic) {
-                        await window.logoutDynamic();
+                btn.onclick = function () {
+                    if (window.showConfirmDialog) {
+                        window.showConfirmDialog({
+                            title: 'Sign out?',
+                            message: 'Are you sure you want to sign out? Your points and progress stay saved to your account.',
+                            okText: 'Yes, sign out',
+                            cancelText: 'Cancel',
+                            onOk: async function () {
+                                if (window.logoutDynamic) {
+                                    await window.logoutDynamic();
+                                }
+                                updateHeader(null);
+                            }
+                        });
+                    } else {
+                        // Fallback: confirm-less direct sign out.
+                        if (window.logoutDynamic) {
+                            window.logoutDynamic().then(() => updateHeader(null));
+                        }
                     }
-                    updateHeader(null);
                 };
             }
 
@@ -184,10 +203,11 @@
             window.currentProfile = profile;
 
         } else {
-            // Logged out state
+            // Logged out state: Sign in button first, points last (points sit
+            // next to the menu, so a menu-tap never hits the sign-in button).
             pill.innerHTML = `
-                <span id="display-points">⭐ 0 Pts</span>
                 <button id="btn-open-auth" class="auth-btn-small">Sign in</button>
+                <span id="display-points">⭐ 0 Pts</span>
             `;
 
             const btn = document.getElementById('btn-open-auth');

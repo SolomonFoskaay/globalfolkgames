@@ -411,6 +411,17 @@ body {
     gap: 8px;
     margin-top: 8px;
 }
+/* Confirm dialog buttons sit side by side: OK on the LEFT, Cancel on the
+   RIGHT. On mobile the right edge is where a thumb naturally lands when
+   reaching for the ☰ menu, so an accidental tap hits Cancel (safe default)
+   and only a deliberate tap on OK signs out. */
+.gfg-confirm-actions {
+    flex-direction: row;
+    justify-content: stretch;
+}
+.gfg-confirm-actions .auth-btn {
+    flex: 1 1 50%;
+}
 .auth-btn {
     width: 100%;
     padding: 12px;
