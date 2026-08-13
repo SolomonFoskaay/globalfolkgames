@@ -23,6 +23,7 @@ import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import './load-env.mjs'; // load .env (Alchemy key) before resolving the RPC chain
 import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus } from '../src/gfg-rpc.js';
+import { authorizeSpend, assertSponsorReserve, recordSpend } from './spend-ledger.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 
@@ -52,6 +53,14 @@ function mkWallet(kp) {
     async signAllTransactions(ts) { return Promise.all(ts.map(t => { t.partialSign(kp); return t; })); },
   };
 }
+
+// Estimated sponsor cost of one base-layer step (initialize or delegate):
+// rent ~0.0009 SOL + tx fee ~0.0005 SOL + ER session cost. Real onboarding is
+// ~0.0013 SOL total, so a per-step estimate of 0.0015 (2x-3x margin) gives
+// fresh players 2 x 0.0015 = 0.003 SOL of budget — comfortably under the
+// 0.005 SOL default per-player cap, while still leaving abuse headroom tight.
+// The realized balance delta is what actually lands in the ledger.
+const ESTIMATED_STEP_COST_LAMPORTS = 0.0015 * 1e9; // 0.0015 SOL
 
 // Initialize + delegate a player's dice PDA. Idempotent.
 // playerPubkey: the player's Solana wallet address (seed basis for the PDA).
@@ -90,10 +99,21 @@ export async function handleDelegate(playerPubkey) {
   const info = await retry(() => conn.getAccountInfo(pda));
   const steps = [];
 
+  // Sponsor spend guard: authorize the estimated cost of the steps we are
+  // ABOUT to run against the per-player and global caps, and verify the
+  // sponsor wallet keeps its reserve after this spend. Throws SpendCapExceeded
+  // (or SpendCapExceeded for the reserve) before any SOL leaves the wallet.
+  const plannedSteps = info ? 1 : 2; // fresh: initialize + delegate; existing: delegate only
+  const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
+  authorizeSpend(player.toBase58(), budgetLamports);
+  const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
+  assertSponsorReserve(sponsorBalance ?? 0, budgetLamports);
+  const balanceBefore = await retry(() => conn.getBalance(sponsor.publicKey));
+
   // 1) Create the PDA if it does not exist yet.
   if (!info) {
     const sig = await sendAndConfirmBase(conn, sponsor,
-      program.methods.initialize()
+      await program.methods.initialize()
         .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player })
         .transaction()
     );
@@ -106,7 +126,7 @@ export async function handleDelegate(playerPubkey) {
   const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBytes()], DELEGATION_PROGRAM);
 
   const sig = await sendAndConfirmBase(conn, sponsor,
-      program.methods.delegate()
+      await program.methods.delegate()
         .accounts({
           payer: sponsor.publicKey,
           playerAuthority: player,
@@ -134,6 +154,17 @@ export async function handleDelegate(playerPubkey) {
       throw new Error(`delegate failed: ${detail}`);
     });
   if (!sig.alreadyDelegated) steps.push({ step: 'delegate', sig });
+
+  // Record the REAL cost (balance delta), not the estimate, so the ledger
+  // reflects actual sponsor spend. Caps were already enforced on the estimate.
+  if (steps.length) {
+    const balanceAfter = await retry(() => conn.getBalance(sponsor.publicKey));
+    const spent = Math.max(0, (balanceBefore ?? balanceAfter) - balanceAfter);
+    if (spent > 0) {
+      recordSpend(player.toBase58(), spent);
+      console.log(`[relay] sponsored ${player.toBase58()}: ${(spent / 1e9).toFixed(6)} SOL (+${steps.length} step(s))`);
+    }
+  }
 
   return { pda: pda.toString(), delegated: true, steps };
 }

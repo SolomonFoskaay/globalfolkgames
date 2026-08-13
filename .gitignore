@@ -19,6 +19,9 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
+# Sponsor spend ledger (relay state, machine-local)
+.gfg-spend-ledger.json
+
 # Editor / OS
 .vscode/
 .idea/
