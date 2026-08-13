@@ -210,6 +210,19 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   `public/changelog/changelog.json` (`summary` = public-facing watered-down
   text; `details` = admin-only bullets folded from unreleased.md; `git` = commit
   ref) and clears unreleased.md for the next cycle.
+- **Published entries are IMMUTABLE (hard rule — do not violate):** once an
+  item is promoted to a shipped entry (via `bump-version.mjs`) it is
+  "published done" for BOTH the admin raw view and the public user page, and
+  must NEVER be silently rewritten, reworded, relabeled, re-dated, or deleted
+  in place afterwards. A changelog that quietly changes what was shipped
+  yesterday looks untrustworthy and admin/user copies would drift. If a real
+  mistake lands in a shipped entry, do NOT fix it silently: either add a new
+  follow-up entry (patch bump) or get the owner's explicit go-ahead to amend.
+  The "live" items — planned and in-progress roadmap entries — REMAIN freely
+  editable (title, summary, dev details, status). The user-side visibility
+  gate stays exactly as before: nothing reaches the user page without the
+  owner's manual approval (`node scripts/approve-roadmap.mjs "<title>" "<summary>"`).
+  Never bypass that gate to rush or reword anything onto the user page.
 - **Pages (Vite inputs):** `/changelog/` = public changelog (v0.7.1+ entries,
   summaries always readable); `/changelog/admin.html` = raw engineer view
   (details + git refs), gated to staff. Both load the standard auth stack via
