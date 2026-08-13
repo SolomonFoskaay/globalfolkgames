@@ -18,7 +18,9 @@
   };
 
   // Current view state: which tab + which page within that tab.
-  let state = { mode: 'user', tab: 'in-progress', page: 1 };
+  // User mode lands on "Planned" (the forward-looking roadmap the owner has
+  // approved for players); admins see the full pipeline from "In progress".
+  let state = { mode: 'user', tab: 'planned', page: 1 };
   let cache = null; // parsed changelog.json
 
   function qs(sel) { return document.querySelector(sel); }
@@ -95,17 +97,23 @@
   }
 
   // Roadmap (Feature Tracker) item — planned or in-progress.
+  // On the admin page, unapproved items get a "pending approval" badge so the
+  // owner instantly sees what's in the technical pipeline but not yet public.
   function renderRoadmapItem(e, mode) {
     const extra = mode === 'admin' ? devPlan(e.details) : '';
+    const pending = mode === 'admin' && e.approved !== true
+      ? `<span class="badge b-status pending">Pending approval</span>`
+      : '';
     return `
       <article class="entry roadmap-entry ${e.status === 'in-progress' ? 'entry-in-progress' : ''}">
         <div class="entry-head">
           <span class="entry-version">Next</span>
           ${statusBadge(e.status)}
+          ${pending}
           <span class="entry-date">added ${esc(e.added || '')}</span>
         </div>
         <h3>${esc(e.title)}</h3>
-        <p class="entry-summary">${esc(e.summary) || '<em>(coming soon)</em>'}</p>
+        <p class="entry-summary">${esc(e.summary) || '<em>(no user summary yet — approve to publish)</em>'}</p>
         ${extra}
       </article>`;
   }
@@ -161,11 +169,13 @@
   // Filter changelog data by the active tab.
   // Everything in this payload is user-safe by construction: unfixed security
   // work is never stored in changelog.json (client-served data), so there is
-  // nothing to hide at render time.
-  function itemsFor(data, tab) {
+  // nothing to hide at render time. Beyond that, user mode only shows roadmap
+  // items explicitly APPROVED by the owner — unapproved items are admin-only.
+  function itemsFor(data, tab, mode) {
     if (tab === 'shipped') return Array.isArray(data.entries) ? data.entries.slice() : [];
     const roadmap = Array.isArray(data.roadmap) ? data.roadmap : [];
-    return roadmap.filter(r => r.status === tab);
+    if (mode === 'admin') return roadmap.filter(r => r.status === tab);
+    return roadmap.filter(r => r.status === tab && r.approved === true);
   }
 
   async function paint() {
@@ -181,7 +191,7 @@
       if (verEl) verEl.textContent = data.current || '';
       whoEl.textContent = esc(mode === 'admin' ? 'Admin view' : 'Public changelog');
 
-      const all = itemsFor(data, state.tab);
+      const all = itemsFor(data, state.tab, mode);
       const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
       // Clamp page so navigation never lands past the end of a tab.
       if (state.page > totalPages) state.page = totalPages;
@@ -233,7 +243,7 @@
       }
       const navBtn = e.target.closest('[data-nav]');
       if (navBtn) {
-        const tabItems = cache ? itemsFor(cache, state.tab).length : 0;
+        const tabItems = cache ? itemsFor(cache, state.tab, state.mode).length : 0;
         const lastPage = Math.max(1, Math.ceil(tabItems / PAGE_SIZE));
         if (navBtn.dataset.nav === 'prev' && state.page > 1) state.page -= 1;
         if (navBtn.dataset.nav === 'next' && state.page < lastPage) state.page += 1;
@@ -244,8 +254,9 @@
 
   async function render(mode) {
     state.mode = mode;
-    // Default tab: land visitors on "In progress" (what we're building now),
-    // keeping "Shipped" a click away for the release history.
+    // Land visitors on the "Planned" tab (the owner-approved roadmap of what's
+    // coming), keeping "Shipped" a click away for the release history. Admin
+    // mode shows the full pipeline from the same default.
     bindControls();
     await paint();
   }

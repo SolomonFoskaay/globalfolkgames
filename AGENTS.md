@@ -115,10 +115,25 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
     under the hood, files, trade-offs, remaining work.
   - *User view (public):* a light, watered-down summary of the same feature —
     the benefit to the player in plain language.
-- **Add it with:** `node scripts/add-roadmap.mjs "<title>" "<user summary>"`
+- **Add it with:** `node scripts/add-roadmap.mjs "<title>" "<user summary>" [--approved]`
   It folds the technical bullets from `docs/changelog/unreleased.md` into the
-  item's dev-only `details`, and the public page shows only the summary. Keep
-  the unreleased.md bullets precise (engineer-facing).
+  item's dev-only `details`. New items are **ADMIN-ONLY by default** (see the
+  approval gate below) — pass `--approved` only if the owner has explicitly
+  agreed this item is ready for the public page right now.
+- **Approval gate (HARD RULE — the admin pipeline is the source of truth):**
+  the owner reviews features as we discuss them; the admin page
+  (`/changelog/admin.html`) is where ALL of it is tracked technically. Nothing
+  shows on the user page (`/changelog/`) until the OWNER explicitly approves
+  it:
+  - Every roadmap item carries `approved: true|false`. Default on add:
+    **false** (admin-only).
+  - Owner approves with: `node scripts/approve-roadmap.mjs "<title>" "<user summary>"`
+    → sets `approved: true` and stores the public-facing summary.
+  - `bump-version.mjs` REFUSES to promote (ship) any roadmap item that is not
+    approved — a shipped entry always appears publicly, so it must be approved
+    first. Approval is the manual go/no-go for user-side visibility, every time.
+  - **Never bypass this to rush a feature onto the user page.** If in doubt,
+    leave it admin-only and ask the owner.
 - **Mark it as it lives:** each roadmap item carries a status:
   `planned` → `in-progress` → `shipped`.
   - Agreed but not started: leave or set `planned`.
@@ -131,8 +146,10 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   3 status tabs — **Planned / In progress / Shipped** (user-view summaries of
   what's being built and where it stands) — plus per-tab pagination
   (Prev / pages / Next, ~6 per page) so history stays browsable as it grows.
-  All dev detail (numbered DEV Plan lists + git refs) stays on
-  `/changelog/admin.html` (staff only).
+  User mode shows ONLY approved items. All dev detail (numbered DEV Plan lists
+  + git refs) stays on `/changelog/admin.html` (staff only), which also badges
+  every unapproved item with "Pending approval" so the owner sees the full
+  pipeline at a glance and can approve from there.
 - **Public vs sensitive (hard rule):** the user-facing page must NEVER contain
   unfixed security/anti-exploit details — not even behind a flag or filter.
   A browser actor can read whatever bytes are in the client payload; hiding them
@@ -270,6 +287,13 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       More native games from the world (current: Nigeria Ludo live, Ayo Olopon
       upcoming), Mainnet launch. Purely marketing/user-relevant — zero security
       or technical downside detail in the public payload.
+- [x] **Approval gate live:** new roadmap items default to **admin-only**
+      (`approved: false`) — visible on `/changelog/admin.html` (with a "Pending
+      approval" badge) but hidden from the user page until the owner runs
+      `node scripts/approve-roadmap.mjs "<title>" "<summary>"`. `bump-version.mjs`
+      REFUSES to ship an unapproved roadmap item to the public changelog.
+      User page defaults to the Planned tab (owner-approved forward-looking
+      roadmap); it shows ONLY approved roadmap items.
 - [ ] On-chain points mirror (future): a `record_points`-style instruction on the
       ER keyed to the proof roll; Supabase stays the fallback source of truth
       across devnet wipes (re-sync on redeploy).

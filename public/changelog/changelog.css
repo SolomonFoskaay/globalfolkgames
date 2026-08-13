@@ -184,6 +184,11 @@
     color: #1a1a1a;
 }
 
+.b-status.pending {
+    background: #8e44ad;
+    color: #fff;
+}
+
 .entry {
     background: #171717;
     border: 1px solid #2a2a2a;

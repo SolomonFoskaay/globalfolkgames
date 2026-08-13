@@ -187,7 +187,7 @@
   "roadmap": [
     {
       "title": "Changelog tabs + pagination",
-      "summary": "The What's New page gets three clean tabs (Planned · In progress · Shipped, starting with Shipped) so you can browse updates without endless scrolling — long lists split into numbered pages.",
+      "summary": "The What's New page gets three clean tabs (Planned · In progress · Shipped) so you can browse updates without endless scrolling — long lists split into numbered pages.",
       "details": [
         "Changelog pages get 3 status tabs at the top: Planned / In progress / Shipped.",
         "Clicking a tab filters the list; the current (v0.8.0) item lands under Shipped.",
@@ -201,7 +201,8 @@
         "admin page list rendering."
       ],
       "status": "in-progress",
-      "added": "2026-08-12"
+      "added": "2026-08-12",
+      "approved": true
     },
     {
       "title": "Only user-safe updates appear publicly",
@@ -214,7 +215,8 @@
         "No hide-by-flag machinery — the bytes are simply not in the client payload."
       ],
       "status": "in-progress",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": false
     },
     {
       "title": "Full on-chain gaming",
@@ -224,7 +226,8 @@
         "Vision: every match played becomes a permanent, verifiable on-chain record."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "Earn competitions",
@@ -234,7 +237,8 @@
         "Expansion of competition-based earn: daily, weekly, monthly competitions with reward pools."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "Referral program",
@@ -244,7 +248,8 @@
         "New referral loop to grow the player base; rewarding existing players for growing the community."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "Community forum",
@@ -254,7 +259,8 @@
         "Community space for players; knowledge sharing and game discussion."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "Giveaways & events",
@@ -264,7 +270,8 @@
         "Periodic giveaways and events to reward active players and celebrate milestones."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "More native games from the world",
@@ -274,7 +281,8 @@
         "More native games from multiple countries. Current: Nigeria — Ludo ludo (shipped). Upcoming: Nigeria — Ayo Olopon. More countries' games to be announced as confirmed."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     },
     {
       "title": "Mainnet launch",
@@ -284,7 +292,8 @@
         "Move from devnet to mainnet: real, permanent on-chain records."
       ],
       "status": "planned",
-      "added": "2026-08-13"
+      "added": "2026-08-13",
+      "approved": true
     }
   ]
 }

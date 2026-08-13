@@ -3,19 +3,30 @@
 // Record an agreed feature in the Feature Tracker BEFORE coding it.
 //
 // Usage:
-//   node scripts/add-roadmap.mjs "<title>" "<user summary>"
+//   node scripts/add-roadmap.mjs "<title>" "<user summary>" [--approved]
 //
-// SECURITY NOTE: do NOT record security/anti-exploit work here. Anything in
-// changelog.json is served to browsers and is public data. Track unfixed
-// security work ONLY in docs/changelog/security-queue.md (private git, never
-// served). When a security fix ships, add it here as a normal shipped feature.
+// APPROVAL GATE (important):
+//   By default a new roadmap item is ADMIN-ONLY: it shows on
+//   /changelog/admin.html (technical pipeline) but is HIDDEN from the public
+//   /changelog/ user page until YOU approve it. To publish it to the user
+//   page now, pass --approved. Otherwise approve later with:
+//     node scripts/approve-roadmap.mjs "<title>" "<user summary>"
+//   Nothing technical/sensitive ever reaches the user page without your
+//   explicit approval.
+//
+// SECURITY NOTE: do NOT record security/anti-exploit work here — not even as
+// admin-only. Anything in changelog.json is served to browsers and is public
+// data. Track unfixed security work ONLY in docs/changelog/security-queue.md
+// (private git, never served). When a security fix ships, add it here as a
+// normal shipped feature.
 //
 // What it does:
 //   1. Appends a roadmap item to public/changelog/changelog.json under the
 //      `roadmap` array with status "planned".
 //   2. The item carries TWO views:
-//      - `summary` : the public-facing, watered-down user view (what the player
-//        gets, in plain language) — shown on /changelog/.
+//      - `summary` : the optional public-facing, watered-down user view (what
+//        the player gets, in plain language) — shown on /changelog/ ONLY after
+//        approval.
 //      - `details` : the admin-only engineer view — technical bullets folded
 //        from docs/changelog/unreleased.md (what changes under the hood).
 //   3. Leaves unreleased.md untouched so the same bullets feed the eventual
@@ -38,9 +49,10 @@ const UNRELEASED = join(ROOT, 'docs', 'changelog', 'unreleased.md');
 
 const title = process.argv[2] || '';
 const summary = process.argv[3] || '';
+const approved = process.argv.includes('--approved');
 
 if (!title) {
-  console.error('Usage: node scripts/add-roadmap.mjs "<title>" "<user summary>"');
+  console.error('Usage: node scripts/add-roadmap.mjs "<title>" "<user summary>" [--approved]');
   process.exit(1);
 }
 
@@ -79,6 +91,7 @@ const item = {
   summary: summary || '',
   details,
   status: 'planned',
+  approved, // admin-only until you approve for the user page
   added: new Date().toISOString().slice(0, 10),
 };
 data.roadmap.push(item);
@@ -86,8 +99,13 @@ data.roadmap.push(item);
 writeFileSync(CHANGELOG, JSON.stringify(data, null, 2) + '\n');
 
 console.log(`\nroadmap added (status: planned): "${item.title}"`);
-console.log(`user view  : ${item.summary || '(none)'}`);
+console.log(`approved for user view : ${approved ? 'YES (public /changelog/)' : 'NO (admin-only until approved)'}`);
+console.log(`user view  : ${item.summary || '(none — add one when approving)'}`);
 console.log(`dev view   : ${item.details.length} bullet(s) folded from unreleased.md`);
-console.log(`shown on   : /changelog/ · raw on /changelog/admin.html\n`);
+console.log(`raw on     : /changelog/admin.html\n`);
+if (!approved) {
+  console.log('Approve it for the user page with:');
+  console.log(`  node scripts/approve-roadmap.mjs "${title}" "<user summary>"\n`);
+}
 console.log('Now mark progress with: node scripts/set-roadmap-status.mjs "<title>" in-progress');
 console.log('Ship it with         : node scripts/bump-version.mjs patch "<title>" "<summary>"');

@@ -86,6 +86,17 @@ if (!Array.isArray(changelog.roadmap)) changelog.roadmap = [];
 const roadmapIdx = changelog.roadmap.findIndex(r => norm(r.title) === norm(title));
 const roadmapItem = roadmapIdx >= 0 ? changelog.roadmap[roadmapIdx] : null;
 
+// Approval gate: a roadmap item may only be promoted to a shipped entry (which
+// always appears on the public /changelog/ page) once the owner has approved it
+// for the user page via scripts/approve-roadmap.mjs. Unapproved (admin-only)
+// items must never leak to public via a release.
+if (roadmapItem && roadmapItem.approved !== true) {
+  console.error(`"${roadmapItem.title}" is NOT approved for the user page yet.`);
+  console.error(`Approve it first: node scripts/approve-roadmap.mjs "${title}" "<user summary>"`);
+  console.error('or remove --promote intent by shipping a title that is not an unapproved roadmap item.');
+  process.exit(1);
+}
+
 // Merge engineer notes: roadmap details (if any) + fresh unreleased.md bullets.
 const mergedDetails = roadmapItem
   ? [...(roadmapItem.details || []), ...details].filter((v, i, arr) => arr.indexOf(v) === i)
