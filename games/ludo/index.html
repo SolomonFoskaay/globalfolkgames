@@ -95,6 +95,9 @@
                 <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
             </div>
 
+            <!-- Clickable on-chain verification link (shown after each on-chain roll) -->
+            <div id="verify-tx-link" style="display:none; margin-top:6px; font-size:0.78rem; text-align:center; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.35); border-radius:8px; padding:6px 8px; width:100%; box-sizing:border-box;"></div>
+
             <!-- Protected Reset Button Layout Box Component -->
             <button id="resetBtn" class="panel-control-btn" onclick="triggerManualArenaReset()">🔄 Reset Arena Match</button>
         </div>
@@ -116,6 +119,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
     <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
     <script src="/header.js"></script>
 

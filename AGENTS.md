@@ -313,9 +313,15 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
         shared house PDA can't race; delegation state is cached ~4min so warm
         rolls are ~1.3s (cold first ~3.1s), staying under the 2.5s p95 revert
         rule in the shipped anti-cheat decision.
-      * Any seat falls back to local randomness (`[Off-Chain Local
-        Randomness]`) only if VRF / relay is unreachable, so play never
-        hard-stalls. Computer "move" timing constants are unchanged.
+      * Any seat has NO offline fallback for core dice: a failed on-chain
+        roll is retried up to 3 times (~1.5s apart), then if the chain is
+        genuinely down the match PAUSES with a visible banner (turn returned,
+        never rolled locally, never advanced on a fake roll) and an 8s
+        monitor pings base RPC + ER RPC (`window.magicblockDice.ping()`),
+        alerting and auto-resuming the paused turn when the network returns.
+        Devnet-wipe recovery: redeploy the program, restore points/game txs
+        from Supabase backup, fresh matches continue. Computer "move" timing
+        constants are unchanged.
 - [x] **Timing + AI speed (HARD CONSTRAINT — do not change):** the owner
       deliberately slowed the AI to human-level playing speed (early versions
       were too fast, made the game hard, and felt like the AI hijacked the

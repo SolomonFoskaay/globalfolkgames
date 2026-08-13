@@ -112,6 +112,13 @@
             </div>
         </section>
 
+        <!-- Wallets & accounts tracker (what each wallet/PDA is + latest txs) -->
+        <section class="game-card dash-section" id="dash-accounts" style="text-align:left; border:1px solid #9b59b6;">
+            <h3>🔑 Wallets &amp; accounts <span class="last-checked" id="acc-last-checked"></span></h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-top:6px;">Every wallet and dice PDA the site touches: what it is, who pays (gasless), live ER delegation, and its latest on-chain transactions. Click a signature to verify directly on SolanaFM (alt link = official explorer).</p>
+            <div id="dash-accounts-list"><p class="empty">Loading…</p></div>
+        </section>
+
         <section class="game-card" id="dash-pipeline">
             <h3>📊 Release pipeline</h3>
             <p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p>
@@ -144,6 +151,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
     <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
     <script src="/header.js"></script>
     <script src="/changelog/render.js"></script>
@@ -192,6 +200,8 @@
 
                     document.getElementById('ep-last-checked').textContent =
                         '· checked ' + new Date(data.generatedAt).toLocaleTimeString() + (data.environment ? ' (' + data.environment + ')' : '');
+
+                    renderAccounts(data);
 
                     // Ops cards
                     const ops = data.ops || {};
@@ -243,7 +253,51 @@
                 }
             }
 
-            document.getElementById('ep-refresh').addEventListener('click', loadProbe);
+                        document.getElementById('ep-refresh').addEventListener('click', loadProbe);
+
+            // ---------- Wallets & accounts tracker ----------
+            const linkTag = (address, isAccount) => {
+                if (!window.gfgExplorer) return '<span class="mono">' + esc(address) + '</span>';
+                return window.gfgExplorer[isAccount ? 'accountLink' : 'txLink'](address);
+            };
+
+            function renderAccounts(data) {
+                const el = document.getElementById('dash-accounts-list');
+                if (!el) return;
+                const acc = data.ops && data.ops.accounts;
+                const stamp = document.getElementById('acc-last-checked');
+                if (stamp && data.generatedAt) stamp.textContent = '· checked ' + new Date(data.generatedAt).toLocaleTimeString();
+
+                if (!acc || acc.error) {
+                    el.innerHTML = '<p class="empty">Accounts tracker unavailable (' + esc((acc && acc.error) || 'no data') + ').</p>';
+                    return;
+                }
+                const rows = (acc.accounts || []).map(a => {
+                    const deleg = a.delegated == null
+                        ? '—'
+                        : a.delegated
+                            ? `<span style="color:#2ecc71;">✓ delegated</span>${a.delegationDetail ? ' <span style="color:#999;font-size:0.78rem;">' + esc(a.delegationDetail) + '</span>' : ''}`
+                            : `<span style="color:#e74c3c;">✗ not delegated</span>`;
+                    const txs = (a.latestTxs || []).map(t => {
+                        const when = t.blockTime ? ' <span style="color:#666;font-size:0.72rem;">' + esc(t.blockTime.slice(0, 16).replace('T', ' ')) + '</span>' : '';
+                        return `<div style="margin:2px 0;">${linkTag(t.signature, false)}${when}</div>`;
+                    }).join('');
+                    const bal = a.balanceSol != null ? esc(a.balanceSol) + ' SOL' : (a.balanceError ? 'err' : '—');
+                    return `<tr>
+                        <td>${esc(a.role)}<br><span class="mono">${linkTag(a.address, true)}</span></td>
+                        <td>${esc(a.gasless || '')}</td>
+                        <td>${deleg}</td>
+                        <td>${bal}</td>
+                        <td>${txs || (a.txsError ? '<span style="color:#e74c3c;">txs: ' + esc(a.txsError) + '</span>' : '—')}</td>
+                    </tr>`;
+                }).join('');
+                el.innerHTML = rows
+                    ? `<table class="mini-table">
+                        <thead><tr><th>What it is</th><th>Gasless / who pays</th><th>ER delegated</th><th>Balance</th><th>Latest transactions</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>`
+                    : '<p class="empty">No accounts yet — play a first roll to seed this list.</p>';
+            }
 
             // ---------- User stats tabs ----------
             document.querySelectorAll('.stats-tab').forEach(function (tab) {

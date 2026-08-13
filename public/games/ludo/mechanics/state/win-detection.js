@@ -65,11 +65,16 @@
                 }
 
                 const explorerUrl = proofSig
-                    ? `https://explorer.solana.com/tx/${proofSig}?cluster=devnet`
+                    ? (window.gfgExplorer && window.gfgExplorer.txUrl(proofSig))
                     : null;
                 console.log(`[REWARD] 1st place (you) +100 — proof roll: ${proofSig}`);
                 if (explorerUrl) {
                     console.log(`[REWARD] Verify on-chain → ${explorerUrl}`);
+                }
+                if (proofSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
+                    if (typeof showVerifyLink === 'function') {
+                        showVerifyLink(window.gfgExplorer.txLink(proofSig, 'Verify your winning roll on-chain during this match'));
+                    }
                 }
 
                 if (typeof window.showAuthBanner === 'function') {

@@ -26,6 +26,13 @@
         <section class="game-card" id="profile-wallet-card" hidden>
             <h3>Blockchain identity</h3>
             <p id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all;">—</p>
+            <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
+        </section>
+
+        <section class="game-card" id="profile-ontx-card" hidden>
+            <h3>🔗 Your on-chain activity</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
+            <div id="profile-ontx-list"><p class="empty">Loading…</p></div>
         </section>
 
         <section class="game-card" style="text-align:center;">
@@ -41,6 +48,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
     <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
     <script src="/header.js"></script>
     <script type="module" src="/src/main.js"></script>
@@ -54,7 +62,48 @@
             const lifetimeEl = document.getElementById('profile-lifetime');
             const walletCard = document.getElementById('profile-wallet-card');
             const walletEl = document.getElementById('profile-wallet');
+            const walletLinkEl = document.getElementById('profile-wallet-link');
+            const ontxCard = document.getElementById('profile-ontx-card');
+            const ontxList = document.getElementById('profile-ontx-list');
             const signinBtn = document.getElementById('profile-signin-btn');
+
+            const esc = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            async function loadOnchainActivity() {
+                if (!window.supabaseClient || !window.currentUser) return;
+                try {
+                    const { data, error } = await window.supabaseClient
+                        .from('point_transactions')
+                        .select('game_id, points, reason, match_id, created_at')
+                        .eq('user_id', window.currentUser.id)
+                        .not('match_id', 'is', null)
+                        .order('created_at', { ascending: false })
+                        .limit(8);
+                    if (error) throw new Error(error.message);
+                    if (!data || !data.length) {
+                        ontxList.innerHTML = '<p class="empty">No on-chain activity linked to your account yet. Play a match and win to see your verifiable rolls here.</p>';
+                        return;
+                    }
+                    const rows = data.map(t => {
+                        const game = t.game_id === 'ludo' ? 'Ludo' : esc(t.game_id);
+                        const reason = t.reason === 'win' ? '🏆 Match won'
+                            : t.reason === 'tamper' ? '⚠ Tamper notice'
+                            : esc(t.reason || 'Activity');
+                        const when = t.created_at ? '<span style="color:#666;font-size:0.75rem;"> ' + esc(t.created_at.slice(0, 16).replace('T', ' ')) + '</span>' : '';
+                        const link = window.gfgExplorer ? window.gfgExplorer.txLink(t.match_id) : esc(t.match_id);
+                        return `<div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                            <div style="font-weight:600;">${game} · ${reason}${t.points ? ' <span style="color:#f39c12;">(+' + esc(t.points) + ' pts)</span>' : ''}</div>
+                            <div style="margin-top:4px;">${link}${when}</div>
+                            <div style="color:#555;font-size:0.72rem; word-break:break-all; margin-top:2px;">${esc(t.match_id)}</div>
+                        </div>`;
+                    }).join('');
+                    ontxList.innerHTML = rows;
+                } catch (e) {
+                    ontxList.innerHTML = '<p class="empty">Could not load on-chain activity (' + esc(e.message) + ').</p>';
+                }
+            }
 
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
@@ -68,7 +117,15 @@
                 levelEl.textContent = 'Level ' + (p.level || 0);
                 lifetimeEl.textContent = 'Lifetime points: ' + (p.lifetime_points || 0);
                 const w = window.currentProfile.solana_wallet || window.getDynamicSolanaWallet?.() || null;
-                if (w) { walletEl.textContent = w; walletCard.hidden = false; }
+                if (w) {
+                    walletEl.textContent = w;
+                    if (window.gfgExplorer) {
+                        walletLinkEl.innerHTML = 'View this wallet on-chain: ' + window.gfgExplorer.accountLink(w);
+                    }
+                    walletCard.hidden = false;
+                    ontxCard.hidden = false;
+                    loadOnchainActivity();
+                }
                 signinBtn.hidden = true;
             }
 

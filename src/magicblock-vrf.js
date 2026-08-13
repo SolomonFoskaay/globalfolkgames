@@ -236,5 +236,34 @@ export function initMagicBlockDice() {
     getLastProofRollSignature() {
       return lastProofRollSignature;
     },
+
+    // Cheap liveness probe for the on-chain outage monitor. Resolves true when
+    // BOTH the base RPC and the ER RPC answer (devnet + the Rollup where rolls
+    // execute). Never throws; the monitor treats any failure as "still down".
+    ping() {
+      return pingOnchainStack();
+    },
   };
+}
+
+async function pingOnchainStack() {
+  const probe = async (url) => {
+    const conn = new Connection(url, 'confirmed');
+    let timer;
+    try {
+      const slotPromise = conn.getSlot();
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('ping timeout')), 5000);
+      });
+      await Promise.race([slotPromise, timeout]);
+      return true;
+    } catch (e) {
+      console.warn(`[VRF] ping failed for ${url}`, e.message || e);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const results = await Promise.all([probe(config.baseRpcUrl), probe(config.erRpcUrl)]);
+  return results.every(Boolean);
 }

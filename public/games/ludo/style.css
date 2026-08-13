@@ -38,6 +38,26 @@ body {
     overflow-y: visible;
 }
 
+/* Persistent on-chain outage banner (Ludo, shown while devnet is unreachable) */
+.chain-down-banner {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 1200;
+    max-width: 90%;
+    text-align: center;
+    background: var(--danger, #e74c3c);
+    color: #fff;
+    border: 2px solid #f39c12;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
 /* Dedicated On-Screen Cultural Notification Banner Line */
 #ludo-log {
     font-size: 0.85rem;

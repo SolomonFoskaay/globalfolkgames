@@ -160,6 +160,7 @@ function passTurnSequence() {
     lastDiceRoll2 = 0; 
     currentTurnMoves = [];
     consecutiveDoubleSixes = 0; 
+    if (typeof hideVerifyLink === 'function') hideVerifyLink(); 
 
     const turnIndicator = document.getElementById('turn-indicator');
     if (turnIndicator) {

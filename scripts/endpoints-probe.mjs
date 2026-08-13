@@ -31,7 +31,7 @@ import { execFileSync } from 'child_process';
 import { PublicKey, Keypair } from '@solana/web3.js';
 import './load-env.mjs';
 import { routerUrl } from '../src/gfg-rpc.js';
-import { createConnection } from '../src/gfg-rpc.js';
+import { createConnection, getDelegationStatus } from '../src/gfg-rpc.js';
 import { spendCaps, loadLedger, spendTotals } from './spend-ledger.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -110,6 +110,110 @@ async function probeHttp(url, timeoutMs = 8000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ---- Latest signatures for an account (devnet public RPC, best-effort) ----
+// Used by the Wallets & accounts tracker: for each wallet/PDA we want the most
+// recent transaction(s) so the owner can click through and verify on-chain.
+async function latestSignatures(address, limit = 2, timeoutMs = 8000) {
+  const start = Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch('https://api.devnet.solana.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignaturesForAddress', params: [address, { limit, commitment: 'confirmed' }] }),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    if (data.error || !Array.isArray(data.result)) {
+      return { ok: false, error: (data.error && data.error.message) || 'bad response', latencyMs: Date.now() - start, signatures: [] };
+    }
+    return {
+      ok: true,
+      latencyMs: Date.now() - start,
+      signatures: data.result.map(s => ({
+        signature: s.signature,
+        slot: s.slot,
+        blockTime: s.blockTime ? new Date(s.blockTime * 1000).toISOString() : null,
+      })),
+    };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message, latencyMs: Date.now() - start, signatures: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---- Wallets & accounts tracker ----
+// Every account kind the site touches (with its role + gasless notes) so the
+// owner always knows WHAT each wallet/PDA is and can watch its latest txs:
+//   - sponsor wallet      : the house/ sponsor key (pays init+delegate once)
+//   - house dice PDA      : the sponsor's own dice PDA (serves computer rolls)
+//   - each sponsored player wallet + its dice PDA (from the spend ledger)
+// Delegation status per PDA comes from the Magic Router; latest txs from the
+// devnet public RPC (best-effort).
+async function buildAccountsTracker() {
+  const out = [];
+  let sponsorPubkey = null;
+  try { sponsorPubkey = loadSponsorPubkey(); } catch (e) { /* sponsor missing */ }
+
+  // Best-effort shared connection (public devnet may be flaky).
+  let conn = null;
+  try { conn = createConnection(routerUrl(), 'confirmed'); } catch (e) { /* continue */ }
+  const getConn = () => { if (!conn) { conn = createConnection(routerUrl(), 'confirmed'); } return conn; };
+
+  const add = async (entry) => {
+    const base = {
+      role: entry.role,
+      kind: entry.kind,       // wallet | dice-pda | program
+      address: entry.address,
+      gasless: entry.gasless, // human note about who pays what
+      balanceSol: null,
+      delegated: null,
+      latestTxs: [],
+      txsError: null,
+    };
+    try {
+      if (entry.kind === 'wallet') {
+        const b = await getConn().getBalance(new PublicKey(entry.address));
+        base.balanceSol = +(b / 1e9).toFixed(4);
+      }
+    } catch (e) { base.balanceError = e.message; }
+    if (entry.kind === 'dice-pda') {
+      try {
+        const d = await getDelegationStatus(getConn(), entry.address);
+        base.delegated = !!(d && d.isDelegated);
+        base.delegationDetail = d && d.fqdn ? d.fqdn : (d && d.delegationRecord ? 'delegated (ER)' : null);
+      } catch (e) { base.delegationError = e.message; }
+    }
+    const txs = await latestSignatures(entry.address);
+    base.latestTxs = txs.signatures;
+    if (!txs.ok) base.txsError = txs.error;
+    out.push(base);
+  };
+
+  if (sponsorPubkey) {
+    await add({ role: 'Sponsor / house wallet', kind: 'wallet', address: sponsorPubkey, gasless: 'App-owned key. Pays the one-time initialize+delegate (~0.0013 SOL) and every computer roll runs ER-gasless.' });
+    const [housePda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'House dice PDA (computer rolls)', kind: 'dice-pda', address: housePda.toBase58(), gasless: 'Dice account for computer seats; rolls gasless on the ER VRF queue.' });
+  }
+
+  let players = [];
+  try { players = (loadLedger().players || {}); } catch (e) { /* ledger empty/missing */ }
+  const playerKeys = Object.keys(players);
+  for (const wallet of playerKeys.slice(0, 25)) {
+    await add({ role: 'Player wallet (sponsored)', kind: 'wallet', address: wallet, gasless: 'Player holds 0 SOL; app sponsors their first delegate.' });
+    const [pda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'Player dice PDA', kind: 'dice-pda', address: pda.toBase58(), gasless: 'This player\'s dice account; rolls gasless on the ER VRF queue.' });
+  }
+
+  return {
+    sponsorPubkey,
+    accounts: out,
+    pdaSeed: 'gfgplayerd',
+  };
 }
 
 // ---- RPC probe: one JSON-RPC call through the configured connection ----
@@ -220,6 +324,14 @@ export async function runProbe() {
 
   const changelog = changelogStats();
 
+  // ---- Wallets & accounts tracker (admin: what each wallet is + latest txs) ----
+  let accountsTracker = null;
+  try {
+    accountsTracker = await buildAccountsTracker();
+  } catch (e) {
+    accountsTracker = { error: e.message };
+  }
+
   // ---- Leak scan: findings go to the server log ONLY (never the payload) ----
   logLeakSinks(sponsor, ledger, changelog);
 
@@ -234,6 +346,7 @@ export async function runProbe() {
       roadmapCounts: changelog.roadmapCounts,
       gitRef: gitRef(),
       inventory: INVENTORY,
+      accounts: accountsTracker,
     },
     probeMs: Date.now() - started,
   };

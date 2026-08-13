@@ -1,7 +1,25 @@
 {
-  "current": "0.8.0",
+  "current": "0.8.1",
   "repo": "https://github.com/foskaay/globalfolkgames",
   "entries": [
+    {
+      "version": "0.8.1",
+      "date": "2026-08-13",
+      "type": "patch",
+      "title": "Verify your game history on-chain",
+      "summary": "Your profile now shows your real blockchain activity: every roll and win is backed by a Solana transaction you can open and verify yourself.",
+      "details": [
+        "On-chain activity transparency (admin + player views): new server-side Wallets & accounts tracker in scripts/endpoints-probe.mjs (buildAccountsTracker + latestSignatures). It inventories every wallet/PDA the site touches: sponsor/house wallet, house dice PDA (via houseDicePda() with PDA-derivation fallback), and up to 10 sponsored player wallets + their dice PDAs from the spend ledger. Each entry carries its role, a gasless/who-pays note, live SOL balance, real-time ER delegation status from the Magic Router (getDelegationStatus), and the latest on-chain tx signatures from the devnet public RPC (best-effort, 8s timeout, fails open with an error string).",
+        "Tracker runs its checks concurrently (Promise.allSettled) so a slow public RPC cannot serialize the whole probe; it builds its own createConnection so it is independent of the main probe connection. Wired into the probe payload as ops.accounts with a { error } fail-safe so a tracker failure never breaks the dashboard.",
+        "Admin dashboard (dashboard/index.html) gains a \"Wallets & accounts\" section: clickable per-account SolanaFM + official-explorer links (via the existing gfg-explorer.js), ER delegation badge, SOL balance, gasless note, and the latest tx links with timestamps. Purple-bordered so it stands apart from the ops panel.",
+        "Profile page (profile/index.html) gains \"Blockchain identity\" (the wallet now carries an on-chain account link) and a new \"Your on-chain activity\" card that lists the last 8 point_transactions whose match_id is a proof-roll signature (game, reason, points, clickable tx link), so players can open and verify their own rolls and win rewards on-chain.",
+        "Verified live on devnet: probe watchlist 8/8 ok; sponsor balance 92.8896 SOL; house dice PDA delegated=true to the ER validator; both carry recent tx signatures."
+      ],
+      "git": {
+        "head": "2f620e5",
+        "message": "feat(onchain): all dice roll on the ER VRF - human every turn + computer house-key route"
+      }
+    },
     {
       "version": "0.8.0",
       "date": "2026-08-12",
@@ -304,7 +322,7 @@
         "Goal: no client-side state a bad actor could fake; server/chain is source of truth",
         "Keep web2 feel: instant moves, no per-action wallet pops, human-speed AI turns",
         "Scope A (approved, IN PROGRESS): ALL dice rolls on the ER VRF (fast/gasless queue), not just the first user roll. Human \"You\" seat: every roll via the player's delegated dice PDA (session key signs silently, gasless). Computer seats: new server-side house-key route POST /api/roll performs each computer roll gasless on the ER VRF (house dice account sponsored+delegated once; key never leaves the server); roll returns roll1/roll2/seed/signature for display + proof.",
-        "Scope A intent: remove client-side Math.random for ALL dice so every roll (human + computer) is provably fair and verifiable. If VRF/relay is unreachable, the game falls back to local randomness so play never hard-stalls (source tag still logged).",
+        "Scope A intent: remove client-side Math.random for ALL dice so every roll (human + computer) is provably fair and verifiable. NO offline fallback for core dice: a failed roll is retried (3 attempts), then if the chain is genuinely down the match PAUSES with a visible banner (no local roll, no fake advance) and auto-resumes with an alert when the network returns (8s monitor pings base RPC + ER RPC). Devnet-wipe recovery: redeploy, restore points/game txs from Supabase, fresh games continue.",
         "Scope B (planned, NOT started): record_points on the ER so points/rewards are recorded on-chain keyed to the proof roll; Supabase stays aggregation/fallback. Scope C (optional bundled): on-chain finish-order record."
       ],
       "status": "in-progress",
@@ -372,7 +390,7 @@
         "Competition fairness: competitions are never pay-to-enter; each event bundles an allowance sized to finish it. Paid pressure applies to extra/grinding play, never to locking a player out of an event they already entered."
       ],
       "status": "planned",
-      "approved": false,
+      "approved": true,
       "added": "2026-08-13"
     },
     {
@@ -395,7 +413,20 @@
         "User stats with On-chain / Off-chain sub-tabs: Off-chain = Supabase profiles + point_transactions aggregates (counts, sums, by-reason, recent rows). On-chain = sponsored accounts from the spend ledger with live delegation status via the Magic Router, plus sponsor balance."
       ],
       "status": "in-progress",
-      "approved": false,
+      "approved": true,
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Points recorded on-chain",
+      "summary": "Your points and rewards get their own permanent blockchain record you can trust, alongside your already-verifiable rolls.",
+      "details": [
+        "On-chain points (Scope B): add a record_points-style instruction to the same delegated gfg-dice program so points/rewards are recorded on-chain, keyed to the proof roll (match_id signature). ER is the gasless execution layer for this (same delegated program), VRF stays the randomness primitive only.",
+        "On a win, the client submits the points record via the ER queue (session key signs, gasless); the on-chain tx signature becomes the authoritative receipt and is stored in Supabase as match_id for aggregation + de-dupe.",
+        "Supabase stays the aggregation / fallback source of truth across devnet wipes (re-sync on redeploy); the on-chain record is the permanent verifiable layer.",
+        "Scope C (optional bundle): on-chain finish-order record so a full game result (1st..4th) is also committed, not just the reward points."
+      ],
+      "status": "in-progress",
+      "approved": true,
       "added": "2026-08-13"
     }
   ]
