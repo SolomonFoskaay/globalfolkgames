@@ -86,9 +86,21 @@ web3.js's opaque `Unknown action 'undefined'` error.
   (:3000). Open http://localhost:3000. Vite binds `--host` (LAN-visible), so a
   phone on the same Wi-Fi can open `http://<your-LAN-IP>:3000` for real mobile
   preview (get the IP with `hostname -I`; the `/api` relay proxy follows along).
-  Note: on the phone, Dynamic OTP sign-in needs the phone's origin allowed in
-  Dynamic — for quick UI-only previews just open the page and eyeball the
-  layout; the header + changelog don't require sign-in to view.
+  Note: on the phone, a plain-`http://<LAN-IP>` page CANNOT do full Dynamic
+  sign-in — browsers only expose WebCrypto (`crypto.subtle`) on HTTPS or
+  localhost, so Dynamic wallet key generation fails with "Cannot read property
+  of undefined (reading 'generateKey')". Use `npm run dev:tunnel` for real
+  phone sign-in testing. UI-only preview on `http://<LAN-IP>:3000` still works
+  fine (the header + changelog don't need sign-in to view).
+- Mobile sign-in testing (99% of users are mobile — test here before you
+  commit): `npm run dev:tunnel` = relay + Vite + a free Cloudflare quick
+  tunnel. Cloudflared must be installed (`~/.local/bin/cloudflared`; no
+  account or token needed). It prints a fresh `https://<random>.trycloudflare.com`
+  URL each run. Vite `allowedHosts` is `true` so the tunnel isn't rejected.
+  Add the wildcard origin `https://*.trycloudflare.com` to Dynamic's Allowed
+  CORS Origins (Security settings) ONCE, and sign-in works on every future
+  tunnel run. The `/api` relay proxy works through the tunnel unchanged.
+  (`scripts/dev-tunnel.mjs`, `npm run dev:tunnel`.)
 - Sign in with an email OTP (Dynamic). Play Ludo (Human vs 3 computers).
   First human roll logs `[VRF] Delegating player dice account (sponsored by
   GlobalFolkGames)...` then resolves instantly on-chain. Computer turns log

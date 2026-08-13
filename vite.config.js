@@ -22,6 +22,9 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Dev-only: allow LAN IPs and random tunnel domains (trycloudflare.com)
+    // to reach Vite without its host check rejecting them.
+    allowedHosts: true,
     proxy: {
       // App-sponsored delegation relay (scripts/relay-server.mjs)
       '/api': 'http://localhost:8787'
