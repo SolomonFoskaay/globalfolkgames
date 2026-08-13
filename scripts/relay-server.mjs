@@ -39,3 +39,13 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => console.log(`[relay] sponsor relay listening on http://localhost:${PORT}`));
+
+// A port conflict (EADDRINUSE, e.g. a stale relay from an earlier dev exit)
+// must not become an unhandled 'error' that crashes Node with a stack dump.
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[relay] port ${PORT} already in use (stale relay? kill it and rerun).`);
+  } else {
+    console.error(`[relay] server error:`, err.message);
+  }
+});

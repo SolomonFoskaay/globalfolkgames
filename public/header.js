@@ -215,6 +215,24 @@
 
         document.body.insertAdjacentHTML('afterbegin', headerHTML);
 
+        // Measure the global header's REAL rendered height and expose it as
+        // --gfg-header-h. On mobile the header wraps to two lines (brand + ☰
+        // on row one, points pill on row two), so a fixed 50px guess would
+        // leave the pill overlapping page headers below. Local headers that
+        // stick under it (e.g. Ludo) read this variable. Re-measure on resize
+        // and after fonts load so the value tracks wrap/line changes.
+        function syncHeaderHeight() {
+            const h = document.querySelector('.gfg-header');
+            if (h) {
+                document.documentElement.style.setProperty('--gfg-header-h', h.offsetHeight + 'px');
+            }
+        }
+        syncHeaderHeight();
+        window.addEventListener('resize', syncHeaderHeight);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => setTimeout(syncHeaderHeight, 120));
+        }
+
         // Wire the hamburger menu to the slide-in drawer.
         const menuBtn = document.getElementById('gfg-menu-btn');
         menuBtn?.addEventListener('click', () => {
