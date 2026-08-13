@@ -13,18 +13,18 @@
 
         <section class="onboarding-billboard" style="border-color:#9b59b6;">
             <h2>🛡 Dashboard</h2>
-            <p class="auth-hint" style="margin-top:8px;">Staff read-only view of the changelog pipeline. Changelog data lives in git — this page never writes to it.</p>
+            <p class="auth-hint" style="margin-top:8px;">Staff read-only view of the changelog pipeline. Changelog data lives in git, so this page never writes to it.</p>
         </section>
 
         <!-- How to update (read-only; changes are made by the AI agent via git) -->
         <section class="game-card" style="text-align:left; border:1px solid #9b59b6;">
             <h3>✍️ How to update the changelog</h3>
             <p style="color:var(--muted); font-size:0.9rem; line-height:1.6;">
-                The changelog is stored in Git (<span style="color:#f39c12;">public/changelog/changelog.json</span>) — it never depends on a database, so it is safe from outages. Updates are made by the AI agent, not typed in here. Just tell the agent:
+                The changelog is stored in Git (<span style="color:#f39c12;">public/changelog/changelog.json</span>) and never depends on a database, so it is safe from outages. Updates are made by the AI agent, not typed in here. Just tell the agent:
             </p>
             <ul style="color:#ccc; font-size:0.9rem; line-height:1.7; padding-left:18px; margin-top:8px;">
                 <li><b style="color:#fff;">"Approve the roadmap item: &lt;title&gt;"</b> → publishes it to the user-facing page.</li>
-                <li><b style="color:#fff;">"New feature: &lt;name&gt; — &lt;what it does&gt;"</b> → agent adds it to the roadmap (admin-only until you approve).</li>
+                <li><b style="color:#fff;">"New feature: &lt;name&gt;, &lt;what it does&gt;"</b> → agent adds it to the roadmap (admin-only until you approve).</li>
                 <li><b style="color:#fff;">"Update the summary of the roadmap item: &lt;title&gt;"</b> → agent rewords the public text.</li>
             </ul>
         </section>
@@ -40,6 +40,13 @@
             <div id="dash-pending-list"><p class="empty">Loading…</p></div>
         </section>
 
+        <!-- Tamper / integrity notices (staff only, read-only) -->
+        <section class="game-card" id="dash-notices" style="text-align:left; border:1px solid #e74c3c; margin-top:14px;">
+            <h3>🚨 Security notices (tamper attempts)</h3>
+            <p style="color:var(--muted); font-size:0.88rem; line-height:1.5;">Client-side detected integrity issues (edited localStorage state, mocked globals). This is an audit trail for opportunistic tampering, not a definitive cheat-proof record.</p>
+            <div id="dash-notices-list"><p class="empty">Loading…</p></div>
+        </section>
+
         <!-- Everything in the tracker (read-only) -->
         <section class="game-card" id="dash-all" style="text-align:left;">
             <h3>🗂 Full tracker (roadmap + released)</h3>
@@ -53,6 +60,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
     <script src="/profiles.js"></script>
     <script src="/header.js"></script>
     <script src="/changelog/render.js"></script>
@@ -166,6 +174,40 @@
                 document.getElementById('dash-pipeline-stats').textContent = 'Could not load roadmap (' + e.message + ').';
                 document.getElementById('dash-pending-list').innerHTML = '<p class="empty">Unavailable.</p>';
                 document.getElementById('dash-all-list').innerHTML = '<p class="empty">Unavailable.</p>';
+            }
+
+            // ---- Tamper / integrity notices (staff read-only) ----
+            try {
+                const noticesEl = document.getElementById('dash-notices-list');
+                const { data: notices, error } = await window.supabaseClient
+                    .from('point_transactions')
+                    .select('user_id, reason, match_id, created_at')
+                    .eq('game_id', 'tamper')
+                    .order('created_at', { ascending: false })
+                    .limit(40);
+
+                if (error) throw new Error(error.message);
+                if (!notices || !notices.length) {
+                    noticesEl.innerHTML = '<p class="empty">No tamper notices recorded. 🎉</p>';
+                } else {
+                    const rows = notices.map(n => {
+                        let detail = { detail: n.reason || '' };
+                        try { detail = JSON.parse(n.match_id || '{}'); } catch (e) { /* keep reason */ }
+                        return `
+                            <article class="entry" style="border:1px solid rgba(231,76,60,0.4);">
+                                <div class="entry-head">
+                                    <span class="badge b-status pending">Tamper</span>
+                                    <span class="entry-date">${esc(n.created_at)}</span>
+                                </div>
+                                <h3>${esc(detail.kind || n.reason || 'tamper')}</h3>
+                                <p class="entry-summary">${esc(detail.detail || '')}</p>
+                                <p style="color:var(--muted); font-size:0.8rem;">user: ${esc(n.user_id || '(signed out)')}${detail.url ? ' · ' + esc(detail.url) : ''}</p>
+                            </article>`;
+                    }).join('');
+                    noticesEl.innerHTML = `<div class="changelog-entries">${rows}</div>`;
+                }
+            } catch (e) {
+                document.getElementById('dash-notices-list').innerHTML = '<p class="empty">Notices unavailable (' + esc(e.message) + ').</p>';
             }
         });
     </script>

@@ -116,7 +116,7 @@ body {
 }
 .gfg-menu-btn:hover { border-color: var(--accent); }
 
-/* ===== SLIDE-IN NAV DRAWER (true glass — nothing blocks the page behind) ===== */
+/* ===== SLIDE-IN NAV DRAWER (transparent, NO blur — page below stays crisp) ===== */
 .gfg-drawer-scrim {
     position: fixed;
     inset: 0;
@@ -140,13 +140,11 @@ body {
     transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     display: flex;
     flex-direction: column;
-    /* Fully transparent glass: no solid panel, the page below stays visible.
-       A strong backdrop blur keeps menu text readable over any content. */
+    /* Transparent: the page below is fully visible and NEVER blurred.
+       Readability comes from each item's own solid card, not background blur. */
     background: transparent;
-    -webkit-backdrop-filter: blur(14px) saturate(1.35);
-    backdrop-filter: blur(14px) saturate(1.35);
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.35);
+    border-left: none;
+    box-shadow: none;
     overflow-y: auto;
 }
 .gfg-drawer.open { transform: translateX(0); }
@@ -159,8 +157,8 @@ body {
 }
 
 .gfg-drawer-close {
-    background: rgba(243, 156, 18, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fff;
     border-radius: 50%;
     width: 34px;
@@ -168,8 +166,6 @@ body {
     font-size: 1.3rem;
     line-height: 1;
     cursor: pointer;
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
 }
 .gfg-drawer-close:hover { border-color: #f39c12; }
 
@@ -197,20 +193,18 @@ body {
     text-decoration: none;
     font-size: 0.95rem;
     font-weight: 600;
-    /* Each menu item is its own small glass chip — transparent, blurred, so it
-       reads clearly while the page content still shows through behind it. */
-    background: rgba(26, 26, 36, 0.34);
-    -webkit-backdrop-filter: blur(8px) saturate(1.2);
-    backdrop-filter: blur(8px) saturate(1.2);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    /* Each menu item is its own solid dark card: clearly readable, no blur
+       needed, and only the item's tile sits over the page (never a panel). */
+    background: rgba(15, 15, 19, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .gfg-drawer-section a:hover {
-    background: rgba(243, 156, 18, 0.22);
-    border-color: rgba(243, 156, 18, 0.5);
+    background: rgba(243, 156, 18, 0.35);
+    border-color: rgba(243, 156, 18, 0.7);
     color: #f39c12;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .auth-btn-small {
@@ -457,4 +451,27 @@ body {
   text-align: center;
   font-size: 1.3rem;
   font-weight: 600;
+}
+
+/* ===== MOBILE: header breaks cleanly into two lines =====
+   Brand + hamburger stay on the first row; the points/username/
+   sign-in pill drops to its own full-width row underneath so the
+   header never crowds on small phones. */
+@media (max-width: 640px) {
+  .gfg-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .gfg-header-right {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 6px;
+  }
+  .gfg-user-pill {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
 }

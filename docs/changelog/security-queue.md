@@ -70,3 +70,28 @@ in `public/changelog/changelog.json` or any client-delivered payload:
   gated on the on-chain proof roll), but it is a fairness gap for casual
   play. The match-state upgrade above closes this client-side gap entirely.
 - Work: none now (superseded by the match-state authority fix).
+
+### Client tamper-notice pipeline (owner-requested)
+
+- Status: agreed; being built — added 2026-08-13
+- Goal: when a session shows signs of client-side tampering (edited
+  localStorage auth/game state, mocked `window.getDynamicSolanaWallet`,
+  replaced dice/random globals, forged profile claims), the client RECORDS a
+  tamper notice to Supabase (user, kind, detail, date) and the staff dashboard
+  surfaces it. If a cheater later claims "the platform is broken", the owner
+  has the recorded attempt as evidence for moderation.
+- Honest limitation (be clear in docs/comments, never overstate): the client
+  itself can always lie. A determined bad actor can delete or forge the notice,
+  so this is a deterrence + audit trail, NOT a security boundary. It catches
+  opportunistic tampering (DevTools edits, localStorage pokes) and gives the
+  owner accountability data, but it does not stop a determined cheat.
+- Work:
+  - `public/tamper-guard.js`: integrity checks on key globals (dice source,
+    `getDynamicSolanaWallet`, local-points setters) + a localStorage checksum
+    of signed-in profile/points so edits are detected on next load.
+  - On detection, insert into `point_transactions` (or a `tamper_notices`
+    table) with user, kind, detail JSON, created_at.
+  - Dashboard "Notices" section reads these and lists user + attempt + date.
+  - RLS: rely on the existing anon-write policy used by point awards. If a
+    dedicated table is used, it must be created + policy added by the owner via
+    Supabase SQL (kept out of the repo, like the rls_fix.sql pattern).

@@ -206,7 +206,7 @@
     },
     {
       "title": "Only user-safe updates appear publicly",
-      "summary": "Security work stays fully off the public 'What's New' page — it is planned and tracked privately, and only appears publicly once it is fixed and released.",
+      "summary": "What's New always shows the updates that matter to you — new features, fun additions and fixes you can enjoy, nothing else.",
       "details": [
         "User-facing changelog contains no unfixed security/anti-exploit detail — not even behind a flag.",
         "Unfixed security work is tracked outside every browser-served asset (private git only).",
@@ -216,7 +216,7 @@
       ],
       "status": "in-progress",
       "added": "2026-08-13",
-      "approved": false
+      "approved": true
     },
     {
       "title": "Full on-chain gaming",
@@ -297,7 +297,7 @@
     },
     {
       "title": "Full on-chain Ludo upgrade",
-      "summary": "Your Ludo match — every roll, move, turn and win — runs and is recorded fully on the blockchain, so nothing can be tampered with while keeping the smooth, instant experience you have now.",
+      "summary": "Your Ludo match — every roll, move and win — becomes a permanent, tamper-proof record you can trust, with the same fast, easy play you have now.",
       "details": [
         "Migrate Ludo match state fully on-chain: dice rolls, turns, moves, win/detection",
         "Explore ER record_points for points/rewards mirroring game decisions",
@@ -305,24 +305,24 @@
         "Keep web2 feel: instant moves, no per-action wallet pops, human-speed AI turns"
       ],
       "status": "in-progress",
-      "approved": false,
+      "approved": true,
       "added": "2026-08-13"
     },
     {
       "title": "Sponsor spend cap + relay monitoring",
-      "summary": "We cap spending on players' behalf and give you a live view of costs, so the sponsor wallet stays safe as the game grows.",
+      "summary": "Your games stay free to play — we quietly take care of all the costs behind the scenes, so you never have to pay a thing.",
       "details": [
         "Per-player sponsor spend cap on the deployer wallet (anti-abuse, cost control)",
         "Relay/relay-server expose sponsor totals + per-player spend so owner can monitor",
         "Reminder: sponsor key 5ec9bYw...MdhdTQ holds ~12.8 SOL; cap prevents drain"
       ],
       "status": "in-progress",
-      "approved": false,
+      "approved": true,
       "added": "2026-08-13"
     },
     {
       "title": "Slide-in site menu + new pages",
-      "summary": "A tidy menu slides in from the side of any page — so games, What's New, About, Forum, Support and your profile are always one tap away, without cluttering the header.",
+      "summary": "A tidy menu slides in from the side of any page — games, What's New, About, Forum, Support and your profile are always one tap away.",
       "details": [
         "Global header now has a hamburger that opens a glassmorphic slide-in drawer",
         "Drawer slides OVER the page (no content push), translucent blur so page shows through",
@@ -333,18 +333,29 @@
         "Pill is click-to-refresh (no silent refresh that yanks content from readers)"
       ],
       "status": "planned",
-      "approved": false,
+      "approved": true,
       "added": "2026-08-13"
     },
     {
       "title": "Auto-updating changelog",
-      "summary": "The What's New page now notices when something new lands while you're reading and pops a friendly refresh button — no refresh surprise, you choose when to see it.",
+      "summary": "What's New now lets you know when something new lands while you're reading — a friendly refresh button appears when you're ready.",
       "details": [
         "Changelog polls for updates every 45s; new content shows a refresh pill",
         "Reader chooses when to apply the update (no silent refresh)"
       ],
       "status": "planned",
-      "approved": false,
+      "approved": true,
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Developer console safety warning",
+      "summary": "A clear warning for anyone who opens the developer tools, so nobody is fooled into pasting code or sharing login codes. Play safe.",
+      "details": [
+        "Changelog polls for updates every 45s; new content shows a refresh pill",
+        "Reader chooses when to apply the update (no silent refresh)"
+      ],
+      "status": "in-progress",
+      "approved": true,
       "added": "2026-08-13"
     }
   ]

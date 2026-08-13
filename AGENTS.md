@@ -83,7 +83,12 @@ web3.js's opaque `Unknown action 'undefined'` error.
 - Toolchain: Rust 1.97.1, solana-cli 3.1.10, anchor-cli 1.0.2, **Node 18.19.1**.
   `concurrently` requires Node 20, so dev uses `scripts/dev.mjs` instead.
 - `npm install` then `npm run dev` → starts the sponsor relay (:8787) + Vite
-  (:3000). Open http://localhost:3000.
+  (:3000). Open http://localhost:3000. Vite binds `--host` (LAN-visible), so a
+  phone on the same Wi-Fi can open `http://<your-LAN-IP>:3000` for real mobile
+  preview (get the IP with `hostname -I`; the `/api` relay proxy follows along).
+  Note: on the phone, Dynamic OTP sign-in needs the phone's origin allowed in
+  Dynamic — for quick UI-only previews just open the page and eyeball the
+  layout; the header + changelog don't require sign-in to view.
 - Sign in with an email OTP (Dynamic). Play Ludo (Human vs 3 computers).
   First human roll logs `[VRF] Delegating player dice account (sponsored by
   GlobalFolkGames)...` then resolves instantly on-chain. Computer turns log
@@ -160,6 +165,25 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   exists). Only user-relevant updates — new features, non-exploit UX/bug fixes
   — belong on the public roadmap. Never reintroduce a `sensitive` flag that
   ships the data and tries to hide it.
+- **Public summary writing rule (owner's explicit instruction):** a roadmap
+  item's public `summary` is a SHORT benefit for players — "what's in it for
+  me, why is this exciting / worth waiting for" — never the technical plan of
+  STEPS (how it'll be built) and never security language. Never write "security
+  work is hidden from you" or anything that hints we're hiding something — even
+  the *admission* of hiding exposes you. Benefits like "your games stay free",
+  "a permanent tamper-proof record you can trust", "one tap away" are the
+  frame. Reported/bug-fix items may say the fixed OUTCOME in plain user words
+  ("fixed the board layout on small phones"), still never the fix pipeline or
+  the security being fixed. The full technical steps live ONLY in `details`
+  (admin-only).
+- **No AI-style long dashes (owner's explicit instruction):** all
+  user-facing copy on content pages must avoid the long/em dash ("—") that
+  reads as AI-generated. Use natural human punctuation instead: parentheses,
+  commas, "and", or rewrite the sentence. Example — write "a plain, familiar
+  web experience (sign in with your email and play)" rather than "a plain,
+  familiar web experience — sign in with your email and play". Applies to all
+  normal text content on the menu/pages (About, Support, Forum, changelog
+  intros, etc.); DO NOT touch code or JS string placeholders.
 - **Golden rule:** if an agreed feature has no roadmap entry, the task is being
   done wrong — add it first, then do it, then mark it.
 
@@ -194,14 +218,15 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   (orange), `--accent-purple` (purple), `--bg-dark`/`--card-bg` (black
   supports). Keep orange-purple dominant in any UI you build; black is the
   canvas, never the accent.
-- **Drawer is TRUE glass (design rule — do not regress):** the slide-in menu
-  must stay transparent so it never blocks the page content behind it — on
-  mobile a solid panel would cover most of the screen and hide what's below.
-  The drawer background is `transparent` with a strong `backdrop-filter: blur`
-  (menu text reads over anything), and **each menu item is its own glass chip**
-  (translucent `rgba(26,26,36,0.34)` + blur, a thin light border, subtle white
-  text-shadow) so items stay readable while the page shows through. Scrim is a
-  light `rgba(0,0,0,0.18)` only. Never reintroduce a solid/opaque drawer body.
+- **Drawer is NO-BLUR, fully transparent (design rule — do not regress):** the
+  slide-in menu must keep the page behind it CRISP — the drawer itself has NO
+  `backdrop-filter` at all (blurring what's below was an active user complaint).
+  The drawer background is `transparent` (no blur, no solid fill), and each
+  menu item is its own solid dark card (`rgba(15,15,19,0.85)`, light border,
+  white text — readable over anything WITHOUT needing a blur). Only the small
+  item tiles sit over the page, never a panel. Scrim stays a light
+  `rgba(0,0,0,0.18)` only. Never reintroduce `backdrop-filter` on the drawer,
+  scrim or items.
 - **Changelog auto-update (`render.js`):** the changelog pages poll
   `changelog.json` every 45s. When the payload changes, a "🔔 new update"
   pill appears above the tabs. It is **click-to-refresh** — never a silent

@@ -10,7 +10,7 @@ const root = dirname(fileURLToPath(import.meta.url)) + '/..';
 const node = process.execPath;
 
 const relay = spawn(node, ['scripts/relay-server.mjs'], { cwd: root, stdio: 'inherit' });
-const vite = spawn(node, ['node_modules/vite/bin/vite.js'], { cwd: root, stdio: 'inherit' });
+const vite = spawn(node, ['node_modules/vite/bin/vite.js', '--host'], { cwd: root, stdio: 'inherit' });
 
 function shutdown(signal) {
   console.log(`\n[dev] ${signal} received — stopping relay + vite`);
