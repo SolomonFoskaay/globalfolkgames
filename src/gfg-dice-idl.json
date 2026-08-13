@@ -291,6 +291,180 @@
       "args": []
     },
     {
+      "name": "delegate_points",
+      "docs": [
+        "Delegates the player's POINTS PDA into an ER session (base layer,",
+        "sponsor pays) so `record_points` runs gasless on the rollup."
+      ],
+      "discriminator": [
+        104,
+        109,
+        190,
+        99,
+        111,
+        89,
+        120,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "points"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "points",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize",
       "docs": [
         "Idempotent: creates the player's dice PDA if it does not exist yet.",
@@ -333,6 +507,64 @@
                   101,
                   114,
                   100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_points",
+      "docs": [
+        "Idempotent: creates the player's POINTS PDA if it does not exist yet.",
+        "Payer (sponsor) pays rent; the account belongs to `player_authority`."
+      ],
+      "discriminator": [
+        128,
+        109,
+        193,
+        180,
+        6,
+        242,
+        202,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
                 ]
               },
               {
@@ -451,6 +683,76 @@
           "type": {
             "vec": "bytes"
           }
+        }
+      ]
+    },
+    {
+      "name": "record_points",
+      "docs": [
+        "Appends a reward to the player's POINTS PDA. Runs GASLESS on the ER:",
+        "the player's session key is the only signer and no SOL is needed. The",
+        "transaction signature is the authoritative on-chain receipt of the award.",
+        "`match_ref` ties the record to the proof-roll transaction that earned it",
+        "(first 8 bytes of the roll signature as a u64)."
+      ],
+      "discriminator": [
+        117,
+        191,
+        229,
+        144,
+        214,
+        225,
+        65,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -626,6 +928,31 @@
         51,
         101
       ]
+    },
+    {
+      "name": "PlayerPoints",
+      "discriminator": [
+        242,
+        191,
+        191,
+        101,
+        67,
+        102,
+        134,
+        66
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ZeroPoints",
+      "msg": "points must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "Overflow",
+      "msg": "points overflow"
     }
   ],
   "types": [
@@ -649,6 +976,50 @@
           {
             "name": "last_request_ts",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerPoints",
+      "docs": [
+        "On-chain points ledger for one player (Scope B — record_points).",
+        "",
+        "Fields:",
+        "- total_points     : cumulative lifetime points recorded on-chain.",
+        "- last_points      : the most recent award amount.",
+        "- last_reason      : award reason tag (see client mapping: 1=ludo-win).",
+        "- last_match_ref   : first 8 bytes (as u64) of the proof-roll tx signature",
+        "that earned the last award.",
+        "- last_recorded_ts : unix ts of the most recent record.",
+        "- award_count      : number of records written."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_points",
+            "type": "u64"
+          },
+          {
+            "name": "last_points",
+            "type": "u64"
+          },
+          {
+            "name": "last_reason",
+            "type": "u8"
+          },
+          {
+            "name": "last_match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_recorded_ts",
+            "type": "i64"
+          },
+          {
+            "name": "award_count",
+            "type": "u64"
           }
         ]
       }

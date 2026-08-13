@@ -29,6 +29,12 @@
             <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
         </section>
 
+        <section class="game-card" id="profile-ledger-card" hidden>
+            <h3>🏆 Your on-chain points ledger</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every reward you win is also written to a tamper-proof ledger on the Solana devnet (free for you to write). This is your own account, verified on-chain — not just a server record.</p>
+            <div id="profile-ledger"><p class="empty">Check your ledger…</p></div>
+        </section>
+
         <section class="game-card" id="profile-ontx-card" hidden>
             <h3>🔗 Your on-chain activity</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
@@ -63,6 +69,8 @@
             const walletCard = document.getElementById('profile-wallet-card');
             const walletEl = document.getElementById('profile-wallet');
             const walletLinkEl = document.getElementById('profile-wallet-link');
+            const ledgerCard = document.getElementById('profile-ledger-card');
+            const ledgerEl = document.getElementById('profile-ledger');
             const ontxCard = document.getElementById('profile-ontx-card');
             const ontxList = document.getElementById('profile-ontx-list');
             const signinBtn = document.getElementById('profile-signin-btn');
@@ -105,6 +113,55 @@
                 }
             }
 
+            async function loadOnchainLedger() {
+                const magic = window.magicblockDice;
+                if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
+                    ledgerEl.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
+                    return;
+                }
+                const pda = magic.pointsPda();
+                if (!pda) {
+                    ledgerEl.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
+                    return;
+                }
+                try {
+                    const ledger = await magic.fetchPointsPda();
+                    if (!ledger) {
+                        ledgerEl.innerHTML = '<p class="empty">Your ledger account has no rewards yet. Win a match and your +100 reward is written here permanently.</p>';
+                        return;
+                    }
+                    const lastTs = ledger.lastRecordedTs
+                        ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
+                    const reasonLabel = ledger.lastReason === 1 ? 'Match won (1st place)'
+                        : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—');
+                    const pdaLink = window.gfgExplorer
+                        ? window.gfgExplorer.accountLink(pda) : esc(pda);
+                    ledgerEl.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                            <span style="color:var(--muted);">Total on-chain points</span>
+                            <b style="color:#f39c12; font-size:1.15rem;">${ledger.totalPoints}</b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                            <span style="color:var(--muted);">Rewards recorded</span>
+                            <b>${ledger.awardCount}</b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                            <span style="color:var(--muted);">Last award</span>
+                            <b>+${ledger.lastPoints} <span style="color:#666;font-size:0.78rem;">(${esc(reasonLabel)})</span></b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                            <span style="color:var(--muted);">Last recorded</span>
+                            <b style="font-size:0.82rem;">${esc(lastTs)}</b>
+                        </div>
+                        <div style="padding:8px 0;">
+                            <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours)</span>
+                            <div style="margin-top:4px;">${pdaLink}</div>
+                        </div>`;
+                } catch (e) {
+                    ledgerEl.innerHTML = '<p class="empty">Could not read your ledger (' + esc(e.message) + ').</p>';
+                }
+            }
+
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
                     statusEl.textContent = 'Sign in to see your profile and points.';
@@ -124,7 +181,9 @@
                     }
                     walletCard.hidden = false;
                     ontxCard.hidden = false;
+                    ledgerCard.hidden = false;
                     loadOnchainActivity();
+                    loadOnchainLedger();
                 }
                 signinBtn.hidden = true;
             }

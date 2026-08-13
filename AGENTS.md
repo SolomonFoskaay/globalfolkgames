@@ -449,9 +449,38 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       REFUSES to ship an unapproved roadmap item to the public changelog.
       User page defaults to the Planned tab (owner-approved forward-looking
       roadmap); it shows ONLY approved roadmap items.
-- [ ] On-chain points mirror (future): a `record_points`-style instruction on the
-      ER keyed to the proof roll; Supabase stays the fallback source of truth
-      across devnet wipes (re-sync on redeploy).
+- [x] **On-chain points (Scope B, built + verified live on devnet):** `record_points`
+      on the same delegated gfg-dice program, gasless on the ER. Program deployed
+      (program id unchanged; init+delegate now support two PDAs per player).
+      * Program: `PlayerPoints` account (seed `gfgpoints`, fields
+        `total_points/last_points/last_reason/last_match_ref/last_recorded_ts/award_count`)
+        + `initialize_points`/`delegate_points`/`record_points` instructions.
+      * Relay (`scripts/delegate-relay.mjs`) `handleDelegate` now creates AND
+        delegates BOTH the player dice PDA (`gfgplayerd`) and the player points
+        PDA (`gfgpoints`) in one idempotent call (fresh onboarding = 4 steps,
+        ~0.0086 SOL verified; per-player spend cap default raised 0.005 → 0.012
+        SOL to cover two PDAs with margin). Verified: fresh = 4 steps, second
+        call = clean no-op.
+      * Client (`src/magicblock-vrf.js`): `recordPoints(points, reason, matchRef)`
+        is a pure gasless ER write (session key signs, 0-SOL player); returns the
+        receipt signature. `matchRefFromSignature()` = first 8 bytes of the
+        proof-roll sig as u64 (binds the reward to the exact winning roll).
+        `fetchPointsPda()` reads the ledger (own account only). `POINT_REASONS`
+        (WIN_1ST=1) exposed on window.
+      * win-detection.js: on a +100 1st-place user win with a valid proof roll,
+        after the Supabase award it fires `magicblockDice.recordPoints(100, 1,
+        matchRef)` as a soft-fail mirror (never blocks the win UX); logs the
+        receipt explorer link.
+      * Admin tracker (`scripts/endpoints-probe.mjs`) now lists each wallet's
+        dice PDA AND points PDA (roles "Player points PDA (Scope B ledger)");
+        dashboard renders both with live delegation status. Profile page
+        (`profile/index.html`) adds "Your on-chain points ledger" card reading
+        the player's own points PDA (own-account only, gasless).
+      * Verified live: gasless `record_points` from a 0-SOL player accumulated
+        total_points/award_count on the delegated ER PDA; tracker shows both PDAs
+        delegated to the ER validator. Supabase stays aggregation/fallback.
+- [ ] On-chain finish-order (Scope C, parked): commit full 1st..4th finish order
+      on-chain (same delegated program), not just reward points.
 - [ ] **Analytics (LAST STEP, after rewards are stable):** add usage tracking.
       Google Analytics 4 (free) + gravity/event-based option for game events,
       hotjar/ms clarity (free) for session replays/funnels, and a free

@@ -420,10 +420,14 @@
       "title": "Points recorded on-chain",
       "summary": "Your points and rewards get their own permanent blockchain record you can trust, alongside your already-verifiable rolls.",
       "details": [
-        "On-chain points (Scope B): add a record_points-style instruction to the same delegated gfg-dice program so points/rewards are recorded on-chain, keyed to the proof roll (match_id signature). ER is the gasless execution layer for this (same delegated program), VRF stays the randomness primitive only.",
-        "On a win, the client submits the points record via the ER queue (session key signs, gasless); the on-chain tx signature becomes the authoritative receipt and is stored in Supabase as match_id for aggregation + de-dupe.",
-        "Supabase stays the aggregation / fallback source of truth across devnet wipes (re-sync on redeploy); the on-chain record is the permanent verifiable layer.",
-        "Scope C (optional bundle): on-chain finish-order record so a full game result (1st..4th) is also committed, not just the reward points."
+        "IMPLEMENTED (built + verified live on devnet). Scope B: record_points on the same delegated gfg-dice program, gasless on the ER.",
+        "Program: new PlayerPoints account (seed gfgpoints: total_points/last_points/last_reason/last_match_ref/last_recorded_ts/award_count) + initialize_points/delegate_points/record_points; program id unchanged.",
+        "Relay scripts/delegate-relay.mjs handleDelegate now creates AND delegates BOTH PDAs per player (dice gfgplayerd + points gfgpoints) in one idempotent call; fresh onboarding = 4 steps ~0.0086 SOL; per-player spend cap default raised 0.005 -> 0.012 SOL (two PDAs).",
+        "Client src/magicblock-vrf.js: recordPoints(points, reason, matchRef) is a pure gasless ER write signed by the session key (0-SOL player) returning the receipt signature; matchRefFromSignature() = first 8 bytes of the proof-roll sig as u64 binding the reward to the exact winning roll; fetchPointsPda() reads the player's own ledger; POINT_REASONS.WIN_1ST=1.",
+        "win-detection.js: after the Supabase +100 1st-place award (proof roll required), fires magicblockDice.recordPoints(100, 1, matchRef) as a SOFT-FAIL mirror that never blocks the win UX, then logs the receipt explorer link.",
+        "Admin tracker endpoints-probe.mjs lists each wallet's dice PDA AND points PDA (roles 'Player points PDA (Scope B ledger)') with live delegation status; dashboard renders both. Profile page adds 'Your on-chain points ledger' card reading the player's own points PDA only (gasless, own-account).",
+        "Verified live: gasless record_points from a 0-SOL player accumulated total_points/award_count on the delegated ER PDA; tracker shows both PDAs delegated to the ER validator; Supabase stays aggregation/fallback.",
+        "Scope C (parked): on-chain finish-order record (full 1st..4th), not just reward points."
       ],
       "status": "in-progress",
       "approved": true,

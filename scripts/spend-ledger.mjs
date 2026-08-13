@@ -42,7 +42,10 @@ export class SpendCapExceeded extends Error {
 
 export function spendCaps() {
   return {
-    perPlayerLamports: Math.round(envNumber('GFG_SPEND_CAP_PER_PLAYER_SOL', 0.005) * LAMPORTS_PER_SOL),
+    // Per-player default sized for Scope B (two PDAs per player: dice + points,
+    // each ~0.0042 SOL fresh init+delegate => ~0.0084 real; 0.012 leaves ~1.5x
+    // margin and stays far under total / tank). Env-tunable.
+    perPlayerLamports: Math.round(envNumber('GFG_SPEND_CAP_PER_PLAYER_SOL', 0.012) * LAMPORTS_PER_SOL),
     globalLamports: Math.round(envNumber('GFG_SPEND_CAP_GLOBAL_SOL', 1.0) * LAMPORTS_PER_SOL),
     reserveLamports: Math.round(envNumber('GFG_SPEND_RESERVE_SOL', 0.3) * LAMPORTS_PER_SOL),
   };

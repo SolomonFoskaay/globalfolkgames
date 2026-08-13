@@ -13,6 +13,16 @@
 //                     player's session key is the only signer (no SOL needed).
 //   - `commit`/`undelegate`: optional manual state pushes back to base layer.
 //
+// Points / rewards (Scope B — on-chain points):
+//   - `initialize_points`: creates the player's POINTS PDA (base layer, app
+//                          pays rent). Seed `gfgpoints`, same player_authority.
+//   - `delegate_points`  : moves the points PDA into the ER session (base
+//                          layer, app pays) so records run gasless.
+//   - `record_points`    : appends an award to the points PDA on the ER. FREE
+//                          for the player (session key signs, no SOL needed).
+//                          The transaction signature is the authoritative
+//                          on-chain receipt of the reward.
+//
 // The PDA seed uses a dedicated `player_authority` key (the player's wallet),
 // NOT the payer, so any wallet can sponsor rent/fees without changing the
 // account's address.
@@ -35,6 +45,7 @@ use ephemeral_rollups_sdk::vrf::{
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
 pub const PLAYER: &[u8] = b"gfgplayerd";
+pub const POINTS: &[u8] = b"gfgpoints";
 
 #[ephemeral]
 #[program]
@@ -129,6 +140,54 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Idempotent: creates the player's POINTS PDA if it does not exist yet.
+    /// Payer (sponsor) pays rent; the account belongs to `player_authority`.
+    pub fn initialize_points(ctx: Context<InitializePoints>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Delegates the player's POINTS PDA into an ER session (base layer,
+    /// sponsor pays) so `record_points` runs gasless on the rollup.
+    pub fn delegate_points(ctx: Context<DelegatePointsInput>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_points(
+            &ctx.accounts.payer,
+            &[POINTS, authority.as_ref()],
+            DelegateConfig {
+                // Optionally set a specific validator from the first remaining account
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Appends a reward to the player's POINTS PDA. Runs GASLESS on the ER:
+    /// the player's session key is the only signer and no SOL is needed. The
+    /// transaction signature is the authoritative on-chain receipt of the award.
+    /// `match_ref` ties the record to the proof-roll transaction that earned it
+    /// (first 8 bytes of the roll signature as a u64).
+    pub fn record_points(
+        ctx: Context<RecordPointsCtx>,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+
+        let dest = &mut ctx.accounts.points;
+        dest.total_points = dest
+            .total_points
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        dest.last_points = points;
+        dest.last_reason = reason;
+        dest.last_match_ref = match_ref;
+        dest.last_recorded_ts = Clock::get()?.unix_timestamp;
+        dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
     /// Commits the latest state and returns the PDA to this program (runs on ER).
     pub fn undelegate(ctx: Context<CommitAndUndelegateInput>) -> Result<()> {
         MagicIntentBundleBuilder::new(
@@ -169,6 +228,46 @@ pub struct DelegateInput<'info> {
     /// CHECK: The pda to delegate.
     #[account(mut, del)]
     pub player: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct InitializePoints<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority that owns this points account.
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + PlayerPoints::INIT_SPACE,
+        seeds = [POINTS, player_authority.key().as_ref()],
+        bump
+    )]
+    pub points: Account<'info, PlayerPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegatePointsInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The points pda to delegate.
+    #[account(mut, del)]
+    pub points: UncheckedAccount<'info>,
+}
+
+/// Context for `record_points`. Runs on the ER (gasless): the player's session
+/// key is the payer, and the points PDA must already exist + be delegated.
+#[derive(Accounts)]
+pub struct RecordPointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, player_authority.key().as_ref()], bump)]
+    pub points: Account<'info, PlayerPoints>,
 }
 
 #[vrf]
@@ -216,4 +315,33 @@ pub struct PlayerDice {
     pub last_roll2: u8,
     pub last_client_seed: u8,
     pub last_request_ts: i64,
+}
+
+/// On-chain points ledger for one player (Scope B — record_points).
+///
+/// Fields:
+///   - total_points     : cumulative lifetime points recorded on-chain.
+///   - last_points      : the most recent award amount.
+///   - last_reason      : award reason tag (see client mapping: 1=ludo-win).
+///   - last_match_ref   : first 8 bytes (as u64) of the proof-roll tx signature
+///                        that earned the last award.
+///   - last_recorded_ts : unix ts of the most recent record.
+///   - award_count      : number of records written.
+#[account]
+#[derive(InitSpace)]
+pub struct PlayerPoints {
+    pub total_points: u64,
+    pub last_points: u64,
+    pub last_reason: u8,
+    pub last_match_ref: u64,
+    pub last_recorded_ts: i64,
+    pub award_count: u64,
+}
+
+#[error_code]
+pub enum PointsError {
+    #[msg("points must be greater than zero")]
+    ZeroPoints,
+    #[msg("points overflow")]
+    Overflow,
 }

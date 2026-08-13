@@ -24,9 +24,17 @@ import { AnchorProvider, Program } from '@anchor-lang/core';
 import { getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { signTransaction, signAllTransactions } from '@dynamic-labs-sdk/solana';
 import { getDelegationStatus } from './gfg-rpc.js';
+import bs58 from 'bs58';
+import { BN } from 'bn.js';
 
 const DELEGATION_PROGRAM = 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
+const POINTS_SEED = Buffer.from('gfgpoints');
+
+// Reasons recorded against a points award (mirrors the program's u8 codes).
+export const POINT_REASONS = Object.freeze({
+  WIN_1ST: 1,     // first place in a match
+});
 
 const config = {
   baseRpcUrl: 'https://api.devnet.solana.com',
@@ -206,7 +214,68 @@ async function rollOnce() {
   throw new Error('VRF request timed out. Please try again.');
 }
 
+// scope B: Points recorded on-chain.
+//
+// The relay's handleDelegate (idempotent) also creates + delegates a second
+// player PDA (points, seed 'gfgpoints'), so recordPoints() is a pure gasless
+// ER write signed by the player's session key — no SOL, no sponsor step here.
+// The returned transaction signature is the authoritative on-chain receipt of
+// the award, and the player's points PDA becomes the verifiable ledger of
+// their rewards (total_points, award_count, last_*).
+//
+// `matchRef` = the proof-roll signature that earned the reward encoded as a
+// u64 (its first 8 bytes), matching what the program stores as last_match_ref
+// so the on-chain record is traceable back to the exact winning roll.
+export async function recordPoints(points, reason, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [pointsPda] = pointsPdaFor(wallet.publicKey);
+
+  // Relay is idempotent per PDA; it creates + delegates the points PDA if
+  // missing, and is a no-op when already delegated. Once the ER validator has
+  // picked the account up, the write below runs gasless.
+  await ensureDelegated(pointsPda, wallet.publicKey);
+  await waitForErPickup(pointsPda);
+
+  const sig = await program.methods
+    .recordPoints(new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+    .accounts({
+      points: pointsPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+function pointsPdaFor(payerPubkey) {
+  return PublicKey.findProgramAddressSync(
+    [POINTS_SEED, payerPubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
+}
+
+// matchRef for a proof-roll signature: first 8 bytes interpreted as a u64.
+export function matchRefFromSignature(sig) {
+  if (!sig) return new BN(0);
+  try {
+    const bytes = bs58.decode(sig);
+    if (!bytes || bytes.length < 8) return new BN(0);
+    const view = new DataView(new ArrayBuffer(8));
+    for (let i = 0; i < 8; i++) view.setUint8(i, bytes[i]);
+    const hex = Buffer.from(new Uint8Array(view.buffer)).toString('hex');
+    return new BN(hex, 16);
+  } catch (e) {
+    return new BN(0);
+  }
+}
+
 export function initMagicBlockDice() {
+  // Reason codes for on-chain points records (shared with win-detection.js).
+  window.POINT_REASONS = POINT_REASONS;
   window.magicblockDice = {
     configure(opts = {}) {
       if (opts.programId) config.programId = opts.programId;
@@ -235,6 +304,48 @@ export function initMagicBlockDice() {
 
     getLastProofRollSignature() {
       return lastProofRollSignature;
+    },
+
+    // Scope B: records the award on the player's on-chain points PDA (gasless
+    // ER write, session key signs). Returns the receipt signature.
+    recordPoints(points, reason, matchRef) {
+      return recordPoints(points, reason, matchRef);
+    },
+
+    // First 8 bytes of a proof-roll signature as u64 — the match_ref the
+    // program stores, so the on-chain record traces to the exact winning roll.
+    matchRefFromSignature(sig) {
+      return matchRefFromSignature(sig);
+    },
+
+    // The player's on-chain points PDA address (for own-account profile view).
+    pointsPda() {
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return pointsPdaFor(wallet.publicKey)[0].toBase58();
+    },
+
+    // Reads the player's on-chain points ledger from the ER (gasless, no sign).
+    // Returns { totalPoints, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount }
+    // or null if the PDA isn't visible yet.
+    async fetchPointsPda() {
+      const ctx = getErProgram();
+      if (!ctx) return null;
+      const { program, wallet } = ctx;
+      const [pointsPda] = pointsPdaFor(wallet.publicKey);
+      try {
+        const acct = await program.account.playerPoints.fetch(pointsPda);
+        return {
+          totalPoints: Number(acct.totalPoints ?? acct.total_points),
+          lastPoints: Number(acct.lastPoints ?? acct.last_points),
+          lastReason: Number(acct.lastReason ?? acct.last_reason),
+          lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
+          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts) * 1000,
+          awardCount: Number(acct.awardCount ?? acct.award_count),
+        };
+      } catch (e) {
+        return null;
+      }
     },
 
     // Cheap liveness probe for the on-chain outage monitor. Resolves true when

@@ -64,6 +64,26 @@
                     window.awardLocalLudoPoints(100, proofSig);
                 }
 
+                // Scope B: write the +100 award to the player's ON-CHAIN points
+                // PDA, gasless on the ER (session key signs, no SOL). Fails soft.
+                const magic = window.magicblockDice;
+                if (magic && typeof magic.recordPoints === 'function') {
+                    const reasonCode = (window.POINT_REASONS && window.POINT_REASONS.WIN_1ST)
+                        ? window.POINT_REASONS.WIN_1ST : 1;
+                    const matchRef = (magic.matchRefFromSignature && proofSig)
+                        ? magic.matchRefFromSignature(proofSig) : 0;
+                    magic.recordPoints(100, reasonCode, matchRef)
+                        .then((onchainReceipt) => {
+                            console.log(`[REWARD] On-chain points recorded — receipt: ${onchainReceipt}`);
+                            const txUrl = onchainReceipt && window.gfgExplorer
+                                ? window.gfgExplorer.txUrl(onchainReceipt) : null;
+                            if (txUrl) console.log(`[REWARD] Verify on-chain → ${txUrl}`);
+                        })
+                        .catch((err) => {
+                            console.warn('[REWARD] On-chain points record failed (mirror only):', err.message || err);
+                        });
+                }
+
                 const explorerUrl = proofSig
                     ? `https://explorer.solana.com/tx/${proofSig}?cluster=devnet`
                     : null;

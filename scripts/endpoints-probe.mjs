@@ -181,7 +181,7 @@ async function buildAccountsTracker() {
         base.balanceSol = +(b / 1e9).toFixed(4);
       }
     } catch (e) { base.balanceError = e.message; }
-    if (entry.kind === 'dice-pda') {
+    if (entry.kind === 'dice-pda' || entry.kind === 'points-pda') {
       try {
         const d = await getDelegationStatus(getConn(), entry.address);
         base.delegated = !!(d && d.isDelegated);
@@ -198,6 +198,8 @@ async function buildAccountsTracker() {
     await add({ role: 'Sponsor / house wallet', kind: 'wallet', address: sponsorPubkey, gasless: 'App-owned key. Pays the one-time initialize+delegate (~0.0013 SOL) and every computer roll runs ER-gasless.' });
     const [housePda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'House dice PDA (computer rolls)', kind: 'dice-pda', address: housePda.toBase58(), gasless: 'Dice account for computer seats; rolls gasless on the ER VRF queue.' });
+    const [housePointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'House points PDA (Scope B ledger)', kind: 'points-pda', address: housePointsPda.toBase58(), gasless: 'Points ledger for the house seat; record_points runs gasless on the ER.' });
   }
 
   let players = [];
@@ -207,6 +209,8 @@ async function buildAccountsTracker() {
     await add({ role: 'Player wallet (sponsored)', kind: 'wallet', address: wallet, gasless: 'Player holds 0 SOL; app sponsors their first delegate.' });
     const [pda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'Player dice PDA', kind: 'dice-pda', address: pda.toBase58(), gasless: 'This player\'s dice account; rolls gasless on the ER VRF queue.' });
+    const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'Player points PDA (Scope B ledger)', kind: 'points-pda', address: pointsPda.toBase58(), gasless: 'This player\'s on-chain points ledger; record_points runs gasless on the ER.' });
   }
 
   return {

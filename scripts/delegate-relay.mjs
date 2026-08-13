@@ -37,6 +37,7 @@ const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd'
 // keyless OnFinality public -> api.devnet.solana.com (last resort).
 const BASE_URL = baseRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
+const POINTS_SEED = Buffer.from('gfgpoints');
 
 export function loadSponsor() {
   if (process.env.GFG_SPONSOR_KEYPAIR) {
@@ -60,11 +61,16 @@ function mkWallet(kp) {
 // fresh players 2 x 0.0015 = 0.003 SOL of budget — comfortably under the
 // 0.005 SOL default per-player cap, while still leaving abuse headroom tight.
 // The realized balance delta is what actually lands in the ledger.
+//
+// Scope B adds a second PDA per player (points, seed `gfgpoints`), so a fully
+// fresh onboarding is now 4 steps (dice init+delegate, points init+delegate)
+// ≈ 0.003 SOL budget — still under the 0.005 default cap.
 const ESTIMATED_STEP_COST_LAMPORTS = 0.0015 * 1e9; // 0.0015 SOL
 
-// Initialize + delegate a player's dice PDA. Idempotent.
-// playerPubkey: the player's Solana wallet address (seed basis for the PDA).
-// Returns { pda, delegated, steps: [{step, sig}] }.
+// Initialize + delegate a player's dice PDA AND their points PDA (Scope B).
+// Idempotent for each PDA individually.
+// playerPubkey: the player's Solana wallet address (seed basis for both PDAs).
+// Returns { pda, pointsPda, delegated, steps: [{step, sig}] }.
 export async function handleDelegate(playerPubkey) {
   const player = new PublicKey(playerPubkey);
   const sponsor = loadSponsor();
@@ -76,6 +82,7 @@ export async function handleDelegate(playerPubkey) {
   const program = new Program(idl, provider);
 
   const [pda] = PublicKey.findProgramAddressSync([PLAYER_SEED, player.toBytes()], PROGRAM_ID);
+  const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
   // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
@@ -90,37 +97,74 @@ export async function handleDelegate(playerPubkey) {
     return null;
   };
   const status = await retry(() => getDelegationStatus(conn, pda));
-  if (status && status.isDelegated) {
-    return { pda: pda.toString(), delegated: true, steps: [] };
+  const pointsStatus = await retry(() => getDelegationStatus(conn, pointsPda));
+  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated) {
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), delegated: true, steps: [] };
   }
-
-  // The PDA needs to exist on the base layer before we can delegate it. Read
-  // via the Router (ER-side view is fine for existence checking).
-  const info = await retry(() => conn.getAccountInfo(pda));
-  const steps = [];
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
   // ABOUT to run against the per-player and global caps, and verify the
   // sponsor wallet keeps its reserve after this spend. Throws SpendCapExceeded
-  // (or SpendCapExceeded for the reserve) before any SOL leaves the wallet.
-  const plannedSteps = info ? 1 : 2; // fresh: initialize + delegate; existing: delegate only
+  // before any SOL leaves the wallet.
+  // Steps per PDA: fresh = initialize + delegate (2); existing = delegate only (1).
+  const plannedSteps =
+    (status && status.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pda)) ? 1 : 2)) +
+    (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
   const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
   assertSponsorReserve(sponsorBalance ?? 0, budgetLamports);
   const balanceBefore = await retry(() => conn.getBalance(sponsor.publicKey));
 
-  // 1) Create the PDA if it does not exist yet.
-  if (!info) {
-    const sig = await sendAndConfirmBase(conn, sponsor,
-      await program.methods.initialize()
-        .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player })
-        .transaction()
-    );
-    steps.push({ step: 'initialize', sig });
+  const steps = [];
+
+  // Dice PDA: create if missing, then delegate if not delegated.
+  if (!(status && status.isDelegated)) {
+    const info = await retry(() => conn.getAccountInfo(pda));
+    if (!info) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initialize()
+          .accounts({ player: pda, payer: sponsor.publicKey, playerAuthority: player })
+          .transaction()
+      );
+      steps.push({ step: 'initialize', sig });
+    }
+    const sig = await delegateDicePda(program, conn, sponsor, player, pda);
+    if (sig) steps.push({ step: 'delegate', sig });
   }
 
-  // 2) Delegate the PDA into the ER session (pin our devnet ER validator).
+  // Points PDA: create if missing, then delegate if not delegated (Scope B).
+  if (!(pointsStatus && pointsStatus.isDelegated)) {
+    const pinfo = await retry(() => conn.getAccountInfo(pointsPda));
+    if (!pinfo) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initializePoints()
+          .accounts({ points: pointsPda, payer: sponsor.publicKey, playerAuthority: player })
+          .transaction()
+      );
+      steps.push({ step: 'initialize_points', sig });
+    }
+    const sig = await delegatePointsPda(program, conn, sponsor, player, pointsPda);
+    if (sig) steps.push({ step: 'delegate_points', sig });
+  }
+
+  // Record the REAL cost (balance delta), not the estimate, so the ledger
+  // reflects actual sponsor spend. Caps were already enforced on the estimate.
+  if (steps.length) {
+    const balanceAfter = await retry(() => conn.getBalance(sponsor.publicKey));
+    const spent = Math.max(0, (balanceBefore ?? balanceAfter) - balanceAfter);
+    if (spent > 0) {
+      recordSpend(player.toBase58(), spent);
+      console.log(`[relay] sponsored ${player.toBase58()}: ${(spent / 1e9).toFixed(6)} SOL (+${steps.length} step(s))`);
+    }
+  }
+
+  return { pda: pda.toString(), pointsPda: pointsPda.toString(), delegated: true, steps };
+}
+
+// Delegate a dice PDA into the ER session (pin our devnet ER validator).
+// Returns the tx signature, or null if the account turns out already delegated.
+async function delegateDicePda(program, conn, sponsor, player, pda) {
   const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pda.toBytes()], PROGRAM_ID);
   const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pda.toBytes()], DELEGATION_PROGRAM);
   const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBytes()], DELEGATION_PROGRAM);
@@ -148,25 +192,47 @@ export async function handleDelegate(playerPubkey) {
       await new Promise(r => setTimeout(r, 600));
       const after = await getDelegationStatus(conn, pda);
       if (after && after.isDelegated) {
-        return { alreadyDelegated: true };
+        return null;
       }
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
       throw new Error(`delegate failed: ${detail}`);
     });
-  if (!sig.alreadyDelegated) steps.push({ step: 'delegate', sig });
+  return sig;
+}
 
-  // Record the REAL cost (balance delta), not the estimate, so the ledger
-  // reflects actual sponsor spend. Caps were already enforced on the estimate.
-  if (steps.length) {
-    const balanceAfter = await retry(() => conn.getBalance(sponsor.publicKey));
-    const spent = Math.max(0, (balanceBefore ?? balanceAfter) - balanceAfter);
-    if (spent > 0) {
-      recordSpend(player.toBase58(), spent);
-      console.log(`[relay] sponsored ${player.toBase58()}: ${(spent / 1e9).toFixed(6)} SOL (+${steps.length} step(s))`);
-    }
-  }
+// Delegate a points PDA into the ER session (Scope B). Mirrors delegateDicePda
+// but uses the points seed + delegate_points instruction accounts.
+async function delegatePointsPda(program, conn, sponsor, player, pointsPda) {
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pointsPda.toBytes()], PROGRAM_ID);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pointsPda.toBytes()], DELEGATION_PROGRAM);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pointsPda.toBytes()], DELEGATION_PROGRAM);
 
-  return { pda: pda.toString(), delegated: true, steps };
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.delegatePoints()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          points: pointsPda,
+          bufferPoints: buffer,
+          delegationRecordPoints: record,
+          delegationMetadataPoints: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
+    .catch(async (err) => {
+      await new Promise(r => setTimeout(r, 600));
+      const after = await getDelegationStatus(conn, pointsPda);
+      if (after && after.isDelegated) {
+        return null;
+      }
+      const detail = err.transactionMessage || err.transactionError?.message || err.message;
+      throw new Error(`delegate_points failed: ${detail}`);
+    });
+  return sig;
 }
 
 // Send a base-layer tx through the Magic Router with the correct per-layer
