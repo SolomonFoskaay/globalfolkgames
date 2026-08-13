@@ -464,10 +464,11 @@ body {
   font-weight: 600;
 }
 
-/* ===== MOBILE: header breaks cleanly into two lines =====
-   Brand + hamburger stay on the first row; the points/username/
-   sign-in pill drops to its own full-width row underneath so the
-   header never crowds on small phones. */
+/* ===== MOBILE =====
+   Everything stays readable, nothing is truncated or hidden. The pill and
+   the ☰ must never split apart: they share the right side as ONE row. When
+   the row is too wide the whole right side wraps to its own line (line 2)
+   together — the menu never falls to a 3rd line on its own. */
 @media (max-width: 640px) {
   .gfg-header {
     flex-wrap: wrap;
@@ -477,12 +478,14 @@ body {
   }
   .gfg-header-right {
     flex: 1 1 auto;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
-    row-gap: 6px;
+    min-width: 0;
+    row-gap: 0;
   }
   .gfg-user-pill {
-    flex-basis: 100%;
+    flex-basis: auto;
     justify-content: flex-end;
+    white-space: nowrap;
   }
 }

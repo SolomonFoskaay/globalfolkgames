@@ -216,11 +216,12 @@
         document.body.insertAdjacentHTML('afterbegin', headerHTML);
 
         // Measure the global header's REAL rendered height and expose it as
-        // --gfg-header-h. On mobile the header wraps to two lines (brand + ☰
-        // on row one, points pill on row two), so a fixed 50px guess would
-        // leave the pill overlapping page headers below. Local headers that
-        // stick under it (e.g. Ludo) read this variable. Re-measure on resize
-        // and after fonts load so the value tracks wrap/line changes.
+        // --gfg-header-h. The header may sit on one row (desktop) or two
+        // (mobile when brand + right side don't fit), and its height varies
+        // with the pill's content and font loading, so a fixed 50px guess
+        // would leave the pill overlapping page headers below. Local headers
+        // that stick under it (e.g. Ludo) read this variable. Re-measure on
+        // resize and after fonts load so the value tracks any changes.
         function syncHeaderHeight() {
             const h = document.querySelector('.gfg-header');
             if (h) {

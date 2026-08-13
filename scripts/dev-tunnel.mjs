@@ -73,6 +73,16 @@ function findFreePort(start = 3000) {
   });
 }
 
+// True if something is already listening on `port`. Used to decide whether to
+// spawn a fresh relay or reuse a stray one left over from a crashed run.
+function portInUse(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once('error', () => resolve(true));
+    probe.listen(port, () => probe.close(() => resolve(false)));
+  });
+}
+
 const cloudflared = resolveCloudflared();
 if (!cloudflared) {
   console.error(`[dev:tunnel] cloudflared not found. Install it and try again:
@@ -83,7 +93,17 @@ if (!cloudflared) {
 
 const vitePort = process.env.GFG_VITE_PORT ? Number(process.env.GFG_VITE_PORT) : await findFreePort();
 
-const relay = spawn(node, ['scripts/relay-server.mjs'], { cwd: root, stdio: detachedStdio });
+// The relay binds a fixed port (:8787). A stray from an earlier run is safe to
+// reuse: the relay is stateless (reads accounts on-chain, spend ledger in a
+// shared file), so spawning a second one merely loses the race and prints a
+// scary "already in use" error. Reuse it; only spawn when the port is free.
+const RELAY_PORT = 8787;
+let relay = null;
+if (await portInUse(RELAY_PORT)) {
+  console.log(`[dev:tunnel] relay already listening on :${RELAY_PORT} — reusing it (left by an earlier run; /api proxy works)`);
+} else {
+  relay = spawn(node, ['scripts/relay-server.mjs'], { cwd: root, stdio: detachedStdio });
+}
 const vite = spawn(node, ['node_modules/vite/bin/vite.js', '--host', '--port', String(vitePort), '--strictPort'], { cwd: root, stdio: detachedStdio });
 
 console.log(`[dev:tunnel] Vite will bind port ${vitePort} (strict) and the tunnel will point at http://localhost:${vitePort}`);
@@ -102,15 +122,15 @@ setTimeout(() => {
 
 // Guard every child's 'error' event (spawn failure, EIO on the stream) so it
 // never bubbles to an unhandled 'error' and kills the parent silently.
-for (const child of [relay, vite]) {
+for (const child of [vite, ...(relay ? [relay] : [])]) {
   child.on('error', (err) => {
     console.error(`[dev:tunnel] process error: ${err.message}`);
   });
 }
 
 function shutdown(signal) {
-  console.log(`\n[dev:tunnel] ${signal} received — stopping relay + vite`);
-  relay.kill('SIGTERM');
+  console.log(`\n[dev:tunnel] ${signal} received — stopping vite${relay ? ' + relay' : ''}`);
+  if (relay) relay.kill('SIGTERM');
   vite.kill('SIGTERM');
   setTimeout(() => process.exit(0), 300);
 }
