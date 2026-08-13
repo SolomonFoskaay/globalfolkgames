@@ -178,6 +178,20 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   summaries always readable); `/changelog/admin.html` = raw engineer view
   (details + git refs), gated to staff. Both load the standard auth stack via
   `/src/main.js` → Dynamic wallet resolution.
+- **Global header + slide-in menu (`public/header.js`):** every page gets the
+  same header with a hamburger (☰) that opens a **glassmorphic drawer** —
+  translucent blur, slides OVER the page (never pushes content), closes on
+  scrim/✕/Esc. Sections: Play (Ludo, Home), Discover (What's New, About,
+  Forum, Support, Contact), Account (My Profile). An extra **Admin** section
+  (Dashboard, raw changelog) is shown only when the connected wallet is in
+  `roles.json` — client-side UX hint, never a security boundary (no sensitive
+  data behind it). New pages (about/, contact/, support/, forum/, profile/,
+  dashboard/) are declared as Vite inputs in `vite.config.js`.
+- **Changelog auto-update (`render.js`):** the changelog pages poll
+  `changelog.json` every 45s. When the payload changes, a "🔔 new update"
+  pill appears above the tabs. It is **click-to-refresh** — never a silent
+  refresh, so a reader mid-scroll never has content yanked away. The pill
+  reapplies the current tab + page on click.
 - **Web3 roles, not DB roles:** `public/changelog/roles.json` maps Solana
   wallets → `admin` / `moderator`. `public/changelog/render.js` resolves the
   connected wallet (`window.getDynamicSolanaWallet`) and bounces non-staff off
@@ -185,8 +199,8 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - **Gotcha (fixed):** Solana base58 addresses are case-sensitive on-chain but
   `roleForWallet` normalizes BOTH the wallet and the role lists to lowercase
   before matching — a mixed-case admin list otherwise never matches.
-- Global header shows a **"What's New"** link → `/changelog/`
-  (`public/header.js`, styled in `public/style.css`).
+- "What's New" (`/changelog/`) is reachable from the slide-in drawer's
+  Discover section (`public/header.js`, styled in `public/style.css`).
 - Seed data: `public/changelog/changelog.json` holds real milestones v0.1.0
   (Dynamic sign-in) → v0.8.0 (roadmap live). Current deployed version: 0.8.0.
 - Seeded/versioned docs: `docs/changelog/`; new engines notes land in

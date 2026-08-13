@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>About | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>Preserving the world’s folk games — on-chain</h2>
+            <p>GlobalFolkGames brings classic native games from around the world to your browser. Every match you play helps preserve a piece of cultural heritage — with real on-chain records proving every roll is fair.</p>
+        </section>
+        <section class="game-card">
+            <h3>Why we exist</h3>
+            <p>Traditional games shaped how communities played and bonded for generations. We preserve them as living, playable experiences — not museum pieces — and prove their fairness on the Solana blockchain.</p>
+        </section>
+        <section class="game-card">
+            <h3>Fair by design</h3>
+            <p>Dice rolls use provably-fair MagicBlock VRF on-chain. Games stay gasless and free — you never need a wallet or SOL.</p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { if (window.initGlobalHeader) window.initGlobalHeader(); });
+    </script>
+</body>
+</html>

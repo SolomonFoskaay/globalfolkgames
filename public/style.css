@@ -101,6 +101,110 @@ body {
     font-size: 0.85rem;
 }
 
+/* Hamburger menu button (opens the slide-in drawer) */
+.gfg-menu-btn {
+    background: #252535;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    width: 38px;
+    height: 38px;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.gfg-menu-btn:hover { border-color: var(--accent); }
+
+/* ===== SLIDE-IN NAV DRAWER (glass, overlays page, never pushes) ===== */
+.gfg-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease;
+    z-index: 900;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+.gfg-drawer-scrim.show { opacity: 1; visibility: visible; }
+
+.gfg-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: min(320px, 86vw);
+    z-index: 901;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    flex-direction: column;
+    /* Glass look: translucent so the page stays visible behind it */
+    background: linear-gradient(160deg, rgba(26, 26, 36, 0.82), rgba(15, 15, 19, 0.72));
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+}
+.gfg-drawer.open { transform: translateX(0); }
+
+.gfg-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.gfg-drawer-head .gfg-brand { font-size: 1rem; }
+
+.gfg-drawer-close {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text);
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.gfg-drawer-close:hover { border-color: var(--accent); }
+
+.gfg-drawer-nav { padding: 10px 18px 24px; }
+
+.gfg-drawer-section { margin-bottom: 18px; }
+.gfg-drawer-section.hidden { display: none; }
+
+.gfg-drawer-heading {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 6px;
+    padding-left: 8px;
+}
+
+.gfg-drawer-section ul { list-style: none; }
+.gfg-drawer-section li { margin: 2px 0; }
+.gfg-drawer-section a {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+.gfg-drawer-section a:hover {
+    background: rgba(243, 156, 18, 0.12);
+    color: var(--accent);
+}
+
 .auth-btn-small {
     background: var(--accent);
     color: #000;

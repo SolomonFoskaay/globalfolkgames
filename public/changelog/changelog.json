@@ -319,6 +319,33 @@
       "status": "in-progress",
       "approved": false,
       "added": "2026-08-13"
+    },
+    {
+      "title": "Slide-in site menu + new pages",
+      "summary": "A tidy menu slides in from the side of any page — so games, What's New, About, Forum, Support and your profile are always one tap away, without cluttering the header.",
+      "details": [
+        "Global header now has a hamburger that opens a glassmorphic slide-in drawer",
+        "Drawer slides OVER the page (no content push), translucent blur so page shows through",
+        "Menu sections: Play (Ludo, Home), Discover (What's New, About, Forum, Support, Contact), Account (My Profile)",
+        "Admin-only section (Dashboard, raw changelog) shown when wallet is in roles.json",
+        "New pages: about/, contact/, support/, forum/, profile/, dashboard/ (vite inputs)",
+        "Changelog pages poll changelog.json every 45s; on change show a \"new update\" pill",
+        "Pill is click-to-refresh (no silent refresh that yanks content from readers)"
+      ],
+      "status": "planned",
+      "approved": false,
+      "added": "2026-08-13"
+    },
+    {
+      "title": "Auto-updating changelog",
+      "summary": "The What's New page now notices when something new lands while you're reading and pops a friendly refresh button — no refresh surprise, you choose when to see it.",
+      "details": [
+        "Changelog polls for updates every 45s; new content shows a refresh pill",
+        "Reader chooses when to apply the update (no silent refresh)"
+      ],
+      "status": "planned",
+      "approved": false,
+      "added": "2026-08-13"
     }
   ]
 }

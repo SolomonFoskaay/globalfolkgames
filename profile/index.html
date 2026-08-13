@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Profile | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>My Profile 👤</h2>
+            <p class="auth-hint" id="profile-status" style="margin-top:8px;">Checking account…</p>
+        </section>
+
+        <section class="game-card" id="profile-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Points &amp; Level</h3>
+                <span id="profile-pts" style="font-size:1.4rem; color:#f39c12; font-weight:800;">0</span>
+            </div>
+            <p id="profile-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
+            <p id="profile-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
+        </section>
+
+        <section class="game-card" id="profile-wallet-card" hidden>
+            <h3>Blockchain identity</h3>
+            <p id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all;">—</p>
+        </section>
+
+        <section class="game-card" style="text-align:center;">
+            <button id="profile-signin-btn" class="auth-btn primary" hidden>Sign in</button>
+        </section>
+
+        <section class="game-card">
+            <h3>Your play</h3>
+            <p><a href="/games/ludo/" style="color:#f39c12;">Play Ludo →</a></p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            const statusEl = document.getElementById('profile-status');
+            const ptsEl = document.getElementById('profile-pts');
+            const levelEl = document.getElementById('profile-level');
+            const lifetimeEl = document.getElementById('profile-lifetime');
+            const walletCard = document.getElementById('profile-wallet-card');
+            const walletEl = document.getElementById('profile-wallet');
+            const signinBtn = document.getElementById('profile-signin-btn');
+
+            function render(signedIn) {
+                if (!signedIn || !window.currentProfile) {
+                    statusEl.textContent = 'Sign in to see your profile and points.';
+                    signinBtn.hidden = false;
+                    return;
+                }
+                const p = window.currentProfile;
+                statusEl.textContent = 'Signed in — welcome back!';
+                ptsEl.textContent = p.global_points || 0;
+                levelEl.textContent = 'Level ' + (p.level || 0);
+                lifetimeEl.textContent = 'Lifetime points: ' + (p.lifetime_points || 0);
+                const w = window.currentProfile.solana_wallet || window.getDynamicSolanaWallet?.() || null;
+                if (w) { walletEl.textContent = w; walletCard.hidden = false; }
+                signinBtn.hidden = true;
+            }
+
+            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
+
+            render(!!window.currentUser);
+            if (window.refreshAuthHeader) {
+                window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+            }
+        });
+    </script>
+</body>
+</html>

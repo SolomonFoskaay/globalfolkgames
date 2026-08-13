@@ -1,3 +1,2 @@
-- Per-player sponsor spend cap on the deployer wallet (anti-abuse, cost control)
-- Relay/relay-server expose sponsor totals + per-player spend so owner can monitor
-- Reminder: sponsor key 5ec9bYw...MdhdTQ holds ~12.8 SOL; cap prevents drain
+- Changelog polls for updates every 45s; new content shows a refresh pill
+- Reader chooses when to apply the update (no silent refresh)

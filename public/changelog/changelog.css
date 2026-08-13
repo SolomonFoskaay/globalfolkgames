@@ -79,6 +79,28 @@
 
 .changelog-entries { display: flex; flex-direction: column; gap: 18px; }
 
+/* ----- New-update pill (auto-detected, click to refresh) ----- */
+.changelog-update-pill {
+    display: none;
+    position: sticky;
+    top: 66px;
+    z-index: 60;
+    align-self: flex-start;
+    margin-bottom: 2px;
+    padding: 8px 16px;
+    background: var(--accent, #f39c12);
+    color: #1a1a1a;
+    border: none;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.changelog-update-pill.show { display: inline-block; }
+.changelog-update-pill:hover { filter: brightness(1.1); }
+
 /* ----- Status tabs (Planned / In progress / Shipped) ----- */
 .changelog-tabs {
     display: flex;

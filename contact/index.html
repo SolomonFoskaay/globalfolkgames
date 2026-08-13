@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Contact | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>Get in touch</h2>
+            <p>Questions, feedback or partnership ideas? We’d love to hear from you.</p>
+        </section>
+        <section class="game-card">
+            <h3>Drop us a line</h3>
+            <p style="color:#fff;">Email: contact@globalfolkgames.fun</p>
+            <p style="color:#aaa;">We read every message. Expect a reply within 1–2 business days.</p>
+        </section>
+        <section class="game-card">
+            <h3>Community</h3>
+            <p>Join the conversation on our <a href="/forum/" style="color:#f39c12;">Forum</a> and on socials.</p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { if (window.initGlobalHeader) window.initGlobalHeader(); });
+    </script>
+</body>
+</html>

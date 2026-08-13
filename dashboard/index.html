@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>🛡 Dashboard</h2>
+            <p class="auth-hint" style="margin-top:8px;">Staff overview — roadmap pipeline, releases and platform health.</p>
+        </section>
+
+        <section class="game-card" id="dash-pipeline">
+            <h3>Feature pipeline</h3>
+            <p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p>
+        </section>
+
+        <section class="game-card" id="dash-releases">
+            <h3>Latest release</h3>
+            <p id="dash-latest-release" style="color:var(--muted);">Loading…</p>
+        </section>
+
+        <section class="game-card" style="text-align:center;">
+            <p><a href="/changelog/admin.html" style="color:#f39c12;">Full raw changelog →</a></p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            // Staff gate mirrors the changelog admin page.
+            const isStaff = async () => {
+                if (window.getChangelogRole) {
+                    const role = await window.getChangelogRole();
+                    return role === 'admin' || role === 'moderator';
+                }
+                return false;
+            };
+
+            try {
+                const staff = await isStaff();
+                if (!staff) {
+                    window.location.replace('/');
+                    return;
+                }
+            } catch (e) {
+                window.location.replace('/');
+                return;
+            }
+
+            try {
+                const res = await fetch('/changelog/changelog.json', { cache: 'no-store' });
+                const data = await res.json();
+                const roadmap = data.roadmap || [];
+                const entries = data.entries || [];
+                const planned = roadmap.filter(r => r.status === 'planned');
+                const inProgress = roadmap.filter(r => r.status === 'in-progress');
+                const unapproved = roadmap.filter(r => r.approved !== true);
+
+                const stats = document.getElementById('dash-pipeline-stats');
+                stats.innerHTML =
+                    `Current version: <b style="color:#fff;">v${data.current || '—'}</b><br>` +
+                    `Planned: <b style="color:#f39c12;">${planned.length}</b> · ` +
+                    `In progress: <b style="color:#2ecc71;">${inProgress.length}</b> · ` +
+                    `Shipped: <b style="color:#3498db;">${entries.length}</b><br>` +
+                    (unapproved.length ? `<br><span style="color:#9b59b6;">⚠ ${unapproved.length} item(s) pending approval for the user page.</span>` : '');
+
+                if (entries.length) {
+                    const latest = entries[0];
+                    document.getElementById('dash-latest-release').innerHTML =
+                        `v${latest.version} · ${latest.date}<br><b style="color:#fff;">${latest.title}</b>`;
+                } else {
+                    document.getElementById('dash-latest-release').textContent = 'No releases yet.';
+                }
+            } catch (e) {
+                document.getElementById('dash-pipeline-stats').textContent = 'Could not load roadmap.';
+            }
+        });
+    </script>
+</body>
+</html>

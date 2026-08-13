@@ -10,7 +10,13 @@ export default defineConfig({
         main: 'index.html',
         ludo: './games/ludo/index.html',
         changelog: './changelog/index.html',
-        'changelog-admin': './changelog/admin.html'
+        'changelog-admin': './changelog/admin.html',
+        about: './about/index.html',
+        contact: './contact/index.html',
+        support: './support/index.html',
+        forum: './forum/index.html',
+        profile: './profile/index.html',
+        dashboard: './dashboard/index.html'
       }
     }
   },

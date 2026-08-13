@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Support | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>How can we help?</h2>
+            <p>Quick answers to the questions we hear most.</p>
+        </section>
+        <section class="game-card">
+            <h3>Signing in</h3>
+            <p>Use your email to sign in — no wallet needed. Your points and progress follow your account everywhere.</p>
+        </section>
+        <section class="game-card">
+            <h3>How do I win points?</h3>
+            <p>Finish first in a match with a valid on-chain proof roll to earn +100 points. Points power levels and future competitions.</p>
+        </section>
+        <section class="game-card">
+            <h3>Still stuck?</h3>
+            <p>Contact us at <span style="color:#f39c12;">contact@globalfolkgames.fun</span> and we’ll sort it out.</p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { if (window.initGlobalHeader) window.initGlobalHeader(); });
+    </script>
+</body>
+</html>

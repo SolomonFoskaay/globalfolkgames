@@ -2,7 +2,7 @@
 // Shared renderer for both changelog pages.
 //   - mode 'user'  : watered-down summaries, always readable.
 //   - mode 'admin' : raw details (numbered DEV Plan bullets, git refs, dates),
-//     gated to staff (NOTE: gate is client-side today — cosmetic, not security).
+//     for staff use.
 // Content is organized by 3 status tabs (Planned / In progress / Shipped) and
 // paginated per tab so long lists break into pages (Prev / pages / Next).
 (function () {
@@ -22,6 +22,8 @@
   // approved for players); admins see the full pipeline from "In progress".
   let state = { mode: 'user', tab: 'planned', page: 1 };
   let cache = null; // parsed changelog.json
+  let renderedFingerprint = null; // what the current screen actually shows
+  const POLL_MS = 45000;
 
   function qs(sel) { return document.querySelector(sel); }
 
@@ -178,6 +180,66 @@
     return roadmap.filter(r => r.status === tab && r.approved === true);
   }
 
+  // Fingerprint the data so we can detect updates without a full diff.
+  // Includes the version, the shipped entries (count + newest date) and the
+  // roadmap (count + newest `added` date). Polling compares this — when it
+  // changes we show a "new update" pill instead of silently clobbering what
+  // the reader is currently looking at.
+  function fingerprint(data) {
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    const roadmap = Array.isArray(data.roadmap) ? data.roadmap : [];
+    return [
+      data.current || '',
+      entries.length,
+      entries[0] && entries[0].date ? entries[0].date : '',
+      roadmap.length,
+      roadmap.reduce((m, r) => (r.added && r.added > m ? r.added : m), '')
+    ].join('|');
+  }
+
+  // --- new-update pill (click to refresh — never yanks the page out from
+  // under a reader, honours the running tab + page they've picked) ---
+  function showUpdatePill() {
+    let pill = document.getElementById('changelog-update-pill');
+    if (!pill) {
+      pill = document.createElement('button');
+      pill.id = 'changelog-update-pill';
+      pill.className = 'changelog-update-pill';
+      pill.type = 'button';
+      pill.setAttribute('aria-live', 'polite');
+      pill.addEventListener('click', () => {
+        cache = null; // force a fresh fetch on next paint
+        paint();
+      });
+      const tabsHost = document.querySelector('.changelog-tabs');
+      const entriesEl = document.getElementById('changelog-entries');
+      if (tabsHost && entriesEl && entriesEl.parentNode) {
+        entriesEl.parentNode.insertBefore(pill, tabsHost);
+      } else if (entriesEl && entriesEl.parentNode) {
+        entriesEl.parentNode.insertBefore(pill, entriesEl);
+      }
+    }
+    pill.textContent = '🔔 1 new update — refresh';
+    pill.classList.add('show');
+  }
+
+  function hideUpdatePill() {
+    const pill = document.getElementById('changelog-update-pill');
+    if (pill) pill.classList.remove('show');
+  }
+
+  // Poll for a fresh changelog.json; if the payload changed since the last
+  // render, surface a refresh pill. The reader chooses when to apply it.
+  async function startPoller() {
+    try {
+      if (!cache) return;
+      const fresh = await loadJson(CHANGELOG_JSON);
+      if (renderedFingerprint && fingerprint(fresh) !== renderedFingerprint) {
+        showUpdatePill();
+      }
+    } catch (e) { /* network blip — keep current view */ }
+  }
+
   async function paint() {
     const out = qs('#changelog-entries');
     const verEl = qs('#changelog-version');
@@ -188,6 +250,8 @@
       if (!cache) cache = await loadJson(CHANGELOG_JSON);
       const data = cache;
       const mode = state.mode;
+      renderedFingerprint = fingerprint(data);
+      hideUpdatePill();
       if (verEl) verEl.textContent = data.current || '';
       whoEl.textContent = esc(mode === 'admin' ? 'Admin view' : 'Public changelog');
 
@@ -259,11 +323,12 @@
     // mode shows the full pipeline from the same default.
     bindControls();
     await paint();
+    // Check periodically for new updates; if found, show a refresh pill.
+    setInterval(startPoller, POLL_MS);
   }
 
   // Admin gate: bounce non-staff to the homepage. Runs after a short auth
   // settle window (mirrors profiles.js). Staff = admin or moderator.
-  // NOTE: client-side only today — cosmetic convenience, not a security gate.
   async function requireStaff() {
     const roles = await loadRoles();
     const wallet = currentWallet();
