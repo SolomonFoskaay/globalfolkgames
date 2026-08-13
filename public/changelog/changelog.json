@@ -371,6 +371,29 @@
       "status": "planned",
       "approved": false,
       "added": "2026-08-13"
+    },
+    {
+      "title": "Admin operations dashboard",
+      "summary": "Behind-the-scenes health and activity view for the team (not player-facing).",
+      "details": [
+        "Changelog polls for updates every 45s; new content shows a refresh pill",
+        "Reader chooses when to apply the update (no silent refresh)",
+        "Devtools console shows a security warning for player who open it (like",
+        "Dynamic's): never paste unknown code / share login codes",
+        "Sponsor spend guard: relay now enforces per-player (0.005 SOL default) and global (1.0 SOL) spend caps plus a sponsor reserve floor, with a durable ledger of real spend (file-based, env-tunable). Server-side only; never shipped to client.",
+        "Relay bug fixed: Anchor `.transaction()` returns a Promise in @anchor-lang/core 1.1.2; the relay passed it unawaited to `sendMagicTx`, throwing 'transaction.instructions is not iterable' on every delegate. Both call sites now `await` the transaction. Verified live on devnet (fresh player init+delegate OK, idempotent no-op OK).",
+        "Value model (mainnet phase, agreed shape): \"free today, honest about limits.\" Free tier = a daily renewing sponsor-cost allowance per player, metered by real sponsor balance-delta from the spend ledger (not arbitrary roll counts) and shown to the player as \"free plays left today\".",
+        "Top-up: players can fund their embedded Solana wallet (Dynamic on-ramp) and buy spendable points; points unlock extra allowance and specials (lives, tournament re-entries). Earned and purchased points share the existing point_transactions ledger (different reason tags).",
+        "Early refill: during the onboarding phase players can request a free allowance refill from their profile (owner grants). The limit is taught from day one so later removal of free refills is never a surprise.",
+        "Transparency: per-game sponsor cost, allowance used, wins and turns are tracked and visible on both the user profile and the admin dashboard, so the owner can see how far the free gas budget stretches (games/turns per SOL).",
+        "Competition fairness: competitions are never pay-to-enter; each event bundles an allowance sized to finish it. Paid pressure applies to extra/grinding play, never to locking a player out of an event they already entered.",
+        "Robust admin operations dashboard (imminent build): endpoint watchlist probed SERVER-SIDE by api/endpoints.mjs (RPC chain, both VRF queues, delegation program, ER validator, ER RPC, Supabase health; per-item status/latency/user-vs-staff accessibility). Leak-scan verdicts are computed but never shipped to the browser (logged server-side only, per the public-vs-sensitive rule).",
+        "Ops panel: sponsor devnet balance, spend ledger totals + caps, version, roadmap counts (planned/in-progress/shipped + pending approvals), git ref (VERCEL_GIT_COMMIT_SHA with fallback to last changelog git ref), ER/on-chain account inventory (program + queue + validator addresses resolved from devnet).",
+        "User stats with On-chain / Off-chain sub-tabs: Off-chain = Supabase profiles + point_transactions aggregates (counts, sums, by-reason, recent rows). On-chain = sponsored accounts from the spend ledger with live delegation status via the Magic Router, plus sponsor balance."
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-13"
     }
   ]
 }

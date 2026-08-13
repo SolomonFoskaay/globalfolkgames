@@ -354,14 +354,27 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       allowance metering, refill farming, verified purchase) is in
       `docs/changelog/security-queue.md` — never client-served. Devnet today is
       free money, so this is a mainnet-phase build.
-- [ ] **Robust admin dashboard (imminent build):** endpoint watchlist via a
-      server-side probe function (`api/endpoints.mjs`) that returns status /
-      latency / user-accessible vs staff-only / leak flags (leak results stay
-      server-side per AGENTS.md rules); user stats with On-chain / Off-chain
-      sub-tabs (wallets, last login, gameplay, points); project ops panel
-      (Vercel env, Dynamic origins, sponsor balance/ledger totals, version,
-      roadmap counts, git refs, ER/on-chain account inventory). Owner approved
-      both scope options: server-side probe + "everything incl. usage analytics".
+- [x] **Robust admin dashboard (built, verified):** endpoint watchlist via a
+      server-side probe function (`scripts/endpoints-probe.mjs`, served as
+      `api/endpoints.mjs` on Vercel and `GET /api/endpoints` on the local
+      relay) that returns per-endpoint status / latency / accessibility
+      (user / staff / infra) across the RPC chain, both VRF queues, the
+      delegation program, the ER validator, ER RPC and Supabase. Leak-scan
+      + accepted-gap observations log server-side ONLY (console + 
+      `.gfg-probe-log.jsonl`), never in the client payload (AGENTS.md rules).
+      Ops panel: sponsor devnet balance, spend ledger totals + caps, version,
+      roadmap counts, git ref (VERCEL_GIT_COMMIT_SHA → git → changelog), and
+      the ER/on-chain account inventory. `dashboard/index.html` adds the
+      watchlist (with re-probe button), the ops panel and Player activity
+      with **On-chain / Off-chain sub-tabs**: On-chain = sponsored accounts
+      from the spend ledger with live delegation status from the Magic Router
+      (routers `getDelegationStatus`), plus sponsor balance. Off-chain =
+      Supabase profiles + point_transactions aggregates (counts, by-reason,
+      recent rows). Staff gate remains the client-side wallet-role gate (known
+      accepted gap; no real secrets behind it). Verified: standalone probe
+      8/8 ok + relay HTTP route via self-terminating harness. Deploy note:
+      Vercel function has no writable fs, so the file-ledger/player list is
+      per-instance (fine on devnet; durable store is the mainnet security item).
 - [ ] Vercel deploy (near-done): domain `https://globalfolkgames.fun` live
       (personal repo + free plan works). `GFG_SPONSOR_KEYPAIR` env set (raw
       contents of `~/.config/solana/id.json`). Dynamic CORS origin added

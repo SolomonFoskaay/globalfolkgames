@@ -6,37 +6,120 @@
     <title>Dashboard | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .dash-section { margin-top: 16px; }
+        .ops-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .ops-card {
+            background: #101014;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .ops-card .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .ops-card .v { color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px; word-break: break-all; }
+        .ops-card .v.small { font-size: 0.82rem; }
+        .ops-card .v.ok { color: #2ecc71; }
+        .ops-card .v.warn { color: #f39c12; }
+        .ops-card .v.bad { color: #e74c3c; }
+
+        .ep-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            margin-top: 6px;
+            background: #16161c;
+        }
+        .ep-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .ep-dot.ok { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+        .ep-dot.down { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+        .ep-name { flex: 1 1 auto; font-weight: 600; font-size: 0.92rem; }
+        .ep-lat { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+        .ep-detail { color: #999; font-size: 0.78rem; word-break: break-all; }
+        .ep-tag {
+            font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+            text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
+        }
+        .ep-tag.user { background: #2ecc71; color: #1a1a1a; }
+        .ep-tag.staff { background: #f39c12; color: #1a1a1a; }
+        .ep-tag.infra { background: #8e44ad; color: #fff; }
+
+        .stats-tabbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .stats-tab {
+            padding: 9px 18px; background: #252535; border: 1px solid var(--border, #333);
+            color: var(--muted, #aaa); border-radius: 10px; font-weight: 600; font-size: 0.88rem;
+            cursor: pointer;
+        }
+        .stats-tab.active { background: var(--accent-purple, #9b59b6); border-color: var(--accent-purple, #9b59b6); color: #fff; }
+        .stats-panel { display: none; }
+        .stats-panel.active { display: block; }
+
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mini-table th, .mini-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #23232b; }
+        .mini-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .mini-table td { color: #ddd; }
+        .mini-table .mono { font-family: monospace; font-size: 0.78rem; color: #9bd4ff; word-break: break-all; }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .last-checked { color: #888; font-size: 0.78rem; }
+    </style>
 </head>
 <body>
 
     <main class="mobile-container" style="max-width:760px;">
 
         <section class="onboarding-billboard" style="border-color:#9b59b6;">
-            <h2>🛡 Dashboard</h2>
-            <p class="auth-hint" style="margin-top:8px;">Staff read-only view of the changelog pipeline. Changelog data lives in git, so this page never writes to it.</p>
+            <h2>🛡 Admin Dashboard</h2>
+            <p class="auth-hint" style="margin-top:8px;">Staff view: endpoint health, on-chain/off-chain activity, sponsor spend and the release pipeline.</p>
         </section>
 
-        <!-- How to update (read-only; changes are made by the AI agent via git) -->
-        <section class="game-card" style="text-align:left; border:1px solid #9b59b6;">
-            <h3>✍️ How to update the changelog</h3>
-            <p style="color:var(--muted); font-size:0.9rem; line-height:1.6;">
-                The changelog is stored in Git (<span style="color:#f39c12;">public/changelog/changelog.json</span>) and never depends on a database, so it is safe from outages. Updates are made by the AI agent, not typed in here. Just tell the agent:
-            </p>
-            <ul style="color:#ccc; font-size:0.9rem; line-height:1.7; padding-left:18px; margin-top:8px;">
-                <li><b style="color:#fff;">"Approve the roadmap item: &lt;title&gt;"</b> → publishes it to the user-facing page.</li>
-                <li><b style="color:#fff;">"New feature: &lt;name&gt;, &lt;what it does&gt;"</b> → agent adds it to the roadmap (admin-only until you approve).</li>
-                <li><b style="color:#fff;">"Update the summary of the roadmap item: &lt;title&gt;"</b> → agent rewords the public text.</li>
-            </ul>
+        <!-- Ops panel (server-probed) -->
+        <section class="game-card dash-section" id="dash-ops" style="text-align:left; border:1px solid #9b59b6;">
+            <h3>⚙️ Project ops</h3>
+            <div id="dash-ops-grid"><p class="empty">Loading…</p></div>
+        </section>
+
+        <!-- Endpoint watchlist (server-probed) -->
+        <section class="game-card dash-section" id="dash-endpoints" style="text-align:left;">
+            <h3>🩺 Endpoint watchlist <span class="last-checked" id="ep-last-checked"></span></h3>
+            <div id="dash-endpoints-list"><p class="empty">Loading…</p></div>
+            <button class="refresh-btn" id="ep-refresh">↻ Re-probe servers</button>
+        </section>
+
+        <!-- User stats: On-chain / Off-chain -->
+        <section class="game-card dash-section" id="dash-users" style="text-align:left;">
+            <h3>👥 Player activity</h3>
+            <div class="stats-tabbar">
+                <button class="stats-tab active" data-tab="onchain">On-chain</button>
+                <button class="stats-tab" data-tab="offchain">Off-chain</button>
+            </div>
+            <div class="stats-panel active" id="stats-onchain">
+                <div id="dash-onchain"><p class="empty">Loading…</p></div>
+            </div>
+            <div class="stats-panel" id="stats-offchain">
+                <div id="dash-offchain"><p class="empty">Loading…</p></div>
+            </div>
         </section>
 
         <section class="game-card" id="dash-pipeline">
-            <h3>📊 Pipeline overview</h3>
+            <h3>📊 Release pipeline</h3>
             <p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p>
         </section>
 
         <!-- Pending user-page approvals (read-only) -->
         <section class="game-card" id="dash-pending" style="text-align:left;">
-            <h3>⏳ Pending approval (hidden from users)</h3>
+            <h3>⏳ Pending approval (admin-only until approved)</h3>
             <div id="dash-pending-list"><p class="empty">Loading…</p></div>
         </section>
 
@@ -69,7 +152,8 @@
         document.addEventListener('DOMContentLoaded', async () => {
             if (window.initGlobalHeader) window.initGlobalHeader();
 
-            // Staff gate mirrors the changelog admin page.
+            // Staff gate mirrors the changelog admin page (client-side UX gate;
+            // the endpoint probe never leaks sensitive findings to this page).
             const isStaff = async () => {
                 if (window.getChangelogRole) {
                     const role = await window.getChangelogRole();
@@ -87,12 +171,208 @@
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-            function statusTag(status) {
+            const statusTag = (status) => {
                 const label = status === 'in-progress' ? 'In progress' : status === 'shipped' ? 'Shipped' : 'Planned';
                 const cls = status === 'in-progress' ? 'in-progress' : '';
                 return `<span class="badge b-status ${cls}">${label}</span>`;
+            };
+
+            // ---------- Ops panel + endpoint watchlist (server probe) ----------
+            async function loadProbe() {
+                const opsEl = document.getElementById('dash-ops-grid');
+                const epEl = document.getElementById('dash-endpoints-list');
+                opsEl.innerHTML = '<p class="empty">Loading…</p>';
+                epEl.innerHTML = '<p class="empty">Loading…</p>';
+                const btn = document.getElementById('ep-refresh');
+                if (btn) btn.disabled = true;
+                try {
+                    const res = await fetch('/api/endpoints', { cache: 'no-store' });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const data = await res.json();
+
+                    document.getElementById('ep-last-checked').textContent =
+                        '· checked ' + new Date(data.generatedAt).toLocaleTimeString() + (data.environment ? ' (' + data.environment + ')' : '');
+
+                    // Ops cards
+                    const ops = data.ops || {};
+                    const cards = [];
+                    cards.push({ k: 'Version', v: 'v' + (ops.version || '—') });
+                    cards.push({ k: 'Git ref', v: (ops.gitRef || '—').slice(0, 10) });
+                    const rc = ops.roadmapCounts;
+                    if (rc) cards.push({ k: 'Roadmap', v: `${rc.planned} planned · ${rc.inProgress} in-progress · ${rc.shipped} shipped`, small: true });
+                    if (ops.sponsor) {
+                        const b = ops.sponsor.balanceSol;
+                        const cls = b == null ? 'bad' : b < 1 ? 'warn' : 'ok';
+                        cards.push({ k: 'Sponsor balance', v: b == null ? 'n/a' : b + ' SOL', cls });
+                    }
+                    if (ops.ledger && !ops.ledger.error) {
+                        cards.push({ k: 'Sponsor spend', v: ops.ledger.globalSpentSol + ' SOL · ' + ops.ledger.playersCount + ' player(s)', small: true });
+                        cards.push({ k: 'Spend caps', v: `${ops.ledger.perPlayerCapSol} / ${ops.ledger.globalCapSol} SOL · reserve ${ops.ledger.reserveSol}`, small: true });
+                    }
+                    if (ops.inventory) {
+                        cards.push({ k: 'gfg-dice program', v: ops.inventory.gfgDiceProgram, small: true });
+                        cards.push({ k: 'ER VRF queue', v: ops.inventory.erVrfQueue, small: true });
+                        cards.push({ k: 'Base VRF queue', v: ops.inventory.baseVrfQueue, small: true });
+                        cards.push({ k: 'ER validator', v: ops.inventory.erValidator, small: true });
+                    }
+                    opsEl.innerHTML = cards.length
+                        ? `<div class="ops-grid">${cards.map(c =>
+                            `<div class="ops-card"><div class="k">${esc(c.k)}</div>` +
+                            `<div class="v ${c.cls || ''} ${c.small ? 'small' : ''}">${esc(c.v)}</div></div>`
+                          ).join('')}</div>`
+                        : '<p class="empty">No ops data.</p>';
+
+                    // Endpoint watchlist
+                    const rows = (data.watchlist || []).map(w => `
+                        <div class="ep-row">
+                            <span class="ep-dot ${w.ok ? 'ok' : 'down'}"></span>
+                            <span class="ep-name">${esc(w.name)}</span>
+                            <span class="ep-tag ${esc(w.access)}">${esc(w.access)}</span>
+                            <span class="ep-lat">${w.latencyMs != null ? w.latencyMs + 'ms' : '—'}</span>
+                            <span class="ep-detail">${esc(w.detail)}</span>
+                        </div>`).join('');
+                    const downs = (data.watchlist || []).filter(w => !w.ok).length;
+                    epEl.innerHTML = downs
+                        ? `${rows}<p class="muted-note" style="color:#e74c3c;">⚠ ${downs} of ${(data.watchlist || []).length} checks failing — see detail above and the server logs.</p>`
+                        : rows;
+                } catch (e) {
+                    opsEl.innerHTML = '<p class="empty">Ops panel unavailable (' + esc(e.message) + ').</p>';
+                    epEl.innerHTML = '<p class="empty">Watchlist unavailable (' + esc(e.message) + '). Is the relay (npm run relay / api function) running?</p>';
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
             }
 
+            document.getElementById('ep-refresh').addEventListener('click', loadProbe);
+
+            // ---------- User stats tabs ----------
+            document.querySelectorAll('.stats-tab').forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    document.querySelectorAll('.stats-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.stats-panel').forEach(p => p.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('stats-' + tab.dataset.tab).classList.add('active');
+                    const loader = document.getElementById(tab.dataset.tab === 'onchain' ? 'dash-onchain' : 'dash-offchain');
+                    if (loader && loader.dataset.loaded !== '1') {
+                        if (tab.dataset.tab === 'onchain') loadOnchain(); else loadOffchain();
+                    }
+                });
+            });
+
+            async function loadOnchain() {
+                const el = document.getElementById('dash-onchain');
+                el.innerHTML = '<p class="empty">Loading…</p>';
+                const out = [];
+                try {
+                    const res = await fetch('/api/endpoints', { cache: 'no-store' });
+                    const data = await res.json();
+                    const ops = data.ops || {};
+
+                    if (ops.sponsor && ops.sponsor.pubkey) {
+                        out.push(`<p>Sponsor wallet: <span class="mono">${esc(ops.sponsor.pubkey)}</span> · <b style="color:#2ecc71;">${esc(ops.sponsor.balanceSol)} SOL</b></p>`);
+                    }
+                    const players = (ops.ledger && ops.ledger.players) || [];
+                    if (players.length) {
+                        // Live-delegation check each sponsored PDA via the Magic Router.
+                        const checkRows = [];
+                        for (const p of players.slice(0, 20)) {
+                            checkRows.push(await delegationRow(p));
+                        }
+                        out.push('<div class="muted-note">Sponsored dice accounts (from the sponsor ledger), with live delegation status from the Magic Router:</div>');
+                        out.push(`
+                            <table class="mini-table">
+                                <thead><tr><th>Player</th><th>Delegated</th><th>Spent</th></tr></thead>
+                                <tbody>${checkRows.join('')}</tbody>
+                            </table>`);
+                    } else {
+                        out.push('<p class="empty">No sponsored accounts yet — play a first roll as a fresh player to seed this list.</p>');
+                    }
+                } catch (e) {
+                    out.push('<p class="empty">On-chain data unavailable (' + esc(e.message) + ').</p>');
+                }
+                el.innerHTML = out.join('');
+                el.dataset.loaded = '1';
+            }
+
+            async function delegationRow(player) {
+                let state = '—';
+                try {
+                    const res = await fetch('https://devnet-router.magicblock.app/getDelegationStatus', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getDelegationStatus', params: [player.pubkey] }),
+                    });
+                    const j = await res.json();
+                    const r = j.result || {};
+                    state = r.isDelegated
+                        ? `<span style="color:#2ecc71;">yes${r.fqdn ? ' · ' + esc(r.fqdn) : ''}</span>`
+                        : `<span style="color:#e74c3c;">no</span>`;
+                } catch (e) { state = '<span style="color:#e74c3c;">error</span>'; }
+                return `<tr><td class="mono">${esc(player.pubkey.slice(0, 6))}…${esc(player.pubkey.slice(-4))}</td>` +
+                       `<td>${state}</td><td>${esc(player.spentSol)} SOL</td></tr>`;
+            }
+
+            async function loadOffchain() {
+                const el = document.getElementById('dash-offchain');
+                el.innerHTML = '<p class="empty">Loading…</p>';
+                const out = [];
+                try {
+                    if (!window.supabaseClient) throw new Error('Supabase client not loaded');
+                    const sb = window.supabaseClient;
+
+                    const [profilesR, txR] = await Promise.all([
+                        sb.from('profiles').select('username, email, solana_wallet, global_points, level, created_at').order('created_at', { ascending: false }).limit(100),
+                        sb.from('point_transactions').select('reason, points').order('created_at', { ascending: false }).limit(500),
+                    ]);
+
+                    if (profilesR.error) throw new Error(profilesR.error.message);
+                    const profiles = profilesR.data || [];
+                    const tx = (txR.data || []);
+
+                    const totalPoints = profiles.reduce((s, p) => s + (p.global_points || 0), 0);
+                    const withWallet = profiles.filter(p => p.solana_wallet).length;
+                    out.push(`<div class="ops-grid">
+                        <div class="ops-card"><div class="k">Profiles</div><div class="v">${profiles.length}</div></div>
+                        <div class="ops-card"><div class="k">With wallet</div><div class="v">${withWallet}<span class="k"> · ${profiles.length ? Math.round(100 * withWallet / profiles.length) : 0}%</span></div></div>
+                        <div class="ops-card"><div class="k">Global points</div><div class="v">${totalPoints.toLocaleString()}</div></div>
+                        <div class="ops-card"><div class="k">Tx records (sample)</div><div class="v">${tx.length}</div></div>
+                    </div>`);
+
+                    const byReason = {};
+                    tx.forEach(t => { byReason[t.reason || 'other'] = (byReason[t.reason || 'other'] || 0) + (t.points || 0); });
+                    const reasons = Object.entries(byReason).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([r, sum]) =>
+                        `<tr><td>${esc(r)}</td><td>${esc(sum.toLocaleString())} pts</td></tr>`).join('');
+                    if (reasons) {
+                        out.push('<div class="muted-note">Points issued by reason (recent ledger sample):</div>');
+                        out.push(`<table class="mini-table"><thead><tr><th>Reason</th><th>Points</th></tr></thead><tbody>${reasons}</tbody></table>`);
+                    }
+
+                    if (profiles.length) {
+                        out.push('<div class="muted-note">Most recent profiles:</div>');
+                        out.push(`<table class="mini-table">
+                            <thead><tr><th>Name</th><th>Email</th><th>Wallet</th><th>Pts</th><th>Level</th><th>Created</th></tr></thead>
+                            <tbody>${profiles.slice(0, 10).map(p => {
+                                const w = p.solana_wallet || '';
+                                return `<tr><td>${esc(p.username || '—')}</td><td>${esc(p.email || '—')}</td>` +
+                                    `<td class="mono">${w ? esc(w.slice(0, 6)) + '…' + esc(w.slice(-4)) : '—'}</td>` +
+                                    `<td>${esc((p.global_points || 0).toLocaleString())}</td><td>${esc(p.level)}</td>` +
+                                    `<td>${esc((p.created_at || '').slice(0, 16).replace('T', ' '))}</td></tr>`;
+                            }).join('')}</tbody>
+                        </table>`);
+                    } else {
+                        out.push('<p class="empty">No profiles in the store yet.</p>');
+                    }
+                } catch (e) {
+                    out.push('<p class="empty">Off-chain data unavailable (' + esc(e.message) + ').</p>');
+                }
+                el.innerHTML = out.join('');
+                el.dataset.loaded = '1';
+            }
+
+            // Load the default panels on first paint.
+            loadProbe();
+
+            // ---------- Release pipeline + tracker (existing) ----------
             function pendingRow(r) {
                 const detail = (r.details && r.details.length)
                     ? `<div class="entry-details"><h4>DEV Plan</h4><ol class="dev-plan-list">${r.details.map(d => `<li>${esc(d)}</li>`).join('')}</ol></div>`
@@ -148,13 +428,11 @@
                     `Released: <b style="color:#3498db;">${entries.length}</b><br>` +
                     (pending.length ? `<br><span style="color:#9b59b6;">⚠ ${pending.length} item(s) pending approval — tell the agent "Approve: &lt;title&gt;" to publish them.</span>` : '<br><span style="color:#27ae60;">All roadmap items are approved for the user page.</span>');
 
-                // Pending approvals list
                 const pendEl = document.getElementById('dash-pending-list');
                 pendEl.innerHTML = pending.length
                     ? `<div class="changelog-entries">${pending.map(pendingRow).join('')}</div>`
                     : `<p class="empty">Nothing pending — every roadmap item is approved.</p>`;
 
-                // Full tracker
                 const allEl = document.getElementById('dash-all-list');
                 const roadmapRows = roadmap.map(trackerRow).join('');
                 const entriesRows = entries.map(e => `

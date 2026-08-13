@@ -5,6 +5,9 @@
   "functions": {
     "api/delegate.mjs": {
       "maxDuration": 30
+    },
+    "api/endpoints.mjs": {
+      "maxDuration": 30
     }
   }
 }
