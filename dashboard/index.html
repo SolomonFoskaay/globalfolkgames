@@ -9,20 +9,41 @@
 </head>
 <body>
 
-    <main class="mobile-container">
+    <main class="mobile-container" style="max-width:760px;">
+
         <section class="onboarding-billboard" style="border-color:#9b59b6;">
             <h2>🛡 Dashboard</h2>
-            <p class="auth-hint" style="margin-top:8px;">Staff overview — roadmap pipeline, releases and platform health.</p>
+            <p class="auth-hint" style="margin-top:8px;">Staff read-only view of the changelog pipeline. Changelog data lives in git — this page never writes to it.</p>
+        </section>
+
+        <!-- How to update (read-only; changes are made by the AI agent via git) -->
+        <section class="game-card" style="text-align:left; border:1px solid #9b59b6;">
+            <h3>✍️ How to update the changelog</h3>
+            <p style="color:var(--muted); font-size:0.9rem; line-height:1.6;">
+                The changelog is stored in Git (<span style="color:#f39c12;">public/changelog/changelog.json</span>) — it never depends on a database, so it is safe from outages. Updates are made by the AI agent, not typed in here. Just tell the agent:
+            </p>
+            <ul style="color:#ccc; font-size:0.9rem; line-height:1.7; padding-left:18px; margin-top:8px;">
+                <li><b style="color:#fff;">"Approve the roadmap item: &lt;title&gt;"</b> → publishes it to the user-facing page.</li>
+                <li><b style="color:#fff;">"New feature: &lt;name&gt; — &lt;what it does&gt;"</b> → agent adds it to the roadmap (admin-only until you approve).</li>
+                <li><b style="color:#fff;">"Update the summary of the roadmap item: &lt;title&gt;"</b> → agent rewords the public text.</li>
+            </ul>
         </section>
 
         <section class="game-card" id="dash-pipeline">
-            <h3>Feature pipeline</h3>
+            <h3>📊 Pipeline overview</h3>
             <p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p>
         </section>
 
-        <section class="game-card" id="dash-releases">
-            <h3>Latest release</h3>
-            <p id="dash-latest-release" style="color:var(--muted);">Loading…</p>
+        <!-- Pending user-page approvals (read-only) -->
+        <section class="game-card" id="dash-pending" style="text-align:left;">
+            <h3>⏳ Pending approval (hidden from users)</h3>
+            <div id="dash-pending-list"><p class="empty">Loading…</p></div>
+        </section>
+
+        <!-- Everything in the tracker (read-only) -->
+        <section class="game-card" id="dash-all" style="text-align:left;">
+            <h3>🗂 Full tracker (roadmap + released)</h3>
+            <div id="dash-all-list"><p class="empty">Loading…</p></div>
         </section>
 
         <section class="game-card" style="text-align:center;">
@@ -51,13 +72,56 @@
 
             try {
                 const staff = await isStaff();
-                if (!staff) {
-                    window.location.replace('/');
-                    return;
-                }
-            } catch (e) {
-                window.location.replace('/');
-                return;
+                if (!staff) { window.location.replace('/'); return; }
+            } catch (e) { window.location.replace('/'); return; }
+
+            const esc = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            function statusTag(status) {
+                const label = status === 'in-progress' ? 'In progress' : status === 'shipped' ? 'Shipped' : 'Planned';
+                const cls = status === 'in-progress' ? 'in-progress' : '';
+                return `<span class="badge b-status ${cls}">${label}</span>`;
+            }
+
+            function pendingRow(r) {
+                const detail = (r.details && r.details.length)
+                    ? `<div class="entry-details"><h4>DEV Plan</h4><ol class="dev-plan-list">${r.details.map(d => `<li>${esc(d)}</li>`).join('')}</ol></div>`
+                    : '';
+                return `
+                    <article class="entry roadmap-entry">
+                        <div class="entry-head">
+                            <span class="entry-version">Next</span>
+                            ${statusTag(r.status)}
+                            <span class="badge b-status pending">Pending approval</span>
+                            <span class="entry-date">added ${esc(r.added || '')}</span>
+                        </div>
+                        <h3>${esc(r.title)}</h3>
+                        <p class="entry-summary">${esc(r.summary) || '<em>(no user summary yet)</em>'}</p>
+                        ${detail}
+                    </article>`;
+            }
+
+            function trackerRow(r) {
+                const approvedTag = r.approved === true
+                    ? '<span class="badge b-minor">User-approved</span>'
+                    : '<span class="badge b-status pending">Pending approval</span>';
+                const detail = (r.details && r.details.length)
+                    ? `<div class="entry-details"><h4>DEV Plan</h4><ol class="dev-plan-list">${r.details.map(d => `<li>${esc(d)}</li>`).join('')}</ol></div>`
+                    : '';
+                return `
+                    <article class="entry roadmap-entry">
+                        <div class="entry-head">
+                            <span class="entry-version">Next</span>
+                            ${statusTag(r.status)}
+                            ${approvedTag}
+                            <span class="entry-date">added ${esc(r.added || '')}</span>
+                        </div>
+                        <h3>${esc(r.title)}</h3>
+                        <p class="entry-summary">${esc(r.summary) || '<em>(no user summary yet)</em>'}</p>
+                        ${detail}
+                    </article>`;
             }
 
             try {
@@ -67,25 +131,41 @@
                 const entries = data.entries || [];
                 const planned = roadmap.filter(r => r.status === 'planned');
                 const inProgress = roadmap.filter(r => r.status === 'in-progress');
-                const unapproved = roadmap.filter(r => r.approved !== true);
+                const pending = roadmap.filter(r => r.approved !== true);
 
-                const stats = document.getElementById('dash-pipeline-stats');
-                stats.innerHTML =
+                document.getElementById('dash-pipeline-stats').innerHTML =
                     `Current version: <b style="color:#fff;">v${data.current || '—'}</b><br>` +
                     `Planned: <b style="color:#f39c12;">${planned.length}</b> · ` +
                     `In progress: <b style="color:#2ecc71;">${inProgress.length}</b> · ` +
-                    `Shipped: <b style="color:#3498db;">${entries.length}</b><br>` +
-                    (unapproved.length ? `<br><span style="color:#9b59b6;">⚠ ${unapproved.length} item(s) pending approval for the user page.</span>` : '');
+                    `Released: <b style="color:#3498db;">${entries.length}</b><br>` +
+                    (pending.length ? `<br><span style="color:#9b59b6;">⚠ ${pending.length} item(s) pending approval — tell the agent "Approve: &lt;title&gt;" to publish them.</span>` : '<br><span style="color:#27ae60;">All roadmap items are approved for the user page.</span>');
 
-                if (entries.length) {
-                    const latest = entries[0];
-                    document.getElementById('dash-latest-release').innerHTML =
-                        `v${latest.version} · ${latest.date}<br><b style="color:#fff;">${latest.title}</b>`;
-                } else {
-                    document.getElementById('dash-latest-release').textContent = 'No releases yet.';
-                }
+                // Pending approvals list
+                const pendEl = document.getElementById('dash-pending-list');
+                pendEl.innerHTML = pending.length
+                    ? `<div class="changelog-entries">${pending.map(pendingRow).join('')}</div>`
+                    : `<p class="empty">Nothing pending — every roadmap item is approved.</p>`;
+
+                // Full tracker
+                const allEl = document.getElementById('dash-all-list');
+                const roadmapRows = roadmap.map(trackerRow).join('');
+                const entriesRows = entries.map(e => `
+                    <article class="entry">
+                        <div class="entry-head">
+                            <span class="entry-version">v${esc(e.version)}</span>
+                            <span class="badge b-${e.type || 'patch'}">${esc(e.type || 'Update')}</span>
+                            <span class="entry-date">${esc(e.date)}</span>
+                        </div>
+                        <h3>${esc(e.title)}</h3>
+                        <p class="entry-summary">${esc(e.summary) || ''}</p>
+                    </article>`).join('');
+                allEl.innerHTML = (roadmapRows || entriesRows)
+                    ? `<div class="changelog-entries">${roadmapRows}${entriesRows}</div>`
+                    : `<p class="empty">Nothing in the tracker yet.</p>`;
             } catch (e) {
-                document.getElementById('dash-pipeline-stats').textContent = 'Could not load roadmap.';
+                document.getElementById('dash-pipeline-stats').textContent = 'Could not load roadmap (' + e.message + ').';
+                document.getElementById('dash-pending-list').innerHTML = '<p class="empty">Unavailable.</p>';
+                document.getElementById('dash-all-list').innerHTML = '<p class="empty">Unavailable.</p>';
             }
         });
     </script>
