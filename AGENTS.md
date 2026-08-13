@@ -187,6 +187,21 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   `roles.json` — client-side UX hint, never a security boundary (no sensitive
   data behind it). New pages (about/, contact/, support/, forum/, profile/,
   dashboard/) are declared as Vite inputs in `vite.config.js`.
+- **Brand theme colors (design rule):** the GlobalFolkGames brand is **Orange
+  (#f39c12) + Purple (#9b59b6)** — those two are the primary brand colors and
+  should lead every design, with black/dark (`#0f0f13`, `#1a1a24`) as the
+  supporting backdrop. CSS vars in `public/style.css` `:root`: `--accent`
+  (orange), `--accent-purple` (purple), `--bg-dark`/`--card-bg` (black
+  supports). Keep orange-purple dominant in any UI you build; black is the
+  canvas, never the accent.
+- **Drawer is TRUE glass (design rule — do not regress):** the slide-in menu
+  must stay transparent so it never blocks the page content behind it — on
+  mobile a solid panel would cover most of the screen and hide what's below.
+  The drawer background is `transparent` with a strong `backdrop-filter: blur`
+  (menu text reads over anything), and **each menu item is its own glass chip**
+  (translucent `rgba(26,26,36,0.34)` + blur, a thin light border, subtle white
+  text-shadow) so items stay readable while the page shows through. Scrim is a
+  light `rgba(0,0,0,0.18)` only. Never reintroduce a solid/opaque drawer body.
 - **Changelog auto-update (`render.js`):** the changelog pages poll
   `changelog.json` every 45s. When the payload changes, a "🔔 new update"
   pill appears above the tabs. It is **click-to-refresh** — never a silent
