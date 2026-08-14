@@ -261,7 +261,7 @@
                 <div class="gas-meta">${esc(bat.balanceSol)} of ${esc(bat.tankSol)} SOL tank · reserve floor ${esc((ledger && ledger.reserveSol) || 0.3)} SOL</div>
                 <div class="gas-note">${
                     bat.tier === 'unknown'
-                        ? 'Sponsor balance could not be read (keypair not resolvable on this host). The relay likely still works; check that GFG_SPONSOR_KEYPAIR is set for this deployment.'
+                        ? 'Sponsor balance could not be read (keypair not resolvable on this host). The relay likely still works; check that GFG_Gasless_Sponsor_Keypair is set for this deployment.'
                         : bat.tier === 'critical'
                             ? 'Critical: the sponsor wallet is close to the reserve floor. Top it up from your own wallet soon or fresh players will stop onboarding.'
                             : bat.tier === 'low'

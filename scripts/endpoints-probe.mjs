@@ -50,8 +50,8 @@ const INVENTORY = {
 
 // ---- Sponsor key resolution (mirrors delegate-relay) ----
 function loadSponsorPubkey() {
-  if (process.env.GFG_SPONSOR_KEYPAIR) {
-    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.GFG_SPONSOR_KEYPAIR))).publicKey.toBase58();
+  if (process.env.GFG_Gasless_Sponsor_Keypair) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.GFG_Gasless_Sponsor_Keypair))).publicKey.toBase58();
   }
   const path = join(homedir(), '.config', 'solana', 'id.json');
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8')))).publicKey.toBase58();

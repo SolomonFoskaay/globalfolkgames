@@ -4,7 +4,7 @@
 // the house (sponsor) key, which never leaves the server. Returns the
 // on-chain result + signature for the client to display and prove.
 //
-// Requires GFG_SPONSOR_KEYPAIR (set in Vercel project settings), same as
+// Requires GFG_Gasless_Sponsor_Keypair (set in Vercel project settings), same as
 // api/delegate.mjs.
 
 import { handleHouseRoll } from '../scripts/roll-relay.mjs';

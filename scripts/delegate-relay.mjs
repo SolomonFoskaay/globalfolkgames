@@ -13,8 +13,8 @@
 //   - `npm run relay`  (local dev server on :8787, Vite proxies /api -> it)
 //   - Vercel serverless function (api/delegate.mjs)
 //
-// Sponsor key: env GFG_SPONSOR_KEYPAIR (JSON array of 64 ints, solana CLI
-// keypair format) or falls back to ~/.config/solana/id.json for local dev.
+// Sponsor key: env GFG_Gasless_Sponsor_Keypair (JSON array of 64 ints, solana
+// CLI keypair format) or falls back to ~/.config/solana/id.json for local dev.
 
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
@@ -40,8 +40,8 @@ const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 
 export function loadSponsor() {
-  if (process.env.GFG_SPONSOR_KEYPAIR) {
-    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.GFG_SPONSOR_KEYPAIR)));
+  if (process.env.GFG_Gasless_Sponsor_Keypair) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.GFG_Gasless_Sponsor_Keypair)));
   }
   const path = join(homedir(), '.config', 'solana', 'id.json');
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8'))));

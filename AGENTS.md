@@ -70,8 +70,8 @@ Players' accounts are funded by an app-owned sponsor key through a relay:
   with `{player}`. Vite dev proxies `/api` → it.
 - `api/delegate.mjs` — the same handler as a Vercel serverless function.
 
-Sponsor key: env `GFG_SPONSOR_KEYPAIR` (JSON array of 64 ints, solana CLI
-keypair format) or fallback `~/.config/solana/id.json`.
+Sponsor key: env `GFG_Gasless_Sponsor_Keypair` (JSON array of 64 ints,
+solana CLI keypair format) or fallback `~/.config/solana/id.json`.
 
 Important gotcha (fixed): always compare `PublicKey` with `.equals()`, never
 `someString === publicKeyObject`. `info.owner.toBase58() === DELEGATION_PROGRAM`
@@ -432,7 +432,7 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       Verified live: analytics present in the probe payload; `npm run build`
       green.
 - [ ] Vercel deploy (near-done): domain `https://globalfolkgames.fun` live
-      (personal repo + free plan works). `GFG_SPONSOR_KEYPAIR` env set (raw
+      (personal repo + free plan works). `GFG_Gasless_Sponsor_Keypair` env set (raw
       contents of `~/.config/solana/id.json`). Dynamic CORS origin added
       (`https://globalfolkgames.fun`, plus localhost in sandbox). Remaining:
       final deploy (fix already made: `api/delegate.mjs` accepts Vercel's

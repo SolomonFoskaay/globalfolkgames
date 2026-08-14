@@ -14,7 +14,7 @@
 // computer rolls through a simple promise queue so two game tabs never hit
 // the same PDA at once and race each other's callback.
 //
-// Env: reuses GFG_SPONSOR_KEYPAIR (or ~/.config/solana/id.json), exactly like
+// Env: reuses GFG_Gasless_Sponsor_Keypair (or ~/.config/solana/id.json), exactly like
 // the delegate relay. No new secrets.
 
 import { readFileSync } from 'fs';

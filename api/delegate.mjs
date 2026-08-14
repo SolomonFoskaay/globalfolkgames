@@ -1,6 +1,6 @@
 // api/delegate.mjs
 // Vercel serverless function: app-sponsored initialize + delegate for gfg-dice.
-// Requires the env var GFG_SPONSOR_KEYPAIR (solana CLI keypair format, JSON
+// Requires the env var GFG_Gasless_Sponsor_Keypair (solana CLI keypair format, JSON
 // array of 64 ints) set in the Vercel project settings.
 
 import { handleDelegate } from '../scripts/delegate-relay.mjs';
