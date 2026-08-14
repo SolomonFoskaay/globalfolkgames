@@ -469,6 +469,26 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       REFUSES to ship an unapproved roadmap item to the public changelog.
       User page defaults to the Planned tab (owner-approved forward-looking
       roadmap); it shows ONLY approved roadmap items.
+- [x] **Game Economics admin workspace (built, verified):** a dedicated
+      staff-only page `/changelog/economics.html` (Vite input, staff-gated the
+      same way as the raw changelog) tracks the break-or-make platform
+      economics through a 3-stage pipeline: **raw → fine-tuned → ready**.
+      `public/changelog/economics.json` holds the items (title, stage, summary,
+      dev notes, tags, dates); `public/changelog/economics.js` renders the
+      sub-tab UI (Raw / Fine-tuned / Ready to implement); `scripts/econ-add.mjs`
+      captures new ideas (default stage raw); `scripts/econ-promote.mjs` moves
+      an item forward. When an item reaches "ready" it is finalized and gets
+      promoted into the normal changelog roadmap (`scripts/add-roadmap.mjs`).
+      Admin links in the drawer + changelog admin header. Same public-vs-
+      sensitive rule as the roadmap: no unfixed security/anti-exploit detail
+      ever goes into economics.json (kept in security-queue.md only).
+- [x] **Token/NFT stance (owner decision, recorded in econ workspace):** never
+      launch a token and never sell NFTs — both crash the project when bad
+      actors fixate on "token must go up" and label it a scam when it drops,
+      evaporating the USP. Instead rewards are EARNED and randomly discovered
+      (lootbox-style), opened to unlock surprises such as bonus points; some
+      in-game rewards may unlock an earned (never sold) NFT. This eases
+      web2-native players into web3 without the token/NFT crash taste.
 - [x] **On-chain points (Scope B, built + verified live on devnet):** `record_points`
       on the same delegated gfg-dice program, gasless on the ER. Program deployed
       (program id unchanged; init+delegate now support two PDAs per player).

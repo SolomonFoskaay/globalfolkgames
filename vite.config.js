@@ -11,6 +11,7 @@ export default defineConfig({
         ludo: './games/ludo/index.html',
         changelog: './changelog/index.html',
         'changelog-admin': './changelog/admin.html',
+        'changelog-economics': './changelog/economics.html',
         about: './about/index.html',
         contact: './contact/index.html',
         support: './support/index.html',

@@ -281,3 +281,17 @@
 }
 
 .empty { color: #888; }
+
+/* ----- Game Economics workspace (admin-only) ----- */
+.econ-updated { color: #666; font-size: 0.8rem; margin: 2px 0 14px; }
+
+.econ-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.econ-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: #29294a;
+    color: #9b59b6;
+}
+.econ-entry { border-left: 3px solid #9b59b6; }

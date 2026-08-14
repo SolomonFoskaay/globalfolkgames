@@ -16,6 +16,25 @@ in `public/changelog/changelog.json` or any client-delivered payload:
 
 ## Queue (unfixed — do not ship to client)
 
+### Lootbox / random-reward farming (token-free, NFT-free model)
+
+- Status: idea recorded (econ-001, raw) — added 2026-08-14
+- Context: owner's decided model (no token, no sold NFTs) uses EARNED,
+  randomly-discovered rewards ("lootbox-style") that open to unlock surprises
+  like bonus points and, possibly, earned-only collectible NFTs. Anything with
+  random value is a farm/stabilization target on mainnet.
+- Hardening plan (do NOT ship anything here to client-served data):
+  - Loot RNG must run through the SAME on-chain VRF path (no
+    client-computable random), so nobody can pre-roll or predict rewards.
+  - Earned-only gates (no purchases of rerolls/keys with real money at first;
+    if keys ever exist they must be spendable-points and server-metered).
+  - Anti-farm rails server-side (cap discoveries per player/day, funnel
+    detection for multi-account discovery, audit in the spend ledger).
+  - Any collectible unlock stays on-chain verifiable; never advertise
+    "investment value" — the model's whole point is avoiding the token/NFT
+    crash label, so no pricing talk in client payloads.
+  - Never put any of this in client-served data until shipped.
+
 ### Free-with-limits value model — anti-abuse hardening (mainnet phase)
 
 - Status: agreed shape; being designed — added 2026-08-13

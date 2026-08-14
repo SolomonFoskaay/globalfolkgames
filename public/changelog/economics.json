@@ -1,0 +1,106 @@
+{
+  "updated": "2026-08-14",
+  "note": "Admin-only Game Economics workspace. Raw ideas land here first, get fine-tuned, and only move to 'ready' when finalized; a ready item is then promoted into the normal changelog roadmap (planned / in-progress).",
+  "items": [
+    {
+      "id": "econ-001",
+      "title": "Token and NFT launches excluded: earned lootbox-style surprises instead",
+      "stage": "raw",
+      "summary": "Never launch a token or sell NFTs. Rewards are earned and randomly discovered, opened to unlock surprises such as bonus points, easing web2 players into web3 without the token/NFT crash taste.",
+      "tags": [
+        "token",
+        "nft",
+        "lootbox",
+        "web3-funnel"
+      ],
+      "notes": [
+        "Do NOT launch a token: token launches usually crash the project; bad actors shift focus to 'token must always go up'; when the token goes down they label the project a scam and the USP evaporates. Token launch is OUT.",
+        "Do NOT launch NFTs for sale either: same crash pattern and same scam-labeling risk.",
+        "Instead: rewards are EARNED and randomly discovered (lootbox-style), opened to unlock surprises like bonus points within the games.",
+        "Possibly some in-game rewards can unlock an NFT (earned, never sold) as the web3 collectible layer.",
+        "Goal: gradually ease web2-native folk game players into web3 without the bad taste of token/NFT value crashes.",
+        "Open questions (fine-tune next): lootbox anti-farming rules, loot RNG fairness (must run through the same on-chain VRF), legal framing of lootboxes."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-002",
+      "title": "Three point ledgers: global lifetime / global spendable / per-game",
+      "stage": "fine-tuned",
+      "summary": "One win updates three ledgers: a permanent lifetime record, the spendable balance, and the detailed per-game record that proves skill in that game.",
+      "tags": [
+        "ledgers",
+        "points"
+      ],
+      "notes": [
+        "GLOBAL LIFETIME: non-spendable, permanent. Every point from every source (won, bought, giveaway, referral) accumulates forever and never decays. Drives the Lifetime Rank and O.G./anniversary rewards.",
+        "GLOBAL SPENDABLE: the exchange currency, spendable anywhere on the platform (Active Tier, cosmetics, competition entries, stakes). Goes up and down; this is what purchases top up.",
+        "LOCAL PER-GAME: detailed, verifiable record of how points were earned in a specific game (already exists as lifetime Ludo points in local-points.js). Drives per-game skill reputation and gates game-specific unlocks.",
+        "All reason-tagged in the point_transactions audit; Supabase aggregation + on-chain record_points PDA as the verifiable layer.",
+        "Decided blind-spot: NO double-credit between local-spendable and global-spendable (one win must not mint two spendable balances). Game-exclusives are gated by local lifetime balance and charged from global spendable."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-003",
+      "title": "Two level systems: permanent Lifetime Rank + monthly Active Tier",
+      "stage": "fine-tuned",
+      "summary": "A permanent loyalty rank that never drops, plus a monthly spendable tier with win multipliers that gates competitions.",
+      "tags": [
+        "levels",
+        "multipliers"
+      ],
+      "notes": [
+        "LIFETIME RANK: permanent, earned from lifetime points + account age (example: 5,000 lifetime AND 1 month old -> Rank 2). Never drops, never lost. Unlocks O.G./legacy rewards and future specials.",
+        "ACTIVE TIER: temporary, monthly, bought from spendable points (500 = Tier 2 today; tiers scale up). Paying deducts from the spendable balance. Multipliers by tier: 2x / 3x / 4x on win point rewards.",
+        "Renews monthly or expires: if it lapses MID-competition, entry locks but the leaderboard keeps points earned within the window; re-up instantly restores entry.",
+        "Gates Earn Competitions. Level cost must stay attainable by play (daily, referral, giveaway) or it reads as a paywall instead of a boost.",
+        "Decided blind-spot: multipliers apply to base match rewards only (never stake returns) plus a per-day cap, so sinks (comp entries, cosmetics) drain faster than multipliers mint."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-004",
+      "title": "Earn Competitions + brand-sponsored events with prize escrow",
+      "stage": "fine-tuned",
+      "summary": "Skilled entry competitions where winners' rewards are free, with brand-sponsored prize pools locked in escrow so prizes always pay out.",
+      "tags": [
+        "competitions",
+        "brands",
+        "escrow"
+      ],
+      "notes": [
+        "Skilled entry (Active Tier gate + small spendable entry fee), NEVER pay-to-win: claiming won rewards is free (tennis analogy: pay a little to enter, win covers it, higher wins cover more).",
+        "Prizes from pooled entries + sponsor/brand top-ups + platform rake.",
+        "Brand events: PLATFORM 30% / WINNERS 70%. Prize LOCKED in a smart-contract escrow (PDAs on the ER program, same gfg-dice owner) BEFORE the event; winners claim by program logic automatically, so a brand can never promise and then stiff winners.",
+        "Proven Solana patterns: BracketChain escrow-vault PDAs, SkillOS permissionless sponsor pools, PYMSTR batch payouts. Build our own escrow PDA to avoid third-party custody.",
+        "Legal framing (mainnet): Ludo is a game of chance; keep entry predominantly earned-points + small, pay prizes in points, real value only via escrow with clear T&Cs; legal review before cash competitions."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-005",
+      "title": "Ads, purchases and monetization rails (no token, no app stores)",
+      "stage": "fine-tuned",
+      "summary": "Inline banners on the free tier only, higher tiers ad-free; players buy spendable points through the embedded wallet on-ramp with no Stripe or app stores.",
+      "tags": [
+        "ads",
+        "purchases",
+        "onramp"
+      ],
+      "notes": [
+        "ADS: inline banners ONLY (never popups/interstitials that break the game), shown on the free tier; higher Active Tiers are ad-free. Level 1 sees a low-fill banner.",
+        "Web2 first: Google AdSense H5 Game Ads (easiest start), then Ezoic / Playwire / AdinPlay for gaming-optimized fill; web3 (Adshares / BigAds) only when crypto-native demand exists.",
+        "Honest revenue reality: Nigeria is Tier-3 traffic (CPM $1-4). Ads are a support line, not the business. Real sustain = competition rake + brand sponsorships + cosmetics + point purchases.",
+        "PURCHASES: no Stripe, no app stores. Player funds the embedded Dynamic wallet via on-ramp (card/bank in local currency), buys spendable points in-app; points minted SERVER-SIDE only after a verified on-chain payment.",
+        "The buy-to-join moment (Ludo King 10k tournament with 2.5k banked) is the conversion driver; soften it early with referral / giveaway / social-share earn paths."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    }
+  ]
+}

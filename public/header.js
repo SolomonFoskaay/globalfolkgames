@@ -99,7 +99,8 @@
     // Admin-only links shown only to staff (admin / moderator wallets).
     const ADMIN_NAV = [
         { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' },
-        { label: 'Changelog (raw)', href: '/changelog/admin.html', match: 'changelog-admin' }
+        { label: 'Changelog (raw)', href: '/changelog/admin.html', match: 'changelog-admin' },
+        { label: 'Game Economics', href: '/changelog/economics.html', match: 'changelog-economics' }
     ];
 
     // Resolve the connected wallet the same way the changelog page does.
