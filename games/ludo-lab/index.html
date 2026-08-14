@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ludo (On-Chain Arena Lab) | GlobalFolkGames</title>
+
+    <!-- 1. Global styles (contains the header design) -->
+    <link rel="stylesheet" href="/style.css">
+
+    <!-- 2. Ludo-lab specific styles -->
+    <link rel="stylesheet" href="/games/ludo-lab/style.css">
+
+</head>
+<body>
+    <!-- ===== LOCAL LUDO HEADER ===== -->
+    <header class="ludo-header">
+        <a href="/index.html" class="back-btn">← Leave Arena</a>
+
+        <div class="ludo-header-center">
+            <span class="ludo-flag">🇮🇳</span>
+            <span class="ludo-title">Ludo Lab (On-Chain)</span>
+        </div>
+
+        <div class="ludo-local-points">
+            Local: <span id="local-points-display">0</span>
+        </div>
+    </header>
+
+    <div id="game-arena-wrapper">
+
+        <!-- Native Educational Text Display Line -->
+        <div id="ludo-log">Setup players below then click "Start Arena Match" to lock choices.</div>
+
+        <!-- Anti-Cheat Tournament Setup Panel Matrix -->
+        <div id="player-setup-panel">
+            <div class="setup-slot" style="color: #2ecc71;">
+                <span>GREEN</span>
+                <select id="type-green">
+                    <option value="you" selected>You</option>
+                    <option value="human">Human</option>
+                    <option value="computer">Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #f1c40f;">
+                <span>YELLOW</span>
+                <select id="type-yellow">
+                    <option value="you">You</option>
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #3498db;">
+                <span>BLUE</span>
+                <select id="type-blue">
+                    <option value="you">You</option>
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+            <div class="setup-slot" style="color: #e74c3c;">
+                <span>RED</span>
+                <select id="type-red">
+                    <option value="you">You</option>
+                    <option value="human">Human</option>
+                    <option value="computer" selected>Computer</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Keep layout dimensions at 600x600 grid pixels to restore graphic rendering -->
+        <canvas id="ludoCanvas" width="600" height="600"></canvas>
+
+        <!-- Persistent Control Center Layout -->
+        <div id="dice-container">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 8px;">
+                <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
+
+                <!-- Rearranged Mobile Action Dashboard Row Grid -->
+                <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
+                    <!-- 1. Dice Button First -->
+                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+
+                    <!-- 2. Start Match / Match Active Button Second -->
+                    <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Start Arena Match</button>
+
+                    <!-- 3. Pause/Resume Button Last -->
+                    <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
+                </div>
+            </div>
+
+            <div id="persistent-scores" style="display: flex; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222; box-sizing: border-box;">
+                <div>Dice 1: <span id="val-d1" style="color: #fff;">-</span></div>
+                <div>Dice 2: <span id="val-d2" style="color: #fff;">-</span></div>
+                <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
+            </div>
+
+            <!-- Protected Reset Button Layout Box Component -->
+            <button id="resetBtn" class="panel-control-btn" onclick="triggerManualArenaReset()">🔄 Reset Arena Match</button>
+        </div>
+    </div>
+
+    <!-- On-Screen Custom Modal Warning Dialogue Portal Box Container -->
+    <div id="custom-confirm-overlay">
+        <div class="confirm-modal-box">
+            <h3>⚠️ ABANDON MATCH?</h3>
+            <p>Are you sure you want to completely end this match? Your active board data and persistence cache tracking states will be wiped out permanently.</p>
+            <div class="confirm-action-row">
+                <button id="confirm-ok-btn" class="confirm-modal-btn" onclick="handleConfirmationCallback(true)">OK</button>
+                <button id="confirm-cancel-btn" class="confirm-modal-btn" onclick="handleConfirmationCallback(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global scripts (needed for points + auth) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+
+    <!-- Ludo lab scripts (duplicate arena build) -->
+    <script src="/games/ludo-lab/board.js"></script>
+    <script src="/games/ludo-lab/physics.js"></script>
+    <script src="/games/ludo-lab/mechanics/state/persistence.js"></script>
+    <script src="/games/ludo-lab/mechanics/state/local-points.js"></script>
+    <script src="/games/ludo-lab/mechanics/state/win-detection.js"></script>
+    <script src="/games/ludo-lab/mechanics/state/turn.js"></script>
+    <script src="/games/ludo-lab/mechanics/paths/index.js"></script>
+    <script src="/games/ludo-lab/mechanics/actions/dice.js"></script>
+    <script src="/games/ludo-lab/mechanics/actions/movement.js"></script>
+    <script src="/games/ludo-lab/mechanics/actions/capture.js"></script>
+    <script src="/games/ludo-lab/mechanics/actions/ai.js"></script>
+    <script type="module" src="/src/main.js"></script>
+
+    <script>
+        // Initialize the global header on the Ludo lab page
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.initGlobalHeader) {
+                window.initGlobalHeader();
+            }
+        });
+    </script>
+</body>
+</html>

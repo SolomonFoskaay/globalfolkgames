@@ -349,6 +349,13 @@ body {
     cursor: pointer;
 }
 
+/* On-chain arena variant of the launch button (links to the ludo-lab build) */
+.launch-btn.onchain {
+    margin-top: 8px;
+    background: var(--accent-purple);
+    color: #fff;
+}
+
 /* ===== AUTH MODAL ===== */
 .auth-modal {
     position: fixed;

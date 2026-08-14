@@ -29,6 +29,7 @@ function drawDashboardContent() {
             <h3>${campaign.title}</h3>
             <p>${campaign.desc}</p>
             <button class="launch-btn" onclick="goToLudoWorkspace()">Enter Game Arena</button>
+            <button class="launch-btn onchain" onclick="goToLudoLabWorkspace()">Enter Game Arena (Onchain)</button>
         `;
         outputBox.appendChild(cardElement);
     });
@@ -38,6 +39,12 @@ function goToLudoWorkspace() {
     // alert("Preping Game: Launching game now.... tab okay!");
     // Redirects user directly into the isolated Ludo game folder architecture
     window.location.href = "/games/ludo/index.html";
+}
+
+function goToLudoLabWorkspace() {
+    // Redirects into the duplicate on-chain arena build (ludo-lab) where the
+    // on-chain game implementation is developed.
+    window.location.href = "/games/ludo-lab/index.html";
 }
 
 // Click event loops for tab controls
