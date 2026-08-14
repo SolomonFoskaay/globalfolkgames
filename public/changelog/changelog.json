@@ -465,6 +465,26 @@
       "status": "planned",
       "approved": false,
       "added": "2026-08-14"
+    },
+    {
+      "title": "Platform economy: revenue-first build order (ledgers -> tier -> comps -> rails)",
+      "summary": "",
+      "details": [
+        "What is on-chain now (two aspects, both devnet + gasless, players hold 0 SOL): (1) DICE - every roll goes through MagicBlock VRF on the ER (human via the player's delegated dice PDA gfgplayerd signed by the session key; computers via the house sponsor key server-side). The roll result plus entropy seed land in the dice PDA and the roll tx signature is the verifiable proof. (2) REWARDS - a 1st-place win that had a valid on-chain roll fires record_points on the player's points PDA (gfgpoints); it stores total_points, award_count, last_points/last_reason/last_match_ref where last_match_ref = first 8 bytes of the winning roll sig, binding the reward to the exact roll. The record_points tx signature is the authoritative receipt. What stays off-chain: board state, token moves, turns, and Supabase profile totals (aggregation/fallback only).",
+        "On-chain points (Scope B, implemented + verified live on devnet): new PlayerPoints ledger account (seed gfgpoints) + initialize_points/delegate_points/record_points instructions on the same delegated gfg-dice program (program id unchanged).",
+        "Relay handleDelegate now creates AND delegates BOTH per-player PDAs (dice gfgplayerd + points gfgpoints) in one idempotent call; fresh onboarding = 4 steps ~0.0086 SOL; per-player spend cap default raised 0.005 -> 0.012 SOL (covers two PDAs with margin).",
+        "Client recordPoints(points, reason, matchRef): pure gasless ER write (session key signs, 0-SOL player) returning the receipt signature; matchRefFromSignature = first 8 bytes of the proof-roll sig as u64; fetchPointsPda reads the player's own ledger; POINT_REASONS.WIN_1ST=1.",
+        "win-detection: after the Supabase +100 1st-place award (proof roll gated), fires recordPoints(100, 1, matchRef) as a soft-fail mirror that never blocks the win UX, and logs the receipt explorer link.",
+        "Admin tracker lists each wallet's dice PDA AND points PDA (live delegation status); dashboard renders both. Profile page adds \"Your on-chain points ledger\" card (own account only, gasless read).",
+        "Supabase stays aggregation/fallback; the on-chain record is the permanent verifiable layer (re-sync on devnet wipe).",
+        "Scope C (parked): on-chain finish-order record so a full game result (1st..4th) is also committed, not just the reward points.",
+        "DECIDED (2026-08-14, econ-003): Active Tier ladder anchored to the 100-pt 1st-place win. Tier 1 free 1x. Tier 2 = 1,000 spendable/mo -> 2x. Tier 3 = 2,500 spendable/mo -> 3x. Tier 4 = 5,000 spendable/mo -> 4x. Multiplier applies ONLY to base match win points (100 -> 200/300/400), never stake returns / comp prizes / referral gifts. Per-day multiplier cap +1,000 boosted pts (about 10 extra 100-pt wins) so whales can't mint infinite points.",
+        "DECIDED (2026-08-14, econ-006): SEVEN revenue streams that decide the build order (revenue first, features second). (1) On-ramp: buy spendable points via embedded wallet, server-verified after on-chain payment (primary). (2) Brand event rake 30/70, prizes on-chain escrowed (SOL BracketChain/SkillOS pattern, our own escrow PDA on the ER program). (3) Active Tier monthly buy (the 2x/3x/4x ladder drains spendable back into the on-ramp). (4) Ads support line (free tier inline banners + opt-in rewarded video, Nigeria Tier-3 CPM $1-4). (5) Cosmetics store non-NFT (board themes / dice skins / avatar frames, spendable sink). (6) Stake mode rake (small fixed per pot, skilled-first, never pay-to-win). (7) Tournament licence (hosted community/brand events, fee or revenue share).",
+        "BUILD ORDER (revenue-first, econ-006 + econ-002/003/004): (S0) point ledgers exist today (lifetime + per-game; spendable balance is next). (S1) Active Tier + multipliers + spendable sink (the money engine). (S2) Earn competitions + brand escrow (30/70 rake). (S3) Monetization rails: on-ramp buy-flow + cosmetics store. (S4) Ads + rewarded video (support line, only after real traffic). (S5) Stake mode rake. (S6) Tournament licence. Each stage gates what we build; nothing is built before its revenue reason exists."
+      ],
+      "status": "planned",
+      "approved": false,
+      "added": "2026-08-14"
     }
   ]
 }

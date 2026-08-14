@@ -26,17 +26,24 @@ const ECON = join(ROOT, 'public', 'changelog', 'economics.json');
 
 const title = process.argv[2] || '';
 const argv = process.argv.slice(3);
-const arg = flag => {
-  const i = argv.indexOf(flag);
-  return i >= 0 ? argv[i + 1] : '';
+const argValues = flag => {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === flag && argv[i + 1]) out.push(argv[i + 1]);
+  }
+  return out;
 };
-const stage = (arg('--stage') || 'raw').toLowerCase();
-const summary = arg('--summary');
-const notesRaw = arg('--notes');
-const tags = arg('--tags');
+const single = flag => {
+  const v = argValues(flag);
+  return v.length ? v[v.length - 1] : '';
+};
+const stage = (single('--stage') || 'raw').toLowerCase();
+const summary = single('--summary');
+const notesRaw = argValues('--notes');
+const tags = single('--tags');
 
 if (!title) {
-  console.error('Usage: node scripts/econ-add.mjs "<title>" [--stage raw|fine-tuned] [--summary "..."] [--notes "a. b. c."] [--tags "a,b"]');
+  console.error('Usage: node scripts/econ-add.mjs "<title>" [--stage raw|fine-tuned] [--summary "..."] [--notes "..." --notes "..."] [--tags "a,b"]');
   process.exit(1);
 }
 if (!['raw', 'fine-tuned', 'ready'].includes(stage)) {
@@ -57,9 +64,11 @@ if (data.items.some(i => norm(i.title) === norm(title))) {
   process.exit(1);
 }
 
-const id = String(data.items.length + 1).padStart(3, '0');
+let id = 'econ-' + String(data.items.length + 1).padStart(3, '0');
+const dupId = id => data.items.some(i => (i.id || '').toLowerCase() === id.toLowerCase());
+while (dupId(id)) id = 'econ-' + String(parseInt(id.slice(5), 10) + 1).padStart(3, '0');
 const today = new Date().toISOString().slice(0, 10);
-const notes = notesRaw ? notesRaw.split(/\s*\.\s+/).filter(Boolean).map(s => s.replace(/\.$/, '')) : [];
+const notes = notesRaw.filter(Boolean).map(s => s.replace(/\.+$/, ''));
 
 data.items.push({
   id,
@@ -74,7 +83,7 @@ data.items.push({
 data.updated = today;
 writeFileSync(ECON, JSON.stringify(data, null, 2) + '\n');
 
-console.log(`\necon added (id econ-${id}, stage: ${stage}): "${title}"`);
+console.log(`\necon added (id ${id}, stage: ${stage}): "${title}"`);
 console.log(`summary : ${summary || '(none)'}`);
 console.log(`notes   : ${notes.length} line(s)`);
 console.log(`tags    : ${tags || '(none)'}`);

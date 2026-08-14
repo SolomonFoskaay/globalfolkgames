@@ -521,6 +521,20 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
         delegated to the ER validator. Supabase stays aggregation/fallback.
 - [ ] On-chain finish-order (Scope C, parked): commit full 1st..4th finish order
       on-chain (same delegated program), not just reward points.
+- [ ] **Settled economics (2026-08-14, consult econ workspace, DO NOT re-litigate):**
+      `public/changelog/economics.json` is the source of truth. econ-003 settled
+      the ACTIVE TIER ladder (Tier 1 free 1x; Tier 2 = 1,000 spendable/mo -> 2x;
+      Tier 3 = 2,500 spendable/mo -> 3x; Tier 4 = 5,000 spendable/mo -> 4x.
+      Multiplier on base match win points ONLY, per-day cap +1,000 boosted pts).
+      econ-006 settled SEVEN revenue streams deciding the build order:
+      (1) on-ramp spendable purchases (primary), (2) brand event rake 30/70 with
+      on-chain escrow, (3) Active Tier monthly buy, (4) ads support line,
+      (5) cosmetics store non-NFT, (6) stake mode rake, (7) tournament licence.
+      BUILD ORDER (revenue-first, roadmap item "Platform economy: revenue-first
+      build order"): S0 ledgers (today) -> S1 Active Tier + spendable sink ->
+      S2 comps + brand escrow -> S3 on-ramp + cosmetics -> S4 ads -> S5 stake ->
+      S6 licence. Each stage gates what we build on-chain; never build ahead of
+      its revenue reason.
 - [ ] **Analytics (LAST STEP, after rewards are stable):** add usage tracking.
       Google Analytics 4 (free) + gravity/event-based option for game events,
       hotjar/ms clarity (free) for session replays/funnels, and a free

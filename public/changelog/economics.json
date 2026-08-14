@@ -54,10 +54,13 @@
       ],
       "notes": [
         "LIFETIME RANK: permanent, earned from lifetime points + account age (example: 5,000 lifetime AND 1 month old -> Rank 2). Never drops, never lost. Unlocks O.G./legacy rewards and future specials.",
-        "ACTIVE TIER: temporary, monthly, bought from spendable points (500 = Tier 2 today; tiers scale up). Paying deducts from the spendable balance. Multipliers by tier: 2x / 3x / 4x on win point rewards.",
+        "ACTIVE TIER (SETTLED 2026-08-14): temporary, monthly, bought from spendable points. Deducts from the spendable balance. Ladder anchored to the 100-pt 1st-place win: Tier 1 free 1x, Tier 2 = 1,000 spendable/mo at 2x, Tier 3 = 2,500 spendable/mo at 3x, Tier 4 = 5,000 spendable/mo at 4x.",
+        "Multiplier math check (why these numbers): avg points per 4P game (100/50/20/10 even split) = 45; a casual player wins ~1 in 4 games, so ~2-3 games per win -> Tier 2 (1,000) is reachable by a few evenings of play a month, Tier 3 (2,500) by a steady player, Tier 4 (5,000) by a serious player or a purchase. That is a boost, not a paywall.",
+        "Multiplier applies to base match win points only (100 -> 200 / 300 / 400 at 2x/3x/4x), NEVER to stake returns, comp prizes or referral gifts.",
+        "PER-DAY MULTIPLIER CAP: at most +1,000 boosted points/day from the multiplier (about 10 extra 100-pt wins). Stops whales from minting infinite points; keeps sinks (comp entries, cosmetics) draining faster than multipliers mint.",
         "Renews monthly or expires: if it lapses MID-competition, entry locks but the leaderboard keeps points earned within the window; re-up instantly restores entry.",
         "Gates Earn Competitions. Level cost must stay attainable by play (daily, referral, giveaway) or it reads as a paywall instead of a boost.",
-        "Decided blind-spot: multipliers apply to base match rewards only (never stake returns) plus a per-day cap, so sinks (comp entries, cosmetics) drain faster than multipliers mint."
+        "Decided blind-spot: multipliers apply to base match rewards only (never stake returns) plus the per-day cap above, so sinks (comp entries, cosmetics) drain faster than multipliers mint."
       ],
       "added": "2026-08-14",
       "updated": "2026-08-14"
@@ -98,6 +101,28 @@
         "Honest revenue reality: Nigeria is Tier-3 traffic (CPM $1-4). Ads are a support line, not the business. Real sustain = competition rake + brand sponsorships + cosmetics + point purchases.",
         "PURCHASES: no Stripe, no app stores. Player funds the embedded Dynamic wallet via on-ramp (card/bank in local currency), buys spendable points in-app; points minted SERVER-SIDE only after a verified on-chain payment.",
         "The buy-to-join moment (Ludo King 10k tournament with 2.5k banked) is the conversion driver; soften it early with referral / giveaway / social-share earn paths."
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-006",
+      "title": "Seven concrete revenue streams (the platform's sustain model)",
+      "stage": "fine-tuned",
+      "summary": "Seven honest ways the platform earns money to keep the games free for players. This list decides the build order: revenue first, features second.",
+      "notes": [
+        "Stream 1, ON-RAMP (primary): players top up real money via the embedded Dynamic wallet on-ramp and buy spendable points server-side after a verified on-chain payment. Every other stream drains spendable, which recycles demand back into this one. The whole economy hinges on a trustworthy buy-flow.",
+        "Stream 2, BRAND EVENT RAKE 30/70: brands sponsor competitions; income = entry pools + brand fees. Platform keeps 30%, winners get 70%, prizes escrowed on-chain before the event so payouts are guaranteed.",
+        "Stream 3, ACTIVE TIER MONTHLY BUY: 1,000 / 2,500 / 5,000 spendable per month for 2x / 3x / 4x win multipliers. A spendable drain that funnels players back to the on-ramp; a future real-money subscription once payment rails mature.",
+        "Stream 4, AD NETWORKS (support line, honest): inline banners on the free tier + opt-in rewarded video for a few bonus points; higher tiers are ad-free. Nigeria is Tier-3 CPM $1-4: treat as support, never the business.",
+        "Stream 5, COSMETICS STORE (non-NFT): board themes, dice skins, avatar frames bought with spendable points. Pure sink with no token/NFT so no crash label; drains spendable and feeds the on-ramp.",
+        "Stream 6, STAKE MODE RAKE (optional, small): players stake spendable points in competitive matches, platform takes a small fixed rake per pot, winners claim the rest. Skilled-first, never pay-to-win.",
+        "Stream 7, TOURNAMENT LICENCE: communities and brands run their own hosted GlobalFolkGames events; platform charges a setup/hosting fee in spendable points or a small revenue share."
+      ],
+      "tags": [
+        "revenue",
+        "monetization",
+        "sustain"
       ],
       "added": "2026-08-14",
       "updated": "2026-08-14"
