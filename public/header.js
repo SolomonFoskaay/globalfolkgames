@@ -52,31 +52,49 @@
     // ---------- Menu items ----------
     // Essential links every visitor needs; admin-only items are shown when the
     // connected wallet is staff.
-    const NAV_SECTIONS = [
-        {
-            heading: 'Play',
-            items: [
-                { label: '🇳🇬 Ludo', href: '/games/ludo/', match: 'ludo' },
-                { label: 'Home', href: '/', match: 'home' }
-            ]
-        },
-        {
-            heading: 'Discover',
-            items: [
-                { label: 'What’s New', href: '/changelog/', match: 'changelog' },
-                { label: 'About', href: '/about/', match: 'about' },
-                { label: 'Forum', href: '/forum/', match: 'forum' },
-                { label: 'Support', href: '/support/', match: 'support' },
-                { label: 'Contact', href: '/contact/', match: 'contact' }
-            ]
-        },
-        {
-            heading: 'Account',
-            items: [
-                { label: 'My Profile', href: '/profile/', match: 'profile' }
-            ]
-        }
-    ];
+    // The Ludo label/flag comes from the central games registry so the origin
+    // stays correct in one place as more games ship.
+    let gameRegistry = null;
+    function loadGameRegistry() {
+        return fetch('/games/registry.json', { cache: 'no-store' })
+            .then(res => (res.ok ? res.json() : null))
+            .then(data => { gameRegistry = data; })
+            .catch(() => { gameRegistry = null; });
+    }
+    function ludoNavLabel() {
+        const g = gameRegistry && gameRegistry.games
+            ? gameRegistry.games.find(x => x.id === 'ludo')
+            : null;
+        if (g && g.origin && g.origin.flag) return `${g.origin.flag} ${g.name}`;
+        return '🇮🇳 Ludo';
+    }
+    function NAV_SECTIONS() {
+        return [
+            {
+                heading: 'Play',
+                items: [
+                    { label: ludoNavLabel(), href: '/games/ludo/', match: 'ludo' },
+                    { label: 'Home', href: '/', match: 'home' }
+                ]
+            },
+            {
+                heading: 'Discover',
+                items: [
+                    { label: 'What’s New', href: '/changelog/', match: 'changelog' },
+                    { label: 'About', href: '/about/', match: 'about' },
+                    { label: 'Forum', href: '/forum/', match: 'forum' },
+                    { label: 'Support', href: '/support/', match: 'support' },
+                    { label: 'Contact', href: '/contact/', match: 'contact' }
+                ]
+            },
+            {
+                heading: 'Account',
+                items: [
+                    { label: 'My Profile', href: '/profile/', match: 'profile' }
+                ]
+            }
+        ];
+    }
 
     // Admin-only links shown only to staff (admin / moderator wallets).
     const ADMIN_NAV = [
@@ -127,7 +145,7 @@
                     <button id="gfg-drawer-close" class="gfg-drawer-close" aria-label="Close menu">×</button>
                 </div>
                 <nav class="gfg-drawer-nav" id="gfg-drawer-nav">
-                    ${NAV_SECTIONS.map(sec => `
+                    ${NAV_SECTIONS().map(sec => `
                         <div class="gfg-drawer-section">
                             <div class="gfg-drawer-heading">${sec.heading}</div>
                             <ul>
@@ -333,6 +351,7 @@
     // Public function used by every page
     window.initGlobalHeader = function (options) {
         renderHeader(options || {});
+        loadGameRegistry(); // keeps nav labels in sync with the games registry
     };
 
 })();

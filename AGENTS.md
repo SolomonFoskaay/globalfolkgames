@@ -458,7 +458,8 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - [x] **Roadmap seeded with the user-facing USP:** Planned tab now carries 7
       exciting, user-safe items players look forward to — Full on-chain gaming,
       Earn competitions, Referral program, Community forum, Giveaways & events,
-      More native games from the world (current: Nigeria Ludo live, Ayo Olopon
+      More native games from the world (current: Ludo live, origin corrected to
+      India via Pachisi, popular in Nigeria; Ayo Olopon (Nigeria native)
       upcoming), Mainnet launch. Purely marketing/user-relevant — zero security
       or technical downside detail in the public payload.
 - [x] **Approval gate live:** new roadmap items default to **admin-only**

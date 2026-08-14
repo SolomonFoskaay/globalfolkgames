@@ -293,10 +293,10 @@
     },
     {
       "title": "More native games from the world",
-      "summary": "GlobalFolkGames is expanding — more traditional games from more countries, starting with Nigeria (Ludo is live, Ayo Olopon coming) and more announced soon.",
+      "summary": "GlobalFolkGames is expanding, with more folk games from more countries. Ludo (born in India from the ancient game Pachisi, loved worldwide) is live, Nigeria's Ayo Olopon is coming, and more are announced soon.",
       "details": [
         "Player-facing milestone item. No security/technical detail here.",
-        "More native games from multiple countries. Current: Nigeria — Ludo ludo (shipped). Upcoming: Nigeria — Ayo Olopon. More countries' games to be announced as confirmed."
+        "More games from multiple countries, each tagged with its TRUE origin plus the countries where it is most popular (central registry: public/games/registry.json). Current: Ludo (origin India, via Pachisi; popular in Nigeria, Ghana, UK, US and more, shipped). Upcoming: Nigeria — Ayo Olopon. More countries' games to be announced as confirmed."
       ],
       "status": "planned",
       "added": "2026-08-13",

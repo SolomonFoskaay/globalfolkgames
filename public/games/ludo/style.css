@@ -233,6 +233,17 @@ canvas {
     font-size: 1.1rem;
 }
 
+/* One-line folk-game heritage strip under the local header. Keeps the
+   corrected origin prominent and names where the game is most loved. */
+.ludo-origin-line {
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    color: #9b59b6;
+    background: #14141c;
+    border-bottom: 1px solid #2c2c3a;
+    line-height: 1.4;
+}
+
 .ludo-local-points {
     background: #2a2a3a;
     color: #9b59b6;
