@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Project ops | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .ops-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .ops-card {
+            background: #101014;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .ops-card .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .ops-card .v { color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px; word-break: break-all; }
+        .ops-card .v.small { font-size: 0.82rem; }
+        .ops-card .v.ok { color: #2ecc71; }
+        .ops-card .v.warn { color: #f39c12; }
+        .ops-card .v.bad { color: #e74c3c; }
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .raw-box {
+            background: #0d0d12;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 0.78rem;
+            color: #9bd4ff;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 380px;
+            overflow: auto;
+        }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+
+        .gas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
+        .gas-cell { background: #101014; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 12px; }
+        .gas-cell-wide { grid-column: 1 / -1; }
+        .gas-cell .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+        .gas-sub { color: #888; font-size: 0.78rem; margin: 8px 0 4px; }
+        .gas-note { color: #999; font-size: 0.78rem; line-height: 1.5; margin-top: 6px; }
+        .gas-big { font-size: 1.4rem; font-weight: 800; color: #fff; margin-top: 6px; }
+        .gas-unit { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+        .gas-battery { position: relative; height: 26px; border: 2px solid #2a2a2a; border-radius: 8px; margin-top: 8px; background: #0d0d12; overflow: hidden; }
+        .gas-battery.full { border-color: #2ecc71; box-shadow: 0 0 10px rgba(46,204,113,0.35); }
+        .gas-battery.low { border-color: #f39c12; box-shadow: 0 0 10px rgba(243,156,18,0.35); }
+        .gas-battery.critical { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231,76,60,0.45); animation: gas-pulse 1.2s ease-in-out infinite; }
+        .gas-battery-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+        .gas-battery.full .gas-battery-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+        .gas-battery.low .gas-battery-fill { background: linear-gradient(90deg, #e67e22, #f39c12); }
+        .gas-battery.critical .gas-battery-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+        .gas-battery-txt { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 0.72rem; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        @keyframes gas-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .gas-bar-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.78rem; }
+        .gas-bar-label { flex: 0 0 52px; color: var(--muted); text-align: right; }
+        .gas-bar-track { flex: 1; height: 12px; background: #1b1b23; border-radius: 6px; overflow: hidden; }
+        .gas-bar-fill { height: 100%; border-radius: 6px; min-width: 2px; }
+        .gas-bar-val { flex: 0 0 84px; color: #ccc; font-size: 0.74rem; }
+        .gas-legend { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.8rem; }
+        .gas-dot { width: 10px; height: 10px; border-radius: 4px; flex-shrink: 0; }
+        .gas-legend-label { flex: 1; color: #ddd; }
+        .gas-legend-val { color: var(--muted); font-size: 0.76rem; }
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 6px; }
+        .mini-table th, .mini-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #23232b; }
+        .mini-table th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .mini-table td { color: #ddd; }
+        .mini-table .mono { font-family: monospace; font-size: 0.78rem; color: #9bd4ff; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content" style="max-width:780px;">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>⚙️ Project ops</h2>
+            <p class="auth-hint" style="margin-top:8px;">Sponsor wallet, spend ledger + caps, version, git ref, roadmap counts and the on-chain inventory in detail.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Ops cards <span class="last-checked" id="ops-checked"></span></h3>
+            <div id="dash-ops-grid"><p class="empty">Loading…</p></div>
+            <button class="refresh-btn" id="ops-refresh">↻ Re-probe</button>
+        </section>
+
+        <section class="game-card" style="text-align:left; border:1px solid #f39c12;">
+            <h3>⛽ Gas reserve &amp; spend analytics</h3>
+            <div id="dash-gas-grid"><p class="empty">Loading…</p></div>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Raw probe payload</h3>
+            <p class="muted-note">Full JSON returned by the server-side probe (endpoint health + accounts tracker + ops). Useful for debugging a specific service.</p>
+            <div class="raw-box" id="ops-raw"><p class="empty">Loading…</p></div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'ops',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+
+            const dc = window.DashCore;
+            const rawEl = document.getElementById('ops-raw');
+            const checkedEl = document.getElementById('ops-checked');
+            const btn = document.getElementById('ops-refresh');
+
+            async function probe() {
+                btn.disabled = true;
+                document.getElementById('dash-ops-grid').innerHTML = '<p class="empty">Loading…</p>';
+                document.getElementById('dash-gas-grid').innerHTML = '<p class="empty">Loading…</p>';
+                try {
+                    const res = await fetch('/api/endpoints', { cache: 'no-store' });
+                    const data = await res.json();
+                    if (checkedEl && data.generatedAt) checkedEl.textContent = '· checked ' + new Date(data.generatedAt).toLocaleTimeString() + (data.environment ? ' (' + data.environment + ')' : '');
+                    dc.renderOps(data, document.getElementById('dash-ops-grid'));
+                    dc.renderGas(data, document.getElementById('dash-gas-grid'));
+                    rawEl.innerHTML = escJson(data);
+                } catch (e) {
+                    document.getElementById('dash-ops-grid').innerHTML = '<p class="empty">Ops unavailable (' + dc.esc(e.message) + ').</p>';
+                    document.getElementById('dash-gas-grid').innerHTML = '<p class="empty">Gas analytics unavailable.</p>';
+                    rawEl.innerHTML = '<p class="empty">Raw unavailable.</p>';
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            // Pretty-print the probe JSON safely.
+            window.escJson = (obj) => {
+                try { return window.DashCore.esc(JSON.stringify(obj, null, 2)); }
+                catch (e) { return 'could not serialize'; }
+            };
+
+            btn.addEventListener('click', probe);
+            probe();
+        });
+    </script>
+</body>
+</html>

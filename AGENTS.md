@@ -412,6 +412,25 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       8/8 ok + relay HTTP route via self-terminating harness. Deploy note:
       Vercel function has no writable fs, so the file-ledger/player list is
       per-instance (fine on devnet; durable store is the mainnet security item).
+- [x] **Gas analytics dashboard (built, verified):** the spend ledger gained a
+      per-spend **event log** (`ledger.events`; auto-migrates old totals into
+      one synthetic onboarding event each) plus `recordSpend(player, lamports,
+      {category, steps})` so the probe can report *what* burns the reserve.
+      `scripts/endpoints-probe.mjs` now folds `ops.ledger.analytics` into
+      `/api/endpoints`: period buckets (day/week/month from the event log),
+      spend-by-category (onboarding vs house), top spenders, burn rate (7d
+      avg), battery (sponsor balance vs `GFG_GAS_TANK_SOL` default 100,
+      tiers full/low/critical with an animated CSS meter), and forecasts
+      (`gasForecast`): 1/5/25 SOL → fresh players funded + months of runway
+      at the current burn. `dash-core.js renderGas()` renders the feed
+      (battery, inline-SVG donut for categories, bar rows per period, top
+      players, forecast cards) on `dashboard/` home + `ops.html`. One-key
+      devnet-airdrop "refill" was prototyped then REMOVED at the owner's
+      request: the sponsor wallet IS the gas tank (same deployer keypair), so
+      no separate reserve exists to top up and the owner refills manually by
+      sending SOL to the sponsor pubkey whenever the battery looks low.
+      Verified live: analytics present in the probe payload; `npm run build`
+      green.
 - [ ] Vercel deploy (near-done): domain `https://globalfolkgames.fun` live
       (personal repo + free plan works). `GFG_SPONSOR_KEYPAIR` env set (raw
       contents of `~/.config/solana/id.json`). Dynamic CORS origin added

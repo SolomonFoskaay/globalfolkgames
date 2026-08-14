@@ -154,8 +154,15 @@ export async function handleDelegate(playerPubkey) {
     const balanceAfter = await retry(() => conn.getBalance(sponsor.publicKey));
     const spent = Math.max(0, (balanceBefore ?? balanceAfter) - balanceAfter);
     if (spent > 0) {
-      recordSpend(player.toBase58(), spent);
-      console.log(`[relay] sponsored ${player.toBase58()}: ${(spent / 1e9).toFixed(6)} SOL (+${steps.length} step(s))`);
+      // Category distinguishes player onboarding from the house's own setup
+      // (the roll relay delegates the house dice account through this same
+      // handler), so the dashboard can show which activity burns the reserve.
+      const isHouse = player.equals(sponsor.publicKey);
+      recordSpend(player.toBase58(), spent, {
+        category: isHouse ? 'house' : 'onboarding',
+        steps: steps.length,
+      });
+      console.log(`[relay] sponsored ${player.toBase58()}: ${(spent / 1e9).toFixed(6)} SOL (+${steps.length} step(s), ${isHouse ? 'house' : 'onboarding'})`);
     }
   }
 

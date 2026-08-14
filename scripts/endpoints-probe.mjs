@@ -32,7 +32,7 @@ import { PublicKey, Keypair } from '@solana/web3.js';
 import './load-env.mjs';
 import { routerUrl } from '../src/gfg-rpc.js';
 import { createConnection, getDelegationStatus } from '../src/gfg-rpc.js';
-import { spendCaps, loadLedger, spendTotals } from './spend-ledger.mjs';
+import { spendCaps, loadLedger, spendTotals, spendAnalytics, gasForecast } from './spend-ledger.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -314,6 +314,17 @@ export async function runProbe() {
     const players = Object.entries(all.players || {})
       .map(([pubkey, v]) => ({ pubkey, spentSol: +((v.spent || 0) / 1e9).toFixed(5), lastSpentAt: v.lastSpentAt || null }))
       .sort((a, b) => b.spentSol - a.spentSol);
+
+    // Gas analytics over the spend-event log: period buckets, categories
+    // (what activity burns the reserve), top consumers, forecasts.
+    const analytics = spendAnalytics();
+    const bankSol = sponsor && sponsor.balanceSol != null ? sponsor.balanceSol : 0;
+    const tankSol = +(analytics.tank.tankLamports / 1e9).toFixed(2);
+    const batteryPct = tankSol > 0 ? Math.max(0, Math.min(100, Math.round(100 * bankSol / tankSol))) : 0;
+    const forecast1 = gasForecast(1 * 1e9);
+    const forecast5 = gasForecast(5 * 1e9);
+    const forecast25 = gasForecast(25 * 1e9);
+
     ledger = {
       playersCount: totals.players,
       globalSpentSol: totals.globalSpentSol,
@@ -321,6 +332,25 @@ export async function runProbe() {
       globalCapSol: +(caps.globalLamports / 1e9).toFixed(3),
       reserveSol: +(caps.reserveLamports / 1e9).toFixed(3),
       players,
+      analytics: {
+        periods: analytics.periods,
+        categories: analytics.categories,
+        topPlayers: analytics.topPlayers,
+        avgOnboardingSol: analytics.avgOnboardingSol,
+        playersPerSol: analytics.playersPerSol,
+        burnPerDaySol: analytics.burnPerDaySol,
+        battery: {
+          balanceSol: +(bankSol).toFixed(3),
+          tankSol,
+          pct: batteryPct,
+          tier: batteryPct >= 50 ? 'full' : batteryPct >= 25 ? 'low' : 'critical',
+        },
+        forecasts: {
+          '1 SOL': { playersFunded: forecast1.playersFunded, runwayMonths: forecast1.runwayMonths },
+          '5 SOL': { playersFunded: forecast5.playersFunded, runwayMonths: forecast5.runwayMonths },
+          '25 SOL': { playersFunded: forecast25.playersFunded, runwayMonths: forecast25.runwayMonths },
+        },
+      },
     };
   } catch (e) {
     ledger = { error: e.message };

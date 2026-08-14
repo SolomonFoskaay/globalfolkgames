@@ -16,7 +16,15 @@ export default defineConfig({
         support: './support/index.html',
         forum: './forum/index.html',
         profile: './profile/index.html',
-        dashboard: './dashboard/index.html'
+        'profile-points': './profile/points.html',
+        'profile-ledger': './profile/ledger.html',
+        'profile-activity': './profile/activity.html',
+        dashboard: './dashboard/index.html',
+        'dashboard-ops': './dashboard/ops.html',
+        'dashboard-endpoints': './dashboard/endpoints.html',
+        'dashboard-activity': './dashboard/activity.html',
+        'dashboard-accounts': './dashboard/accounts.html',
+        'dashboard-release': './dashboard/release.html'
       }
     }
   },

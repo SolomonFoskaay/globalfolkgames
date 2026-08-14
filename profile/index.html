@@ -8,37 +8,63 @@
 </head>
 <body>
 
-    <main class="mobile-container">
+    <main class="mobile-container dash-rail-content dash-home">
         <section class="onboarding-billboard">
             <h2>My Profile 👤</h2>
             <p class="auth-hint" id="profile-status" style="margin-top:8px;">Checking account…</p>
         </section>
 
-        <section class="game-card" id="profile-card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Points &amp; Level</h3>
-                <span id="profile-pts" style="font-size:1.4rem; color:#f39c12; font-weight:800;">0</span>
+        <div class="dash-grid">
+
+        <section class="game-card dash-section" id="profile-card">
+            <div class="dash-fold-head">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <h3>Points &amp; Level</h3>
+                    <span id="profile-pts" style="font-size:1.4rem; color:#f39c12; font-weight:800;">0</span>
+                </div>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
             </div>
-            <p id="profile-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
-            <p id="profile-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
+            <div class="dash-fold-summary">Your points, level and lifetime total. Full view: <a href="/profile/points.html" style="color:#f39c12;">points.html →</a></div>
+            <div class="dash-fold-body">
+                <p id="profile-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
+                <p id="profile-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
+            </div>
         </section>
 
-        <section class="game-card" id="profile-wallet-card" hidden>
-            <h3>Blockchain identity</h3>
-            <p id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all;">—</p>
-            <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
+        <section class="game-card dash-section" id="profile-wallet-card">
+            <div class="dash-fold-head">
+                <h3>Blockchain identity</h3>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
+            </div>
+            <div class="dash-fold-summary">Your wallet address, verifiable on-chain.</div>
+            <div class="dash-fold-body">
+                <p id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all;">—</p>
+                <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
+            </div>
         </section>
 
-        <section class="game-card" id="profile-ledger-card" hidden>
-            <h3>🏆 Your on-chain points ledger</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every reward you win is also written to a tamper-proof ledger on the Solana devnet (free for you to write). This is your own account, verified on-chain — not just a server record.</p>
-            <div id="profile-ledger"><p class="empty">Check your ledger…</p></div>
+        <section class="game-card dash-section" id="profile-ledger-card">
+            <div class="dash-fold-head">
+                <h3>🏆 Your on-chain points ledger</h3>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
+            </div>
+            <div class="dash-fold-summary">The tamper-proof on-chain record of your rewards. Full view: <a href="/profile/ledger.html" style="color:#f39c12;">ledger.html →</a></div>
+            <div class="dash-fold-body">
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every reward you win is also written to a tamper-proof ledger on the Solana devnet (free for you to write). This is your own account, verified on-chain — not just a server record.</p>
+                <div id="profile-ledger"><p class="empty">Check your ledger…</p></div>
+            </div>
         </section>
 
-        <section class="game-card" id="profile-ontx-card" hidden>
-            <h3>🔗 Your on-chain activity</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
-            <div id="profile-ontx-list"><p class="empty">Loading…</p></div>
+        <section class="game-card dash-section" id="profile-ontx-card">
+            <div class="dash-fold-head">
+                <h3>🔗 Your on-chain activity</h3>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
+            </div>
+            <div class="dash-fold-summary">Every roll and win reward, verifiable on-chain. Full view: <a href="/profile/activity.html" style="color:#f39c12;">activity.html →</a></div>
+            <div class="dash-fold-body">
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
+                <div id="profile-ontx-list"><p class="empty">Loading…</p></div>
+            </div>
         </section>
 
         <section class="game-card" style="text-align:center;">
@@ -49,6 +75,8 @@
             <h3>Your play</h3>
             <p><a href="/games/ludo/" style="color:#f39c12;">Play Ludo →</a></p>
         </section>
+
+        </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -56,111 +84,40 @@
     <script src="/tamper-guard.js"></script>
     <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
-    <script src="/header.js"></script>
+    <script src="/profile-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/header.js"></script>
+    <script src="/dash-nav.js"></script>
     <script type="module" src="/src/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.initGlobalHeader) window.initGlobalHeader();
 
+            window.GFG_DASH_NAV.render({
+                brand: '👤 Profile',
+                active: 'home',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Profile home', href: '/profile/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'points', label: '⭐ Points & level', href: '/profile/points.html' },
+                        { key: 'ledger', label: '🏆 On-chain ledger', href: '/profile/ledger.html' },
+                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                    ]},
+                ]
+            });
+            window.ProfileCore && window.ProfileCore.bindFolds && window.ProfileCore.bindFolds();
+
             const statusEl = document.getElementById('profile-status');
             const ptsEl = document.getElementById('profile-pts');
             const levelEl = document.getElementById('profile-level');
             const lifetimeEl = document.getElementById('profile-lifetime');
-            const walletCard = document.getElementById('profile-wallet-card');
             const walletEl = document.getElementById('profile-wallet');
             const walletLinkEl = document.getElementById('profile-wallet-link');
-            const ledgerCard = document.getElementById('profile-ledger-card');
-            const ledgerEl = document.getElementById('profile-ledger');
-            const ontxCard = document.getElementById('profile-ontx-card');
             const ontxList = document.getElementById('profile-ontx-list');
+            const ledgerEl = document.getElementById('profile-ledger');
             const signinBtn = document.getElementById('profile-signin-btn');
-
-            const esc = s => String(s == null ? '' : s)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-            async function loadOnchainActivity() {
-                if (!window.supabaseClient || !window.currentUser) return;
-                try {
-                    const { data, error } = await window.supabaseClient
-                        .from('point_transactions')
-                        .select('game_id, points, reason, match_id, created_at')
-                        .eq('user_id', window.currentUser.id)
-                        .not('match_id', 'is', null)
-                        .order('created_at', { ascending: false })
-                        .limit(8);
-                    if (error) throw new Error(error.message);
-                    if (!data || !data.length) {
-                        ontxList.innerHTML = '<p class="empty">No on-chain activity linked to your account yet. Play a match and win to see your verifiable rolls here.</p>';
-                        return;
-                    }
-                    const rows = data.map(t => {
-                        const game = t.game_id === 'ludo' ? 'Ludo' : esc(t.game_id);
-                        const reason = t.reason === 'win' ? '🏆 Match won'
-                            : t.reason === 'tamper' ? '⚠ Tamper notice'
-                            : esc(t.reason || 'Activity');
-                        const when = t.created_at ? '<span style="color:#666;font-size:0.75rem;"> ' + esc(t.created_at.slice(0, 16).replace('T', ' ')) + '</span>' : '';
-                        const link = window.gfgExplorer ? window.gfgExplorer.txLink(t.match_id) : esc(t.match_id);
-                        return `<div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <div style="font-weight:600;">${game} · ${reason}${t.points ? ' <span style="color:#f39c12;">(+' + esc(t.points) + ' pts)</span>' : ''}</div>
-                            <div style="margin-top:4px;">${link}${when}</div>
-                            <div style="color:#555;font-size:0.72rem; word-break:break-all; margin-top:2px;">${esc(t.match_id)}</div>
-                        </div>`;
-                    }).join('');
-                    ontxList.innerHTML = rows;
-                } catch (e) {
-                    ontxList.innerHTML = '<p class="empty">Could not load on-chain activity (' + esc(e.message) + ').</p>';
-                }
-            }
-
-            async function loadOnchainLedger() {
-                const magic = window.magicblockDice;
-                if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
-                    ledgerEl.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
-                    return;
-                }
-                const pda = magic.pointsPda();
-                if (!pda) {
-                    ledgerEl.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
-                    return;
-                }
-                try {
-                    const ledger = await magic.fetchPointsPda();
-                    if (!ledger) {
-                        ledgerEl.innerHTML = '<p class="empty">Your ledger account has no rewards yet. Win a match and your +100 reward is written here permanently.</p>';
-                        return;
-                    }
-                    const lastTs = ledger.lastRecordedTs
-                        ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
-                    const reasonLabel = ledger.lastReason === 1 ? 'Match won (1st place)'
-                        : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—');
-                    const pdaLink = window.gfgExplorer
-                        ? window.gfgExplorer.accountLink(pda) : esc(pda);
-                    ledgerEl.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <span style="color:var(--muted);">Total on-chain points</span>
-                            <b style="color:#f39c12; font-size:1.15rem;">${ledger.totalPoints}</b>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <span style="color:var(--muted);">Rewards recorded</span>
-                            <b>${ledger.awardCount}</b>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <span style="color:var(--muted);">Last award</span>
-                            <b>+${ledger.lastPoints} <span style="color:#666;font-size:0.78rem;">(${esc(reasonLabel)})</span></b>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <span style="color:var(--muted);">Last recorded</span>
-                            <b style="font-size:0.82rem;">${esc(lastTs)}</b>
-                        </div>
-                        <div style="padding:8px 0;">
-                            <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours)</span>
-                            <div style="margin-top:4px;">${pdaLink}</div>
-                        </div>`;
-                } catch (e) {
-                    ledgerEl.innerHTML = '<p class="empty">Could not read your ledger (' + esc(e.message) + ').</p>';
-                }
-            }
 
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
@@ -179,11 +136,8 @@
                     if (window.gfgExplorer) {
                         walletLinkEl.innerHTML = 'View this wallet on-chain: ' + window.gfgExplorer.accountLink(w);
                     }
-                    walletCard.hidden = false;
-                    ontxCard.hidden = false;
-                    ledgerCard.hidden = false;
-                    loadOnchainActivity();
-                    loadOnchainLedger();
+                    window.ProfileCore.loadOnchainActivity(ontxList, { full: false });
+                    window.ProfileCore.loadPointsLedger(ledgerEl);
                 }
                 signinBtn.hidden = true;
             }

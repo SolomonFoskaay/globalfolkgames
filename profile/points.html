@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Points &amp; Level | Profile | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>⭐ Points &amp; Level</h2>
+            <p class="auth-hint" id="points-status" style="margin-top:8px;">Checking account…</p>
+        </section>
+
+        <section class="game-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Current points</h3>
+                <span id="points-total" style="font-size:1.6rem; color:#f39c12; font-weight:800;">0</span>
+            </div>
+            <p id="points-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
+            <p id="points-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
+            <p style="color:var(--muted); font-size:0.8rem; margin-top:10px; line-height:1.5;">Points come from winning matches with a verifiable on-chain roll. A 1st-place finish with a valid roll earns +100 points, recorded both here and on-chain.</p>
+        </section>
+
+        <section class="game-card">
+            <button id="points-signin-btn" class="auth-btn primary" hidden>Sign in</button>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            window.GFG_DASH_NAV.render({
+                brand: '👤 Profile',
+                active: 'points',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Profile home', href: '/profile/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'points', label: '⭐ Points & level', href: '/profile/points.html' },
+                        { key: 'ledger', label: '🏆 On-chain ledger', href: '/profile/ledger.html' },
+                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                    ]},
+                ]
+            });
+
+            const statusEl = document.getElementById('points-status');
+            const totalEl = document.getElementById('points-total');
+            const levelEl = document.getElementById('points-level');
+            const lifetimeEl = document.getElementById('points-lifetime');
+            const signinBtn = document.getElementById('points-signin-btn');
+
+            function render(signedIn) {
+                if (!signedIn || !window.currentProfile) {
+                    statusEl.textContent = 'Sign in to see your points and level.';
+                    signinBtn.hidden = false;
+                    return;
+                }
+                const p = window.currentProfile;
+                statusEl.textContent = 'Signed in — welcome back!';
+                totalEl.textContent = p.global_points || 0;
+                levelEl.textContent = 'Level ' + (p.level || 0);
+                lifetimeEl.textContent = 'Lifetime points: ' + (p.lifetime_points || 0);
+                signinBtn.hidden = true;
+            }
+
+            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
+
+            render(!!window.currentUser);
+            if (window.refreshAuthHeader) {
+                window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+            }
+        });
+    </script>
+</body>
+</html>

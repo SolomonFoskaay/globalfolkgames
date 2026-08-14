@@ -489,3 +489,238 @@ body {
     white-space: nowrap;
   }
 }
+
+/* ===== DASH NAV RAIL (left side, opposite the global drawer) =====
+   Glassmorphic vertical navigation for the dashboard / profile page groups.
+   Same language as the drawer: the rail itself is TRANSPARENT (no blur, the
+   page behind stays crisp) and every item is its own solid dark card. Sits on
+   the LEFT so it never collides with the global header menu (which opens from
+   the right). */
+.dash-rail {
+  position: fixed;
+  top: var(--gfg-header-h, 48px);
+  left: 0;
+  bottom: 0;
+  width: min(230px, 74vw);
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px 20px;
+  overflow-y: auto;
+  background: transparent;
+  transform: translateX(-105%);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.dash-rail.open { transform: translateX(0); }
+
+/* Mobile: rail overlays from the left; body is nudged only on wide screens. */
+.dash-rail-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease;
+  z-index: 949;
+}
+.dash-rail-scrim.show { opacity: 1; visibility: visible; }
+
+.dash-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 10px;
+}
+.dash-rail-brand {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #fff;
+}
+.dash-rail-close {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.dash-rail-close:hover { border-color: #f39c12; }
+
+.dash-rail-section { margin-bottom: 14px; }
+.dash-rail-heading {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #f39c12;
+  margin-bottom: 4px;
+  padding-left: 8px;
+}
+.dash-rail ul { list-style: none; }
+.dash-rail li { margin: 3px 0; }
+.dash-rail a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: rgba(15, 15, 19, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.dash-rail a:hover {
+  background: rgba(243, 156, 18, 0.35);
+  border-color: rgba(243, 156, 18, 0.7);
+  color: #f39c12;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.dash-rail a.active {
+  background: var(--accent, #f39c12);
+  border-color: var(--accent, #f39c12);
+  color: #1a1a1a;
+  text-shadow: none;
+}
+
+/* Hamburger for the LEFT rail (page nav), distinct from the global ☰. Sits
+   BELOW the global header so it never overlaps the site logo/brand row. */
+.dash-rail-btn {
+  background: rgba(15, 15, 19, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  position: fixed;
+  left: 10px;
+  top: calc(var(--gfg-header-h, 48px) + 8px);
+  z-index: 960;
+}
+.dash-rail-btn:hover { border-color: var(--accent); }
+.dash-rail-btn.hide { display: none; }
+
+/* On wide screens the rail is always open; content moves right. */
+@media (min-width: 900px) {
+  .dash-rail { transform: none; }
+  .dash-rail-scrim, .dash-rail-close, .dash-rail-btn { display: none; }
+  body.dash-rail-on .mobile-container.dash-rail-content {
+    margin-left: 240px;
+    max-width: 780px;
+  }
+  /* Homepage overviews use more width so the grid can show 3-4 columns. */
+  body.dash-rail-on .mobile-container.dash-rail-content.dash-home {
+    max-width: 1200px;
+  }
+}
+
+/* Collapsible dashboard sections on the homepage. EXPANDED by default: the
+   body is visible on first landing. Clicking the header row collapses the
+   section (body hides, one-line summary shows). Clicking again re-expands. */
+.dash-fold-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}
+.dash-fold-head h3 { margin: 0; }
+.dash-fold-toggle {
+  flex-shrink: 0;
+  background: rgba(15, 15, 19, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f39c12;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.dash-fold-toggle:hover { border-color: #f39c12; }
+.dash-fold-body { margin-top: 12px; }
+.dash-section.collapsed .dash-fold-body { display: none; }
+.dash-fold-summary {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 6px;
+  padding-left: 2px;
+  display: none;
+}
+.dash-section.collapsed .dash-fold-summary { display: block; }
+
+/* Homepage sections sit in a responsive grid: 3-4 across on wide screens,
+   2 on tablets, 1 stacked on phones. */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.dash-grid > .game-card { margin: 0; }
+.dash-grid .dash-section { margin-top: 0; }
+
+/* Pagination (pager.js): a Prev / numbered / Next nav that appears only once
+   content spans more than one page. Optional "show per page" selector on the
+   dedicated detail pages. */
+.pager-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.pager-btn {
+  background: rgba(15, 15, 19, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ddd;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 30px;
+  text-align: center;
+}
+.pager-btn:hover:not(:disabled) { border-color: var(--accent, #f39c12); color: #f39c12; }
+.pager-btn.active {
+  background: var(--accent, #f39c12);
+  border-color: var(--accent, #f39c12);
+  color: #1a1a1a;
+}
+.pager-btn:disabled { opacity: 0.4; cursor: default; }
+.pager-ellipsis { color: #888; padding: 0 2px; }
+.pager-sizes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.pager-sizes-label { color: var(--muted, #aaa); font-size: 0.78rem; margin-right: 2px; }
+.pager-size {
+  background: rgba(15, 15, 19, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #bbb;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.pager-size:hover:not(.active) { border-color: var(--accent-purple, #9b59b6); color: #fff; }
+.pager-size.active { background: var(--accent-purple, #9b59b6); border-color: var(--accent-purple, #9b59b6); color: #fff; }
+
+/* Homepage cards: a consistent max height so long sections never dwarf the
+   others. Content that would overflow is paginated (pager kicks in). */
+.mobile-container.dash-home .dash-fold-body {
+  max-height: 480px;
+  overflow-y: auto;
+}
+

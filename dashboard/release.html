@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Release pipeline | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content" style="max-width:820px;">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>📊 Release pipeline</h2>
+            <p class="auth-hint" style="margin-top:8px;">Version, roadmap counts, pending approvals, the full tracker (roadmap + released) and the tamper-notice audit trail.</p>
+        </section>
+
+        <section class="game-card" id="dash-pipeline" style="text-align:left;">
+            <h3>Pipeline</h3>
+            <p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p>
+        </section>
+
+        <section class="game-card" id="dash-pending" style="text-align:left;">
+            <h3>⏳ Pending approval (admin-only until approved)</h3>
+            <div id="dash-pending-list"><p class="empty">Loading…</p></div>
+        </section>
+
+        <section class="game-card" id="dash-notices" style="text-align:left; border:1px solid #e74c3c;">
+            <h3>🚨 Security notices (tamper attempts)</h3>
+            <p class="muted-note">Client-side detected integrity issues (edited localStorage state, mocked globals). This is an audit trail for opportunistic tampering, not a definitive cheat-proof record.</p>
+            <div id="dash-notices-list"><p class="empty">Loading…</p></div>
+        </section>
+
+        <section class="game-card" id="dash-all" style="text-align:left;">
+            <h3>🗂 Full tracker (roadmap + released)</h3>
+            <div id="dash-all-list"><p class="empty">Loading…</p></div>
+        </section>
+
+        <section class="game-card" style="text-align:center;">
+            <p><a href="/changelog/admin.html" style="color:#f39c12;">Full raw changelog →</a></p>
+        </section>
+
+        <button class="refresh-btn" id="rel-refresh" style="margin-left:16px;">↻ Refresh all</button>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'release',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+
+            const dc = window.DashCore;
+            function refresh() {
+                dc.loadRoadmap({});
+                dc.loadNotices(document.getElementById('dash-notices-list'));
+            }
+            document.getElementById('rel-refresh').addEventListener('click', refresh);
+            refresh();
+        });
+    </script>
+</body>
+</html>

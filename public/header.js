@@ -137,14 +137,8 @@
                             </ul>
                         </div>
                     `).join('')}
-                    <div class="gfg-drawer-section gfg-drawer-admin hidden" id="gfg-drawer-admin">
-                        <div class="gfg-drawer-heading">Admin</div>
-                        <ul>
-                            ${ADMIN_NAV.map(it => `
-                                <li><a href="${it.href}" data-nav-item="${it.match}">${it.label}</a></li>
-                            `).join('')}
-                        </ul>
-                    </div>
+                    <!-- Admin links are NOT in the DOM for visitors; added only
+                         after the wallet is verified staff (see ensureAdminSection). -->
                 </nav>
             </aside>
         `;
@@ -180,10 +174,37 @@
         window.openGlobalDrawer = openDrawer;
         window.closeGlobalDrawer = closeDrawer;
 
-        // Reveal admin-only items for staff.
+        // Admin-only links appear ONLY after the connected wallet is verified
+        // staff. For everyone else the Admin section never exists in the DOM,
+        // so a non-admin inspecting the page cannot even see the target URLs.
         resolveMyRole().then(role => {
-            const adminSec = document.getElementById('gfg-drawer-admin');
-            if (adminSec && role !== 'user') adminSec.classList.remove('hidden');
+            if (role !== 'user') ensureAdminSection();
+        });
+    }
+
+    // Insert the Admin nav section for staff wallets only. Built lazily so
+    // visitors and signed-in non-admins never receive the admin URLs in the
+    // client payload at all.
+    function ensureAdminSection() {
+        if (document.getElementById('gfg-drawer-admin')) return;
+        const nav = document.getElementById('gfg-drawer-nav');
+        if (!nav) return;
+        const sec = document.createElement('div');
+        sec.className = 'gfg-drawer-section gfg-drawer-admin';
+        sec.id = 'gfg-drawer-admin';
+        sec.innerHTML = `
+            <div class="gfg-drawer-heading">Admin</div>
+            <ul>
+                ${ADMIN_NAV.map(it => `
+                    <li><a href="${it.href}" data-nav-item="${it.match}">${it.label}</a></li>
+                `).join('')}
+            </ul>
+        `;
+        nav.appendChild(sec);
+        sec.querySelectorAll('a[data-nav-item]').forEach(a => {
+            a.addEventListener('click', () => {
+                if (typeof window.closeGlobalDrawer === 'function') window.closeGlobalDrawer();
+            });
         });
     }
 

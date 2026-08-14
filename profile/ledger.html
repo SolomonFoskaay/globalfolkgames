@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>On-chain ledger | Profile | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>🏆 On-chain points ledger</h2>
+            <p class="auth-hint" id="ledger-status" style="margin-top:8px;">Checking account…</p>
+        </section>
+
+        <section class="game-card">
+            <h3>Your ledger</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every reward you win is also written to a tamper-proof ledger on the Solana devnet (free for you to write). This is your own account, verified on-chain — not just a server record.</p>
+            <div id="profile-ledger"><p class="empty">Check your ledger…</p></div>
+        </section>
+
+        <section class="game-card" style="text-align:center;">
+            <button id="ledger-signin-btn" class="auth-btn primary" hidden>Sign in</button>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/profile-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            window.GFG_DASH_NAV.render({
+                brand: '👤 Profile',
+                active: 'ledger',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Profile home', href: '/profile/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'points', label: '⭐ Points & level', href: '/profile/points.html' },
+                        { key: 'ledger', label: '🏆 On-chain ledger', href: '/profile/ledger.html' },
+                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                    ]},
+                ]
+            });
+
+            const statusEl = document.getElementById('ledger-status');
+            const ledgerEl = document.getElementById('profile-ledger');
+            const signinBtn = document.getElementById('ledger-signin-btn');
+
+            function render(signedIn) {
+                if (!signedIn) {
+                    statusEl.textContent = 'Sign in to see your on-chain ledger.';
+                    signinBtn.hidden = false;
+                    return;
+                }
+                statusEl.textContent = 'Signed in — welcome back!';
+                window.ProfileCore.loadPointsLedger(ledgerEl);
+                signinBtn.hidden = true;
+            }
+
+            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
+
+            render(!!window.currentUser);
+            if (window.refreshAuthHeader) {
+                window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+            }
+        });
+    </script>
+</body>
+</html>

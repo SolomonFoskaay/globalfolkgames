@@ -432,6 +432,21 @@
       "status": "in-progress",
       "approved": true,
       "added": "2026-08-13"
+    },
+    {
+      "title": "Dashboard pages with left nav",
+      "summary": "A cleaner dashboard home where every section is still there but neatly folded, plus dedicated pages per section and a side menu to hop between them, so keeping tabs on the game is fast and organised.",
+      "details": [
+        "Dashboard home (current all-in-one) stays the landing page for both admin and user: on first open it lands on the homepage with ALL features still present but rendered COLLAPSED by default.",
+        "Each grouped section on the homepage gets its own expand/collapse control so any single section can be unfolded in place on the homepage without leaving it.",
+        "Each important grouped area also gets a dedicated detail page with fuller content: Endpoint watchlist, Ops panel (sponsor/spend/version/git), Player activity (On-chain + Off-chain tabs), plus room for future groups.",
+        "A left-side vertical nav rail (glassmorphic, same visual language as the global header drawer) sits on the left of the dashboard pages, opposite the global header menu, to navigate existing and future dashboard pages.",
+        "Global header and its main menu stay untouched (no changes to public/header.js behavior).",
+        "Vite inputs updated for new dashboard pages; shared styles/nav component reused across them."
+      ],
+      "status": "in-progress",
+      "approved": true,
+      "added": "2026-08-13"
     }
   ]
 }

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Player activity | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .stats-tabbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .stats-tab {
+            padding: 9px 18px; background: #252535; border: 1px solid var(--border, #333);
+            color: var(--muted, #aaa); border-radius: 10px; font-weight: 600; font-size: 0.88rem;
+            cursor: pointer;
+        }
+        .stats-tab.active { background: var(--accent-purple, #9b59b6); border-color: var(--accent-purple, #9b59b6); color: #fff; }
+        .stats-panel { display: none; }
+        .stats-panel.active { display: block; }
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mini-table th, .mini-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #23232b; }
+        .mini-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .mini-table td { color: #ddd; }
+        .mini-table .mono { font-family: monospace; font-size: 0.78rem; color: #9bd4ff; word-break: break-all; }
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .ops-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .ops-card { background: #101014; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 12px; }
+        .ops-card .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .ops-card .v { color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px; }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content" style="max-width:780px;">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>👥 Player activity</h2>
+            <p class="auth-hint" style="margin-top:8px;">On-chain: sponsored wallets and their live ER delegation. Off-chain: profiles and the points ledger (Supabase aggregation).</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <div class="stats-tabbar">
+                <button class="stats-tab active" data-tab="onchain">On-chain</button>
+                <button class="stats-tab" data-tab="offchain">Off-chain</button>
+            </div>
+            <div class="stats-panel active" id="stats-onchain">
+                <div id="dash-onchain"><p class="empty">Loading…</p></div>
+            </div>
+            <div class="stats-panel" id="stats-offchain">
+                <div id="dash-offchain"><p class="empty">Loading…</p></div>
+            </div>
+            <button class="refresh-btn" id="act-refresh">↻ Refresh</button>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'activity',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+
+            const dc = window.DashCore;
+            dc.bindStatsTabs();
+            function refresh() {
+                const onchain = document.getElementById('dash-onchain');
+                const offchain = document.getElementById('dash-offchain');
+                delete onchain.dataset.loaded;
+                delete offchain.dataset.loaded;
+                dc.loadOnchain(onchain);
+                dc.loadOffchain(offchain);
+            }
+            document.getElementById('act-refresh').addEventListener('click', refresh);
+            // Load the visible tab first.
+            dc.loadOnchain(document.getElementById('dash-onchain'));
+        });
+    </script>
+</body>
+</html>

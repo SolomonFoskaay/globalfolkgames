@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wallets & accounts | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mini-table th, .mini-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #23232b; }
+        .mini-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .mini-table td { color: #ddd; }
+        .mini-table .mono { font-family: monospace; font-size: 0.78rem; color: #9bd4ff; word-break: break-all; }
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+        .table-wrap { overflow-x: auto; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content" style="max-width:900px;">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>🔑 Wallets &amp; accounts</h2>
+            <p class="auth-hint" style="margin-top:8px;">Every wallet and PDA the site touches: what it is, who pays (gasless), live ER delegation, and latest on-chain txs. Click a signature to verify.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Accounts tracker <span class="last-checked" id="acc-last-checked"></span></h3>
+            <div class="table-wrap">
+                <div id="dash-accounts-list"><p class="empty">Loading…</p></div>
+            </div>
+            <button class="refresh-btn" id="acc-refresh">↻ Refresh</button>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'accounts',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+
+            const dc = window.DashCore;
+            function refresh() {
+                dc.loadProbe({
+                    opsEl: null,
+                    epEl: null,
+                    accountsEl: 'dash-accounts-list',
+                    accountsLastEl: 'acc-last-checked',
+                    refreshBtn: 'acc-refresh',
+                });
+            }
+            document.getElementById('acc-refresh').addEventListener('click', refresh);
+            refresh();
+        });
+    </script>
+</body>
+</html>

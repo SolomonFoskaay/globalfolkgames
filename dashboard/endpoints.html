@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Endpoint watchlist | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .ep-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            margin-top: 6px;
+            background: #16161c;
+        }
+        .ep-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .ep-dot.ok { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+        .ep-dot.down { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+        .ep-name { flex: 1 1 auto; font-weight: 600; font-size: 0.92rem; }
+        .ep-lat { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+        .ep-detail { color: #999; font-size: 0.78rem; word-break: break-all; }
+        .ep-tag {
+            font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+            text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
+        }
+        .ep-tag.user { background: #2ecc71; color: #1a1a1a; }
+        .ep-tag.staff { background: #f39c12; color: #1a1a1a; }
+        .ep-tag.infra { background: #8e44ad; color: #fff; }
+        .refresh-btn {
+            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
+        }
+        .refresh-btn:disabled { opacity: 0.5; }
+        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+        .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; color: var(--muted); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content" style="max-width:780px;">
+        <section class="onboarding-billboard" style="border-color:#9b59b6;">
+            <h2>🩺 Endpoint watchlist</h2>
+            <p class="auth-hint" style="margin-top:8px;">Server-side health of every service the game touches. Re-probe any time; a failing check shows red with the detail.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Watchlist <span class="last-checked" id="ep-last-checked"></span></h3>
+            <div id="dash-endpoints-list"><p class="empty">Loading…</p></div>
+            <div class="legend">
+                <span><span class="ep-dot ok" style="display:inline-block;"></span> ok</span>
+                <span><span class="ep-dot down" style="display:inline-block;"></span> failing</span>
+                <span class="ep-tag user">user</span> player-facing
+                <span class="ep-tag staff">staff</span> staff
+                <span class="ep-tag infra">infra</span> internal
+            </div>
+            <button class="refresh-btn" id="ep-refresh">↻ Re-probe servers</button>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+        <script src="/pager.js"></script>
+<script src="/dash-nav.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'endpoints',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+
+            const dc = window.DashCore;
+            function probe() {
+                dc.loadProbe({
+                    opsEl: null,
+                    epEl: 'dash-endpoints-list',
+                    refreshBtn: 'ep-refresh',
+                    lastCheckedEl: 'ep-last-checked',
+                });
+            }
+            document.getElementById('ep-refresh').addEventListener('click', probe);
+            probe();
+        });
+    </script>
+</body>
+</html>
