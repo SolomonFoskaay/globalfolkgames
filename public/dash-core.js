@@ -98,9 +98,13 @@
             const an = ops.ledger.analytics;
             if (an) {
                 const bat = an.battery || {};
-                const tierLabel = { full: 'Healthy', low: 'Low', critical: 'Critical' }[bat.tier] || 'Healthy';
+                const tierLabel = { full: 'Healthy', low: 'Low', critical: 'Critical', unknown: 'Unknown' }[bat.tier] || 'Healthy';
                 const tCls = bat.tier === 'full' ? 'ok' : bat.tier === 'low' ? 'warn' : 'bad';
-                cards.push({ k: `Gas reserve · ${tierLabel}`, v: bat.tier === 'critical' ? 'Need top-up' : bat.balanceSol + ' / ' + bat.tankSol + ' SOL', cls: tCls, html: batteryMeter(bat) });
+                cards.push({ k: `Gas reserve · ${tierLabel}`, v: bat.tier === 'critical' ? 'Need top-up' : bat.balanceSol == null ? 'balance read failed' : bat.balanceSol + ' / ' + bat.tankSol + ' SOL', cls: tCls, html: batteryMeter(bat) });
+                const cap = an.cap;
+                if (cap && cap.limitSol) {
+                    cards.push({ k: `Global spend cap · ${cap.tier === 'critical' ? 'Critical' : cap.tier === 'low' ? 'Low' : 'Healthy'}`, v: cap.spentSol + ' / ' + cap.limitSol + ' SOL' + (cap.tier === 'critical' ? ' · onboarding will pause' : ''), cls: cap.tier === 'full' ? 'ok' : 'warn', html: capMeter(cap) });
+                }
                 cards.push({ k: 'Avg player onboarding', v: an.avgOnboardingSol + ' SOL', small: true });
                 cards.push({ k: 'Players funded / SOL', v: an.playersPerSol + ' fresh player(s)', small: true });
                 cards.push({ k: 'Burn rate (7d avg)', v: (an.burnPerDaySol || 0) + ' SOL/day', small: true });
@@ -146,10 +150,27 @@
     // Battery meter: — a horizontal gauge showing the gas reserve vs the tank.
     function batteryMeter(bat) {
         if (!bat) return '';
+        if (bat.tier === 'unknown' || bat.pct == null) {
+            return `<div class="gas-battery unknown" title="Balance read failed (sponsor keypair not resolvable)">
+            <div class="gas-battery-fill" style="width:0%"></div>
+            <span class="gas-battery-txt">n/a</span>
+        </div>`;
+        }
         const pct = bat.pct || 0;
         const tier = pct >= 50 ? 'full' : pct >= 25 ? 'low' : 'critical';
         return `<div class="gas-battery ${tier}" title="${esc(bat.balanceSol)} / ${esc(bat.tankSol)} SOL reserve">
             <div class="gas-battery-fill" style="width:${pct}%"></div>
+            <span class="gas-battery-txt">${pct}%</span>
+        </div>`;
+    }
+
+    // Spend-cap meter: how much of the global onboarding cap has been used.
+    function capMeter(cap) {
+        if (!cap) return '';
+        const pct = cap.pct || 0;
+        const tier = cap.tier === 'critical' ? 'critical' : cap.tier === 'low' ? 'low' : 'full';
+        return `<div class="gas-battery ${tier}" title="${esc(cap.spentSol)} / ${esc(cap.limitSol)} SOL global spend cap used">
+            <div class="gas-battery-fill" style="width:${Math.min(100, pct)}%"></div>
             <span class="gas-battery-txt">${pct}%</span>
         </div>`;
     }
@@ -239,11 +260,28 @@
                 </div>
                 <div class="gas-meta">${esc(bat.balanceSol)} of ${esc(bat.tankSol)} SOL tank · reserve floor ${esc((ledger && ledger.reserveSol) || 0.3)} SOL</div>
                 <div class="gas-note">${
-                    bat.tier === 'critical'
-                        ? 'Critical: the sponsor wallet is close to the reserve floor. Top it up from your own wallet soon or fresh players will stop onboarding.'
-                        : bat.tier === 'low'
-                            ? 'Low: plan a top-up of the sponsor wallet. It is the same deployer keypair, so a manual send there refills it.'
-                            : 'The sponsor wallet is the gas tank (same deployer keypair). Nothing auto-refills it, so top it up yourself whenever this looks low.'
+                    bat.tier === 'unknown'
+                        ? 'Sponsor balance could not be read (keypair not resolvable on this host). The relay likely still works; check that GFG_SPONSOR_KEYPAIR is set for this deployment.'
+                        : bat.tier === 'critical'
+                            ? 'Critical: the sponsor wallet is close to the reserve floor. Top it up from your own wallet soon or fresh players will stop onboarding.'
+                            : bat.tier === 'low'
+                                ? 'Low: plan a top-up of the sponsor wallet. It is the same deployer keypair, so a manual send there refills it.'
+                                : 'The sponsor wallet is the gas tank (same deployer keypair). Nothing auto-refills it, so top it up yourself whenever this looks low.'
+                }</div>
+            </div>
+
+            <div class="gas-cell">
+                <div class="k">Global spend cap (onboarding)</div>
+                <div>
+                    ${capMeter(an.cap)}
+                </div>
+                <div class="gas-meta">${esc((an.cap && an.cap.spentSol) || 0)} of ${esc((an.cap && an.cap.limitSol) || 0)} SOL used · pause at ${esc((an.cap && an.cap.limitSol) || 0)} SOL</div>
+                <div class="gas-note">${
+                    an.cap && an.cap.tier === 'critical'
+                        ? 'Critical: onboarding budget nearly used. Fresh players will stop being sponsored. Top up the sponsor wallet to reset the meter.'
+                        : an.cap && an.cap.tier === 'low'
+                            ? 'Low: onboarding budget past halfway. Plan a sponsor top-up before fresh players stop onboarding.'
+                            : 'The global cap is a safety tripwire so an exploit cannot drain the sponsor wallet. It is not a per-player fee.'
                 }</div>
             </div>
 

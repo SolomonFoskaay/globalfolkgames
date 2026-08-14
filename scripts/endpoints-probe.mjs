@@ -318,9 +318,9 @@ export async function runProbe() {
     // Gas analytics over the spend-event log: period buckets, categories
     // (what activity burns the reserve), top consumers, forecasts.
     const analytics = spendAnalytics();
-    const bankSol = sponsor && sponsor.balanceSol != null ? sponsor.balanceSol : 0;
+    const bankSol = sponsor && sponsor.balanceSol != null ? sponsor.balanceSol : null;
     const tankSol = +(analytics.tank.tankLamports / 1e9).toFixed(2);
-    const batteryPct = tankSol > 0 ? Math.max(0, Math.min(100, Math.round(100 * bankSol / tankSol))) : 0;
+    const batteryPct = bankSol != null && tankSol > 0 ? Math.max(0, Math.min(100, Math.round(100 * bankSol / tankSol))) : null;
     const forecast1 = gasForecast(1 * 1e9);
     const forecast5 = gasForecast(5 * 1e9);
     const forecast25 = gasForecast(25 * 1e9);
@@ -340,10 +340,18 @@ export async function runProbe() {
         playersPerSol: analytics.playersPerSol,
         burnPerDaySol: analytics.burnPerDaySol,
         battery: {
-          balanceSol: +(bankSol).toFixed(3),
+          balanceSol: bankSol != null ? +(bankSol).toFixed(3) : null,
           tankSol,
           pct: batteryPct,
-          tier: batteryPct >= 50 ? 'full' : batteryPct >= 25 ? 'low' : 'critical',
+          tier: bankSol == null ? 'unknown' : batteryPct >= 50 ? 'full' : batteryPct >= 25 ? 'low' : 'critical',
+        },
+        cap: {
+          spentLamports: totals.globalSpentLamports,
+          limitLamports: caps.globalLamports,
+          spentSol: +(totals.globalSpentLamports / 1e9).toFixed(4),
+          limitSol: +(caps.globalLamports / 1e9).toFixed(2),
+          pct: caps.globalLamports > 0 ? Math.round(100 * totals.globalSpentLamports / caps.globalLamports) : 0,
+          tier: caps.globalLamports > 0 && totals.globalSpentLamports / caps.globalLamports >= 0.8 ? 'critical' : caps.globalLamports > 0 && totals.globalSpentLamports / caps.globalLamports >= 0.5 ? 'low' : 'full',
         },
         forecasts: {
           '1 SOL': { playersFunded: forecast1.playersFunded, runwayMonths: forecast1.runwayMonths },

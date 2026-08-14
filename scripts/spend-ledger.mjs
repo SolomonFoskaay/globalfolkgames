@@ -48,7 +48,11 @@ export function spendCaps() {
     // each ~0.0042 SOL fresh init+delegate => ~0.0084 real; 0.012 leaves ~1.5x
     // margin and stays far under total / tank). Env-tunable.
     perPlayerLamports: Math.round(envNumber('GFG_SPEND_CAP_PER_PLAYER_SOL', 0.012) * LAMPORTS_PER_SOL),
-    globalLamports: Math.round(envNumber('GFG_SPEND_CAP_GLOBAL_SOL', 1.0) * LAMPORTS_PER_SOL),
+    // Global default 10 SOL on devnet: at ~0.0084 SOL/player it funds the
+    // first ~1,000 fresh players without an onboarding pause. It is a safety
+    // tripwire against a drained sponsor wallet, NOT a subscription meter, so it
+    // is sized generously while devnet SOL is free. Env-tunable.
+    globalLamports: Math.round(envNumber('GFG_SPEND_CAP_GLOBAL_SOL', 10.0) * LAMPORTS_PER_SOL),
     reserveLamports: Math.round(envNumber('GFG_SPEND_RESERVE_SOL', 0.3) * LAMPORTS_PER_SOL),
   };
 }
