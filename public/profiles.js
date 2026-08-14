@@ -158,6 +158,12 @@
             const profile = await ensureProfile(dynamicUser);
             const points = profile ? profile.global_points : 0;
             const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
+            const tier = (typeof window.getActiveTier === 'function')
+                ? window.getActiveTier()
+                : { tier: 1, mult: 1, label: 'Tier 1' };
+            const tierBadge = (tier.tier > 1)
+                ? `<span class="tier-badge" title="Active ${tier.label} — ${tier.mult}x on win points">⚡${tier.mult}x</span>`
+                : '';
 
             // Order matters on mobile: the SIGN OUT button comes FIRST, and the
             // points sit at the far right, directly beside the ☰ menu. A thumb
@@ -166,6 +172,7 @@
             pill.innerHTML = `
                 <button id="btn-signout" class="auth-btn-small">Sign out</button>
                 <span class="auth-user">· ${name}</span>
+                ${tierBadge}
                 <span id="display-points">⭐ ${points.toLocaleString()} Pts</span>
             `;
 
@@ -445,16 +452,37 @@
         return synced;
     };
 
+    // Wait for Dynamic to restore the OTP session after a page load.
+    // createDynamicClient restores auth asynchronously (from localStorage /
+    // the Dynamic API), and on a cold page load (e.g. navigating straight to a
+    // game page) restore can finish AFTER the old fixed 900ms delay, leaving
+    // the header pill stuck on "Sign in" even though the user IS logged in.
+    // So we poll until either the user appears or a deadline passes.
+    function waitForDynamicSession(timeoutMs = 8000) {
+        return new Promise(resolve => {
+            const deadline = Date.now() + timeoutMs;
+            (function poll() {
+                const u = getDynamicUser();
+                if (u) return resolve(true);
+                if (Date.now() >= deadline) return resolve(false);
+                setTimeout(poll, 250);
+            })();
+        });
+    }
+
     // On page load
     document.addEventListener('DOMContentLoaded', function () {
-        // Give Dynamic a short moment to restore session
-        setTimeout(() => {
-            window.refreshAuthHeader().then(() => {
-                // Re-sync any awards queued while Supabase was unreachable.
-                if (typeof window.syncPendingPointAwards === 'function') {
-                    window.syncPendingPointAwards();
-                }
-            });
-        }, 900);
+        setTimeout(async () => {
+            await waitForDynamicSession();
+            await window.refreshAuthHeader();
+            // Re-sync any awards queued while Supabase was unreachable.
+            if (typeof window.syncPendingPointAwards === 'function') {
+                await window.syncPendingPointAwards();
+            }
+            // If Dynamic finished restoring the session AFTER the first
+            // refresh rendered the logged-out pill, render again now that the
+            // user is known.
+            if (getDynamicUser()) await window.refreshAuthHeader();
+        }, 200);
     });
 })();

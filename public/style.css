@@ -223,6 +223,18 @@ body {
     font-size: 0.8rem;
 }
 
+/* Active Tier badge in the header pill (S1) */
+.tier-badge {
+    background: var(--accent-purple);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+    line-height: 1.5;
+}
+
 /* ===== LANDING PAGE LAYOUT ===== */
 .mobile-container {
     padding: 16px;

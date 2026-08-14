@@ -31,6 +31,19 @@
             </div>
         </section>
 
+        <section class="game-card dash-section" id="profile-tier-card">
+            <div class="dash-fold-head">
+                <h3>⚡ Active Tier (S1)</h3>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
+            </div>
+            <div class="dash-fold-summary">Boost your win points with a monthly Active Tier. Multiplies base match wins only (2x/3x/4x), capped at +1,000 boosted points/day.</div>
+            <div class="dash-fold-body">
+                <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin-bottom:10px;">—</p>
+                <div id="tier-buy-row" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+                <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">—</p>
+            </div>
+        </section>
+
         <section class="game-card dash-section" id="profile-wallet-card">
             <div class="dash-fold-head">
                 <h3>Blockchain identity</h3>
@@ -84,6 +97,7 @@
     <script src="/tamper-guard.js"></script>
     <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
+    <script src="/tiers.js"></script>
     <script src="/profile-core.js"></script>
         <script src="/pager.js"></script>
 <script src="/header.js"></script>
@@ -139,8 +153,59 @@
                     window.ProfileCore.loadOnchainActivity(ontxList, { full: false });
                     window.ProfileCore.loadPointsLedger(ledgerEl);
                 }
+                renderTierCard();
                 signinBtn.hidden = true;
             }
+
+            function renderTierCard() {
+                if (typeof window.getActiveTier !== 'function') return;
+                const tier = window.getActiveTier();
+                const spendable = window.getSpendablePoints();
+                const statusEl = document.getElementById('tier-status');
+                const buyRow = document.getElementById('tier-buy-row');
+                const spendableEl = document.getElementById('tier-spendable');
+
+                if (tier.tier > 1) {
+                    const upgradeTarget = tier.tier < 4 ? (window.ACTIVE_TIERS || {})[tier.tier + 1] : null;
+                    const upgradeHint = upgradeTarget
+                        ? `<div style="margin-top:6px; font-size:0.8rem; color:var(--muted);">Upgrade: <b style="color:#f39c12;">${upgradeTarget.name} (${upgradeTarget.mult}x)</b> costs ${upgradeTarget.cost.toLocaleString()} spendable points for another month.</div>`
+                        : '';
+                    statusEl.innerHTML = `You have <b style="color:#f39c12;">${tier.label} (${tier.mult}x)</b> on wins, active until <b>${new Date(tier.expiresAt).toLocaleDateString()}</b>. Boosted points today: <span id="tier-used-today">${(window.TIER_DAILY_BOOST_CAP || 0) - (tier.remainingToday ?? 0)}</span> / ${(window.TIER_DAILY_BOOST_CAP || 0).toLocaleString()}.${upgradeHint}`;
+                } else {
+                    statusEl.innerHTML = `You are on the free <b>Tier 1 (1x)</b>. Buy a tier below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: every tier lasts one month, multiplies base win points only (100 → 200/300/400 at 2x/3x/4x), and is capped at +1,000 boosted points per day. Earn or top up spendable points, then tap a tier to activate it.</span>`;
+                }
+
+                buyRow.innerHTML = '';
+                const ladder = window.ACTIVE_TIERS || {};
+                [2, 3, 4].forEach(level => {
+                    const t = ladder[level];
+                    if (!t) return;
+                    const btn = document.createElement('button');
+                    btn.className = 'launch-btn onchain';
+                    btn.style.marginTop = '0';
+                    btn.style.flex = '1';
+                    btn.style.minWidth = '110px';
+                    btn.textContent = `${t.name} · ${t.mult}x · ${t.cost.toLocaleString()}`;
+                    btn.disabled = spendable < t.cost;
+                    btn.title = spendable < t.cost ? 'Not enough spendable points' : 'Buy for one month';
+                    btn.onclick = async function () {
+                        if (typeof window.buyActiveTier === 'function') {
+                            await window.buyActiveTier(level);
+                            if (window.refreshAuthHeader) {
+                                window.refreshAuthHeader().then(() => render(!!window.currentUser));
+                            }
+                            renderTierCard();
+                        }
+                    };
+                    buyRow.appendChild(btn);
+                });
+
+                spendableEl.innerHTML = `Spendable balance: <b>⭐ ${spendable.toLocaleString()}</b> · Lifetime (never spent): <b>${window.getLifetimePoints().toLocaleString()}</b>`;
+            }
+
+            window.__renderTierUI = function () {
+                if (window.currentProfile) renderTierCard();
+            };
 
             signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 

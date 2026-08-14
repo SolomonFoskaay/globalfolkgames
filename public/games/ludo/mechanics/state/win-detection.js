@@ -58,13 +58,21 @@
                 const proofSig = typeof window.getLastProofRollSignature === 'function'
                     ? window.getLastProofRollSignature() : null;
 
+                // S1: Active Tier multiplier applies to the base match win
+                // reward (100 -> 200/300/400 at 2x/3x/4x), capped at +1,000
+                // boosted points/day. The boosted total is what gets banked.
+                const reward = (typeof window.computeWinReward === 'function')
+                    ? window.computeWinReward(100)
+                    : { base: 100, total: 100, mult: 1, boosted: 0 };
+                const awarded = reward.total;
+
                 if (typeof window.awardLocalLudoPoints === 'function') {
                     // The proof-roll signature becomes the match_id in Supabase,
                     // tying the reward to the verifiable on-chain roll.
-                    window.awardLocalLudoPoints(100, proofSig);
+                    window.awardLocalLudoPoints(awarded, proofSig);
                 }
 
-                // Scope B: write the +100 award to the player's ON-CHAIN points
+                // Scope B: write the award to the player's ON-CHAIN points
                 // PDA, gasless on the ER (session key signs, no SOL). The
                 // receipt signature is the authoritative on-chain proof of the
                 // reward. Fails soft: Supabase already has the record and the
@@ -75,7 +83,7 @@
                         ? window.POINT_REASONS.WIN_1ST : 1;
                     const matchRef = (magic.matchRefFromSignature && proofSig)
                         ? magic.matchRefFromSignature(proofSig) : 0;
-                    magic.recordPoints(100, reasonCode, matchRef)
+                    magic.recordPoints(awarded, reasonCode, matchRef)
                         .then((onchainReceipt) => {
                             console.log(`[REWARD] On-chain points recorded — receipt: ${onchainReceipt}`);
                             const txUrl = onchainReceipt && window.gfgExplorer
@@ -91,7 +99,7 @@
                 const explorerUrl = proofSig
                     ? (window.gfgExplorer && window.gfgExplorer.txUrl(proofSig))
                     : null;
-                console.log(`[REWARD] 1st place (you) +100 — proof roll: ${proofSig}`);
+                console.log(`[REWARD] 1st place (you) +${awarded} — proof roll: ${proofSig}`);
                 if (explorerUrl) {
                     console.log(`[REWARD] Verify on-chain → ${explorerUrl}`);
                 }
@@ -102,7 +110,10 @@
                 }
 
                 if (typeof window.showAuthBanner === 'function') {
-                    window.showAuthBanner(`🎉 You finished 1st! +100 points`);
+                    const boostNote = (reward.mult > 1)
+                        ? ` (${reward.mult}x Active Tier${reward.boosted > 0 ? ' — +' + reward.boosted + ' boost' : ''})`
+                        : '';
+                    window.showAuthBanner(`🎉 You finished 1st! +${awarded} points${boostNote}`);
                 }
             }
         }

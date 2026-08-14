@@ -500,6 +500,10 @@
                 out.push(`<table class="mini-table"><thead><tr><th>Reason</th><th>Points</th></tr></thead><tbody>${reasons}</tbody></table>`);
             }
 
+            // Active Tier tracking (S1) — separate fail-open query so a missing
+            // migration column never breaks the whole off-chain tab.
+            out.push(await tierTrackingHtml(sb));
+
             if (profiles.length) {
                 out.push('<div class="muted-note">Most recent profiles:</div>');
                 const profileRow = p => {
@@ -533,6 +537,70 @@
             el.innerHTML = out.join('');
         }
         el.dataset.loaded = '1';
+    }
+
+    // Active Tier tracking (S1): how many players hold tiers, spendable
+    // drained by purchases, and recent purchases. Fail-open: if the migration
+    // columns don't exist yet, render a note instead of erroring the tab.
+    async function tierTrackingHtml(sb) {
+        try {
+            const [profilesR, tierTxR] = await Promise.all([
+                sb.from('profiles')
+                    .select('id, username, email, solana_wallet, active_tier, active_tier_expires_at, global_points')
+                    .order('created_at', { ascending: false })
+                    .limit(500),
+                sb.from('point_transactions')
+                    .select('user_id, points, created_at')
+                    .eq('reason', 'active_tier_purchase')
+                    .order('created_at', { ascending: false })
+                    .limit(200),
+            ]);
+            if (profilesR.error) throw new Error(profilesR.error.message);
+            const profiles = profilesR.data || [];
+            const tierTx = tierTxR.data || [];
+
+            const now = Date.now();
+            const holders = profiles.filter(p => p.active_tier && Number(p.active_tier) > 1);
+            const activeHolders = holders.filter(p => p.active_tier_expires_at && new Date(p.active_tier_expires_at).getTime() > now);
+            const lapsedHolders = holders.length - activeHolders.length;
+
+            const byLevel = {};
+            activeHolders.forEach(p => { const l = Number(p.active_tier); byLevel[l] = (byLevel[l] || 0) + 1; });
+            const dist = [2, 3, 4].map(l => `<span style="color:#f39c12;">T${l}: ${byLevel[l] || 0}</span>`).join(' · ');
+
+            const spent = tierTx.reduce((s, t) => s + Math.abs(t.points || 0), 0);
+            const purchases30d = tierTx.filter(t => t.created_at && (Date.now() - new Date(t.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000).length;
+
+            const recentRows = tierTx.slice(0, 8).map(t => {
+                const p = profiles.find(p => p.id === t.user_id);
+                const name = p && (p.username || p.email) ? (p.username || p.email) : (t.user_id || '').slice(0, 8);
+                return `<tr><td>${esc(name)}</td><td>-${esc(Math.abs(t.points || 0).toLocaleString())}</td>` +
+                    `<td>${esc((t.created_at || '').slice(0, 16).replace('T', ' '))}</td></tr>`;
+            }).join('');
+
+            const cells = `
+                <div class="ops-card"><div class="k">Tier holders</div><div class="v">${holders.length}</div></div>
+                <div class="ops-card"><div class="k">Active now</div><div class="v" style="color:#2ecc71;">${activeHolders.length}</div></div>
+                <div class="ops-card"><div class="k">Lapsed</div><div class="v">${lapsedHolders}</div></div>
+                <div class="ops-card"><div class="k">Distribution</div><div class="v small">${dist}</div></div>
+                <div class="ops-card"><div class="k">Spendable drained</div><div class="v" style="color:#f39c12;">${spent.toLocaleString()}</div></div>
+                <div class="ops-card"><div class="k">Purchases (30d)</div><div class="v">${purchases30d}</div></div>`;
+
+            const recentBlock = recentRows
+                ? `<div class="muted-note" style="margin-top:12px;">Recent tier purchases (spendable sink):</div>
+                   <table class="mini-table"><thead><tr><th>Player</th><th>Spent</th><th>When</th></tr></thead><tbody>${recentRows}</tbody></table>`
+                : `<p class="empty">No Active Tier purchases yet — the S1 tier buy card on /profile/ seeds this view.</p>`;
+
+            return `<div style="margin-top:16px;border-top:1px solid #9b59b6;padding-top:12px;">
+                <div class="k" style="color:#9b59b6;font-weight:700;margin-bottom:4px;">⚡ Active Tier (S1) — tracked</div>
+                <div class="ops-grid">${cells}</div>${recentBlock}
+            </div>`;
+        } catch (e) {
+            return `<div style="margin-top:16px;border-top:1px solid #9b59b6;padding-top:12px;">
+                <div class="k" style="color:#9b59b6;font-weight:700;">⚡ Active Tier (S1)</div>
+                <p class="muted-note">Tier tracking unavailable — run <span class="mono">supabase/migrations/0001_active_tier.sql</span> first (${esc(e.message)}).</p>
+            </div>`;
+        }
     }
 
     // Bind the On-chain / Off-chain tab bar to the two loaders.

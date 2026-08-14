@@ -23,6 +23,21 @@
 //                          The transaction signature is the authoritative
 //                          on-chain receipt of the reward.
 //
+// Active Tier (S1, FUTURE/mainnet design, NOT implemented in this build):
+//   - `initialize_tier`   : creates the player's TIER PDA (base layer, app
+//                           pays rent). Seed `gfgtier`, same player_authority.
+//   - `delegate_tier`     : moves the tier PDA into the ER session (base
+//                           layer, app pays) so purchases run gasless.
+//   - `purchase_tier`     : buys a monthly Active Tier on the ER. The cost is
+//                           the player's SPENDABLE balance, derived on-chain
+//                           as points.total_points - tier.total_spent (so a
+//                           spend can never exceed what was earned on-chain).
+//                           FREE for the player (session key signs, no SOL).
+// S1 ships WITHOUT these: the multiplier/cap run client + Supabase and the
+// existing `record_points` PDA mirrors the boosted award on-chain. Full
+// on-chain tier enforcement is deferred to mainnet (see roadmap "Active Tier
+// subscriptions + spendable sink").
+//
 // The PDA seed uses a dedicated `player_authority` key (the player's wallet),
 // NOT the payer, so any wallet can sponsor rent/fees without changing the
 // account's address.

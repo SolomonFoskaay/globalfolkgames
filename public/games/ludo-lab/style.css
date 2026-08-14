@@ -17,12 +17,6 @@ body {
     touch-action: pan-y; /* FOEVER ALLOWS VERTICAL GESTURES, BLOCKS HORIZONTAL DRAG */
 }
 
-header { 
-    width: 100%; display: flex; justify-content: space-between; 
-    padding: 10px 20px; box-sizing: border-box; background: #1e1e1e; 
-    position: sticky; top: 0; z-index: 10; height: 50px;
-}
-
 .back-btn { 
     background: #333; color: #fff; border: none; padding: 8px 12px; 
     border-radius: 6px; font-weight: bold; cursor: pointer; 
@@ -42,6 +36,26 @@ header {
     gap: 4px;
     overflow-x: hidden;
     overflow-y: visible;
+}
+
+/* Persistent on-chain outage banner (Ludo, shown while devnet is unreachable) */
+.chain-down-banner {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 1200;
+    max-width: 90%;
+    text-align: center;
+    background: var(--danger, #e74c3c);
+    color: #fff;
+    border: 2px solid #f39c12;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
 
 /* Dedicated On-Screen Cultural Notification Banner Line */
@@ -186,7 +200,7 @@ canvas {
 #confirm-ok-btn { background: #2ecc71; color: #fff; text-align: center; }
 #confirm-cancel-btn { background: #555; color: #fff; text-align: center; }
 
-/* ===== Local Ludo Header (sits under the global header) ===== */
+/* ===== Local Ludo Header (sticky, pinned under the global header) ===== */
 .ludo-header {
     width: 100%;
     display: flex;
@@ -197,6 +211,13 @@ canvas {
     background: #1a1a24;
     border-bottom: 1px solid #2c2c3a;
     height: 48px;
+    position: sticky;
+    /* header.js measures the real global-header height (2 lines on mobile when
+       the user pill wraps) and exposes it as --gfg-header-h, so the local
+       header sticks exactly below it and is never covered. Desktop keeps a
+       48px fallback. */
+    top: var(--gfg-header-h, 48px);
+    z-index: 10;
 }
 
 .ludo-header-center {
@@ -210,6 +231,17 @@ canvas {
 
 .ludo-flag {
     font-size: 1.1rem;
+}
+
+/* One-line folk-game heritage strip under the local header. Keeps the
+   corrected origin prominent and names where the game is most loved. */
+.ludo-origin-line {
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    color: #9b59b6;
+    background: #14141c;
+    border-bottom: 1px solid #2c2c3a;
+    line-height: 1.4;
 }
 
 .ludo-local-points {

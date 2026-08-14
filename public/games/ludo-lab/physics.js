@@ -22,7 +22,7 @@ function runDicePhysicsCalculations() {
         }
 
         // Boundary Collisions: Bounce off 600x600 canvas parameters
-        const size = 35;
+        const size = 46;
         if (die.x < 0 || die.x > 600 - size) { die.vx *= -1; die.x = Math.max(0, Math.min(die.x, 600 - size)); }
         if (die.y < 0 || die.y > 600 - size) { die.vy *= -1; die.y = Math.max(0, Math.min(die.y, 600 - size)); }
     });
@@ -39,21 +39,64 @@ function renderPhysicalDiceCubes() {
     if (!displayDiceOnBoard || physicalDice.length !== 2) return;
 
     physicalDice.forEach(die => {
-        const size = 32;
+        const size = 46;
+        const x = die.x + (32 - size) / 2;
+        const y = die.y + (32 - size) / 2;
+        const r = Math.max(4, size * 0.12);
+        const value = die.value;
+
         ctx.save();
+
+        // Soft drop shadow so the dice pop off the board on any screen.
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 4;
+
+        // White die body — one path so fill + stroke share the same rounded shape.
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + size, y, x + size, y + size, r);
+        ctx.arcTo(x + size, y + size, x, y + size, r);
+        ctx.arcTo(x, y + size, x, y, r);
+        ctx.arcTo(x, y, x + size, y, r);
+        ctx.closePath();
+
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(die.x, die.y, size, size);
-        ctx.strokeStyle = '#000000'; 
-        ctx.lineWidth = 2;
-        ctx.strokeRect(die.x, die.y, size, size);
-        
-        ctx.fillStyle = '#000000'; 
-        ctx.font = 'bold 20px sans-serif';
-        ctx.textAlign = 'center'; 
-        ctx.textBaseline = 'middle';
-        
-        const dicePipFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-        ctx.fillText(dicePipFaces[die.value - 1], die.x + (size / 2), die.y + (size / 2));
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Bevel: a subtle inner highlight across the top edge for a real die feel.
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y + 1.5);
+        ctx.arcTo(x + size, y + 1.5, x + size, y + size, r);
+        ctx.stroke();
+
+        // Pips as real dots (position map per face) — reliable on every device,
+        // unlike unicode die glyphs that render inconsistently on mobile.
+        const pipMap = {
+            1: [[0.5, 0.5]],
+            2: [[0.28, 0.28], [0.72, 0.72]],
+            3: [[0.28, 0.28], [0.5, 0.5], [0.72, 0.72]],
+            4: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]],
+            5: [[0.28, 0.28], [0.72, 0.28], [0.5, 0.5], [0.28, 0.72], [0.72, 0.72]],
+            6: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.5], [0.72, 0.5], [0.28, 0.72], [0.72, 0.72]]
+        }[value] || [[0.5, 0.5]];
+
+        const pipRadius = Math.max(3.5, size * 0.075);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        pipMap.forEach(([fx, fy]) => {
+            ctx.moveTo(x + size * fx + pipRadius, y + size * fy);
+            ctx.arc(x + size * fx, y + size * fy, pipRadius, 0, Math.PI * 2);
+        });
+        ctx.fill();
+
         ctx.restore();
     });
 }
