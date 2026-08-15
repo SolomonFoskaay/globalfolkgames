@@ -66,21 +66,41 @@ function hideVerifyLink() {
 }
 
 function showChainDownBanner(message, persistent = false) {
-    if (typeof window.showAuthBanner === 'function') window.showAuthBanner(message, true);
-    const el = document.getElementById('chain-down-banner');
-    if (el) {
-        el.textContent = message;
+    try {
+        if (typeof window.showAuthBanner === 'function') window.showAuthBanner(message, true);
+        ensureChainBannerElement();
+        const el = document.getElementById('chain-down-banner');
+        if (!el) return;
+        el.textContent = '';
         el.classList.toggle('persistent', persistent);
+
+        const msg = document.createElement('span');
+        msg.textContent = message;
+        el.appendChild(msg);
+
+        // Manual escape hatch: even if the 8s auto-monitor keeps failing, the
+        // player can force a fresh connectivity check at any moment.
+        if (!document.getElementById('chain-retry-btn')) {
+            const retryBtn = document.createElement('button');
+            retryBtn.id = 'chain-retry-btn';
+            retryBtn.textContent = 'Retry now';
+            retryBtn.addEventListener('click', () => {
+                if (typeof retryChainNow === 'function') retryChainNow();
+            });
+            el.appendChild(retryBtn);
+        }
         el.style.display = 'block';
-    }
+    } catch (e) { /* banner is cosmetic - never break the game */ }
 }
 
 function ensureChainBannerElement() {
-    if (document.getElementById('chain-down-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'chain-down-banner';
-    banner.className = 'chain-down-banner';
-    document.body.appendChild(banner);
+    try {
+        if (document.getElementById('chain-down-banner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'chain-down-banner';
+        banner.className = 'chain-down-banner';
+        document.body.appendChild(banner);
+    } catch (e) { /* DOM not ready / stubbed */ }
 }
 
 function hideChainDownBanner() {
@@ -109,6 +129,10 @@ async function pingOnchainStack() {
     }
 }
 
+// Exposed for diagnostics / boot-time verification of the pause state.
+window.getChainDownState = function () { return isChainDown; };
+window.setChainDownState = function (v) { isChainDown = !!v; };
+
 // Pause the ongoing turn (do NOT consume it) until the on-chain stack returns.
 function enterChainDownState() {
     if (isChainDown) return;
@@ -127,34 +151,87 @@ function enterChainDownState() {
     if (diceBtn) diceBtn.disabled = true;
 
     ensureChainBannerElement();
-    showChainDownBanner('On-chain dice are unavailable. Your match is paused and will resume automatically when the network returns.', true);
+    showChainDownBanner('On-chain dice are unreachable. Your match is paused so nothing is falsely recorded. It resumes automatically, or press Retry once your internet is back.', true);
     displayEducationalLog(`${currentTurn.toUpperCase()}: On-chain dice unreachable. Match paused - will auto-resume when the network is back.`);
+
+    // Persist the paused (pre-roll) state so a REFRESH during the outage
+    // resumes into this same paused state instead of a broken or fresh match.
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
 
     if (!chainMonitorTimer) {
         chainMonitorTimer = setInterval(async () => {
             const ok = await pingOnchainStack();
             if (!ok || !isChainDown) return;
-            // Network is back: stop monitoring and resume the paused turn.
-            clearInterval(chainMonitorTimer);
-            chainMonitorTimer = null;
-            isChainDown = false;
-            hideChainDownBanner();
-            if (typeof window.showAuthBanner === 'function') window.showAuthBanner('On-chain dice are back - resuming your match.');
-            displayEducationalLog(`${currentTurn.toUpperCase()}: On-chain dice are back. Resuming...`);
-            const btn2 = document.getElementById('diceBtn');
-            if (btn2) btn2.disabled = false;
-            setTimeout(() => {
-                if (isGamePaused) return;
-                if (playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'computer') {
-                    if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
-                } else {
-                    if (typeof rollDiceEngine === 'function') rollDiceEngine();
-                }
-            }, 1200);
+            resumeFromChainDown();
         }, CHAIN_MONITOR_INTERVAL_MS);
     }
     return;
 }
+
+// Shared recovery path used by the auto-monitor, the banner's Retry button and
+// the boot-time probe once the on-chain stack answers again.
+function resumeFromChainDown() {
+    if (!isChainDown) return;
+    if (chainMonitorTimer) {
+        clearInterval(chainMonitorTimer);
+        chainMonitorTimer = null;
+    }
+    isChainDown = false;
+    hideChainDownBanner();
+    if (typeof window.showAuthBanner === 'function') {
+        window.showAuthBanner('On-chain dice are back. Resuming your match.');
+    }
+    displayEducationalLog(`${currentTurn.toUpperCase()}: On-chain dice are back. Resuming...`);
+    const btn2 = document.getElementById('diceBtn');
+    if (btn2) btn2.disabled = false;
+
+    // Retry anything that could not be pushed on-chain while we were offline.
+    if (typeof window.flushPendingPushes === 'function') {
+        try { window.flushPendingPushes(); } catch (e) { console.warn('[persistence] pending-push flush failed:', e); }
+    }
+
+    setTimeout(() => {
+        if (isGamePaused || isChainDown || matchOver) return;
+        if (playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'computer') {
+            if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
+        } else {
+            if (typeof rollDiceEngine === 'function') rollDiceEngine();
+        }
+    }, 1200);
+}
+
+// Banner Retry button: force a connectivity check right now.
+async function retryChainNow() {
+    const ok = await pingOnchainStack();
+    if (ok && isChainDown) {
+        resumeFromChainDown();
+    } else if (!ok) {
+        displayEducationalLog(`${currentTurn.toUpperCase()}: Still offline - retrying automatically...`);
+        if (typeof window.showAuthBanner === 'function') {
+            window.showAuthBanner('Still offline. Waiting for the network to return...');
+        }
+    }
+}
+
+// Boot-time + retry entry point: probe the on-chain stack and either pause the
+// match (banner + monitor + Retry button) or clear any stale pause, then flush
+// pending on-chain pushes.
+async function verifyChainForResume() {
+    const ok = await pingOnchainStack();
+    if (isChainDown) {
+        if (ok) resumeFromChainDown();
+        return;
+    }
+    if (!ok && setupConfigurationLocked && !isGamePaused) {
+        enterChainDownState();
+    }
+    if (typeof window.flushPendingPushes === 'function') {
+        try { window.flushPendingPushes(); } catch (e) { console.warn('[persistence] pending-push flush failed:', e); }
+    }
+}
+window.verifyChainForResume = verifyChainForResume;
+window.retryChainNow = retryChainNow;
+window.resumeFromChainDown = resumeFromChainDown;
 
 async function rollDiceEngine(source) {
     if (!setupConfigurationLocked) {
@@ -186,6 +263,10 @@ async function rollDiceEngine(source) {
     hasRolledThisTurn = true;
     displayDiceOnBoard = true;
     activeDiceSource = 'offchain'; // reset until the VRF path confirms otherwise
+
+    // Persist immediately so a page reload during the (up to ~1.3s) on-chain
+    // round trip resumes with "rolled, awaiting result" instead of re-rolling.
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
 
     const totalDisplay = document.getElementById('val-total');
     if (totalDisplay) totalDisplay.innerText = 'Rolling...';

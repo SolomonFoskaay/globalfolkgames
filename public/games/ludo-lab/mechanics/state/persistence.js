@@ -44,6 +44,143 @@ function clearPersistedState() {
     try { localStorage.removeItem(PERSISTENCE_HASH_KEY); } catch (e) {}
 }
 
+// ---------------------------------------------------------------------------
+// Pending on-chain push queue ("backup plan with a tamper-proof hash").
+//
+// When an on-chain record (match result proof, future M3/M4 reward record)
+// cannot be pushed because the network is down or the push fails, the game
+// queues it here. On the next load and on every network restore the queue is
+// flushed: each entry's digest is re-verified BEFORE it is pushed. A tampered
+// entry is dropped and surfaces a loud warning, so an altered play is NEVER
+// recorded on-chain and the player is told their data was rejected.
+//
+// Note (honest limit): a player can always re-sign their own device data, so
+// this is DETECTION + deterrence, not a security boundary. The authoritative,
+// non-tamperable records are the on-chain VRF proofs and the reward row keyed
+// by the proof-roll signature.
+// ---------------------------------------------------------------------------
+const PENDING_PUSH_KEY = 'gfg_pending_onchain_pushes';
+let pendingPushHandlers = {};
+let lastPersistenceWarning = null;
+
+window.registerPendingPushHandler = function (type, fn) {
+    if (typeof fn === 'function') pendingPushHandlers[type] = fn;
+};
+
+function readPendingPushes() {
+    try {
+        const raw = localStorage.getItem(PENDING_PUSH_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+}
+
+function writePendingPushes(arr) {
+    try { localStorage.setItem(PENDING_PUSH_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+
+function queuePendingPush(type, payload) {
+    try {
+        const arr = readPendingPushes();
+        arr.push({
+            type,
+            payload,
+            createdAt: Date.now(),
+            digest: hashStateString(type + '|' + JSON.stringify(payload)),
+        });
+        writePendingPushes(arr);
+        return true;
+    } catch (e) { return false; }
+}
+window.queuePendingPush = queuePendingPush;
+
+window.getPendingPushes = function () { return readPendingPushes(); };
+
+async function flushPendingPushes() {
+    const arr = readPendingPushes();
+    if (!arr.length) return;
+    const remaining = [];
+    for (const entry of arr) {
+        const expected = hashStateString(entry.type + '|' + JSON.stringify(entry.payload));
+        if (entry.digest !== expected) {
+            // Tampered entry: refuse to push it and warn the player loudly so
+            // they never believe an altered play was recorded on-chain.
+            console.warn('[persistence] discarded tampered pending push:', entry.type);
+            showPersistenceWarning('Some of your match data on this device was modified and cannot be recorded on-chain. It has been discarded.');
+            continue;
+        }
+        const handler = pendingPushHandlers[entry.type];
+        if (!handler) { remaining.push(entry); continue; }
+        try {
+            const ok = await handler(entry.payload);
+            if (ok) continue; // pushed successfully -> drop the entry
+        } catch (e) {
+            console.warn(`[persistence] pending push '${entry.type}' failed, will retry:`, e);
+        }
+        remaining.push(entry);
+    }
+    writePendingPushes(remaining);
+}
+window.flushPendingPushes = flushPendingPushes;
+
+// Records the last warning shown (survives stubbed DOM in tests / consoles).
+window.getLastPersistenceWarning = function () { return lastPersistenceWarning; };
+
+// Visible, dismissible warning so a player is ALWAYS aware when their play can
+// no longer be recorded on-chain (tampered data, unverifiable save).
+function showPersistenceWarning(message) {
+    lastPersistenceWarning = message;
+    try {
+        ensureWarningOverlay();
+        const overlay = document.getElementById('gfg-persistence-warning');
+        if (!overlay) return;
+        const msgEl = overlay.querySelector('.gfg-pw-msg');
+        if (msgEl) msgEl.textContent = message;
+        overlay.style.display = 'flex';
+        const okBtn = document.getElementById('gfg-pw-ok');
+        if (okBtn) {
+            okBtn.onclick = () => { overlay.style.display = 'none'; };
+        }
+    } catch (e) {
+        console.warn('PERSISTENCE: warning popup unavailable:', e);
+    }
+}
+window.showPersistenceWarning = showPersistenceWarning;
+
+function ensureWarningOverlay() {
+    if (document.getElementById('gfg-persistence-warning')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'gfg-persistence-warning';
+    overlay.className = 'gfg-persistence-warning';
+    const box = document.createElement('div');
+    box.className = 'gfg-pw-box';
+    const title = document.createElement('p');
+    title.className = 'gfg-pw-title';
+    title.textContent = 'Match data could not be verified';
+    const msg = document.createElement('p');
+    msg.className = 'gfg-pw-msg';
+    const okBtn = document.createElement('button');
+    okBtn.id = 'gfg-pw-ok';
+    okBtn.textContent = 'Got it';
+    box.appendChild(title);
+    box.appendChild(msg);
+    box.appendChild(okBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
+// Best-effort: ask the browser not to evict the save under storage pressure
+// (research-backed: localStorage can be evicted on mobile). Never fails loudly.
+function requestPersistentStorage() {
+    try {
+        if (navigator.storage && typeof navigator.storage.persist === 'function') {
+            navigator.storage.persist().catch(() => {});
+        }
+    } catch (e) { /* best-effort */ }
+}
+requestPersistentStorage();
+
 function saveGameStateToStorage() {
     const winState = (typeof window.serializeWinState === 'function')
         ? window.serializeWinState()
@@ -83,11 +220,13 @@ function loadGameStateFromStorage() {
     if (!rawData) return false;
 
     // Integrity check: a tampered/corrupt payload (edited in the console, or a
-    // partial write) must NOT be silently resumed. Detect it and start fresh.
+    // partial write) must NOT be silently resumed. Detect it, refuse it, and
+    // tell the player loudly that the altered data can never be recorded.
     let savedDigest = null;
     try { savedDigest = localStorage.getItem(PERSISTENCE_HASH_KEY); } catch (e) {}
     if (savedDigest && savedDigest !== hashStateString(rawData)) {
         clearPersistedState();
+        showPersistenceWarning('Your saved match data on this device was modified and could not be verified. It will not be recorded on-chain. A fresh match has started.');
         displayEducationalLog("Saved match state failed its integrity check; starting fresh.");
         return false;
     }
@@ -104,6 +243,14 @@ function loadGameStateFromStorage() {
         hasRolledThisTurn = savedState.hasRolledThisTurn;
         isGamePaused = savedState.isGamePaused;
         setupConfigurationLocked = savedState.setupConfigurationLocked;
+
+        // Interrupted-roll recovery: a page closed while an on-chain roll was
+        // in flight (isDiceRolled set at roll start, result never finalized)
+        // must NOT hang the turn. Re-arm it so the roll runs cleanly again.
+        if (isDiceRolled && hasRolledThisTurn && (!currentTurnMoves || currentTurnMoves.length === 0)) {
+            isDiceRolled = false;
+            hasRolledThisTurn = false;
+        }
 
         // Restore the match mode (2P / 4P) FIRST so active-seat logic lines up.
         if (typeof matchMode !== 'undefined' && savedState.matchMode) {
@@ -132,8 +279,19 @@ function loadGameStateFromStorage() {
         }
 
         // A finished match restores to the ceremony (never resumes play).
-        const restoredStatus = (typeof window.getMatchStatus === 'function')
+        let restoredStatus = (typeof window.getMatchStatus === 'function')
             ? window.getMatchStatus() : 'in-progress';
+
+        // REFRESH-SAFE RESUME (fixes "refresh starts a fresh game"): a reload
+        // mid-match must resume the exact same board. Only a truly STALE
+        // in-progress match (untouched for a full day, i.e. a session that
+        // ended long ago) is treated as abandoned and cleared to fresh setup.
+        const STALE_MATCH_MS = 24 * 60 * 60 * 1000;
+        if (restoredStatus === 'in-progress' && savedState.savedAt && (Date.now() - savedState.savedAt) > STALE_MATCH_MS) {
+            if (typeof window.setMatchStatus === 'function') window.setMatchStatus('abandoned');
+            if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+            restoredStatus = 'abandoned';
+        }
 
         // An abandoned match never resumes: clear the cache back to fresh setup.
         if (restoredStatus === 'abandoned') {
@@ -250,6 +408,11 @@ function loadGameStateFromStorage() {
                     if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
                 }
             }, 1500);
+        }
+
+        // Retry any on-chain pushes that could not go through while offline.
+        if (typeof window.flushPendingPushes === 'function') {
+            try { window.flushPendingPushes(); } catch (e) { console.warn('[persistence] pending-push flush failed:', e); }
         }
 
         return true;

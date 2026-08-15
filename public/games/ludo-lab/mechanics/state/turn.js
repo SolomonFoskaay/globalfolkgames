@@ -454,16 +454,9 @@ window.endMatchAbandon = function () {
     setTimeout(() => window.location.reload(), 500);
 };
 
-// Best-effort: if the tab closes mid-match, record status=abandoned so a
-// reload never resumes a match that was abandoned (and it can never reward).
-window.addEventListener('beforeunload', function () {
-    try {
-        if (setupConfigurationLocked && !matchOver && window.getMatchStatus && window.getMatchStatus() === 'in-progress') {
-            if (typeof window.setMatchStatus === 'function') window.setMatchStatus('abandoned');
-            if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
-        }
-    } catch (e) { /* best-effort only */ }
-});
+// REFRESH-SAFE RESUME: no `beforeunload` abandonment. A reload mid-match must
+// resume the exact same board (the stale-match clear lives in persistence.js:
+// only an in-progress match untouched for 24h+ is treated as abandoned).
 
 document.addEventListener('DOMContentLoaded', () => {
     turnSequence.forEach(color => {
@@ -499,4 +492,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }, 200);
+
+    // Chain recovery probe: after any restore, check the on-chain stack and
+    // either pause (banner + monitor + Retry button) or flush pending pushes.
+    setTimeout(() => {
+        if (typeof window.verifyChainForResume === 'function') {
+            window.verifyChainForResume();
+        }
+    }, 1400);
 });

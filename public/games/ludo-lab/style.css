@@ -57,6 +57,68 @@ body {
     border: 2px solid #f39c12;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
+.chain-down-banner #chain-retry-btn {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    background: #f39c12;
+    color: #0f0f13;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+.chain-down-banner #chain-retry-btn:hover { background: #ffb347; }
+.chain-down-banner #chain-retry-btn:active { transform: scale(0.97); }
+
+/* Visible integrity-warning popup (tampered / unverifiable local data).
+   Brand colours: orange accent on the dark canvas, purple on the button. */
+.gfg-persistence-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    align-items: center;
+    justify-content: center;
+    z-index: 1400;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.gfg-persistence-warning .gfg-pw-box {
+    background: #1a1a24;
+    border: 2px solid #f39c12;
+    border-radius: 14px;
+    padding: 22px 24px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.6);
+}
+.gfg-persistence-warning .gfg-pw-title {
+    color: #f39c12;
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+}
+.gfg-persistence-warning .gfg-pw-msg {
+    color: #e8e8ee;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0 0 18px;
+}
+.gfg-persistence-warning #gfg-pw-ok {
+    border: none;
+    border-radius: 9px;
+    padding: 9px 22px;
+    background: #9b59b6;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.gfg-persistence-warning #gfg-pw-ok:hover { background: #b06cc9; }
 
 /* Dedicated On-Screen Cultural Notification Banner Line */
 #ludo-log {
