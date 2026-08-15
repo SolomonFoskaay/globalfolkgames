@@ -440,7 +440,9 @@ check('3+5 with stale counter -> counter force-reset to 0', vm.runInContext('con
   await new Promise(r => setTimeout(r, 900));
 
   console.log('\n== Spec: PAUSE / RESUME async (roll completes, computer re-triggers) ==');
-  // Pause DURING the in-flight roll, resume, then the roll still finalizes.
+  // Pause on the human's turn, resume: the human must NOT get an automated
+  // roll (2P regression: a stale computer timer must never roll a human seat),
+  // and a manual dice tap must still work and finalize after resume.
   lockFreshMatch();
   vm.runInContext(`
     currentTurn = 'green'; isDiceRolled = false; hasRolledThisTurn = false; currentTurnMoves = [];
@@ -450,10 +452,14 @@ check('3+5 with stale counter -> counter force-reset to 0', vm.runInContext('con
   `, sandbox);
   check('paused roll stays blocked', T().isDiceRolled === false, T().isDiceRolled);
   vm.runInContext('toggleArenaPauseState();', sandbox);   // resume
+  check('resume clears pause', T().isGamePaused === false);
   await new Promise(r => setTimeout(r, 300));
-  check('after resume the human can roll again', T().isDiceRolled === true, T().isDiceRolled);
-  await new Promise(r => setTimeout(r, 1200));
-  check('in-flight roll after resume finalizes moves', Array.isArray(T().currentTurnMoves) && T().currentTurnMoves.length === 2, JSON.stringify(T().currentTurnMoves));
+  check('no phantom auto-roll on the human seat after resume', T().isDiceRolled === false, `isDiceRolled=${T().isDiceRolled} turn=${T().currentTurn}`);
+  vm.runInContext('rollDiceEngine();', sandbox);   // human taps the dice after resume
+  await new Promise(r => setTimeout(r, 300));
+  check('human can roll again after resume', T().isDiceRolled === true, T().isDiceRolled);
+  await new Promise(r => setTimeout(r, 900));
+  check('human roll after resume finalizes moves', Array.isArray(T().currentTurnMoves) && T().currentTurnMoves.length === 2, JSON.stringify(T().currentTurnMoves));
 
   // Computer seat: pause then resume -> the automated roll re-triggers.
   vm.runInContext(`

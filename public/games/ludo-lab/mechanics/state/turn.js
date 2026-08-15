@@ -270,6 +270,16 @@ function initiateArenaMatch() {
         return;
     }
 
+    // 2P fix: a fresh match must start on the signed-in user's seat (never an
+    // inactive seat). Reset turn flags so the new turn starts clean.
+    currentTurn = userSeat;
+    isDiceRolled = false;
+    hasRolledThisTurn = false;
+    displayDiceOnBoard = false;
+    lastDiceRoll1 = 0;
+    lastDiceRoll2 = 0;
+    currentTurnMoves = [];
+
     lockSetupDropdowns();
     displayEducationalLog(`${currentTurn.toUpperCase()}: Arena match successfully initiated. Roll dice.`);
 

@@ -241,6 +241,13 @@ async function rollDiceEngine(source) {
         return;
     }
 
+    // 2P fix: AI_CONFIRMED is only ever legitimate on a computer seat. A stale
+    // automated timer firing on a human seat must be rejected, not honoured.
+    if (source === 'AI_CONFIRMED' && playerProfiles[currentTurn].mode !== 'computer') {
+        displayEducationalLog(`ANTI-CHEAT: Automated roll requested for a human seat. Blocked.`);
+        return;
+    }
+
     if (isDiceRolled && hasRolledThisTurn) return;
 
     // On-chain outage pause: never consume the turn nor roll locally.

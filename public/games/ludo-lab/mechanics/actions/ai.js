@@ -6,6 +6,8 @@
 function triggerAutomatedComputerDiceRoll() {
     if (isGamePaused) return;
     if (typeof matchOver !== 'undefined' && matchOver) return;
+    // 2P fix: a stale timer must never auto-roll on a seat that is now human.
+    if (playerProfiles[currentTurn] && playerProfiles[currentTurn].mode !== 'computer') return;
     if (currentTurnMoves.length > 0 || isDiceRolled) return;
     rollDiceEngine('AI_CONFIRMED');
 }
@@ -13,6 +15,8 @@ function triggerAutomatedComputerDiceRoll() {
 function executeAutomatedComputerMove() {
     if (isGamePaused) return;
     if (typeof matchOver !== 'undefined' && matchOver) return;
+    // 2P fix: a stale timer must never auto-move on a seat that is now human.
+    if (playerProfiles[currentTurn] && playerProfiles[currentTurn].mode !== 'computer') return;
     if (currentTurnMoves.length === 0) return;
 
     let activeTokens = tokens[currentTurn];
