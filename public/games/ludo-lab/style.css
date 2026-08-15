@@ -244,16 +244,3 @@ canvas {
     line-height: 1.4;
 }
 
-.ludo-local-points {
-    background: #2a2a3a;
-    color: #9b59b6;
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 12px;
-    white-space: nowrap;
-}
-
-.ludo-local-points span {
-    color: #ffffff;
-}

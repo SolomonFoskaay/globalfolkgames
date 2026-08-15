@@ -1,13 +1,25 @@
-// win-detection.js
-// Detects winners, awards points (Human only), and tracks finishing order for crowns
+// win-detection.js (M1 — game core only)
+// Detects winners, tracks finishing order for crowns, and emits a match-result
+// SEAM when the match completes. M1 knows NOTHING about points, tiers,
+// competitions or rewards: when the match ends it simply publishes the result
+// (finish order + the on-chain proof-roll signature) on
+// window.gfgMatchResultHandlers so an M2/M3 module can consume it later.
 
 (function () {
 
-    let pointsAwardedThisMatch = false;
     let finishOrder = [];   // e.g. ['green', 'red', 'yellow', 'blue']
-    // Scope C: the on-chain result commit (full 1st..4th finish order) mirrors
-    // the award that was banked, tying the committed order to the winning roll.
-    let lastAwardCommit = { points: 0, multiplier: 1, matchRef: 0 };
+
+    // M2/M3 modules subscribe here to consume match results (finish order +
+    // proof-of-play signature). The game itself never touches points.
+    const matchResultHandlers = [];
+
+    window.onGfgMatchResult = function (handler) {
+        if (typeof handler === 'function') matchResultHandlers.push(handler);
+        return () => {
+            const i = matchResultHandlers.indexOf(handler);
+            if (i >= 0) matchResultHandlers.splice(i, 1);
+        };
+    };
 
     function countFinishedTokens(color) {
         if (!window.tokens || !window.tokens[color]) return 0;
@@ -35,132 +47,29 @@
             saveGameStateToStorage();
         }
 
-        // Reward policy (first place only, and only the signed-in user's seat):
-        // - A non-user seat finishing 1st gets NO reward (it's a local/AI seat).
-        // - The user finishing 1st gets +100 ONLY if the match had a valid
-        //   on-chain proof roll (the untamperable proof of play). Otherwise the
-        //   run still counts but earns no points, so users can't farm rewards
-        //   off-chain.
-        const isUserSeat = window.playerProfiles[color]?.isUser === true;
-        const proofRollUsed = typeof window.getOnchainProofUsedThisMatch === 'function'
-            && window.getOnchainProofUsedThisMatch();
-
-        if (position === 1) {
-            if (!isUserSeat) {
-                if (typeof window.showAuthBanner === 'function') {
-                    window.showAuthBanner(`${color.toUpperCase()} finished 1st — no reward (only the signed-in player earns rewards).`);
-                }
-            } else if (!proofRollUsed) {
-                if (typeof window.showAuthBanner === 'function') {
-                    window.showAuthBanner(`You finished 1st! But no on-chain proof roll ran this match — no reward.`);
-                }
-                console.warn('[REWARD] 1st place (you) skipped: no valid on-chain proof roll this match.');
-            } else if (!pointsAwardedThisMatch) {
-                pointsAwardedThisMatch = true;
-
-                const proofSig = typeof window.getLastProofRollSignature === 'function'
-                    ? window.getLastProofRollSignature() : null;
-
-                // S1: Active Tier multiplier applies to the base match win
-                // reward (100 -> 200/300/400 at 2x/3x/4x), capped at +1,000
-                // boosted points/day. The boosted total is what gets banked.
-                const reward = (typeof window.computeWinReward === 'function')
-                    ? window.computeWinReward(100)
-                    : { base: 100, total: 100, mult: 1, boosted: 0 };
-                const awarded = reward.total;
-                lastAwardCommit = {
-                    points: awarded,
-                    multiplier: reward.mult || 1,
-                    matchRef: (typeof window.getLastProofRollSignature === 'function')
-                        ? window.getLastProofRollSignature() : null,
-                };
-
-                if (typeof window.awardLocalLudoPoints === 'function') {
-                    // The proof-roll signature becomes the match_id in Supabase,
-                    // tying the reward to the verifiable on-chain roll.
-                    window.awardLocalLudoPoints(awarded, proofSig);
-                }
-
-                // Scope B: write the award to the player's ON-CHAIN points
-                // PDA, gasless on the ER (session key signs, no SOL). The
-                // receipt signature is the authoritative on-chain proof of the
-                // reward. Fails soft: Supabase already has the record and the
-                // on-chain record is a mirror, not the source of truth.
-                const magic = window.magicblockDice;
-                if (magic && typeof magic.recordPoints === 'function') {
-                    const reasonCode = (window.POINT_REASONS && window.POINT_REASONS.WIN_1ST)
-                        ? window.POINT_REASONS.WIN_1ST : 1;
-                    const matchRef = (magic.matchRefFromSignature && proofSig)
-                        ? magic.matchRefFromSignature(proofSig) : 0;
-                    magic.recordPoints(awarded, reasonCode, matchRef)
-                        .then((onchainReceipt) => {
-                            console.log(`[REWARD] On-chain points recorded — receipt: ${onchainReceipt}`);
-                            const txUrl = onchainReceipt && window.gfgExplorer
-                                ? window.gfgExplorer.txUrl(onchainReceipt) : null;
-                            if (txUrl) console.log(`[REWARD] Verify on-chain → ${txUrl}`);
-                        })
-                        .catch((err) => {
-                            // Never fail the win UX on a mirror write.
-                            console.warn('[REWARD] On-chain points record failed (mirror only):', err.message || err);
-                        });
-                }
-
-                const explorerUrl = proofSig
-                    ? (window.gfgExplorer && window.gfgExplorer.txUrl(proofSig))
-                    : null;
-                console.log(`[REWARD] 1st place (you) +${awarded} — proof roll: ${proofSig}`);
-                if (explorerUrl) {
-                    console.log(`[REWARD] Verify on-chain → ${explorerUrl}`);
-                }
-                if (proofSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
-                    if (typeof showVerifyLink === 'function') {
-                        showVerifyLink(window.gfgExplorer.txLink(proofSig, 'Verify your winning roll on-chain during this match'));
-                    }
-                }
-
-                if (typeof window.showAuthBanner === 'function') {
-                    const boostNote = (reward.mult > 1)
-                        ? ` (${reward.mult}x Active Tier${reward.boosted > 0 ? ' — +' + reward.boosted + ' boost' : ''})`
-                        : '';
-                    window.showAuthBanner(`🎉 You finished 1st! +${awarded} points${boostNote}`);
-                }
-            }
-        }
-
-        // Scope C: when the FULL 1st..4th finish order is known (match over),
-        // commit it on-chain. Gasless ER write (session key signs, no SOL),
-        // soft-fail like the points mirror. Only commits when at least one
-        // valid on-chain proof roll ran this match (the trustworthy play proof).
-        if (proofRollUsed && finishOrder.length === 4) {
-            const magic = window.magicblockDice;
-            if (magic && typeof magic.recordResult === 'function') {
-                const matchRefSig = lastAwardCommit.matchRef
-                    || (typeof window.getLastProofRollSignature === 'function'
-                        ? window.getLastProofRollSignature() : null);
-                const matchRef = (magic.matchRefFromSignature && matchRefSig)
-                    ? magic.matchRefFromSignature(matchRefSig) : 0;
-                magic.recordResult(
-                    finishOrder.slice(),
-                    lastAwardCommit.points || 100,
-                    lastAwardCommit.multiplier || 1,
-                    matchRef,
-                )
-                    .then((receipt) => {
-                        console.log(`[RESULT] On-chain finish order committed — receipt: ${receipt}`);
-                        const txUrl = receipt && window.gfgExplorer
-                            ? window.gfgExplorer.txUrl(receipt) : null;
-                        if (txUrl) console.log(`[RESULT] Verify on-chain → ${txUrl}`);
-                    })
-                    .catch((err) => {
-                        // Never fail the match UX on a mirror write.
-                        console.warn('[RESULT] On-chain finish-order commit failed (mirror only):', err.message || err);
-                    });
-            }
-        }
-
         // Force a redraw so the crown appears immediately
         if (typeof drawLudoLayout === 'function') {
             drawLudoLayout();
+        }
+
+        // Match complete (all 4 seats finished): publish the result seam. The
+        // proof-roll signature (when present) is M1's proof-of-play — M2/M3
+        // decide what to do with it. No points logic lives here.
+        if (finishOrder.length === 4) {
+            const proofSig = typeof window.getLastProofRollSignature === 'function'
+                ? window.getLastProofRollSignature() : null;
+            const result = {
+                game: 'ludo',
+                finishOrder: finishOrder.slice(),
+                proofSignature: proofSig || null,
+                finishedAt: Date.now(),
+            };
+            console.log('[M1] Match complete — emitting result seam', result);
+            matchResultHandlers.slice().forEach(h => {
+                try { h(result); } catch (e) { console.warn('[M1] match-result handler failed:', e); }
+            });
+            const evt = new CustomEvent('gfg:match-result', { detail: result });
+            window.dispatchEvent(evt);
         }
     };
 
@@ -178,7 +87,6 @@
     window.serializeWinState = function () {
         return {
             finishOrder: finishOrder.slice(),
-            pointsAwardedThisMatch: pointsAwardedThisMatch
         };
     };
 
@@ -188,12 +96,10 @@
         if (Array.isArray(state.finishOrder)) {
             finishOrder = state.finishOrder.filter(c => typeof c === 'string');
         }
-        pointsAwardedThisMatch = !!state.pointsAwardedThisMatch;
     };
 
     // Reset only the match flags (Local points stay permanent)
     window.resetWinDetection = function () {
-        pointsAwardedThisMatch = false;
         finishOrder = [];
     };
 
