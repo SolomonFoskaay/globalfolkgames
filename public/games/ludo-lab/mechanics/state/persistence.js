@@ -253,18 +253,32 @@ function loadGameStateFromStorage() {
         }
 
         // Restore the match mode (2P / 4P) FIRST so active-seat logic lines up.
+        // NOTE: we restore matchMode + activeSeats DIRECTLY instead of calling
+        // selectMatchMode()/setActiveSeats() — both are USER actions guarded by
+        // setupConfigurationLocked and would NO-OP on a mid-match reload, leaving
+        // activeSeats at the 4P default and silently re-activating the seats the
+        // player never picked (the 2P-refresh bug). The persisted mode + corner
+        // choice are internal restore data, not user edits.
         if (typeof matchMode !== 'undefined' && savedState.matchMode) {
-            matchMode = savedState.matchMode === '2p' ? '2p' : '4p';
-            // Restore the chosen 2P corner choice BEFORE the mode re-apply so
-            // selectMatchMode('2p') preserves the player's two picked seats.
+            const restoredMode = savedState.matchMode === '2p' ? '2p' : '4p';
+            matchMode = restoredMode;
+
+            let restoredActive = null;
             if (savedState.activeSeats && Array.isArray(savedState.activeSeats) && savedState.activeSeats.length > 0) {
-                if (typeof window.setActiveSeats === 'function') {
-                    window.setActiveSeats(savedState.activeSeats);
-                }
+                const valid = savedState.activeSeats.filter(color => ALL_SEATS.indexOf(color) !== -1);
+                if (valid.length > 0) restoredActive = valid;
             }
-            if (typeof window.selectMatchMode === 'function') {
-                window.selectMatchMode(matchMode);
+
+            if (restoredMode === '4p') {
+                activeSeats = ALL_SEATS.slice();
+            } else if (restoredActive && restoredActive.length === 2) {
+                activeSeats = restoredActive;
+            } else {
+                activeSeats = ['green', 'red'];
             }
+
+            if (typeof ensureUserOnActiveSeat === 'function') ensureUserOnActiveSeat();
+            if (typeof syncModeUI === 'function') syncModeUI();
         }
         
         for (let color in savedState.playerProfiles) {

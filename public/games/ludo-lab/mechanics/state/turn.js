@@ -17,9 +17,10 @@ let hasRolledThisTurn = false;
 // Pause Loop Execution Control States
 let isGamePaused = false;
 
-// Endgame state (M1 locked spec): once ALL active seats are finished the loop
-// STOPS (no infinite cycling, no reset-only ending) and a result ceremony
-// 1st..4th + "Play Again" is shown. matchOver guards every action.
+// Endgame state (M1 locked spec, amended 2026-08-15): once the match is decided
+// — at most ONE active seat left unfinished, the trailing seat auto-last — the
+// loop STOPS (no infinite cycling, no reset-only ending) and a result ceremony
+// 1st..Nth + "Play Again" is shown. matchOver guards every action.
 let matchOver = false;
 
 // Anti-Cheat Automation Settings Engine States
@@ -284,8 +285,9 @@ function passTurnSequence() {
     if (isGamePaused) return;
     if (matchOver) return;
 
-    // Endgame guard: when all active seats are finished the loop must STOP.
-    if (typeof window.allSeatsFinished === 'function' && window.allSeatsFinished()) {
+    // Endgame guard: once the match is decided (at most ONE active seat left
+    // unfinished) the loop must STOP — the trailing seat is auto-last.
+    if (typeof window.isMatchComplete === 'function' && window.isMatchComplete()) {
         return;
     }
 
@@ -374,8 +376,8 @@ window.showResultCeremony = function () {
         const winner = order && order[0];
         const winnerIsUser = winner && window.playerProfiles && window.playerProfiles[winner] && window.playerProfiles[winner].isUser === true;
         msgEl.innerText = winnerIsUser
-            ? 'You win! Match complete — all seats finished.'
-            : 'Match complete — all seats finished.';
+            ? 'You win! Match complete.'
+            : 'Match complete.';
     }
 
     overlay.classList.add('visible');

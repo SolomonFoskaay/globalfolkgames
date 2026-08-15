@@ -5,13 +5,15 @@
 // NOTHING about points, tiers, competitions or rewards: it publishes a
 // canonical result and the platform bus fans it out to M3/M4/M7 consumers.
 //
-// ENDGAME (locked spec):
+// ENDGAME (locked spec, amended 2026-08-15 for early end):
 //   - once a seat has all 4 tokens DISAPPEARED OFF THE BOARD (stepsWalked>=57),
 //     it is "finished"; its turns auto-pass (~1.5s log, no dice roll, no tap)
 //     for human AND computer seats (see turn.js).
-//   - when ALL active seats are finished the loop STOPS (no infinite cycling),
-//     status=finished, the seam is emitted and the result ceremony 1st..4th +
-//     "Play Again" is shown. No reset-only ending, no skip-remaining toggle.
+//   - the match is DECIDED the moment at most ONE active seat has not finished
+//     (2P: one winner ends it, the other is 2nd; 4P: three winners end it, the
+//     last is 4th). The trailing seat is auto-last and never plays its turns.
+//     Then the loop STOPS, status=finished, the seam is emitted and the result
+//     ceremony 1st..Nth + "Play Again" is shown.
 
 (function () {
 
@@ -31,12 +33,26 @@
     };
 
     // Every seat in the active turn sequence must finish (2P: both seats;
-    // 4P: all 4). No "leader wins and match ends" shortcut.
+    // 4P: all 4).
     window.allSeatsFinished = function () {
         const active = (typeof window.getActiveSeats === 'function')
             ? window.getActiveSeats()
             : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
         return active.every(c => window.isSeatFinished(c));
+    };
+
+    // NEW endgame rule (owner-approved 2026-08-15): the match is decided the
+    // moment at most ONE active seat has not finished. The last unfinished seat
+    // is auto-last — its turn is never played (2P: one winner ends it, the
+    // other is 2nd; 4P: three winners end it, the last is 4th). This stops the
+    // match from dragging on for the trailing seat, which wastes on-chain ER
+    // rolls for zero decision.
+    window.isMatchComplete = function () {
+        const active = (typeof window.getActiveSeats === 'function')
+            ? window.getActiveSeats()
+            : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
+        const unfinished = active.filter(c => !window.isSeatFinished(c));
+        return unfinished.length <= 1;
     };
 
     window.getMatchStatus = function () {
@@ -76,16 +92,28 @@
             drawLudoLayout();
         }
 
-        // Match complete (ALL active seats finished): stop the loop, mark the
-        // outcome, publish the universal game result envelope and show the
-        // 1st..4th ceremony. M1 only reports facts:
+        // Match complete (the match is decided once at most ONE active seat is
+        // unfinished): the remaining seat is auto-last, then we stop the loop,
+        // mark the outcome, publish the universal game result envelope and show
+        // the 1st..Nth ceremony. M1 only reports facts:
         //   - who played each seat (actor: user / house / local)
         //   - the finish order (position)
         //   - the on-chain proof of play (VRF roll signature) when present
         // The platform bus (window.publishGameResult) attaches identity to the
         // 'user' seat and fans the result out to M3/M4/M7. No points logic
         // lives here, and M1 never calls reward-bound instructions.
-        if (window.allSeatsFinished()) {
+        if (window.isMatchComplete()) {
+            // Auto-last: the one remaining unfinished active seat gets the final
+            // position without playing its trailing turns (the game is decided).
+            const active = (typeof window.getActiveSeats === 'function')
+                ? window.getActiveSeats()
+                : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
+            active.forEach(c => {
+                if (!finishOrder.includes(c) && !window.isSeatFinished(c)) {
+                    finishOrder.push(c);
+                }
+            });
+
             matchStatus = 'finished';
             if (typeof saveGameStateToStorage === 'function') {
                 saveGameStateToStorage();
