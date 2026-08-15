@@ -10,15 +10,25 @@ const COLORS = {
     blue: '#3498db',
     red: '#e74c3c',
     white: '#ffffff',
-    gray: '#2c3e50',
+    gray: '#c3c3cf',   // light board grid line (native Ludo = white board, not black)
     dark: '#1a1a1a'
 };
+
+// Purely cosmetic arrow overlays (native Ludo look). NEVER affect mechanics:
+// they only tell the player which way pieces travel (clockwise track) and
+// which way the home column leads into the center.
+const ARROW_COLOR = 'rgba(60,72,88,0.72)';
 
 let globalBlinkAlpha = 1.0;
 let blinkGrowing = false;
 
 function drawLudoLayout() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Native Ludo board: white surface, not black. Fill before the grid so
+    // every uncoloured cell reads as clean white instead of dark boxes.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
@@ -49,7 +59,64 @@ function drawLudoLayout() {
     drawCell(6, 13, COLORS.red); 
 
     drawCenterTriangles();
+    drawPathArrows();
     drawAllTokens();
+}
+
+// Small straight arrow centred in a cell, pointing in the given direction.
+// angleDeg: 0 = east (→), 90 = south (↓), 180 = west (←), -90/270 = north (↑).
+function drawArrowInCell(col, row, angleDeg, color) {
+    const cx = (col + 0.5) * CELL_SIZE;
+    const cy = (row + 0.5) * CELL_SIZE;
+    const s = CELL_SIZE * 0.3; // arrow half-length
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angleDeg * Math.PI / 180);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = Math.max(1.8, CELL_SIZE * 0.06);
+    ctx.lineCap = 'round';
+
+    // Shaft
+    ctx.beginPath();
+    ctx.moveTo(-s, 0);
+    ctx.lineTo(s * 0.7, 0);
+    ctx.stroke();
+
+    // Head
+    ctx.beginPath();
+    ctx.moveTo(s * 0.7, 0);
+    ctx.lineTo(s * 0.28, -s * 0.42);
+    ctx.lineTo(s * 0.28, s * 0.42);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+// Clockwise-direction + home-column arrows (native Ludo board look).
+// Purely decorative: drawn under the tokens, never read by the game logic.
+function drawPathArrows() {
+    const whiteArrow = '#ffffff';
+
+    // HOME COLUMNS: each coloured cell carries a white arrow pointing toward
+    // the centre (that is the way that colour's pieces finish).
+    for (let c = 1; c <= 6; c++) drawArrowInCell(c, 7, 0, whiteArrow);        // green  -> east
+    for (let r = 1; r <= 6; r++) drawArrowInCell(7, r, 90, whiteArrow);       // yellow -> south
+    for (let c = 9; c <= 14; c++) drawArrowInCell(c, 7, 180, whiteArrow);     // blue   -> west
+    for (let r = 9; r <= 14; r++) drawArrowInCell(7, r, -90, whiteArrow);     // red    -> north
+
+    // MAIN TRACK: straight arrows on white path cells showing the clockwise
+    // direction of travel around the board.
+    drawArrowInCell(3, 6, 0, ARROW_COLOR);
+    drawArrowInCell(4, 6, 0, ARROW_COLOR);
+    drawArrowInCell(8, 3, 90, ARROW_COLOR);
+    drawArrowInCell(8, 4, 90, ARROW_COLOR);
+    drawArrowInCell(11, 8, 180, ARROW_COLOR);
+    drawArrowInCell(12, 8, 180, ARROW_COLOR);
+    drawArrowInCell(6, 11, -90, ARROW_COLOR);
+    drawArrowInCell(6, 12, -90, ARROW_COLOR);
 }
 
 function drawCell(col, row, color) {
@@ -65,9 +132,20 @@ function drawCell(col, row, color) {
 //     ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2); ctx.fill();
 // }
 
+// Active-seat model (2P: only the two chosen seats play). Used to grey out
+// inactive yards and skip their tokens entirely.
+function isSeatActive(colorName) {
+    if (typeof window.getActiveSeats === 'function') {
+        return window.getActiveSeats().indexOf(colorName) !== -1;
+    }
+    return true; // No active-seat model loaded — behave like a classic 4-seat board.
+}
+
 function drawBigYard(startCol, startRow, colorName) {
     const color = COLORS[colorName];
-    ctx.fillStyle = color;
+    const inactive = !isSeatActive(colorName);
+
+    ctx.fillStyle = inactive ? 'rgba(118,118,128,0.5)' : color;
     ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
 
     ctx.strokeStyle = COLORS.white;
@@ -80,13 +158,23 @@ function drawBigYard(startCol, startRow, colorName) {
     ctx.arc((startCol + 3) * CELL_SIZE, (startRow + 3) * CELL_SIZE, CELL_SIZE * 2, 0, Math.PI * 2);
     ctx.fill();
 
+    const centerX = (startCol + 3) * CELL_SIZE;
+    const centerY = (startRow + 3) * CELL_SIZE;
+
+    // ===== INACTIVE seat (2P mode): greyed yard, bold label, NO crown =====
+    if (inactive) {
+        ctx.font = `bold ${CELL_SIZE * 0.78}px system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(20,20,28,0.7)';
+        ctx.fillText('INACTIVE', centerX, centerY);
+        return;
+    }
+
     // ===== CROWN for finished players =====
     if (typeof window.getPlayerRank === 'function') {
         const rank = window.getPlayerRank(colorName);
         if (rank > 0) {
-            const centerX = (startCol + 3) * CELL_SIZE;
-            const centerY = (startRow + 3) * CELL_SIZE;
-
             // Crown emoji
             ctx.font = `${CELL_SIZE * 1.8}px serif`;
             ctx.textAlign = 'center';
@@ -114,6 +202,7 @@ function drawAllTokens() {
     let gridOccupancyMap = {};
 
     Object.keys(tokens).forEach(color => {
+        if (!isSeatActive(color)) return; // 2P: inactive seats show NO tokens
         tokens[color].forEach((token, index) => {
             if (token.stepsWalked >= 57) return; // Hide completed tokens that reached the center
 

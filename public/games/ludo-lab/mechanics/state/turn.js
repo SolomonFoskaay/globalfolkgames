@@ -36,27 +36,23 @@ window.playerProfiles = {
 const turnSequence = ['green', 'yellow', 'blue', 'red'];
 const colorsMap = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
 
-// Match mode: '2p' (green + red, the opposite corners) or '4p' (all four).
-// Selectable BEFORE the match locks; after lock it is frozen. Active seats in
-// 2P mode are turnSequence[0] (green) and turnSequence[3] (red) — the classic
-// 2-player Ludo setup. The locked spec's COMPLETED DEFINITION requires both
-// seats (2P) or all four seats (4P) to finish, so the endgame + ceremony +
-// seam all derive from the ACTIVE seats only.
+// Match mode: '2p' (exactly TWO seats, user picks any two colours) or '4p'
+// (all four). Selectable BEFORE the match locks; after lock it is frozen.
+// The locked spec's COMPLETED DEFINITION requires every ACTIVE seat to finish
+// (2P: both chosen seats, 4P: all four), so the turn loop, endgame, ceremony
+// and seam all derive from the ACTIVE seats only.
 let matchMode = '4p';
-const MODE_ACTIVE_SEATS = {
-    '2p': ['green', 'red'],
-    '4p': ['green', 'yellow', 'blue', 'red'],
-};
 const ALL_SEATS = ['green', 'yellow', 'blue', 'red'];
+let activeSeats = ALL_SEATS.slice();   // mutable: the seats actually in the match
 
 // Active seats for the current mode (what the turn loop, endgame and seam use).
 function getActiveSeats() {
-    return MODE_ACTIVE_SEATS[matchMode] || MODE_ACTIVE_SEATS['4p'];
+    return activeSeats.slice();
 }
 window.getActiveSeats = getActiveSeats;
 
-// Public: select 2P / 4P before the match locks. In 2P, the yellow + blue
-// seat dropdowns are disabled (their slots stay visible but greyed out).
+// Public: select 2P / 4P before the match locks. In 2P, the user picks ANY two
+// colours (defaults to green + red); in 4P all four seats are active.
 window.selectMatchMode = function (mode) {
     if (setupConfigurationLocked) {
         displayEducationalLog("ERROR: Match already active. Mode cannot be changed.");
@@ -64,34 +60,101 @@ window.selectMatchMode = function (mode) {
     }
     matchMode = (mode === '2p') ? '2p' : '4p';
 
-    const active = getActiveSeats();
-
-    // Keep the signed-in 'You' seat on an ACTIVE seat: if the current 'You'
-    // seat is no longer active (e.g. user was 'You' on yellow, then switched
-    // to 2P), fall back to green. Otherwise leave the player's choice alone.
-    const userOnActive = active.find(color => playerProfiles[color] && playerProfiles[color].isUser === true);
-    if (!userOnActive) {
-        turnSequence.forEach(color => { playerProfiles[color].isUser = false; });
-        playerProfiles.green = { mode: 'human', isUser: true };
+    if (matchMode === '4p') {
+        activeSeats = ALL_SEATS.slice();
+    } else {
+        // Keep any previous 2P choice; first time defaults to green + red.
+        if (activeSeats.length !== 2) {
+            activeSeats = ['green', 'red'];
+        }
     }
 
-    // Disable the seats that are NOT active in this mode.
-    ALL_SEATS.forEach(color => {
-        const selectElement = document.getElementById(`type-${color}`);
-        if (selectElement) {
-            selectElement.disabled = active.indexOf(color) === -1;
-            selectElement.value = playerProfiles[color].isUser ? 'you' : playerProfiles[color].mode;
-        }
-    });
+    ensureUserOnActiveSeat();
+    syncModeUI();
+    displayEducationalLog(`Match mode: ${matchMode === '2p' ? '2 Players - tap a colour to pick your two seats' : '4 Players'}.`);
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+};
 
+// Public: tap a seat colour to toggle it in/out of the match (2P only).
+// During selection 1..2 seats stay active (so the pair can be freely swapped:
+// remove one, add another); locking enforces EXACTLY two (initiateArenaMatch).
+window.toggleActiveSeat = function (color) {
+    if (setupConfigurationLocked) {
+        displayEducationalLog("ERROR: Match already active. Seats cannot be changed.");
+        return;
+    }
+    if (matchMode !== '2p') {
+        displayEducationalLog("Seat choice applies in 2 Players mode.");
+        return;
+    }
+
+    const index = activeSeats.indexOf(color);
+    if (index === -1) {
+        // Adding beyond two is blocked — a 3rd seat has no turn slot in 2P.
+        if (activeSeats.length >= 2) {
+            displayEducationalLog("2 Players: exactly two seats play. Tap one of the active colours to swap it out first.");
+            return;
+        }
+        activeSeats.push(color);
+    } else {
+        // Removing the last active seat is blocked — every match needs a seat.
+        if (activeSeats.length <= 1) {
+            displayEducationalLog("2 Players: at least one seat must stay active.");
+            return;
+        }
+        activeSeats.splice(index, 1);
+    }
+
+    ensureUserOnActiveSeat();
+    syncModeUI();
+    displayEducationalLog(`2 Players: ${activeSeats.map(c => c.toUpperCase()).join(' vs ')}.`);
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+};
+
+// Keep the signed-in 'You' seat on an ACTIVE seat (never on a disabled one).
+function ensureUserOnActiveSeat() {
+    const userOnActive = activeSeats.find(color => playerProfiles[color] && playerProfiles[color].isUser === true);
+    if (!userOnActive) {
+        ALL_SEATS.forEach(color => { if (playerProfiles[color]) playerProfiles[color].isUser = false; });
+        const first = activeSeats[0] || 'green';
+        playerProfiles[first] = { mode: 'human', isUser: true };
+    }
+}
+
+// Restore the previously chosen active seats (2P corner choice) on reload.
+window.setActiveSeats = function (colors) {
+    if (setupConfigurationLocked) return;
+    if (Array.isArray(colors) && colors.length > 0) {
+        activeSeats = colors.filter(color => ALL_SEATS.indexOf(color) !== -1);
+        if (activeSeats.length !== 2) {
+            activeSeats = ['green', 'red'];
+        }
+        ensureUserOnActiveSeat();
+        syncModeUI();
+    }
+};
+
+// Reflect the active/inactive seats in the setup slots: inactive seats get a
+// bold INACTIVE badge and a greyed (disabled) dropdown; active seats are live.
+function syncModeUI() {
     const btn2 = document.getElementById('mode-2p');
     const btn4 = document.getElementById('mode-4p');
     if (btn2) btn2.classList.toggle('active', matchMode === '2p');
     if (btn4) btn4.classList.toggle('active', matchMode === '4p');
 
-    displayEducationalLog(`Match mode: ${matchMode === '2p' ? '2 Players (Green vs Red)' : '4 Players'}.`);
-    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
-};
+    ALL_SEATS.forEach(color => {
+        const slot = document.getElementById(`slot-${color}`);
+        const selectElement = document.getElementById(`type-${color}`);
+        const statusEl = document.getElementById(`seat-status-${color}`);
+        const active = activeSeats.indexOf(color) !== -1;
+        if (slot) slot.classList.toggle('inactive', !active);
+        if (selectElement) {
+            selectElement.disabled = !active;
+            selectElement.value = playerProfiles[color].isUser ? 'you' : playerProfiles[color].mode;
+        }
+        if (statusEl) statusEl.style.display = active ? 'none' : 'inline';
+    });
+}
 
 function toggleArenaPauseState() {
     if (!setupConfigurationLocked) {
@@ -188,6 +251,12 @@ function initiateArenaMatch() {
         return;
     }
 
+    // 2P mode locks with EXACTLY two active seats (corner choice is complete).
+    if (matchMode === '2p' && activeSeats.length !== 2) {
+        displayEducationalLog("ERROR: 2 Players needs exactly two active seats — tap the colour pills to pick your two.");
+        return;
+    }
+
     let humanCount = 0;
     activeSeats.forEach(color => {
         const selectElement = document.getElementById(`type-${color}`);
@@ -220,7 +289,7 @@ function passTurnSequence() {
         return;
     }
 
-    // Advance only within the ACTIVE seats (2P: green<->red, 4P: all four).
+    // Advance only within the ACTIVE seats (2P: the two chosen seats, 4P: all four).
     const active = getActiveSeats();
     let nextIndex = (active.indexOf(currentTurn) + 1) % active.length;
     currentTurn = active[nextIndex];

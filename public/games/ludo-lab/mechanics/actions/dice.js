@@ -269,11 +269,14 @@ async function rollDiceEngine(source) {
 
     if (physicsAnimationLoop) cancelAnimationFrame(physicsAnimationLoop);
 
-    // Dice are locked to the on-chain result (physics snaps to finalValue at rest)
+    // Dice are locked to the on-chain result (physics snaps to finalValue at rest).
+    // Each die gets a little random tumble (rotV) so they look thrown, and a
+    // natural rattle plays as they fly across the board.
     physicalDice = [
-        { x: 260, y: 280, vx: (Math.random() * 12) - 6, vy: (Math.random() * 12) - 6, value: rollValues[0], finalValue: rollValues[0] },
-        { x: 310, y: 290, vx: (Math.random() * 12) - 6, vy: (Math.random() * 12) - 6, value: rollValues[1], finalValue: rollValues[1] }
+        { x: 200, y: 260, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[0], finalValue: rollValues[0], rotV: (Math.random() - 0.5) * 0.09 },
+        { x: 310, y: 300, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[1], finalValue: rollValues[1], rotV: (Math.random() - 0.5) * 0.09 }
     ];
+    if (typeof playDiceRattle === 'function') playDiceRattle();
 
     runDicePhysicsCalculations();
 }

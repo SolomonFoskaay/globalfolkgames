@@ -26,6 +26,7 @@ function saveGameStateToStorage() {
         setupConfigurationLocked,
         playerProfiles,
         matchMode: (typeof matchMode !== 'undefined') ? matchMode : '4p',
+        activeSeats: (typeof getActiveSeats === 'function') ? getActiveSeats() : null,
         winState,
         tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null
     };
@@ -52,6 +53,13 @@ function loadGameStateFromStorage() {
         // Restore the match mode (2P / 4P) FIRST so active-seat logic lines up.
         if (typeof matchMode !== 'undefined' && savedState.matchMode) {
             matchMode = savedState.matchMode === '2p' ? '2p' : '4p';
+            // Restore the chosen 2P corner choice BEFORE the mode re-apply so
+            // selectMatchMode('2p') preserves the player's two picked seats.
+            if (savedState.activeSeats && Array.isArray(savedState.activeSeats) && savedState.activeSeats.length > 0) {
+                if (typeof window.setActiveSeats === 'function') {
+                    window.setActiveSeats(savedState.activeSeats);
+                }
+            }
             if (typeof window.selectMatchMode === 'function') {
                 window.selectMatchMode(matchMode);
             }
