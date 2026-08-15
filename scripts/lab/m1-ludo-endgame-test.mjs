@@ -561,6 +561,24 @@ check('3+5 with stale counter -> counter force-reset to 0', vm.runInContext('con
   sandbox.localStorage.removeItem('gfg_ludo_persistence_state');
   sandbox.localStorage.removeItem('gfg_ludo_persistence_state_digest');
 
+  console.log('\n== Spec: 2P turn label syncs to the chosen starting seat ==');
+  vm.runInContext(`
+    setupConfigurationLocked = false; matchOver = false; window.resetWinDetection();
+    window.setMatchStatus('in-progress');
+    window.selectMatchMode('2p');
+    window.setActiveSeats(['yellow','red']);
+    window.playerProfiles.yellow = { mode: 'human', isUser: true };
+    window.playerProfiles.red = { mode: 'computer', isUser: false };
+    window.playerProfiles.green.isUser = false; window.playerProfiles.green.mode = 'human';
+    window.playerProfiles.blue.isUser = false; window.playerProfiles.blue.mode = 'computer';
+    document.getElementById('type-yellow').value = 'you';
+    document.getElementById('type-red').value = 'computer';
+    window.initiateArenaMatch();
+  `, sandbox);
+  check('2P match starts on the user seat (yellow)', T().currentTurn === 'yellow', T().currentTurn);
+  check('2P dice-box turn label shows Yellow', els['turn-indicator'].innerText === "Yellow's Turn", els['turn-indicator'].innerText);
+  check('2P dice-box turn label uses the seat colour', els['turn-indicator'].style.color === vm.runInContext('colorsMap.yellow', sandbox), els['turn-indicator'].style.color);
+
   console.log(`\n================  RESULT: ${passed} passed, ${failed} failed  ================`);
   process.exit(failed ? 1 : 0);
 })();

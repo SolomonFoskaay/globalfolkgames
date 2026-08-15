@@ -280,6 +280,15 @@ function initiateArenaMatch() {
     lastDiceRoll2 = 0;
     currentTurnMoves = [];
 
+    // Keep the dice-box turn label in sync with the actual starting seat
+    // (previously it stayed on the HTML default "Green's Turn" until the first
+    // turn pass, even when the match correctly started on YELLOW/RED etc).
+    const turnIndicator = document.getElementById('turn-indicator');
+    if (turnIndicator) {
+        turnIndicator.innerText = `${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}'s Turn`;
+        turnIndicator.style.color = colorsMap[currentTurn];
+    }
+
     lockSetupDropdowns();
     displayEducationalLog(`${currentTurn.toUpperCase()}: Arena match successfully initiated. Roll dice.`);
 
