@@ -1055,6 +1055,7 @@ name = "gfg-dice"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "borsh 1.8.0",
  "ephemeral-rollups-sdk",
 ]
 

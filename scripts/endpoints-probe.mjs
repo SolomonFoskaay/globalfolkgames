@@ -33,6 +33,7 @@ import './load-env.mjs';
 import { routerUrl } from '../src/gfg-rpc.js';
 import { createConnection, getDelegationStatus } from '../src/gfg-rpc.js';
 import { spendCaps, loadLedger, spendTotals, spendAnalytics, gasForecast } from './spend-ledger.mjs';
+import { fetchCompState, compPda } from './comp-relay.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -181,7 +182,7 @@ async function buildAccountsTracker() {
         base.balanceSol = +(b / 1e9).toFixed(4);
       }
     } catch (e) { base.balanceError = e.message; }
-    if (entry.kind === 'dice-pda' || entry.kind === 'points-pda') {
+    if (entry.kind === 'dice-pda' || entry.kind === 'points-pda' || entry.kind === 'result-pda') {
       try {
         const d = await getDelegationStatus(getConn(), entry.address);
         base.delegated = !!(d && d.isDelegated);
@@ -200,6 +201,10 @@ async function buildAccountsTracker() {
     await add({ role: 'House dice PDA (computer rolls)', kind: 'dice-pda', address: housePda.toBase58(), gasless: 'Dice account for computer seats; rolls gasless on the ER VRF queue.' });
     const [housePointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'House points PDA (Scope B ledger)', kind: 'points-pda', address: housePointsPda.toBase58(), gasless: 'Points ledger for the house seat; record_points runs gasless on the ER.' });
+    const [houseResultPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgresult'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'House result PDA (Scope C order)', kind: 'result-pda', address: houseResultPda.toBase58(), gasless: 'Finish-order ledger for the house seat; record_result runs gasless on the ER.' });
+    const [compPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgcomp'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'Competition escrow (S2)', kind: 'result-pda', address: compPda.toBase58(), gasless: 'One active competition per sponsor; fund/close/settle/claim run gasless on the ER. 70/30 rake split enforced by the program.' });
   }
 
   let players = [];
@@ -211,6 +216,8 @@ async function buildAccountsTracker() {
     await add({ role: 'Player dice PDA', kind: 'dice-pda', address: pda.toBase58(), gasless: 'This player\'s dice account; rolls gasless on the ER VRF queue.' });
     const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'Player points PDA (Scope B ledger)', kind: 'points-pda', address: pointsPda.toBase58(), gasless: 'This player\'s on-chain points ledger; record_points runs gasless on the ER.' });
+    const [resultPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgresult'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'Player result PDA (Scope C order)', kind: 'result-pda', address: resultPda.toBase58(), gasless: 'This player\'s on-chain finish-order ledger; record_result runs gasless on the ER.' });
   }
 
   return {
@@ -374,6 +381,18 @@ export async function runProbe() {
     accountsTracker = { error: e.message };
   }
 
+  // ---- Competition escrow (S2): live on-chain state for the ops panel ----
+  let compState = null;
+  try {
+    if (sponsor && sponsor.pubkey && compPda) {
+      const pda = compPda(sponsor.pubkey);
+      const s = await fetchCompState(pda.toBase58());
+      compState = { compPda: pda.toBase58(), state: s };
+    }
+  } catch (e) {
+    compState = { error: e.message };
+  }
+
   // ---- Leak scan: findings go to the server log ONLY (never the payload) ----
   logLeakSinks(sponsor, ledger, changelog);
 
@@ -389,6 +408,7 @@ export async function runProbe() {
       gitRef: gitRef(),
       inventory: INVENTORY,
       accounts: accountsTracker,
+      compState,
     },
     probeMs: Date.now() - started,
   };

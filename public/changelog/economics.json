@@ -126,6 +126,31 @@
       ],
       "added": "2026-08-14",
       "updated": "2026-08-14"
+    },
+    {
+      "id": "econ-007",
+      "title": "Core architecture: modular point layers + pluggable modules (game-agnostic)",
+      "stage": "fine-tuned",
+      "summary": "The platform is built as pluggable modules, not a rigid stack: the game, its pure local points, the 3 global ledgers, competitions, and sponsor escrow are each independent modules that slot together. No module is tailored to any single game.",
+      "notes": [
+        "MODULE MAP (each independent + pluggable):",
+        "  M1 Game core + proof of play. Per-game engine + on-chain VRF dice + verifiable roll. Knows NOTHING about points, tiers, comps. Ludo is the first M1; Ayo Olopon and 50+ games each become their own M1 instance",
+        "  M2 Local points (per game, PURE, on-chain). Only verified gameplay + win (proof-of-play gated). NO multiplier, NO purchase, NO bonus, NO giveaway, NO referral. Can never be diluted. Feeds in-game levels + future untransferable level NFT. On-chain PDA per game",
+        "  M3 Global points (3 ledgers, site-wide, decoupled from how games are played): (a) GLOBAL PURE - strictly the sum of M2 local wins across ALL games, no multiplier, honest cross-game skill total; (b) GLOBAL LIFETIME (unspendable) - every point ever earned from ANY source (games, signup, giveaway, referral, sub multiplier); (c) GLOBAL SPENDABLE - the spendable split of lifetime. 2x/3x/4x Active Tier multiplier applies ONLY at M3 flow-up (lifetime + spendable), NEVER on M2 local or M3 pure. Purchases/signup/referral feed M3 only",
+        "  M4 Competitions (standalone, game-agnostic). Entry config = points requirement + optional custom fields (e.g. phone number for airtime). Plugs into one/multiple/ALL games. Pluggable payout: airtime, escrow, manual. Runs fine with NO sponsor",
+        "  M5 Sponsor escrow (OPTIONAL plugin, separate from M4). Brand-funded prize pool locked on-chain BEFORE the event, 30/70 rake at settle. A competition may use M5 or not",
+        "RULES: game + rewards separated (M1 never calls M3); competition stands alone from sponsor (M4 needs no M5); local points never diluted (only M2 feed M3-pure and M3-lifetime-flow, always with a source tag like 'Ludo' / 'Ayo Olopon'); everything plugs in/interchangeably",
+        "S STAGES REDO: S0 = M1 Ludo whole + testable (on-chain dice, local points, global flow-up). S1 = M3 global ledgers + tier multiplier applied at flow-up. S2 = M4 competitions game-agnostic + M5 escrow as plugin. S3+ = on-ramp, cosmetics, ads, stake, licence (unchanged)"
+      ],
+      "tags": [
+        "architecture",
+        "modules",
+        "points",
+        "multi-game",
+        "game-agnostic"
+      ],
+      "added": "2026-08-14",
+      "updated": "2026-08-14"
     }
   ]
 }

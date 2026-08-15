@@ -23,6 +23,36 @@
 //                          The transaction signature is the authoritative
 //                          on-chain receipt of the reward.
 //
+// Match results (Scope C — on-chain finish order):
+//   - `initialize_result`: creates the player's RESULT PDA (base layer, app
+//                          pays rent). Seed `gfgresult`, same player_authority.
+//   - `delegate_result`  : moves the result PDA into the ER session (base
+//                          layer, app pays) so records run gasless.
+//   - `record_result`    : commits the FULL 1st..4th finish order of a match
+//                          on the ER. FREE for the player (session key signs,
+//                          no SOL). This completes the on-chain match story:
+//                          dice roll -> reward points -> full finish order.
+//
+// Competitions (S2 — earn + brand escrow, 30/70 rake):
+//   - `initialize_comp`  : creates a Competition escrow PDA (base layer, app
+//                          pays rent). Seed `gfgcomp` + comp_id, authority =
+//                          the sponsor (brand / the app relay).
+//   - `delegate_comp`    : moves the competition PDA into the ER session so
+//                          fund/settle/claim run gasless.
+//   - `fund_comp`        : the sponsor LOCKS the prize pool on-chain BEFORE
+//                          the event (Open -> prize_pool += amount).
+//   - `close_comp`       : closes entry after the deadline (Open -> Funded).
+//   - `settle_comp`      : program logic splits the pool: 70% to winners
+//                          (50/30/20 for 1st/2nd/3rd), 30% platform rake.
+//                          Requires the pool funded; sponsor triggers it.
+//   - `claim_comp`       : a winner claims their allocation gasless on the ER;
+//                          credits their points PDA and marks the allocation
+//                          claimed. Signed by the winner's session key.
+//   Proven pattern (BracketChain / SkillOS): prize LOCKED in a smart-contract
+//   escrow BEFORE the event, payouts by program logic, no third-party custody.
+//   On devnet the pool is mirror points (free money) — real-value escrow +
+//   legal framing is a mainnet item.
+//
 // Active Tier (S1, FUTURE/mainnet design, NOT implemented in this build):
 //   - `initialize_tier`   : creates the player's TIER PDA (base layer, app
 //                           pays rent). Seed `gfgtier`, same player_authority.
@@ -61,6 +91,11 @@ declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
 pub const PLAYER: &[u8] = b"gfgplayerd";
 pub const POINTS: &[u8] = b"gfgpoints";
+pub const RESULT: &[u8] = b"gfgresult";
+pub const COMP: &[u8] = b"gfgcomp";
+
+pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
+pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
 
 #[ephemeral]
 #[program]
@@ -214,6 +249,185 @@ pub mod gfg_dice {
         .build_and_invoke()?;
         Ok(())
     }
+
+    /// Idempotent: creates the player's RESULT PDA if it does not exist yet.
+    /// Payer (sponsor) pays rent; the account belongs to `player_authority`.
+    pub fn initialize_result(ctx: Context<InitializeResult>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Delegates the player's RESULT PDA into an ER session (base layer,
+    /// sponsor pays) so `record_result` runs gasless on the rollup.
+    pub fn delegate_result(ctx: Context<DelegateResultInput>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_result(
+            &ctx.accounts.payer,
+            &[RESULT, authority.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Commits the FULL 1st..4th finish order of a match. Runs GASLESS on the
+    /// ER: the player's session key is the only signer, no SOL needed.
+    /// `finish_order[i]` is the player (color/seat index) that finished in
+    /// position i+1 (0 = 1st place). `points`/`multiplier`/`match_ref` mirror
+    /// the same values the reward used, so the result ties to the winning roll.
+    pub fn record_result(
+        ctx: Context<RecordResultCtx>,
+        finish_order: [u8; 4],
+        points: u64,
+        multiplier: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        let dest = &mut ctx.accounts.result;
+        dest.finish_order = finish_order;
+        dest.points = points;
+        dest.multiplier = multiplier;
+        dest.match_ref = match_ref;
+        dest.last_recorded_ts = Clock::get()?.unix_timestamp;
+        dest.result_count = dest.result_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Creates a Competition escrow PDA. Base layer; the payer (sponsor) covers
+    /// rent. The sponsor authority is the creator; only they can fund/close.
+    pub fn initialize_comp(
+        ctx: Context<InitializeComp>,
+        comp_id: u64,
+        entry_fee: u64,
+        ends_at: i64,
+    ) -> Result<()> {
+        let comp = &mut ctx.accounts.comp;
+        comp.comp_id = comp_id;
+        comp.sponsor = ctx.accounts.sponsor.key();
+        comp.entry_fee = entry_fee;
+        comp.ends_at = ends_at;
+        comp.prize_pool = 0;
+        comp.state = CompState::Open as u8;
+        comp.winner_count = 0;
+        Ok(())
+    }
+
+    /// Delegates the Competition PDA into an ER session (base layer, sponsor
+    /// pays) so fund/settle/claim run gasless on the rollup.
+    pub fn delegate_comp(ctx: Context<DelegateCompInput>) -> Result<()> {
+        ctx.accounts.delegate_comp(
+            &ctx.accounts.payer,
+            &[COMP, ctx.accounts.payer.key().as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Sponsor LOCKS prize pool into the escrow BEFORE the event. Base layer
+    /// or ER (sponsor signs either way). Open -> prize_pool += amount.
+    pub fn fund_comp(ctx: Context<FundCompCtx>, amount: u64) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        require!(
+            ctx.accounts.comp.state == CompState::Open as u8,
+            PointsError::NotOpen
+        );
+        let comp = &mut ctx.accounts.comp;
+        comp.prize_pool = comp
+            .prize_pool
+            .checked_add(amount)
+            .ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Sponsor closes entry once the deadline has passed. Open -> Funded.
+    pub fn close_comp(ctx: Context<CloseCompCtx>) -> Result<()> {
+        require!(
+            ctx.accounts.comp.state == CompState::Open as u8,
+            PointsError::NotOpen
+        );
+        require!(
+            Clock::get()?.unix_timestamp >= ctx.accounts.comp.ends_at,
+            PointsError::StillRunning
+        );
+        ctx.accounts.comp.state = CompState::Funded as u8;
+        Ok(())
+    }
+
+    /// Program logic splits a funded pool: 70% to the winners bucket (split
+    /// 50/30/20 across 1st/2nd/3rd), 30% stays as platform rake. Sponsor
+    /// submits the winner table after the on-chain finish orders resolve; the
+    /// program validates the total and stores the allocations so claims are
+    /// enforceable. Funded -> Settled.
+    pub fn settle_comp(
+        ctx: Context<SettleCompCtx>,
+        winners: [Pubkey; 3],
+        amounts: [u64; 3],
+    ) -> Result<()> {
+        let comp = &mut ctx.accounts.comp;
+        require!(
+            comp.state == CompState::Funded as u8,
+            PointsError::NotFunded
+        );
+        let winners_bucket = comp
+            .prize_pool
+            .checked_mul((10_000 - RAKE_BPS) as u64)
+            .ok_or(PointsError::Overflow)?
+            / 10_000;
+        let mut total: u64 = 0;
+        for a in amounts.iter() {
+            total = total.checked_add(*a).ok_or(PointsError::Overflow)?;
+        }
+        require!(total <= winners_bucket, PointsError::OverAlloc);
+        comp.prize_pool = winners_bucket;
+        for i in 0..3 {
+            comp.winners[i].winner = winners[i];
+            comp.winners[i].amount = amounts[i];
+            comp.winners[i].claimed = false;
+            if amounts[i] > 0 {
+                comp.winner_count = (i + 1) as u8;
+            }
+        }
+        comp.state = CompState::Settled as u8;
+        Ok(())
+    }
+
+    /// A winner claims their allocation gasless on the ER. Requires the winner
+    /// to be a stored allocation. Credits the player's points PDA with the
+    /// allocation and marks it claimed (each allocation claims exactly once).
+    pub fn claim_comp(
+        ctx: Context<ClaimCompCtx>,
+        winner_index: u8,
+    ) -> Result<()> {
+        let comp = &mut ctx.accounts.comp;
+        require!(
+            comp.state == CompState::Settled as u8,
+            PointsError::NotSettled
+        );
+        let idx = winner_index as usize;
+        require!(idx < comp.winner_count as usize, PointsError::NoSuchWinner);
+        let alloc = &mut comp.winners[idx];
+        require!(
+            alloc.winner == ctx.accounts.payer.key(),
+            PointsError::NotYourAllocation
+        );
+        require!(!alloc.claimed, PointsError::AlreadyClaimed);
+        alloc.claimed = true;
+
+        let dest = &mut ctx.accounts.points;
+        dest.total_points = dest
+            .total_points
+            .checked_add(alloc.amount)
+            .ok_or(PointsError::Overflow)?;
+        dest.last_points = alloc.amount;
+        dest.last_reason = 2; // COMP_WIN
+        dest.last_match_ref = comp.comp_id;
+        dest.last_recorded_ts = Clock::get()?.unix_timestamp;
+        dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -271,6 +485,142 @@ pub struct DelegatePointsInput<'info> {
     /// CHECK: The points pda to delegate.
     #[account(mut, del)]
     pub points: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeResult<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority that owns this result account.
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + PlayerResult::INIT_SPACE,
+        seeds = [RESULT, player_authority.key().as_ref()],
+        bump
+    )]
+    pub result: Account<'info, PlayerResult>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateResultInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The result pda to delegate.
+    #[account(mut, del)]
+    pub result: UncheckedAccount<'info>,
+}
+
+/// Context for `record_result`. Runs on the ER (gasless): the player's session
+/// key is the payer, and the result PDA must already exist + be delegated.
+#[derive(Accounts)]
+pub struct RecordResultCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [RESULT, player_authority.key().as_ref()], bump)]
+    pub result: Account<'info, PlayerResult>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeComp<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// The competition sponsor (brand / the app relay). Pays rent; owns the
+    /// escrow lifecycle (fund/close/settle). One active competition per
+    /// sponsor: the PDA seed is the sponsor key.
+    pub sponsor: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + Competition::INIT_SPACE,
+        seeds = [COMP, sponsor.key().as_ref()],
+        bump
+    )]
+    pub comp: Account<'info, Competition>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateCompInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The competition escrow PDA (seed: gfgcomp + sponsor key).
+    #[account(mut, del)]
+    pub comp: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FundCompCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// The sponsor who created the competition.
+    pub sponsor: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [COMP, sponsor.key().as_ref()],
+        bump,
+        constraint = comp.sponsor == sponsor.key() @ PointsError::NotSponsor
+    )]
+    pub comp: Account<'info, Competition>,
+}
+
+#[derive(Accounts)]
+pub struct CloseCompCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// The sponsor who created the competition.
+    pub sponsor: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [COMP, sponsor.key().as_ref()],
+        bump,
+        constraint = comp.sponsor == sponsor.key() @ PointsError::NotSponsor
+    )]
+    pub comp: Account<'info, Competition>,
+}
+
+#[derive(Accounts)]
+pub struct SettleCompCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// The sponsor who created the competition.
+    pub sponsor: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [COMP, sponsor.key().as_ref()],
+        bump,
+        constraint = comp.sponsor == sponsor.key() @ PointsError::NotSponsor
+    )]
+    pub comp: Account<'info, Competition>,
+}
+
+/// Context for `claim_comp`. Runs on the ER (gasless): the winner's session
+/// key is the payer; the competition PDA must be delegated and the winner's
+/// points PDA must exist + be delegated.
+#[derive(Accounts)]
+pub struct ClaimCompCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the points PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, player_authority.key().as_ref()], bump)]
+    pub points: Account<'info, PlayerPoints>,
+    /// The competition sponsor (read-only seed basis; not required to sign).
+    /// CHECK: read-only, used only as the PDA seed.
+    pub sponsor: AccountInfo<'info>,
+    #[account(
+        mut,
+        seeds = [COMP, sponsor.key().as_ref()],
+        bump,
+        constraint = comp.sponsor == sponsor.key() @ PointsError::NotSponsor
+    )]
+    pub comp: Account<'info, Competition>,
 }
 
 /// Context for `record_points`. Runs on the ER (gasless): the player's session
@@ -353,10 +703,85 @@ pub struct PlayerPoints {
     pub award_count: u64,
 }
 
+/// On-chain match-result ledger for one player (Scope C — finish order).
+///
+/// Fields:
+///   - finish_order     : finish positions for the match, index i = seat/color
+///                        that finished in position i+1 (0 = 1st place).
+///   - points           : the reward points recorded for that result.
+///   - multiplier       : the Active Tier multiplier that applied.
+///   - match_ref        : first 8 bytes (as u64) of the proof-roll tx signature.
+///   - last_recorded_ts : unix ts of the most recent result.
+///   - result_count     : number of results recorded.
+#[account]
+#[derive(InitSpace)]
+pub struct PlayerResult {
+    pub finish_order: [u8; 4],
+    pub points: u64,
+    pub multiplier: u8,
+    pub match_ref: u64,
+    pub last_recorded_ts: i64,
+    pub result_count: u64,
+}
+
+/// Competition lifecycle states.
+#[repr(u8)]
+pub enum CompState {
+    Open = 0,    // entries open, sponsor can fund the pool
+    Funded = 1,  // entry closed, pool locked, sponsor can settle
+    Settled = 2, // winners allocated, claims open
+}
+
+/// One winner's allocation inside a Competition escrow.
+#[derive(InitSpace, Default, Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct WinnerAlloc {
+    pub winner: Pubkey,
+    pub amount: u64,
+    pub claimed: bool,
+}
+
+/// Competition escrow (S2 — earn + brand rake). Seed `gfgcomp` + comp_id.
+///
+/// The sponsor locks the prize pool on-chain BEFORE the event; on settle the
+/// program enforces a 70/30 rake and stores the winner table; winners claim
+/// their allocations gasless on the ER.
+#[account]
+#[derive(InitSpace)]
+pub struct Competition {
+    pub comp_id: u64,
+    pub sponsor: Pubkey,
+    pub entry_fee: u64,
+    pub ends_at: i64,
+    pub prize_pool: u64,
+    pub state: u8,
+    pub winner_count: u8,
+    pub winners: [WinnerAlloc; 3],
+}
+
 #[error_code]
 pub enum PointsError {
     #[msg("points must be greater than zero")]
     ZeroPoints,
     #[msg("points overflow")]
     Overflow,
+    #[msg("only the competition sponsor can do this")]
+    NotSponsor,
+    #[msg("fund amount must be greater than zero")]
+    ZeroAmount,
+    #[msg("competition is not open")]
+    NotOpen,
+    #[msg("competition is not funded")]
+    NotFunded,
+    #[msg("competition is not settled")]
+    NotSettled,
+    #[msg("competition still running (ends_at not reached)")]
+    StillRunning,
+    #[msg("winner allocations exceed the 70% winners bucket")]
+    OverAlloc,
+    #[msg("no such winner index")]
+    NoSuchWinner,
+    #[msg("allocation belongs to a different player")]
+    NotYourAllocation,
+    #[msg("allocation already claimed")]
+    AlreadyClaimed,
 }

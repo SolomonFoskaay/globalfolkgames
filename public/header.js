@@ -74,6 +74,7 @@
                 heading: 'Play',
                 items: [
                     { label: ludoNavLabel(), href: '/games/ludo/', match: 'ludo' },
+                    { label: '🏆 Competitions', href: '/competitions/', match: 'competitions' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]
             },
@@ -100,7 +101,8 @@
     const ADMIN_NAV = [
         { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' },
         { label: 'Changelog (raw)', href: '/changelog/admin.html', match: 'changelog-admin' },
-        { label: 'Game Economics', href: '/changelog/economics.html', match: 'changelog-economics' }
+        { label: 'Game Economics', href: '/changelog/economics.html', match: 'changelog-economics' },
+        { label: 'Architecture (Modules)', href: '/changelog/architecture.html', match: 'changelog-architecture' }
     ];
 
     // Resolve the connected wallet the same way the changelog page does.

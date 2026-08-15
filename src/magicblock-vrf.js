@@ -30,6 +30,7 @@ import { BN } from 'bn.js';
 const DELEGATION_PROGRAM = 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
+const RESULT_SEED = Buffer.from('gfgresult');
 
 // Reasons recorded against a points award (mirrors the program's u8 codes).
 export const POINT_REASONS = Object.freeze({
@@ -258,6 +259,97 @@ function pointsPdaFor(payerPubkey) {
   );
 }
 
+// Scope C: commits the FULL 1st..4th finish order on-chain. Gasless on the ER
+// (session key signs, 0 SOL), mirroring recordPoints. The relay's handleDelegate
+// (idempotent) also creates + delegates the result PDA (seed 'gfgresult'), so
+// this write is a pure ER send once onboarded.
+//
+// `finishOrder` = array of color/seat keys, index 0 = 1st place (maps to the
+// program's `finish_order[i]` = seat index that finished in position i+1).
+// `points`/`multiplier`/`matchRef` mirror the reward that was banked, tying the
+// committed finish to the exact winning roll.
+export async function recordResult(finishOrder, points, multiplier, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [resultPda] = resultPdaFor(wallet.publicKey);
+
+  // Relay is idempotent per PDA; it creates + delegates the result PDA if
+  // missing and is a no-op when already delegated. Then the ER write is free.
+  await ensureDelegated(resultPda, wallet.publicKey);
+  await waitForErPickup(resultPda);
+
+  // Map colors to the canonical seat indexes (green=0, yellow=1, blue=2, red=3).
+  const seatIndexes = finishOrder.map(color =>
+    typeof color === 'number' ? color : SEAT_INDEX[color] ?? 0,
+  );
+  const order = Array.from({ length: 4 }, (_, i) => seatIndexes[i] ?? 0);
+
+  const sig = await program.methods
+    .recordResult(
+      order,
+      new BN(points),
+      new BN(multiplier),
+      matchRef instanceof BN ? matchRef : new BN(matchRef.toString()),
+    )
+    .accounts({
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+      result: resultPda,
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+const SEAT_INDEX = Object.freeze({ green: 0, yellow: 1, blue: 2, red: 3 });
+
+function resultPdaFor(payerPubkey) {
+  return PublicKey.findProgramAddressSync(
+    [RESULT_SEED, payerPubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
+}
+
+// S2: winner claims their competition allocation. Gasless ER write signed by
+// the player's session key (0 SOL), mirroring recordPoints. The relay's
+// handleDelegate (idempotent) also creates + delegates the player's points
+// PDA, which is what the claim credits.
+//
+// `compPda` identifies the competition (seed `gfgcomp` + sponsor pubkey, read
+// via the relay's GET /api/comp). `winnerIndex` = the player's slot in the
+// settled winner table (0, 1, 2). Returns the claim receipt signature.
+export async function claimComp(compPda, winnerIndex) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [pointsPda] = pointsPdaFor(wallet.publicKey);
+
+  // The winner's points PDA must exist + be delegated for the claim to credit
+  // it. Relay is idempotent: creates + delegates if missing, no-op if done.
+  await ensureDelegated(pointsPda, wallet.publicKey);
+  await waitForErPickup(pointsPda);
+
+  // Read the sponsor out of the comp account so the PDA seed constraint passes.
+  const compAccount = await program.account.competition.fetch(new PublicKey(compPda));
+  const sponsorKey = new PublicKey(compAccount.sponsor);
+
+  const sig = await program.methods
+    .claimComp(winnerIndex)
+    .accounts({
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+      points: pointsPda,
+      sponsor: sponsorKey,
+      comp: new PublicKey(compPda),
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
 // matchRef for a proof-roll signature: first 8 bytes interpreted as a u64.
 export function matchRefFromSignature(sig) {
   if (!sig) return new BN(0);
@@ -310,6 +402,19 @@ export function initMagicBlockDice() {
     // ER write, session key signs). Returns the receipt signature.
     recordPoints(points, reason, matchRef) {
       return recordPoints(points, reason, matchRef);
+    },
+
+    // Scope C: commits the full 1st..4th finish order on-chain (gasless ER
+    // write, session key signs). Returns the receipt signature.
+    recordResult(finishOrder, points, multiplier, matchRef) {
+      return recordResult(finishOrder, points, multiplier, matchRef);
+    },
+
+    // S2: winner claims their competition allocation gasless on the ER
+    // (session key signs, 0 SOL). `compPda` from the relay, `winnerIndex`
+    // from the settled winner table. Returns the claim receipt signature.
+    claimComp(compPda, winnerIndex) {
+      return claimComp(compPda, winnerIndex);
     },
 
     // First 8 bytes of a proof-roll signature as u64 — the match_ref the

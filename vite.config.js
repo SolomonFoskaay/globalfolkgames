@@ -13,6 +13,8 @@ export default defineConfig({
         changelog: './changelog/index.html',
         'changelog-admin': './changelog/admin.html',
         'changelog-economics': './changelog/economics.html',
+        'changelog-architecture': './changelog/architecture.html',
+        competitions: './competitions/index.html',
         about: './about/index.html',
         contact: './contact/index.html',
         support: './support/index.html',

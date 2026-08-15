@@ -38,6 +38,7 @@ const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd'
 const BASE_URL = baseRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
+const RESULT_SEED = Buffer.from('gfgresult');
 
 export function loadSponsor() {
   if (process.env.GFG_Gasless_Sponsor_Keypair) {
@@ -47,7 +48,7 @@ export function loadSponsor() {
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8'))));
 }
 
-function mkWallet(kp) {
+export function mkWallet(kp) {
   return {
     publicKey: kp.publicKey,
     async signTransaction(t) { t.partialSign(kp); return t; },
@@ -63,14 +64,19 @@ function mkWallet(kp) {
 // The realized balance delta is what actually lands in the ledger.
 //
 // Scope B adds a second PDA per player (points, seed `gfgpoints`), so a fully
-// fresh onboarding is now 4 steps (dice init+delegate, points init+delegate)
+// fresh onboarding is 4 steps (dice init+delegate, points init+delegate)
 // ≈ 0.003 SOL budget — still under the 0.005 default cap.
+//
+// Scope C adds a THIRD PDA per player (result, seed `gfgresult`), so a fully
+// fresh onboarding is now 6 steps (dice + points + result, init+delegate each)
+// ≈ 0.009 SOL budget. The per-player cap default was raised to 0.015 SOL.
 const ESTIMATED_STEP_COST_LAMPORTS = 0.0015 * 1e9; // 0.0015 SOL
 
-// Initialize + delegate a player's dice PDA AND their points PDA (Scope B).
+// Initialize + delegate a player's dice PDA AND their points PDA (Scope B)
+// AND their result PDA (Scope C).
 // Idempotent for each PDA individually.
-// playerPubkey: the player's Solana wallet address (seed basis for both PDAs).
-// Returns { pda, pointsPda, delegated, steps: [{step, sig}] }.
+// playerPubkey: the player's Solana wallet address (seed basis for all PDAs).
+// Returns { pda, pointsPda, resultPda, delegated, steps: [{step, sig}] }.
 export async function handleDelegate(playerPubkey) {
   const player = new PublicKey(playerPubkey);
   const sponsor = loadSponsor();
@@ -83,6 +89,7 @@ export async function handleDelegate(playerPubkey) {
 
   const [pda] = PublicKey.findProgramAddressSync([PLAYER_SEED, player.toBytes()], PROGRAM_ID);
   const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, player.toBytes()], PROGRAM_ID);
+  const [resultPda] = PublicKey.findProgramAddressSync([RESULT_SEED, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
   // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
@@ -98,8 +105,9 @@ export async function handleDelegate(playerPubkey) {
   };
   const status = await retry(() => getDelegationStatus(conn, pda));
   const pointsStatus = await retry(() => getDelegationStatus(conn, pointsPda));
-  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated) {
-    return { pda: pda.toString(), pointsPda: pointsPda.toString(), delegated: true, steps: [] };
+  const resultStatus = await retry(() => getDelegationStatus(conn, resultPda));
+  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated) {
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), delegated: true, steps: [] };
   }
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
@@ -109,7 +117,8 @@ export async function handleDelegate(playerPubkey) {
   // Steps per PDA: fresh = initialize + delegate (2); existing = delegate only (1).
   const plannedSteps =
     (status && status.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pda)) ? 1 : 2)) +
-    (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2));
+    (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2)) +
+    (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
   const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
@@ -148,6 +157,21 @@ export async function handleDelegate(playerPubkey) {
     if (sig) steps.push({ step: 'delegate_points', sig });
   }
 
+  // Result PDA: create if missing, then delegate if not delegated (Scope C).
+  if (!(resultStatus && resultStatus.isDelegated)) {
+    const rinfo = await retry(() => conn.getAccountInfo(resultPda));
+    if (!rinfo) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initializeResult()
+          .accounts({ result: resultPda, payer: sponsor.publicKey, playerAuthority: player })
+          .transaction()
+      );
+      steps.push({ step: 'initialize_result', sig });
+    }
+    const sig = await delegateResultPda(program, conn, sponsor, player, resultPda);
+    if (sig) steps.push({ step: 'delegate_result', sig });
+  }
+
   // Record the REAL cost (balance delta), not the estimate, so the ledger
   // reflects actual sponsor spend. Caps were already enforced on the estimate.
   if (steps.length) {
@@ -166,7 +190,7 @@ export async function handleDelegate(playerPubkey) {
     }
   }
 
-  return { pda: pda.toString(), pointsPda: pointsPda.toString(), delegated: true, steps };
+  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), delegated: true, steps };
 }
 
 // Delegate a dice PDA into the ER session (pin our devnet ER validator).
@@ -209,8 +233,7 @@ async function delegateDicePda(program, conn, sponsor, player, pda) {
 
 // Delegate a points PDA into the ER session (Scope B). Mirrors delegateDicePda
 // but uses the points seed + delegate_points instruction accounts.
-async function delegatePointsPda(program, conn, sponsor, player, pointsPda) {
-  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pointsPda.toBytes()], PROGRAM_ID);
+async function delegatePointsPda(program, conn, sponsor, player, pointsPda) {  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pointsPda.toBytes()], PROGRAM_ID);
   const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pointsPda.toBytes()], DELEGATION_PROGRAM);
   const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pointsPda.toBytes()], DELEGATION_PROGRAM);
 
@@ -238,6 +261,41 @@ async function delegatePointsPda(program, conn, sponsor, player, pointsPda) {
       }
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
       throw new Error(`delegate_points failed: ${detail}`);
+    });
+  return sig;
+}
+
+// Delegate a result PDA into the ER session (Scope C). Mirrors delegatePointsPda
+// but uses the result seed + delegate_result instruction accounts.
+async function delegateResultPda(program, conn, sponsor, player, resultPda) {
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), resultPda.toBytes()], PROGRAM_ID);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), resultPda.toBytes()], DELEGATION_PROGRAM);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), resultPda.toBytes()], DELEGATION_PROGRAM);
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.delegateResult()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          result: resultPda,
+          bufferResult: buffer,
+          delegationRecordResult: record,
+          delegationMetadataResult: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
+    .catch(async (err) => {
+      await new Promise(r => setTimeout(r, 600));
+      const after = await getDelegationStatus(conn, resultPda);
+      if (after && after.isDelegated) {
+        return null;
+      }
+      const detail = err.transactionMessage || err.transactionError?.message || err.message;
+      throw new Error(`delegate_result failed: ${detail}`);
     });
   return sig;
 }

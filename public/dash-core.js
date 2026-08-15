@@ -115,6 +115,24 @@
                 cards.push({ k: 'Forecast · 25 SOL', v: (f25 ? `${f25.playersFunded} players` : 'n/a') + (f25 && f25.runwayMonths != null ? ` · ${f25.runwayMonths} mo` : ''), small: true });
             }
         }
+        if (ops.compState) {
+            const cs = ops.compState;
+            if (cs.error) {
+                cards.push({ k: 'Competition escrow (S2)', v: 'unavailable (' + esc(cs.error) + ')', small: true, cls: 'warn' });
+            } else if (cs.state) {
+                const st = cs.state;
+                const stateCls = st.state === 'Settled' ? 'ok' : st.state === 'Funded' ? 'warn' : 'ok';
+                cards.push({
+                    k: 'Competition escrow (S2)',
+                    v: '#' + (st.compId || '—') + ' · ' + st.state + ' · 🏆 ' + (st.prizePool || 0).toLocaleString() + ' pts',
+                    cls: stateCls,
+                    small: true,
+                    html: `<div class="v small ${stateCls}">#${esc(st.compId || '—')} · ${esc(st.state)}</div>
+                        <div class="k">Prize pool</div><div class="v">${(st.prizePool || 0).toLocaleString()} pts</div>
+                        <div class="k">Winners settled</div><div class="v">${st.winnerCount || 0} / 3</div>`,
+                });
+            }
+        }
         if (ops.inventory) {
             cards.push({ k: 'gfg-dice program', v: ops.inventory.gfgDiceProgram, small: true });
             cards.push({ k: 'ER VRF queue', v: ops.inventory.erVrfQueue, small: true });

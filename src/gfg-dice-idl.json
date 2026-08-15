@@ -53,6 +53,151 @@
       ]
     },
     {
+      "name": "claim_comp",
+      "docs": [
+        "A winner claims their allocation gasless on the ER. Requires the winner",
+        "to be a stored allocation. Credits the player's points PDA with the",
+        "allocation and marks it claimed (each allocation claims exactly once)."
+      ],
+      "discriminator": [
+        50,
+        237,
+        11,
+        185,
+        76,
+        82,
+        129,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "The competition sponsor (read-only seed basis; not required to sign)."
+          ]
+        },
+        {
+          "name": "comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sponsor"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "winner_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "close_comp",
+      "docs": [
+        "Sponsor closes entry once the deadline has passed. Open -> Funded."
+      ],
+      "discriminator": [
+        57,
+        46,
+        252,
+        117,
+        147,
+        91,
+        35,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "The sponsor who created the competition."
+          ],
+          "signer": true
+        },
+        {
+          "name": "comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sponsor"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "commit",
       "docs": [
         "Manually pushes the delegated state back to the base layer (runs on ER)."
@@ -291,6 +436,177 @@
       "args": []
     },
     {
+      "name": "delegate_comp",
+      "docs": [
+        "Delegates the Competition PDA into an ER session (base layer, sponsor",
+        "pays) so fund/settle/claim run gasless on the rollup."
+      ],
+      "discriminator": [
+        141,
+        223,
+        201,
+        153,
+        232,
+        212,
+        142,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "buffer_comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "comp"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "comp"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "comp"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "comp",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "delegate_points",
       "docs": [
         "Delegates the player's POINTS PDA into an ER session (base layer,",
@@ -465,6 +781,241 @@
       "args": []
     },
     {
+      "name": "delegate_result",
+      "docs": [
+        "Delegates the player's RESULT PDA into an ER session (base layer,",
+        "sponsor pays) so `record_result` runs gasless on the rollup."
+      ],
+      "discriminator": [
+        201,
+        198,
+        51,
+        69,
+        241,
+        173,
+        75,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "result",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fund_comp",
+      "docs": [
+        "Sponsor LOCKS prize pool into the escrow BEFORE the event. Base layer",
+        "or ER (sponsor signs either way). Open -> prize_pool += amount."
+      ],
+      "discriminator": [
+        103,
+        224,
+        59,
+        240,
+        251,
+        11,
+        81,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "The sponsor who created the competition."
+          ],
+          "signer": true
+        },
+        {
+          "name": "comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sponsor"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "docs": [
         "Idempotent: creates the player's dice PDA if it does not exist yet.",
@@ -524,6 +1075,81 @@
       "args": []
     },
     {
+      "name": "initialize_comp",
+      "docs": [
+        "Creates a Competition escrow PDA. Base layer; the payer (sponsor) covers",
+        "rent. The sponsor authority is the creator; only they can fund/close."
+      ],
+      "discriminator": [
+        89,
+        55,
+        150,
+        116,
+        134,
+        86,
+        238,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "The competition sponsor (brand / the app relay). Pays rent; owns the",
+            "escrow lifecycle (fund/close/settle). One active competition per",
+            "sponsor: the PDA seed is the sponsor key."
+          ],
+          "signer": true
+        },
+        {
+          "name": "comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sponsor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "comp_id",
+          "type": "u64"
+        },
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "ends_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "initialize_points",
       "docs": [
         "Idempotent: creates the player's POINTS PDA if it does not exist yet.",
@@ -565,6 +1191,64 @@
                   110,
                   116,
                   115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_result",
+      "docs": [
+        "Idempotent: creates the player's RESULT PDA if it does not exist yet.",
+        "Payer (sponsor) pays rent; the account belongs to `player_authority`."
+      ],
+      "discriminator": [
+        150,
+        212,
+        176,
+        141,
+        183,
+        117,
+        137,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
                 ]
               },
               {
@@ -757,6 +1441,85 @@
       ]
     },
     {
+      "name": "record_result",
+      "docs": [
+        "Commits the FULL 1st..4th finish order of a match. Runs GASLESS on the",
+        "ER: the player's session key is the only signer, no SOL needed.",
+        "`finish_order[i]` is the player (color/seat index) that finished in",
+        "position i+1 (0 = 1st place). `points`/`multiplier`/`match_ref` mirror",
+        "the same values the reward used, so the result ties to the winning roll."
+      ],
+      "discriminator": [
+        208,
+        243,
+        63,
+        218,
+        63,
+        116,
+        76,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "finish_order",
+          "type": {
+            "array": [
+              "u8",
+              4
+            ]
+          }
+        },
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "multiplier",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "roll_dice",
       "docs": [
         "Requests verifiable randomness from the MagicBlock VRF program.",
@@ -852,6 +1615,84 @@
       ]
     },
     {
+      "name": "settle_comp",
+      "docs": [
+        "Program logic splits a funded pool: 70% to the winners bucket (split",
+        "50/30/20 across 1st/2nd/3rd), 30% stays as platform rake. Sponsor",
+        "submits the winner table after the on-chain finish orders resolve; the",
+        "program validates the total and stores the allocations so claims are",
+        "enforceable. Funded -> Settled."
+      ],
+      "discriminator": [
+        68,
+        8,
+        169,
+        44,
+        112,
+        179,
+        124,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "The sponsor who created the competition."
+          ],
+          "signer": true
+        },
+        {
+          "name": "comp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sponsor"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "winners",
+          "type": {
+            "array": [
+              "pubkey",
+              3
+            ]
+          }
+        },
+        {
+          "name": "amounts",
+          "type": {
+            "array": [
+              "u64",
+              3
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "undelegate",
       "docs": [
         "Commits the latest state and returns the PDA to this program (runs on ER)."
@@ -917,6 +1758,19 @@
   ],
   "accounts": [
     {
+      "name": "Competition",
+      "discriminator": [
+        193,
+        49,
+        76,
+        118,
+        106,
+        22,
+        221,
+        106
+      ]
+    },
+    {
       "name": "PlayerDice",
       "discriminator": [
         251,
@@ -941,6 +1795,19 @@
         134,
         66
       ]
+    },
+    {
+      "name": "PlayerResult",
+      "discriminator": [
+        78,
+        16,
+        80,
+        154,
+        121,
+        147,
+        199,
+        48
+      ]
     }
   ],
   "errors": [
@@ -953,9 +1820,115 @@
       "code": 6001,
       "name": "Overflow",
       "msg": "points overflow"
+    },
+    {
+      "code": 6002,
+      "name": "NotSponsor",
+      "msg": "only the competition sponsor can do this"
+    },
+    {
+      "code": 6003,
+      "name": "ZeroAmount",
+      "msg": "fund amount must be greater than zero"
+    },
+    {
+      "code": 6004,
+      "name": "NotOpen",
+      "msg": "competition is not open"
+    },
+    {
+      "code": 6005,
+      "name": "NotFunded",
+      "msg": "competition is not funded"
+    },
+    {
+      "code": 6006,
+      "name": "NotSettled",
+      "msg": "competition is not settled"
+    },
+    {
+      "code": 6007,
+      "name": "StillRunning",
+      "msg": "competition still running (ends_at not reached)"
+    },
+    {
+      "code": 6008,
+      "name": "OverAlloc",
+      "msg": "winner allocations exceed the 70% winners bucket"
+    },
+    {
+      "code": 6009,
+      "name": "NoSuchWinner",
+      "msg": "no such winner index"
+    },
+    {
+      "code": 6010,
+      "name": "NotYourAllocation",
+      "msg": "allocation belongs to a different player"
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyClaimed",
+      "msg": "allocation already claimed"
     }
   ],
   "types": [
+    {
+      "name": "Competition",
+      "docs": [
+        "Competition escrow (S2 — earn + brand rake). Seed `gfgcomp` + comp_id.",
+        "",
+        "The sponsor locks the prize pool on-chain BEFORE the event; on settle the",
+        "program enforces a 70/30 rake and stores the winner table; winners claim",
+        "their allocations gasless on the ER."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "comp_id",
+            "type": "u64"
+          },
+          {
+            "name": "sponsor",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_fee",
+            "type": "u64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "prize_pool",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "winner_count",
+            "type": "u8"
+          },
+          {
+            "name": "winners",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "WinnerAlloc"
+                  }
+                },
+                3
+              ]
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "PlayerDice",
       "type": {
@@ -1020,6 +1993,78 @@
           {
             "name": "award_count",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerResult",
+      "docs": [
+        "On-chain match-result ledger for one player (Scope C — finish order).",
+        "",
+        "Fields:",
+        "- finish_order     : finish positions for the match, index i = seat/color",
+        "that finished in position i+1 (0 = 1st place).",
+        "- points           : the reward points recorded for that result.",
+        "- multiplier       : the Active Tier multiplier that applied.",
+        "- match_ref        : first 8 bytes (as u64) of the proof-roll tx signature.",
+        "- last_recorded_ts : unix ts of the most recent result.",
+        "- result_count     : number of results recorded."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "finish_order",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "points",
+            "type": "u64"
+          },
+          {
+            "name": "multiplier",
+            "type": "u8"
+          },
+          {
+            "name": "match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_recorded_ts",
+            "type": "i64"
+          },
+          {
+            "name": "result_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WinnerAlloc",
+      "docs": [
+        "One winner's allocation inside a Competition escrow."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
           }
         ]
       }

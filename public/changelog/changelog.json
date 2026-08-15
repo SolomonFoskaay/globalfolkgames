@@ -251,8 +251,9 @@
       "title": "Earn competitions",
       "summary": "Compete in daily, weekly and monthly challenges for real reward pools — play to earn, climb the leaderboard, and turn your wins into points that never expire.",
       "details": [
-        "Player-facing milestone item. No security/technical detail here.",
-        "Expansion of competition-based earn: daily, weekly, monthly competitions with reward pools."
+        "M4 (DEFERRED, planned): competitions re-scoped behind the module guide. Product build now waits until M1 game core + M2 pure local points + M3 global ledgers are stable for Ludo.",
+        "On-chain work done (kept): Competition escrow PDA (seed gfgcomp) + initialize_comp/fund_comp/close_comp/settle_comp/claim_comp, 30/70 brand rake, gasless claims. Scope C PlayerResult PDA (seed gfgresult) records full 1st..4th finish order.",
+        "M5 escrow proof = brand event rake. M4 product build starts after M1-M3 ship."
       ],
       "status": "planned",
       "added": "2026-08-13",
@@ -274,7 +275,8 @@
       "summary": "A place for the GlobalFolkGames community to connect — share strategies, discuss native games, and help each other get better.",
       "details": [
         "Player-facing milestone item. No security/technical detail here.",
-        "Community space for players; knowledge sharing and game discussion."
+        "Community space for players; knowledge sharing and game discussion.",
+        "Module guide: the community forum is NOT M1-M7; it becomes a NEW module (M8 Community/social, recorded in public/changelog/architecture.json) when the build starts. No feature is ever unmodular - forum earns its own module and integrates through the module seams."
       ],
       "status": "planned",
       "added": "2026-08-13",
@@ -507,6 +509,19 @@
       "status": "in-progress",
       "approved": false,
       "added": "2026-08-14"
+    },
+    {
+      "title": "Platform architecture: modular (M1-M7)",
+      "summary": "",
+      "details": [
+        "Staff guide (/changelog/architecture.html + public/changelog/architecture.json): the platform is pluggable modules, not a rigid stack. M1 game core (Ludo now) -> M2 pure local points (no +100 rule) -> M3 global ledgers (lifetime/spendable) -> M4 competitions -> M5 sponsor escrow -> M6 Active Tier subscription (money module) -> M7 point sources (referral/giveaway/sub buy-in).",
+        "Decisions: +100 rule dropped, M2 local points pure board-game points. Every module status is in architecture.json: M1 = in-progress (finalize Ludo), M2 = planned, M3 = planned, M4/M5 deferred (Earn competitions), M6 = in-progress (S1), M7 = planned.",
+        "Build order per module guide: M1+M2+M3 stable for Ludo first; M4/M5 after. S2 escrow + Scope C finish-order stay on-chain (done, program id unchanged).",
+        "Roadmap sync: this item tracks the guide. Module states are read from architecture.json, not here."
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-15"
     }
   ]
 }

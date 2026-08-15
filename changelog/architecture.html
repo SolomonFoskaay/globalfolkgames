@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Changelog Admin (Raw) | GlobalFolkGames</title>
+    <title>Architecture (Modules) | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
 </head>
@@ -11,19 +11,16 @@
 
     <main class="changelog-page admin">
         <section class="changelog-head">
-            <a href="/" class="changelog-back">← Home</a>
-            <h2>Changelog, engineer view</h2>
-            <p class="changelog-sub">Full details, technical bullets and git refs. Staff only (admin / moderator wallets).</p>
+            <a href="/changelog/admin.html" class="changelog-back">← Changelog admin</a>
+            <h2>Architecture, staff workspace</h2>
+            <p class="changelog-sub">The platform is a set of pluggable modules, not a rigid stack. This is the source-of-truth guide for what exists, what is being built, and what is planned: every feature added to the platform slots into one of these modules. Staff only.</p>
             <div class="changelog-meta">
-                <span class="changelog-current">Current version <b>v<span id="changelog-version">—</span></b></span>
                 <span id="changelog-role" class="changelog-role"></span>
-                <a href="/changelog/economics.html" class="changelog-admin-link">Game Economics →</a>
-                <a href="/changelog/architecture.html" class="changelog-admin-link">Architecture (Modules) →</a>
-                <a href="/changelog/" class="changelog-admin-link">Public view →</a>
+                <a href="/changelog/admin.html" class="changelog-admin-link">Raw changelog →</a>
             </div>
         </section>
 
-        <div id="changelog-entries" class="changelog-entries">
+        <div id="architecture-items" class="changelog-entries">
             <p class="empty">Checking access…</p>
         </div>
     </main>
@@ -36,6 +33,7 @@
     <script src="/tiers.js"></script>
     <script src="/header.js"></script>
     <script src="/changelog/render.js"></script>
+    <script src="/changelog/architecture.js"></script>
     <script type="module" src="/src/main.js"></script>
 
     <script>
@@ -44,10 +42,9 @@
 
             if (window.requireStaffAccess) {
                 const role = await window.requireStaffAccess();
-                // Non-staff are bounced home inside requireStaffAccess.
-                if (role && window.renderChangelog) window.renderChangelog('admin');
-            } else if (window.renderChangelog) {
-                window.renderChangelog('admin');
+                if (role && window.renderArchitecture) window.renderArchitecture();
+            } else if (window.renderArchitecture) {
+                window.renderArchitecture();
             }
         });
     </script>

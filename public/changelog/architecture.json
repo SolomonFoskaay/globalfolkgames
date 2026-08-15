@@ -1,0 +1,113 @@
+{
+  "updated": "2026-08-15",
+  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Staff only.",
+  "modules": [
+    {
+      "id": "M1",
+      "title": "Game core + proof of play",
+      "status": "in-progress",
+      "summary": "Per-game engine + on-chain VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. Each game is its own M1 instance (Ludo now, Ayo Olopon next, then 50+).",
+      "details": [
+        "Ludo is the first M1 instance (live, on-chain dice on the ER VRF).",
+        "Scope A shipped: every human roll runs gasless on the ER VRF; computer rolls via the house key server-side.",
+        "Any seat's roll has NO offline fallback: retry x3 then pause + monitor (never fake roll).",
+        "Pluggable: the next game (Ayo Olopon) becomes its own M1 instance with the same proof-of-play contract."
+      ]
+    },
+    {
+      "id": "M2",
+      "title": "Local points (per game, PURE, on-chain)",
+      "status": "planned",
+      "summary": "Only verified gameplay + win (proof-of-play gated). No multiplier, no purchase, no bonus, no referral. Never diluted. On-chain PDA per game (seed gfgpoints + game tag). Feeds in-game levels + future untransferable level NFT. The bragging-rights source of truth.",
+      "details": [
+        "On-chain: per-game points PDA, seed [gfgpoints, game_tag, player]. record_points writes ONLY the pure base win (100), never a multiplied total.",
+        "Game tag ('ludo', 'ayo_olopon') isolates each game's ledger; 50+ games each get their own.",
+        "Proof-of-play gated: a valid on-chain roll must exist for the win to bank.",
+        "No source of dilution: signup bonus, purchases, referral, giveaways NEVER land here.",
+        "Feeds local in-game levels; future: level as untransferable on-chain NFT.",
+        "Current state to change: record_points today writes the multiplied total to one gfgpoints PDA (pre-module model); this is the core M2 rework."
+      ]
+    },
+    {
+      "id": "M3",
+      "title": "Global points (3 ledgers, site-wide, decoupled from gameplay)",
+      "status": "planned",
+      "summary": "M3a Global Pure (sum of M2 local wins across all games, no multiplier, honest cross-game skill total). M3b Global Lifetime (unspendable) - every point ever earned from any source. M3c Global Spendable - the spendable split of lifetime. The 2x/3x/4x multiplier applies ONLY at M3 flow-up, never on M2 or M3a.",
+      "details": [
+        "M3a GLOBAL PURE: strictly the sum of M2 local wins across all games. No multiplier, no purchases, no bonus. The honest 'how good are you across the whole platform' number.",
+        "M3b GLOBAL LIFETIME (unspendable): every point ever earned from ANY source (game wins, signup bonus, giveaways, referral, sub multiplier). Permanent reputation/level number.",
+        "M3c GLOBAL SPENDABLE: the spendable split of lifetime. Purchases, Active Tier buys, comp entries, cosmetics all flow here. Goes up and down.",
+        "Active Tier 2x/3x/4x multiplier applies ONLY at M3 flow-up (lifetime + spendable), NEVER on M2 local or M3a pure.",
+        "Source-tagged: every M3 credit carries its game/event source ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral', 'giveaway').",
+        "Current state to change: today there is ONE global_points + lifetime_points on the profile and a single point_transactions ledger; this becomes the 3-ledger M3 model."
+      ]
+    },
+    {
+      "id": "M4",
+      "title": "Competitions (standalone, game-agnostic)",
+      "status": "planned",
+      "summary": "Entry config = points requirement + optional custom fields (e.g. phone number for airtime). Plugs into one / multiple / all games. Pluggable payout: airtime, escrow, manual. Runs fine with NO sponsor.",
+      "details": [
+        "Game-agnostic: a competition selects which games' points count (one, several, or all), never tailored to a single game.",
+        "Entry requirements: general (points threshold) + competition-specific custom fields (e.g. phone number for airtime rewards).",
+        "Payout is pluggable: airtime (via phone field), on-chain escrow (M5), or manual. Standalone even with no sponsor.",
+        "Product build is deferred until M1-M3 ship and test; the escrow program proof (M5) already exists on devnet.",
+        "NG test-launch plan: 1-2 week launch, daily airtime to winners via the phone number collected at entry."
+      ]
+    },
+    {
+      "id": "M5",
+      "title": "Sponsor escrow (optional plugin, separate from M4)",
+      "status": "planned",
+      "summary": "Brand-funded prize pool locked on-chain BEFORE the event, 30/70 rake at settle. A competition may use M5 or not. Optional plugin, not part of the core competition flow.",
+      "details": [
+        "Program proof already built + verified on devnet (Competition account, fund/close/settle/claim, 70/30 winners bucket, one active comp per sponsor).",
+        "Sponsor (brand) locks SOL on-chain before the event; winners claim gasless; platform keeps 30%.",
+        "Kept SEPARATE from M4: a competition runs without M5 (airtime / manual payout). M5 is attached only when a brand wants a guaranteed escrowed prize.",
+        "Mainnet legal framing: points entry + small fee, prizes in points, real value only via escrow with T&Cs."
+      ]
+    },
+    {
+      "id": "M6",
+      "title": "Monthly subscription (powers the multiplier)",
+      "status": "in-progress",
+      "summary": "The consistent-money module: a monthly subscription (Active Tier) bought from spendable points that powers the 2x/3x/4x win multiplier applied at M3 flow-up. The core recurring revenue stream.",
+      "details": [
+        "Standalone module because it is the consistent money engine: 1,000 / 2,500 / 5,000 spendable per month for 2x / 3x / 4x (econ-003 settled ladder).",
+        "Multiplier applies ONLY at M3 flow-up (lifetime + spendable), never on M2 local or M3a pure. A player's pure local wins stay honest.",
+        "Build timing: EARLY, immediately after the game (M1-M3) - the platform can't launch without the monthly subscription because players expect to upgrade and get a multiplier instead of base rewards.",
+        "Future: real-money subscription once payment rails mature (econ-006 stream 3).",
+        "Gates M4 competition entry in the settled design."
+      ]
+    },
+    {
+      "id": "M7",
+      "title": "Point-source modules (referral, giveaway, signup, social earn)",
+      "status": "planned",
+      "summary": "The other point sources that feed M3 (lifetime + spendable) but NEVER M2 local. Signup bonus from day 1; referral, giveaway and social-share earn paths built early.",
+      "details": [
+        "SIGNUP BONUS: from day 1 a user joins the platform. Goes to M3c spendable (and M3b lifetime), NEVER M2 local, so bragging rights stay pure.",
+        "REFERRAL: invites earn the referrer M3 points when the friend joins/plays. Early build - core acquisition.",
+        "GIVEAWAY: promotional/lootbox-style surprises (econ-001), feed M3 only.",
+        "SOCIAL EARN: share-linked small earn paths to soften the buy-to-join moment (econ-005).",
+        "Rule: ALL of these feed M3 (lifetime + spendable), never M2 local and never M3a pure. M2 stays strictly verified gameplay."
+      ]
+    }
+  ],
+  "rules": [
+    "M1 never calls M3: the game and rewards are separated. The game does not know how points work.",
+    "M4 needs no M5: competitions stand alone from sponsor; escrow is an optional plugin.",
+    "Local (M2) never diluted: no multiplier, no purchase, no bonus, no giveaway, no referral on local points.",
+    "Multiplier only at M3 flow-up: 2x/3x/4x touches M3b lifetime + M3c spendable, never M2 or M3a.",
+    "Everything slots together by source tag ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral').",
+    "Modular + pluggable: each module is interchangeable and game-agnostic; no module is tailored to a single game.",
+    "Extensible: M1-M7 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M8+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one."
+  ],
+  "implementationOrder": [
+    "1. M1 + M2 + M3 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at M3 flow-up, 3 global ledgers. Test it.",
+    "2. M6 monthly subscription (after M1-M3): the money engine - Active Tier multiplier at flow-up, spendable drain.",
+    "3. M7 point sources: signup bonus (day 1), referral, giveaway, social earn.",
+    "4. M4 competitions game-agnostic (after M1-M3 stable), with pluggable payout (airtime / manual / escrow).",
+    "5. M5 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize."
+  ]
+}

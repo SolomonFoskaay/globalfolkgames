@@ -151,8 +151,9 @@ export async function getBlockhashForAccounts(connection, accounts) {
     }),
   });
   const data = await res.json();
-  if (!data.result || !data.result.blockhash) throw new Error(`getBlockhashForAccounts failed: ${JSON.stringify(data.error || data)}`);
-  return data.result; // { blockhash, lastValidBlockHeight }
+  const inner = data && data.result ? (data.result.value && data.result.value.blockhash ? data.result.value : data.result) : null;
+  if (!inner || !inner.blockhash) throw new Error(`getBlockhashForAccounts failed: ${JSON.stringify(data.error || data)}`);
+  return inner; // { blockhash, lastValidBlockHeight }
 }
 
 // Collect the writable accounts of a legacy Transaction (fee payer + all

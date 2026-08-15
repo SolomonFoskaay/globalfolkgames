@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Competitions | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>🏆 Competitions</h2>
+            <p class="auth-hint" id="comp-status" style="margin-top:8px;">Loading the current competition…</p>
+        </section>
+
+        <div id="comp-signin-hint" class="game-card" style="display:none;">
+            <p>Sign in to enter competitions and claim your winnings.</p>
+        </div>
+
+        <section class="game-card dash-section" id="comp-card">
+            <div class="dash-fold-head">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <h3>Active competition</h3>
+                    <span id="comp-badge" style="font-size:0.9rem; color:#9b59b6; font-weight:700;">—</span>
+                </div>
+            </div>
+            <div class="dash-fold-summary">One funded, on-chain competition at a time. Play Ludo to enter; the top 3 finishers share a 70% winner pool (30% platform rake).</div>
+            <div class="dash-fold-body" id="comp-body">
+                <p id="comp-prize" style="color:#f39c12; font-size:1.3rem; font-weight:800;">—</p>
+                <p id="comp-meta" style="color:var(--muted); font-size:0.85rem; margin-top:6px;">—</p>
+                <div id="comp-winners" style="margin-top:12px;"></div>
+                <div id="comp-claim-row" style="margin-top:14px;"></div>
+                <p id="comp-claim-receipt" style="margin-top:10px; font-size:0.85rem;"></p>
+            </div>
+        </section>
+
+        <section class="game-card">
+            <h3>How it works</h3>
+            <p>Every competition locks its prize pool on-chain <b>before</b> the event, so the pot is always real and verifiable. When the competition closes, the top 3 finishers of your Ludo matches share <b>70%</b> of the pool (the platform keeps 30% to keep the games free). Winnings land directly in your on-chain points ledger, gasless.</p>
+            <p style="margin-top:8px;">Finish 1st with a valid on-chain roll to bank points, climb the Active Tier, and chase the leaderboard.</p>
+            <p style="margin-top:10px;">
+                <a href="/games/ludo/" class="launch-btn" style="text-decoration:none; display:inline-block;">🎲 Play Ludo</a>
+            </p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/tiers.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+
+            const statusEl = document.getElementById('comp-status');
+            const badgeEl = document.getElementById('comp-badge');
+            const prizeEl = document.getElementById('comp-prize');
+            const metaEl = document.getElementById('comp-meta');
+            const winnersEl = document.getElementById('comp-winners');
+            const claimRowEl = document.getElementById('comp-claim-row');
+            const receiptEl = document.getElementById('comp-claim-receipt');
+
+            const BADGE_STYLE = { Open: '#f39c12', Funded: '#9b59b6', Settled: '#2ecc71' };
+
+            function short(id, n) {
+                if (!id) return '';
+                n = n || 8;
+                return id.length > 2 * n ? id.slice(0, n) + '…' + id.slice(-n) : id;
+            }
+
+            function myWallet() {
+                return (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())
+                    || (window.currentProfile && window.currentProfile.solana_wallet) || null;
+            }
+
+            async function refresh() {
+                let signedIn = false;
+                try {
+                    signedIn = !!(window.getDynamicUser && window.getDynamicUser());
+                } catch (e) { /* ignore */ }
+                if (!signedIn) {
+                    statusEl.textContent = 'Sign in to see the current competition and claim winnings.';
+                    document.getElementById('comp-signin-hint').style.display = 'block';
+                } else {
+                    statusEl.textContent = 'Signed in — checking the competition…';
+                }
+
+                let comp;
+                try {
+                    const res = await fetch('/api/comp');
+                    if (!res.ok) throw new Error('relay returned ' + res.status);
+                    comp = await res.json();
+                } catch (e) {
+                    statusEl.textContent = 'Competition state is unavailable right now (relay offline?).';
+                    return;
+                }
+
+                if (!comp || !comp.state) {
+                    statusEl.textContent = 'No competition is running yet. Check back soon!';
+                    return;
+                }
+                statusEl.textContent = signedIn ? 'Signed in' : 'Sign in to play and win';
+
+                const s = comp.state;
+                badgeEl.textContent = s.state || '—';
+                badgeEl.style.color = BADGE_STYLE[s.state] || '#f39c12';
+
+                prizeEl.textContent = '🏆 ' + (s.prizePool || 0).toLocaleString() + ' pts prize pool';
+                const endsAt = s.endsAt ? new Date(s.endsAt * 1000).toLocaleString() : '—';
+                const entryFee = s.entryFee > 0 ? s.entryFee + ' pts' : 'Free';
+                metaEl.textContent = 'Entry: ' + entryFee + ' · Closes: ' + endsAt
+                    + ' · Comp #' + (s.compId || '—');
+
+                // Winner table (the leaderboard).
+                winnersEl.innerHTML = '';
+                const winners = s.winners || [];
+                const medal = ['🥇', '🥈', '🥉'];
+                if (winners.length) {
+                    const list = document.createElement('ol');
+                    list.style.listStyle = 'none';
+                    list.style.padding = '0';
+                    winners.forEach((w, i) => {
+                        const li = document.createElement('li');
+                        li.style.padding = '8px 0';
+                        li.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+                        li.innerHTML = (medal[i] || '🏅') + ' <b>' + short(w.winner) + '</b>'
+                            + '<span style="float:right; color:' + (w.claimed ? '#2ecc71' : '#f39c12') + ';">'
+                            + (w.amount || 0).toLocaleString() + ' pts ' + (w.claimed ? '✓ claimed' : '')
+                            + '</span>';
+                        list.appendChild(li);
+                    });
+                    winnersEl.appendChild(list);
+                } else {
+                    winnersEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">No winners settled yet.</p>';
+                }
+
+                // Claim flow: only a settled winner (their wallet in the table)
+                // can claim, gasless via the ER with their session key.
+                claimRowEl.innerHTML = '';
+                receiptEl.innerHTML = '';
+                const myW = myWallet();
+                if (s.state === 'Settled' && myW) {
+                    const myIndex = (winners || []).findIndex(w =>
+                        String(w.winner).toLowerCase() === String(myW).toLowerCase());
+                    if (myIndex !== -1 && !winners[myIndex].claimed) {
+                        const btn = document.createElement('button');
+                        btn.className = 'launch-btn onchain';
+                        btn.textContent = 'Claim my ' + (winners[myIndex].amount || 0).toLocaleString() + ' pts';
+                        btn.onclick = async () => {
+                            btn.disabled = true;
+                            btn.textContent = 'Claiming…';
+                            try {
+                                const magic = window.magicblockDice;
+                                if (!magic || typeof magic.claimComp !== 'function') {
+                                    throw new Error('on-chain claim not available (sign-in or network)');
+                                }
+                                const sig = await magic.claimComp(comp.compPda, myIndex);
+                                receiptEl.innerHTML = '✅ Claimed! Transaction: '
+                                    + (window.gfgExplorer ? window.gfgExplorer.txLink(sig, 'view on-chain') : short(sig));
+                                btn.textContent = 'Claimed ✓';
+                                await refresh();
+                            } catch (e) {
+                                receiptEl.innerHTML = '<span style="color:#e74c3c;">Claim failed: ' + (e.message || e) + '</span>';
+                                btn.disabled = false;
+                                btn.textContent = 'Retry claim';
+                            }
+                        };
+                        claimRowEl.appendChild(btn);
+                    } else if (myIndex !== -1) {
+                        claimRowEl.innerHTML = '<p style="color:#2ecc71; font-size:0.9rem;">You claimed your winnings already 🎉</p>';
+                    }
+                }
+            }
+
+            refresh();
+            // Keep the leaderboard fresh while the page is open.
+            setInterval(refresh, 45000);
+        });
+    </script>
+</body>
+</html>

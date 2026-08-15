@@ -5,6 +5,9 @@
 
     let pointsAwardedThisMatch = false;
     let finishOrder = [];   // e.g. ['green', 'red', 'yellow', 'blue']
+    // Scope C: the on-chain result commit (full 1st..4th finish order) mirrors
+    // the award that was banked, tying the committed order to the winning roll.
+    let lastAwardCommit = { points: 0, multiplier: 1, matchRef: 0 };
 
     function countFinishedTokens(color) {
         if (!window.tokens || !window.tokens[color]) return 0;
@@ -65,6 +68,12 @@
                     ? window.computeWinReward(100)
                     : { base: 100, total: 100, mult: 1, boosted: 0 };
                 const awarded = reward.total;
+                lastAwardCommit = {
+                    points: awarded,
+                    multiplier: reward.mult || 1,
+                    matchRef: (typeof window.getLastProofRollSignature === 'function')
+                        ? window.getLastProofRollSignature() : null,
+                };
 
                 if (typeof window.awardLocalLudoPoints === 'function') {
                     // The proof-roll signature becomes the match_id in Supabase,
@@ -115,6 +124,37 @@
                         : '';
                     window.showAuthBanner(`🎉 You finished 1st! +${awarded} points${boostNote}`);
                 }
+            }
+        }
+
+        // Scope C: when the FULL 1st..4th finish order is known (match over),
+        // commit it on-chain. Gasless ER write (session key signs, no SOL),
+        // soft-fail like the points mirror. Only commits when at least one
+        // valid on-chain proof roll ran this match (the trustworthy play proof).
+        if (proofRollUsed && finishOrder.length === 4) {
+            const magic = window.magicblockDice;
+            if (magic && typeof magic.recordResult === 'function') {
+                const matchRefSig = lastAwardCommit.matchRef
+                    || (typeof window.getLastProofRollSignature === 'function'
+                        ? window.getLastProofRollSignature() : null);
+                const matchRef = (magic.matchRefFromSignature && matchRefSig)
+                    ? magic.matchRefFromSignature(matchRefSig) : 0;
+                magic.recordResult(
+                    finishOrder.slice(),
+                    lastAwardCommit.points || 100,
+                    lastAwardCommit.multiplier || 1,
+                    matchRef,
+                )
+                    .then((receipt) => {
+                        console.log(`[RESULT] On-chain finish order committed — receipt: ${receipt}`);
+                        const txUrl = receipt && window.gfgExplorer
+                            ? window.gfgExplorer.txUrl(receipt) : null;
+                        if (txUrl) console.log(`[RESULT] Verify on-chain → ${txUrl}`);
+                    })
+                    .catch((err) => {
+                        // Never fail the match UX on a mirror write.
+                        console.warn('[RESULT] On-chain finish-order commit failed (mirror only):', err.message || err);
+                    });
             }
         }
 
