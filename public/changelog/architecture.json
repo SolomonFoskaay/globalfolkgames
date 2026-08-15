@@ -11,7 +11,8 @@
         "Ludo is the first M1 instance (live, on-chain dice on the ER VRF).",
         "Scope A shipped: every human roll runs gasless on the ER VRF; computer rolls via the house key server-side.",
         "Any seat's roll has NO offline fallback: retry x3 then pause + monitor (never fake roll).",
-        "Pluggable: the next game (Ayo Olopon) becomes its own M1 instance with the same proof-of-play contract."
+        "UNIVERSAL RESULT SEAM: every M1 game ends by calling window.publishGameResult() with the canonical gfg:game-result@1 envelope (players[] with seat/actor/position|score + optional on-chain proof). The bus (public/game-result.js) attaches identity to 'user' seats and fans the result out to M2/M3/M4. A game NEVER knows how points/competitions work; 50 games = 1 reward plug, 1 competition plug.",
+        "Pluggable: the next game (Ayo Olopon) becomes its own M1 instance with the same proof-of-play contract + the same result seam."
       ]
     },
     {
@@ -96,6 +97,7 @@
   ],
   "rules": [
     "M1 never calls M3: the game and rewards are separated. The game does not know how points work.",
+    "UNIVERSAL SEAM: every game ends with the same call (window.publishGameResult, gfg:game-result@1 envelope). M2/M3/M4 subscribe to the bus (window.onGameResult) and never read game internals. No game ships its own reward/competition plug.",
     "M4 needs no M5: competitions stand alone from sponsor; escrow is an optional plugin.",
     "Local (M2) never diluted: no multiplier, no purchase, no bonus, no giveaway, no referral on local points.",
     "Multiplier only at M3 flow-up: 2x/3x/4x touches M3b lifetime + M3c spendable, never M2 or M3a.",

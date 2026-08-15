@@ -1,25 +1,12 @@
 // win-detection.js (M1 — game core only)
-// Detects winners, tracks finishing order for crowns, and emits a match-result
-// SEAM when the match completes. M1 knows NOTHING about points, tiers,
-// competitions or rewards: when the match ends it simply publishes the result
-// (finish order + the on-chain proof-roll signature) on
-// window.gfgMatchResultHandlers so an M2/M3 module can consume it later.
+// Detects winners, tracks finishing order for crowns, and emits the universal
+// GAME RESULT envelope when the match completes (see /game-result.js). M1 knows
+// NOTHING about points, tiers, competitions or rewards: it publishes a
+// canonical result and the platform bus fans it out to M2/M3/M4.
 
 (function () {
 
     let finishOrder = [];   // e.g. ['green', 'red', 'yellow', 'blue']
-
-    // M2/M3 modules subscribe here to consume match results (finish order +
-    // proof-of-play signature). The game itself never touches points.
-    const matchResultHandlers = [];
-
-    window.onGfgMatchResult = function (handler) {
-        if (typeof handler === 'function') matchResultHandlers.push(handler);
-        return () => {
-            const i = matchResultHandlers.indexOf(handler);
-            if (i >= 0) matchResultHandlers.splice(i, 1);
-        };
-    };
 
     function countFinishedTokens(color) {
         if (!window.tokens || !window.tokens[color]) return 0;
@@ -52,24 +39,49 @@
             drawLudoLayout();
         }
 
-        // Match complete (all 4 seats finished): publish the result seam. The
-        // proof-roll signature (when present) is M1's proof-of-play — M2/M3
-        // decide what to do with it. No points logic lives here.
+        // Match complete (all 4 seats finished): publish the UNIVERSAL game
+        // result envelope. M1 only reports facts:
+        //   - who played each seat (actor: user / house / local)
+        //   - the finish order (position)
+        //   - the on-chain proof of play (VRF roll signature) when present
+        // The platform bus (window.publishGameResult) attaches identity to the
+        // 'user' seat and fans the result out to M2/M3/M4. No points logic
+        // lives here.
         if (finishOrder.length === 4) {
             const proofSig = typeof window.getLastProofRollSignature === 'function'
                 ? window.getLastProofRollSignature() : null;
+
+            const players = finishOrder.map(color => ({
+                seat: color,
+                actor: (window.playerProfiles[color] && window.playerProfiles[color].isUser === true)
+                    ? 'user'
+                    : (window.playerProfiles[color] && window.playerProfiles[color].mode === 'human')
+                        ? 'local'
+                        : 'house',
+                position: finishOrder.indexOf(color) + 1,
+            }));
+
             const result = {
-                game: 'ludo',
-                finishOrder: finishOrder.slice(),
-                proofSignature: proofSig || null,
+                gameId: 'ludo',
+                mode: 'human_vs_computer',
                 finishedAt: Date.now(),
+                players,
+                proof: proofSig
+                    ? {
+                        method: 'magicblock-vrf',
+                        chain: 'solana-devnet',
+                        signature: proofSig,
+                    }
+                    : null,
             };
-            console.log('[M1] Match complete — emitting result seam', result);
-            matchResultHandlers.slice().forEach(h => {
-                try { h(result); } catch (e) { console.warn('[M1] match-result handler failed:', e); }
-            });
-            const evt = new CustomEvent('gfg:match-result', { detail: result });
-            window.dispatchEvent(evt);
+
+            if (typeof window.publishGameResult === 'function') {
+                window.publishGameResult(result);
+            } else {
+                // Bus not loaded (shouldn't happen on the real page) — fall
+                // back to a plain log so the game still works standalone.
+                console.log('[M1] Match complete — result:', result);
+            }
         }
     };
 

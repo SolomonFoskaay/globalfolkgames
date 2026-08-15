@@ -61,13 +61,20 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    local points (M2); global ledgers (M3) consume them; spendable (M3) buys
    tiers (M6) or enters events (M4/M7). Never hard-wire one game into the
    platform.
-4. **Feature Tracker stays synced.** Roadmap items reference their module
+4. **Universal result seam (the plug-and-play contract):** every game ends by
+   calling `window.publishGameResult()` (`public/game-result.js`, canonical
+   `gfg:game-result@1` envelope: `players[]` with seat/actor/position|score +
+   optional on-chain proof). M2/M3/M4 subscribe via `window.onGameResult()` and
+   NEVER read game internals. A game never ships its own reward/competition
+   plug — 50 games = 1 reward plug, 1 competition plug. Adding a new game =
+   emit the same envelope; the platform doesn't change.
+5. **Feature Tracker stays synced.** Roadmap items reference their module
    (e.g. "Earn competitions = M4/M5"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.
-5. **Admin visibility:** the Architecture workspace is admin-only, listed in the
+6. **Admin visibility:** the Architecture workspace is admin-only, listed in the
    drawer Admin section below "Game Economics" and on the raw changelog header.
    Never move it to the public page.
-6. **The module list is extensible.** M1-M7 cover the current roadmap, but any
+7. **The module list is extensible.** M1-M7 cover the current roadmap, but any
    genuinely new domain (community/forum, support, profile, etc.) becomes a NEW
    module (M8+) recorded in `architecture.json` FIRST. A feature is never
    "unmodular" — either it slots into an existing module or it earns a new one.
