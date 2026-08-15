@@ -1,18 +1,52 @@
 {
   "updated": "2026-08-15",
-  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Staff only.",
+  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. M1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Staff only.",
   "modules": [
     {
       "id": "M1",
       "title": "Game core + proof of play",
       "status": "in-progress",
-      "summary": "Per-game engine + on-chain VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. Each game is its own M1 instance (Ludo now, Ayo Olopon next, then 50+).",
+      "summary": "Per-game engine + on-chain ER VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. M1 is ONE module; its game core sub-module M1A covers every game (Ludo locked now, Ayo Olopon planned next, then 50+) - the dropdown on this page differentiates the games. Each game's LOCKED spec lives there.",
       "details": [
-        "Ludo is the first M1 instance (live, on-chain dice on the ER VRF).",
-        "Scope A shipped: every human roll runs gasless on the ER VRF; computer rolls via the house key server-side.",
+        "M1A = the game core sub-module for ALL games (one sub-module, many games). The dropdown below differentiates them: M1A Ludo (locked), M1A Ayo Olopon (planned), more later.",
+        "Ludo is the first M1A game (live, on-chain ER VRF dice for EVERY seat). LOCKED 2026-08-15.",
+        "ALL rolls resolve on-chain in the game's single delegated ER session (ER VRF queue, gasless, ~50-100ms), bundled with game moves - NO server-side /api/roll house roll in the on-chain build.",
+        "Three seat types: 'You' (signed-in user, own delegated dice PDA, session key, manual input); 'Human' (extra local human, on-chain roll like a computer, manual input, no separate session sign-in); 'Computer' (fully automated on-chain, automation itself runs in the ER).",
         "Any seat's roll has NO offline fallback: retry x3 then pause + monitor (never fake roll).",
         "A game emits into the universal result seam (M2) and knows nothing else. It NEVER knows how points/competitions work.",
-        "Pluggable: the next game (Ayo Olopon) becomes its own M1 instance with the same proof-of-play contract + the same result seam."
+        "Pluggable: M1A Ayo Olopon becomes the next game with the same proof-of-play contract + the same result seam.",
+        "Per-game locked specs: see the game dropdown below (M1A Ludo locked 2026-08-15)."
+      ],
+      "games": [
+        {
+          "id": "M1A",
+          "gameKey": "ludo",
+          "title": "Ludo",
+          "status": "locked",
+          "lockedAt": "2026-08-15",
+          "summary": "LOCKED build spec for M1A (Ludo). The agent MUST read this before/during any Ludo M1 build, test against it, and only conclude M1 for Ludo when the build matches it end to end.",
+          "details": [
+            "DICE - ER VRF for every seat, no server: all rolls resolve on-chain inside the game's single delegated ER session (ER VRF queue 5hBR...K5Tc, gasless, ~50-100ms), bundled with game moves. /api/roll server-side house rolls are OUT of the on-chain design.",
+            "SEAT TYPES: (1) 'You' = signed-in user seat; roll via the player's own delegated dice PDA, session key signs silently (0 SOL); manual input (tap dice, tap token). (2) 'Human' = extra local human seat (dropdown 'Human', NOT 'You'); roll is ON-CHAIN like a computer (ER VRF in the session, sponsored by the session - NO separate sign-in, NO session key requested); move is MANUAL input by the real human (dice tap + token tap), never auto-played. (3) 'Computer' = fully automated; roll on-chain (ER VRF in the session) AND the automation itself moves on-chain (auto_computer_move-style instruction on the same delegated program - AI decision + token move happen in the ER, not client-side, not server-side). Human-vs-computer timing constants unchanged (deliberate slow AI pace).",
+            "MATCH OUTCOMES (on-chain account design): finished = all active seats have all 4 tokens DISAPPEARED OFF THE BOARD COMPLETELY -> status=finished, full finish order 1st..Nth committed to base layer. ONLY finished earns M3/M4 rewards later (rewards gate on status===finished). abandoned = End Match button (best-effort on tab close) commits the board exactly as-is with status=abandoned - immortalized on-chain but never rewarded. session lost = browser dies with no tx -> ER session expires -> no permanent record (acceptable).",
+            "COMPLETED DEFINITION (confirmed): all active seats must finish. 2P: both seats all 4 tokens home. 4P: all 4 seats. No 'leader wins and match ends' shortcut - rewards stay honest.",
+            "ENDGAME BEHAVIOR: (1) auto-skip finished seats - once a seat has all 4 tokens off the board its turns auto-pass (~1.5s log, no dice roll, no tap) for human AND computer seats. (2) auto-complete - when all active seats have all 4 tokens off the board the loop STOPS (result ceremony 1st..4th + 'Play Again'), no infinite cycling, no reset-only ending. (3) NO skip-remaining toggle; End Match is the only speed escape hatch.",
+            "PÈ (capture) is UNCONDITIONAL on the common path - fixed + verified (commit 1af91cc, 18/18 checks, both ludo + ludo-lab). Only two safe zones: the 4 colored start boxes (universally safe for any token standing there) and the own-color home lane. Same-color tokens stack. Landing on an opponent with the LAST movable token + LAST die still pè's.",
+            "TERMINOLOGY (hard rules): 'disappeared from board completely' = the winning/finished state (stepsWalked >= 57, token at center, hidden) - this is what counts toward finishing. 'locked back in homebox / return home' = the LOSING state after pè (pathIndex -1, needs a 6 to re-enter). 'home safe zone' = the 5 colored boxes before the center (own color only). Two win paths: (a) full 360° circuit into own home lane -> center -> disappear; (b) pè fast-track - capture an opponent -> capturer completes circuit and disappears.",
+            "SEAM: M1 emits the gfg:game-result@1 envelope via window.publishGameResult when the match completes (all active seats finished). M1 knows NOTHING about points/tiers/competitions."
+          ]
+        },
+        {
+          "id": "M1A",
+          "gameKey": "ayo-olopon",
+          "title": "Ayo Olopon",
+          "status": "planned",
+          "summary": "Nigeria-native Ayo Olopon, the next M1A game. Spec not yet locked; when it is, this entry is the LOCKED build spec and the agent builds/tests against it exactly like Ludo.",
+          "details": [
+            "Planned M1A game - no locked spec yet. Same proof-of-play contract + same M2 result seam as Ludo.",
+            "Lock the spec here (status -> locked) BEFORE building; the agent then uses this entry as the build + test benchmark."
+          ]
+        }
       ]
     },
     {
@@ -120,7 +154,8 @@
     "Multiplier only at M4 flow-up: 2x/3x/4x touches M4b lifetime + M4c spendable, never M3 or M4a.",
     "Everything slots together by source tag ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral').",
     "Modular + pluggable: each module is interchangeable and game-agnostic; no module is tailored to a single game.",
-    "Extensible: M1-M8 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M9+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one."
+    "Extensible: M1-M8 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M9+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
+    "LOCKED PER-GAME SPECS ARE THE BENCHMARK (M1A rule): each game under M1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the M1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes M1 for that game when the build matches A-Z."
   ],
   "implementationOrder": [
     "1. M1 + M2 + M3 + M4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at M4 flow-up, 3 global ledgers. Test it.",

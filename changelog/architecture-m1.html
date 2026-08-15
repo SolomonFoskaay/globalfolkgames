@@ -3,23 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Architecture (Modules) | GlobalFolkGames</title>
+    <title>M1 · Game core + proof of play | Architecture | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
 </head>
-<body>
+<body data-module="m1">
 
     <main class="mobile-container dash-rail-content changelog-page admin">
-        <section class="changelog-head">
-            <a href="/changelog/admin.html" class="changelog-back">← Changelog admin</a>
-            <h2>Architecture, staff workspace</h2>
-            <p class="changelog-sub">The platform is a set of pluggable modules, not a rigid stack. This is the source-of-truth guide for what exists, what is being built, and what is planned: every feature added to the platform slots into one of these modules. Staff only.</p>
-            <div class="changelog-meta">
-                <span id="changelog-role" class="changelog-role"></span>
-                <a href="/changelog/admin.html" class="changelog-admin-link">Raw changelog →</a>
-            </div>
-        </section>
-
         <div id="architecture-items" class="changelog-entries">
             <p class="empty">Checking access…</p>
         </div>
@@ -48,11 +38,10 @@
                 window.renderArchitecture();
             }
 
-            // Left-rail navigation between the architecture pages.
             if (window.GFG_DASH_NAV) {
                 window.GFG_DASH_NAV.render({
                     brand: '🏛 Architecture',
-                    active: 'home',
+                    active: 'm1',
                     sections: [
                         { heading: 'Workspace', items: [
                             { key: 'home', label: '🏛 Overview', href: '/changelog/architecture.html' },

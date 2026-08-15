@@ -324,3 +324,61 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     margin: 18px 0;
 }
+
+/* ----- M1 per-game sub-module picker (searchable dropdown) ----- */
+.game-picker {
+    position: relative;
+    max-width: 480px;
+    margin-bottom: 14px;
+}
+.game-search {
+    width: 100%;
+    padding: 10px 14px;
+    background: #101014;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.9rem;
+}
+.game-search:focus { outline: none; border-color: #f39c12; }
+.game-options {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: #16161c;
+    border: 1px solid #333;
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 30;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.game-options.open { display: block; }
+.game-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #23232b;
+    color: #eee;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: left;
+}
+.game-option:last-child { border-bottom: none; }
+.game-option:hover, .game-option.active { background: rgba(243, 156, 18, 0.12); }
+.game-option-empty { color: #888; cursor: default; }
+.game-option-empty:hover { background: none; }
+.game-option-title { font-weight: 600; }
+.game-spec .entry { margin-bottom: 14px; }
+.game-spec .entry-major { border-color: #f39c12; }
+
+/* Left-rail module navigation on architecture pages */
+.arch-module-link { text-decoration: none; }
+.arch-module-link:hover { text-decoration: underline; }

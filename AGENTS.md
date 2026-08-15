@@ -34,6 +34,10 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 - **M1 — Game core:** the games themselves (Ludo now), board rules, moves,
   win detection, timing/AI constraints. Game-agnostic: adding a game = adding a
   game module, the rest of the platform doesn't care which game is running.
+  M1 is ONE module; its game core sub-module **M1A** covers EVERY game (the
+  dropdown on the M1 admin page differentiates them: M1A Ludo locked, M1A Ayo
+  Olopon planned, ...). Each game's LOCKED build spec lives under M1's `games`
+  in architecture.json and is the build + test benchmark.
 - **M2 — Universal result seam (the plug-and-play contract bus):** the one
   integration contract between every game and every reward module. Standalone
   because it is the platform's wiring, not a game and not a reward. Every game
