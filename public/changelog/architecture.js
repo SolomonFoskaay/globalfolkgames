@@ -2,8 +2,9 @@
 // Admin-only "Architecture (Modules)" workspace renderer.
 //
 // Shows the modular architecture: each module is a pluggable, game-agnostic
-// piece of the platform (M1 game core, M2 local points, M3 global ledgers,
-// M4 competitions, M5 sponsor escrow, M6 subscription, M7 point sources).
+// piece of the platform (M1 game core, M2 universal result seam, M3 local
+// points, M4 global ledgers, M5 subscription, M6 point sources, M7
+// competitions, M8 sponsor escrow).
 // Status per module: planned / in-progress / shipped. Plus the rules that
 // govern how modules may touch each other, and the implementation order.
 //

@@ -1,8 +1,8 @@
 // public/game-result.js
 // UNIVERSAL GAME RESULT BUS (platform-level, game-agnostic)
 //
-// The one seam every game emits into. M2 (local points), M3 (global ledgers),
-// M4 (competitions) and any future module subscribe here and consume a
+// The one seam every game emits into. M3 (local points), M4 (global ledgers),
+// M7 (competitions) and any future module subscribe here and consume a
 // canonical result envelope — they never touch a game's internals. This is
 // what makes 50 games = 1 reward plug, 1 competition plug: the game only has
 // to call publishGameResult once when its match completes.
@@ -125,7 +125,7 @@
         lastResult = result;
         console.log(`[GameResult] ${result.gameId} — ${result.players.length} player(s)`, result);
 
-        // 1) Notify every subscribed module (M2/M3/M4/…).
+        // 1) Notify every subscribed module (M3/M4/M7/…).
         handlers.slice().forEach(h => {
             try { h(result); } catch (e) { console.warn('[GameResult] handler failed:', e); }
         });

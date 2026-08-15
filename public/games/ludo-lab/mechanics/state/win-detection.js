@@ -2,7 +2,7 @@
 // Detects winners, tracks finishing order for crowns, and emits the universal
 // GAME RESULT envelope when the match completes (see /game-result.js). M1 knows
 // NOTHING about points, tiers, competitions or rewards: it publishes a
-// canonical result and the platform bus fans it out to M2/M3/M4.
+// canonical result and the platform bus fans it out to M3/M4/M7.
 
 (function () {
 
@@ -45,7 +45,7 @@
         //   - the finish order (position)
         //   - the on-chain proof of play (VRF roll signature) when present
         // The platform bus (window.publishGameResult) attaches identity to the
-        // 'user' seat and fans the result out to M2/M3/M4. No points logic
+        // 'user' seat and fans the result out to M3/M4/M7. No points logic
         // lives here.
         if (finishOrder.length === 4) {
             const proofSig = typeof window.getLastProofRollSignature === 'function'

@@ -30,70 +30,88 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 `/changelog/architecture.html`). Module status lives THERE, not in AGENTS.md
 (AGENTS.md only mirrors the current state).
 
-**Modules (M1-M7):**
+**Modules (M1-M8):**
 - **M1 — Game core:** the games themselves (Ludo now), board rules, moves,
   win detection, timing/AI constraints. Game-agnostic: adding a game = adding a
   game module, the rest of the platform doesn't care which game is running.
-- **M2 — Local points (pure):** per-game board points, no platform rule. The
+- **M2 — Universal result seam (the plug-and-play contract bus):** the one
+  integration contract between every game and every reward module. Standalone
+  because it is the platform's wiring, not a game and not a reward. Every game
+  ends with `window.publishGameResult()`; every reward module subscribes via
+  `window.onGameResult()`. 50 games = 1 reward plug, 1 competition plug.
+- **M3 — Local points (pure):** per-game board points, no platform rule. The
   old "+100 1st-place" rule is DROPPED; a game's own scoring is purely its own.
-- **M3 — Global ledgers:** platform-wide ledgers (lifetime points, spendable
-  points) that aggregate game results. Points flow game -> local -> global.
-- **M4 — Competitions:** earn events (daily/weekly/monthly), leaderboards.
-  DEFERRED until M1-M3 are stable for Ludo.
-- **M5 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
-  The escrow proof-of-life; product build waits behind M1-M3.
-- **M6 — Active Tier subscription:** the money module. Monthly tier bought from
+  Consumes the seam (M2).
+- **M4 — Global ledgers:** platform-wide ledgers (lifetime points, spendable
+  points) that aggregate game results. Points flow game -> seam -> local ->
+  global. Consumes the seam (M2).
+- **M5 — Active Tier subscription:** the money module. Monthly tier bought from
   spendable points (Tier 2/3/4 = 1,000/2,500/5,000 spendable/mo -> 2x/3x/4x on
   base match win points, per-day +1,000 cap). S1 = in-progress.
-- **M7 — Point sources:** referral program, giveaways, sub buy-in. All feed the
-  spendable balance (M3). Planned.
+- **M6 — Point sources:** referral program, giveaways, sub buy-in. All feed the
+  spendable balance (M4). Planned.
+- **M7 — Competitions:** earn events (daily/weekly/monthly), leaderboards.
+  DEFERRED until M1-M4 are stable for Ludo. Consumes the seam (M2).
+- **M8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
+  The escrow proof-of-life; product build waits behind M1-M4.
 
 **HARD RULES (do not regress):**
 1. **Every feature = a module.** Before writing ANY feature code, state which
    module it belongs to and confirm it slots in (via the module status in
    `architecture.json`). If it doesn't fit a module, it does not get built.
-2. **M4/M5 are deferred.** Competitions and sponsor escrow product work does NOT
-   start until M1 + M2 + M3 are stable and verified for Ludo. The on-chain S2
-   escrow + Scope C finish-order code that ALREADY exists stays (program id
+   A feature that is important and standalone earns its OWN new module
+   (recorded in `architecture.json` FIRST) — never bury it inside another
+   module's details.
+2. **M7/M8 are deferred.** Competitions and sponsor escrow product work does NOT
+   start until M1 + M2 + M3 + M4 are stable and verified for Ludo. The on-chain
+   S2 escrow + Scope C finish-order code that ALREADY exists stays (program id
    unchanged, idempotent, verified live on devnet) but the PRODUCT/UI build for
    competitions waits.
-3. **Modules integrate cleanly.** Each module is a seam: games (M1) produce
-   local points (M2); global ledgers (M3) consume them; spendable (M3) buys
-   tiers (M6) or enters events (M4/M7). Never hard-wire one game into the
-   platform.
-4. **Universal result seam (the plug-and-play contract):** every game ends by
-   calling `window.publishGameResult()` (`public/game-result.js`, canonical
+3. **Modules integrate cleanly.** Each module is a seam: games (M1) emit into
+   the result bus (M2); local points (M3) and global ledgers (M4) consume it;
+   spendable (M4) buys tiers (M5) or enters events (M7). Never hard-wire one
+   game into the platform.
+4. **Universal result seam (M2, the plug-and-play contract):** every game ends
+   by calling `window.publishGameResult()` (`public/game-result.js`, canonical
    `gfg:game-result@1` envelope: `players[]` with seat/actor/position|score +
-   optional on-chain proof). M2/M3/M4 subscribe via `window.onGameResult()` and
+   optional on-chain proof). M3/M4/M7 subscribe via `window.onGameResult()` and
    NEVER read game internals. A game never ships its own reward/competition
    plug — 50 games = 1 reward plug, 1 competition plug. Adding a new game =
    emit the same envelope; the platform doesn't change.
 5. **Feature Tracker stays synced.** Roadmap items reference their module
-   (e.g. "Earn competitions = M4/M5"). Module statuses live in
+   (e.g. "Earn competitions = M7"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.
 6. **Admin visibility:** the Architecture workspace is admin-only, listed in the
    drawer Admin section below "Game Economics" and on the raw changelog header.
    Never move it to the public page.
-7. **The module list is extensible.** M1-M7 cover the current roadmap, but any
+7. **The module list is extensible.** M1-M8 cover the current roadmap, but any
    genuinely new domain (community/forum, support, profile, etc.) becomes a NEW
-   module (M8+) recorded in `architecture.json` FIRST. A feature is never
+   module (M9+) recorded in `architecture.json` FIRST. A feature is never
    "unmodular" — either it slots into an existing module or it earns a new one.
    Existing and future features must integrate through the module seams, never
    standalone.
+8. **Module-First is enforced in the agent.** The project rule at
+   `.opencode/rules/module-first.md` is auto-loaded into every opencode session
+   (`opencode.json` `instructions`). It MUST be followed for ANY feature work —
+   read `architecture.json` first, state the module, slot check, renumber by
+   build order when inserting a module. Never skip it; the owner will not repeat
+   this.
 
 **Current module status (mirror of architecture.json, 2026-08-15):**
 - M1: in-progress — finalize Ludo (currently the focus; the game must be fully
   done and tested before any other module product work).
-- M2: planned — pure local points (no +100 rule).
-- M3: planned — global ledgers (lifetime/spendable split; spendable is next).
-- M4: planned (deferred) — competitions.
-- M5: planned (deferred) — sponsor escrow.
-- M6: in-progress — S1 Active Tier + spendable sink.
-- M7: planned — referral / giveaways / sub buy-in.
+- M2: in-progress — universal result seam (built: public/game-result.js + Ludo
+  emits the envelope; subscribers for M3/M4/M7 land with those modules).
+- M3: planned — pure local points (no +100 rule).
+- M4: planned — global ledgers (lifetime/spendable split; spendable is next).
+- M5: in-progress — S1 Active Tier + spendable sink.
+- M6: planned — referral / giveaways / sub buy-in.
+- M7: planned (deferred) — competitions.
+- M8: planned (deferred) — sponsor escrow.
 
-**Build order:** M1+M2+M3 stable for Ludo FIRST -> M4/M5 -> S3 rails (on-ramp,
-cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never build ahead of its module
-status.
+**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> M5 (money) -> M6 -> M7/M8
+-> S3 rails (on-ramp, cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never
+build ahead of its module status.
 
 ## Core architecture (current)
 
