@@ -213,23 +213,13 @@ async function retryChainNow() {
     }
 }
 
-// Boot-time + retry entry point: probe the on-chain stack and either pause the
-// match (banner + monitor + Retry button) or clear any stale pause, then flush
-// pending on-chain pushes.
-async function verifyChainForResume() {
-    const ok = await pingOnchainStack();
-    if (isChainDown) {
-        if (ok) resumeFromChainDown();
-        return;
-    }
-    if (!ok && setupConfigurationLocked && !isGamePaused) {
-        enterChainDownState();
-    }
-    if (typeof window.flushPendingPushes === 'function') {
-        try { window.flushPendingPushes(); } catch (e) { console.warn('[persistence] pending-push flush failed:', e); }
-    }
-}
-window.verifyChainForResume = verifyChainForResume;
+// The banner + pause ONLY ever appears when a real on-chain roll attempt has
+// actually failed (see rollDiceEngine / enterChainDownState). There is NO
+// boot-time probe: a ping check right after a reload gave false "outage"
+// pauses even when internet was fine (a slow/blocked RPC from the player's
+// network read as "down"), and the banner stuck around forever. Recovery is
+// still fully covered: the monitor, the banner's Retry button and the saved
+// pre-roll state all share resumeFromChainDown().
 window.retryChainNow = retryChainNow;
 window.resumeFromChainDown = resumeFromChainDown;
 

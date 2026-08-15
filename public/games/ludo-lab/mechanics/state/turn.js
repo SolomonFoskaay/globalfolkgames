@@ -492,12 +492,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }, 200);
-
-    // Chain recovery probe: after any restore, check the on-chain stack and
-    // either pause (banner + monitor + Retry button) or flush pending pushes.
-    setTimeout(() => {
-        if (typeof window.verifyChainForResume === 'function') {
-            window.verifyChainForResume();
-        }
-    }, 1400);
 });
