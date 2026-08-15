@@ -10,10 +10,17 @@
  * 2nd -> bonus, 3rd -> pass to the next player). The bonus is granted even if a
  * double-six produced NO usable move, so the rare streak is never silently lost.
  * Non-double-six or a 3rd double-six passes the turn on.
+ *
+ * HARDENING: the bonus is granted ONLY when the CURRENT roll is literally a
+ * double six (lastDiceRoll1===6 && lastDiceRoll2===6). The counter is a
+ * secondary streak record; a stale/leaked counter on a random roll (2+6, 3+5,
+ * ...) can NEVER grant an extra turn this way. The else branch also force-resets
+ * the counter so no stale value survives a pass.
  */
 function resolveTurnEndAfterMoves() {
     const upperColor = currentTurn.toUpperCase();
-    if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
+    const isDoubleSixRoll = lastDiceRoll1 === 6 && lastDiceRoll2 === 6;
+    if (isDoubleSixRoll && consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
         displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
         isDiceRolled = false;
         hasRolledThisTurn = false;
@@ -26,6 +33,7 @@ function resolveTurnEndAfterMoves() {
             }, 1500);
         }
     } else {
+        consecutiveDoubleSixes = 0;
         setTimeout(() => {
             if (isGamePaused) return;
             passTurnSequence();
