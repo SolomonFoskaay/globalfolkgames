@@ -16,33 +16,34 @@ function checkCaptureMechanic(currentPiece, selectedTokenIndex, activeTokens) {
         if (oppColor !== currentTurn) {
             tokens[oppColor].forEach((oppToken, oppIdx) => {
                 
-                // Match tracking steps positions on common pathway layout cells
+                // Match tracking steps positions on common pathway layout cells.
+                // PÈ IS UNCONDITIONAL: landing on an opponent token anywhere on
+                // the common path (outside the two safe zones: the 4 colored
+                // start boxes and the home lane) MUST capture. No gate on
+                // "another movable token" or remaining die values - the previous
+                // gate made capture fail randomly whenever the mover had no other
+                // movable token, leaving tokens side-by-side on a capturable cell.
                 if (oppToken.pathIndex === currentPiece.pathIndex && oppToken.stepsWalked < 52) {
-                    
-                    let hasAnotherMovableToken = activeTokens.some((t, idx) => idx !== selectedTokenIndex && isTokenMovable(currentTurn, t, idx)) || currentTurnMoves.length > 1;
-                    
-                    if (hasAnotherMovableToken) {
-                        // Core "pe" logic action: kick enemy piece back to their starting yard slot coordinates
-                        oppToken.pathIndex = -1;
-                        oppToken.stepsWalked = 0;
-                        oppToken.c = HOME_YARDS[oppColor][oppIdx].c;
-                        oppToken.r = HOME_YARDS[oppColor][oppIdx].r;
+                    // Core "pe" logic action: kick enemy piece back to their starting yard slot coordinates
+                    oppToken.pathIndex = -1;
+                    oppToken.stepsWalked = 0;
+                    oppToken.c = HOME_YARDS[oppColor][oppIdx].c;
+                    oppToken.r = HOME_YARDS[oppColor][oppIdx].r;
 
-                        // Localized linguistic broadcast overlay alert
-                        displayEducationalLog(`${upperColor} "${"pe"}" ${oppColor.toUpperCase()}! Token returned to base yard.`);
+                    // Localized linguistic broadcast overlay alert
+                    displayEducationalLog(`${upperColor} "${"pe"}" ${oppColor.toUpperCase()}! Token returned to base yard.`);
 
-                        // Fast-track win bonus: the capturing token that "pe" opponent also completes its circuit and exits the board.
-                        if (currentPiece.stepsWalked < 57) {
-                            currentPiece.stepsWalked = 57;
-                            currentPiece.pathIndex = -2;
-                            currentPiece.c = 7;
-                            currentPiece.r = 7;
-                            displayEducationalLog(`${upperColor}: Capture completed the circuit and the token exited the board.`);
-                            
-                            // Check if this player has now finished all 4 tokens
-                            if (typeof window.checkForMatchWinner === 'function') {
-                                window.checkForMatchWinner(currentTurn);
-                            }
+                    // Fast-track win bonus: the capturing token that "pe" opponent also completes its circuit and exits the board.
+                    if (currentPiece.stepsWalked < 57) {
+                        currentPiece.stepsWalked = 57;
+                        currentPiece.pathIndex = -2;
+                        currentPiece.c = 7;
+                        currentPiece.r = 7;
+                        displayEducationalLog(`${upperColor}: Capture completed the circuit and the token exited the board.`);
+
+                        // Check if this player has now finished all 4 tokens
+                        if (typeof window.checkForMatchWinner === 'function') {
+                            window.checkForMatchWinner(currentTurn);
                         }
                     }
                 }
