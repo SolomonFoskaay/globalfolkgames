@@ -36,6 +36,63 @@ window.playerProfiles = {
 const turnSequence = ['green', 'yellow', 'blue', 'red'];
 const colorsMap = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
 
+// Match mode: '2p' (green + red, the opposite corners) or '4p' (all four).
+// Selectable BEFORE the match locks; after lock it is frozen. Active seats in
+// 2P mode are turnSequence[0] (green) and turnSequence[3] (red) — the classic
+// 2-player Ludo setup. The locked spec's COMPLETED DEFINITION requires both
+// seats (2P) or all four seats (4P) to finish, so the endgame + ceremony +
+// seam all derive from the ACTIVE seats only.
+let matchMode = '4p';
+const MODE_ACTIVE_SEATS = {
+    '2p': ['green', 'red'],
+    '4p': ['green', 'yellow', 'blue', 'red'],
+};
+const ALL_SEATS = ['green', 'yellow', 'blue', 'red'];
+
+// Active seats for the current mode (what the turn loop, endgame and seam use).
+function getActiveSeats() {
+    return MODE_ACTIVE_SEATS[matchMode] || MODE_ACTIVE_SEATS['4p'];
+}
+window.getActiveSeats = getActiveSeats;
+
+// Public: select 2P / 4P before the match locks. In 2P, the yellow + blue
+// seat dropdowns are disabled (their slots stay visible but greyed out).
+window.selectMatchMode = function (mode) {
+    if (setupConfigurationLocked) {
+        displayEducationalLog("ERROR: Match already active. Mode cannot be changed.");
+        return;
+    }
+    matchMode = (mode === '2p') ? '2p' : '4p';
+
+    const active = getActiveSeats();
+
+    // Keep the signed-in 'You' seat on an ACTIVE seat: if the current 'You'
+    // seat is no longer active (e.g. user was 'You' on yellow, then switched
+    // to 2P), fall back to green. Otherwise leave the player's choice alone.
+    const userOnActive = active.find(color => playerProfiles[color] && playerProfiles[color].isUser === true);
+    if (!userOnActive) {
+        turnSequence.forEach(color => { playerProfiles[color].isUser = false; });
+        playerProfiles.green = { mode: 'human', isUser: true };
+    }
+
+    // Disable the seats that are NOT active in this mode.
+    ALL_SEATS.forEach(color => {
+        const selectElement = document.getElementById(`type-${color}`);
+        if (selectElement) {
+            selectElement.disabled = active.indexOf(color) === -1;
+            selectElement.value = playerProfiles[color].isUser ? 'you' : playerProfiles[color].mode;
+        }
+    });
+
+    const btn2 = document.getElementById('mode-2p');
+    const btn4 = document.getElementById('mode-4p');
+    if (btn2) btn2.classList.toggle('active', matchMode === '2p');
+    if (btn4) btn4.classList.toggle('active', matchMode === '4p');
+
+    displayEducationalLog(`Match mode: ${matchMode === '2p' ? '2 Players (Green vs Red)' : '4 Players'}.`);
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+};
+
 function toggleArenaPauseState() {
     if (!setupConfigurationLocked) {
         displayEducationalLog("ERROR: Match has not started yet. Cannot pause an inactive arena.");
@@ -121,7 +178,8 @@ function initiateArenaMatch() {
     }
 
     // Exactly one seat must be the logged-in user's seat ("You").
-    const userSeat = turnSequence.find(color => playerProfiles[color] && playerProfiles[color].isUser === true);
+    const activeSeats = getActiveSeats();
+    const userSeat = activeSeats.find(color => playerProfiles[color] && playerProfiles[color].isUser === true);
     if (!userSeat) {
         displayEducationalLog("ERROR: Assign the logged-in player to a seat — choose 'You' on one seat.");
         if (typeof window.showAuthBanner === 'function') {
@@ -131,7 +189,7 @@ function initiateArenaMatch() {
     }
 
     let humanCount = 0;
-    turnSequence.forEach(color => {
+    activeSeats.forEach(color => {
         const selectElement = document.getElementById(`type-${color}`);
         const value = selectElement ? selectElement.value : playerProfiles[color].mode;
         if (value === 'human' || value === 'you') humanCount++;
@@ -162,8 +220,10 @@ function passTurnSequence() {
         return;
     }
 
-    let nextIndex = (turnSequence.indexOf(currentTurn) + 1) % turnSequence.length;
-    currentTurn = turnSequence[nextIndex];
+    // Advance only within the ACTIVE seats (2P: green<->red, 4P: all four).
+    const active = getActiveSeats();
+    let nextIndex = (active.indexOf(currentTurn) + 1) % active.length;
+    currentTurn = active[nextIndex];
 
     // ENDGAME auto-skip: a finished seat (all 4 tokens off the board) has its
     // turn auto-passed (~1.5s log) with NO dice roll and NO tap — for human

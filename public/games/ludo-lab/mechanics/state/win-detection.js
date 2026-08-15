@@ -33,7 +33,10 @@
     // Every seat in the active turn sequence must finish (2P: both seats;
     // 4P: all 4). No "leader wins and match ends" shortcut.
     window.allSeatsFinished = function () {
-        return turnSequence.every(c => window.isSeatFinished(c));
+        const active = (typeof window.getActiveSeats === 'function')
+            ? window.getActiveSeats()
+            : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
+        return active.every(c => window.isSeatFinished(c));
     };
 
     window.getMatchStatus = function () {

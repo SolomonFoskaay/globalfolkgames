@@ -32,37 +32,44 @@
 
         <!-- Anti-Cheat Tournament Setup Panel Matrix -->
         <div id="player-setup-panel">
-            <div class="setup-slot" style="color: #2ecc71;">
-                <span>GREEN</span>
-                <select id="type-green">
-                    <option value="you" selected>You</option>
-                    <option value="human">Human</option>
-                    <option value="computer">Computer</option>
-                </select>
+            <div class="mode-selector">
+                <span class="mode-label">Players</span>
+                <button id="mode-2p" class="mode-btn" onclick="selectMatchMode('2p')">2</button>
+                <button id="mode-4p" class="mode-btn active" onclick="selectMatchMode('4p')">4</button>
             </div>
-            <div class="setup-slot" style="color: #f1c40f;">
-                <span>YELLOW</span>
-                <select id="type-yellow">
-                    <option value="you">You</option>
-                    <option value="human">Human</option>
-                    <option value="computer" selected>Computer</option>
-                </select>
-            </div>
-            <div class="setup-slot" style="color: #3498db;">
-                <span>BLUE</span>
-                <select id="type-blue">
-                    <option value="you">You</option>
-                    <option value="human">Human</option>
-                    <option value="computer" selected>Computer</option>
-                </select>
-            </div>
-            <div class="setup-slot" style="color: #e74c3c;">
-                <span>RED</span>
-                <select id="type-red">
-                    <option value="you">You</option>
-                    <option value="human">Human</option>
-                    <option value="computer" selected>Computer</option>
-                </select>
+            <div class="setup-slots-row">
+                <div class="setup-slot" style="color: #2ecc71;">
+                    <span>GREEN</span>
+                    <select id="type-green">
+                        <option value="you" selected>You</option>
+                        <option value="human">Human</option>
+                        <option value="computer">Computer</option>
+                    </select>
+                </div>
+                <div class="setup-slot" style="color: #f1c40f;">
+                    <span>YELLOW</span>
+                    <select id="type-yellow">
+                        <option value="you">You</option>
+                        <option value="human">Human</option>
+                        <option value="computer" selected>Computer</option>
+                    </select>
+                </div>
+                <div class="setup-slot" style="color: #3498db;">
+                    <span>BLUE</span>
+                    <select id="type-blue">
+                        <option value="you">You</option>
+                        <option value="human">Human</option>
+                        <option value="computer" selected>Computer</option>
+                    </select>
+                </div>
+                <div class="setup-slot" style="color: #e74c3c;">
+                    <span>RED</span>
+                    <select id="type-red">
+                        <option value="you">You</option>
+                        <option value="human">Human</option>
+                        <option value="computer" selected>Computer</option>
+                    </select>
+                </div>
             </div>
         </div>
 

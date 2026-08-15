@@ -25,6 +25,7 @@ function saveGameStateToStorage() {
         isGamePaused,
         setupConfigurationLocked,
         playerProfiles,
+        matchMode: (typeof matchMode !== 'undefined') ? matchMode : '4p',
         winState,
         tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null
     };
@@ -47,6 +48,14 @@ function loadGameStateFromStorage() {
         hasRolledThisTurn = savedState.hasRolledThisTurn;
         isGamePaused = savedState.isGamePaused;
         setupConfigurationLocked = savedState.setupConfigurationLocked;
+
+        // Restore the match mode (2P / 4P) FIRST so active-seat logic lines up.
+        if (typeof matchMode !== 'undefined' && savedState.matchMode) {
+            matchMode = savedState.matchMode === '2p' ? '2p' : '4p';
+            if (typeof window.selectMatchMode === 'function') {
+                window.selectMatchMode(matchMode);
+            }
+        }
         
         for (let color in savedState.playerProfiles) {
             if (!playerProfiles[color]) continue;
@@ -80,6 +89,14 @@ function loadGameStateFromStorage() {
                 const selectElement = document.getElementById(`type-${color}`);
                 if (selectElement) selectElement.disabled = false;
             });
+            // Re-apply the mode's active-seat disable (2P: yellow + blue stay off).
+            if (typeof window.getActiveSeats === 'function') {
+                const active = window.getActiveSeats();
+                turnSequence.forEach(color => {
+                    const selectElement = document.getElementById(`type-${color}`);
+                    if (selectElement && active.indexOf(color) === -1) selectElement.disabled = true;
+                });
+            }
             const diceBtn = document.getElementById('diceBtn');
             if (diceBtn) diceBtn.disabled = true;
             return true;
@@ -122,6 +139,15 @@ function loadGameStateFromStorage() {
                 selectElement.disabled = setupConfigurationLocked;
             }
         });
+        // In 2P mode the yellow + blue seats are not part of the match: keep
+        // their dropdowns disabled even when unlocked (restored pre-lock setup).
+        if (typeof window.getActiveSeats === 'function') {
+            const active = window.getActiveSeats();
+            turnSequence.forEach(color => {
+                const selectElement = document.getElementById(`type-${color}`);
+                if (selectElement && active.indexOf(color) === -1) selectElement.disabled = true;
+            });
+        }
 
         const startBtn = document.getElementById('startMatchBtn');
         if (startBtn) {
