@@ -9,6 +9,41 @@ function displayEducationalLog(message) {
     if (logBox) logBox.innerText = message;
 }
 
+// ---------------------------------------------------------------------------
+// Device-level resume cache ("no more persistence" hardening).
+//
+// The board snapshot is stored locally so a REFRESH resumes the match instead
+// of resetting to fresh setup. It is a resume cache ONLY: the authoritative,
+// non-tamperable records live ON-CHAIN (each VRF roll's proof signature, the
+// points ledger PDA, and the reward row keyed by the winning roll sig). The
+// MagicBlock guidance is that ER state is ephemeral and must be explicitly
+// committed to base layer; committing every move is too costly, so the match
+// snapshot stays local while the game's *authority* stays on-chain.
+//
+// A client can always edit its own localStorage (console tampering cannot be
+// fully prevented client-side). We store a deterministic digest next to the
+// payload so corruption / naive tampering is DETECTED on load and a fresh
+// match is issued instead of silently resuming a doctored one. Blocked
+// localStorage (some mobile browsers / private modes) degrades gracefully:
+// the game still plays, it just cannot resume after a refresh.
+// ---------------------------------------------------------------------------
+const PERSISTENCE_KEY = 'gfg_ludo_persistence_state';
+const PERSISTENCE_HASH_KEY = PERSISTENCE_KEY + '_digest';
+
+function hashStateString(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = (h * 0x01000193) >>> 0;
+    }
+    return h.toString(36);
+}
+
+function clearPersistedState() {
+    try { localStorage.removeItem(PERSISTENCE_KEY); } catch (e) {}
+    try { localStorage.removeItem(PERSISTENCE_HASH_KEY); } catch (e) {}
+}
+
 function saveGameStateToStorage() {
     const winState = (typeof window.serializeWinState === 'function')
         ? window.serializeWinState()
@@ -28,14 +63,34 @@ function saveGameStateToStorage() {
         matchMode: (typeof matchMode !== 'undefined') ? matchMode : '4p',
         activeSeats: (typeof getActiveSeats === 'function') ? getActiveSeats() : null,
         winState,
-        tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null
+        tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null,
+        savedAt: Date.now()
     };
-    localStorage.setItem('gfg_ludo_persistence_state', JSON.stringify(statePayload));
+    try {
+        const payloadStr = JSON.stringify(statePayload);
+        localStorage.setItem(PERSISTENCE_KEY, payloadStr);
+        try { localStorage.setItem(PERSISTENCE_HASH_KEY, hashStateString(payloadStr)); } catch (e) {}
+    } catch (e) {
+        // Blocked localStorage (private mode / some mobile webviews): the match
+        // still plays, it just cannot resume after a refresh.
+        console.warn('PERSISTENCE: localStorage blocked, match cannot resume after refresh.', e);
+    }
 }
 
 function loadGameStateFromStorage() {
-    const rawData = localStorage.getItem('gfg_ludo_persistence_state');
+    let rawData = null;
+    try { rawData = localStorage.getItem(PERSISTENCE_KEY); } catch (e) { return false; }
     if (!rawData) return false;
+
+    // Integrity check: a tampered/corrupt payload (edited in the console, or a
+    // partial write) must NOT be silently resumed. Detect it and start fresh.
+    let savedDigest = null;
+    try { savedDigest = localStorage.getItem(PERSISTENCE_HASH_KEY); } catch (e) {}
+    if (savedDigest && savedDigest !== hashStateString(rawData)) {
+        clearPersistedState();
+        displayEducationalLog("Saved match state failed its integrity check; starting fresh.");
+        return false;
+    }
 
     try {
         const savedState = JSON.parse(rawData);
@@ -82,7 +137,7 @@ function loadGameStateFromStorage() {
 
         // An abandoned match never resumes: clear the cache back to fresh setup.
         if (restoredStatus === 'abandoned') {
-            localStorage.removeItem('gfg_ludo_persistence_state');
+            clearPersistedState();
             displayEducationalLog("Previous match was abandoned (never rewarded). Ready for a fresh match.");
             if (typeof window.resetWinDetection === 'function') window.resetWinDetection();
             setupConfigurationLocked = false;
@@ -240,7 +295,7 @@ function handleConfirmationCallback(userApproved) {
     }
     // =============================================
 
-    localStorage.removeItem('gfg_ludo_persistence_state');
+    clearPersistedState();
     displayEducationalLog("SYSTEM RESET: Persistent cache cleared. Re-initializing arena canvas...");
     setTimeout(() => {
         window.location.reload();

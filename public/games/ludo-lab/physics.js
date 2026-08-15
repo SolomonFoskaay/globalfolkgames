@@ -187,24 +187,75 @@ function renderPhysicalDiceCubes() {
         const value = die.value;
         const rot = die.rot || 0;
 
+        // How fast the die is currently spinning. While it tumbles, the cube
+        // shows DEEPER side faces (it looks like it is flipping end over end);
+        // when it settles the extrusion relaxes to a fixed 3D depth.
+        const spin = Math.min(1, Math.abs(die.rotV || 0) / 10);
+        const ext = size * (0.13 + 0.10 * spin);
+
         ctx.save();
 
-        // Soft drop shadow so the dice pop off the board on any screen.
-        ctx.shadowColor = 'rgba(0,0,0,0.55)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 4;
+        // Contact shadow on the board, drawn OUTSIDE the tumble rotation so it
+        // stays planted under the die (sells the height of the cube).
+        const shadowW = size * 0.44 * (1 - spin * 0.22);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(cx + 5, cy + size * 0.44, shadowW, size * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
 
         // Small tumble rotation while in motion (settles back to level).
         ctx.translate(cx, cy);
         ctx.rotate(rot);
         ctx.translate(-cx, -cy);
 
-        // Die body with a top-to-bottom gradient so it reads as a 3D block.
+        // ---- Right face (side in shadow) ----
+        // Both side faces share one depth vector d = (+ext, -ext), so the cube
+        // is a proper axonometric projection receding toward the upper-right.
+        const rightGrad = ctx.createLinearGradient(cx, cy, cx + ext, cy);
+        rightGrad.addColorStop(0, '#cfd4da');
+        rightGrad.addColorStop(1, '#9aa1ab');
+        ctx.fillStyle = rightGrad;
+        ctx.strokeStyle = 'rgba(15,15,19,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + size / 2, cy - size / 2);
+        ctx.lineTo(cx + size / 2, cy + size / 2);
+        ctx.lineTo(cx + size / 2 + ext, cy + size / 2 - ext);
+        ctx.lineTo(cx + size / 2 + ext, cy - size / 2 - ext);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // ---- Top face (lit from above) ----
+        const topGrad = ctx.createLinearGradient(cx, cy - size / 2 - ext, cx, cy - size / 2);
+        topGrad.addColorStop(0, '#ffffff');
+        topGrad.addColorStop(1, '#e9ebee');
+        ctx.fillStyle = topGrad;
+        ctx.strokeStyle = 'rgba(15,15,19,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - size / 2, cy - size / 2);
+        ctx.lineTo(cx + size / 2, cy - size / 2);
+        ctx.lineTo(cx + size / 2 + ext, cy - size / 2 - ext);
+        ctx.lineTo(cx - size / 2 + ext, cy - size / 2 - ext);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Glossy streak along the top face (fake a specular reflection on the
+        // polished cube).
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - size / 2 + 3, cy - size / 2 - 1.5);
+        ctx.lineTo(cx + size / 2 + ext - 3, cy - size / 2 - ext + 1.5);
+        ctx.stroke();
+
+        // ---- Front face (the rolled value) ----
         const bodyGrad = ctx.createLinearGradient(x, y, x, y + size);
         bodyGrad.addColorStop(0, '#ffffff');
-        bodyGrad.addColorStop(0.72, '#f4f4f4');
-        bodyGrad.addColorStop(1, '#d8d8de');
+        bodyGrad.addColorStop(0.72, '#f3f4f6');
+        bodyGrad.addColorStop(1, '#d9dce1');
 
         ctx.beginPath();
         ctx.moveTo(x + r, y);
@@ -216,7 +267,6 @@ function renderPhysicalDiceCubes() {
 
         ctx.fillStyle = bodyGrad;
         ctx.fill();
-        ctx.shadowColor = 'transparent';
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 2.5;
         ctx.stroke();

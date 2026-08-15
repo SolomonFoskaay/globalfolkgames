@@ -314,8 +314,8 @@ function finalizeDiceScores() {
         displayDiceOnBoard = false;
 
         if (!hasAnyValidMoveForCurrentTurn()) {
-            displayEducationalLog(`${upperColor}: No valid options available. Auto-passing turn.`);
-            setTimeout(passTurnSequence, 1500);
+            displayEducationalLog(`${upperColor}: No valid options available. Resolving turn.`);
+            resolveTurnEndAfterMoves();
         } else {
             if (playerProfiles[currentTurn].mode === 'computer') {
                 setTimeout(() => {

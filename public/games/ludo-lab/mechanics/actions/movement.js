@@ -3,6 +3,36 @@
  * Handles user touch inputs, coordinate transformations, and AI move exceptions.
  */
 
+/**
+ * Resolve how a turn ends AFTER the rolled moves are spent (or none were usable).
+ * "Shoki" double-six rule: the player counts the move as usual, then keeps the
+ * turn for a bonus roll — up to THREE double-sixes per turn cycle (1st -> bonus,
+ * 2nd -> bonus, 3rd -> pass to the next player). The bonus is granted even if a
+ * double-six produced NO usable move, so the rare streak is never silently lost.
+ * Non-double-six or a 3rd double-six passes the turn on.
+ */
+function resolveTurnEndAfterMoves() {
+    const upperColor = currentTurn.toUpperCase();
+    if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
+        displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
+        isDiceRolled = false;
+        hasRolledThisTurn = false;
+        if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
+        if (playerProfiles[currentTurn].mode === 'computer') {
+            setTimeout(() => {
+                if (isGamePaused) return;
+                if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
+            }, 1500);
+        }
+    } else {
+        setTimeout(() => {
+            if (isGamePaused) return;
+            passTurnSequence();
+        }, 500);
+    }
+}
+
 function handleInputInteraction(clientX, clientY) {
     if (isGamePaused) return;
     if (typeof matchOver !== 'undefined' && matchOver) return;
@@ -107,12 +137,9 @@ function processTokenMovementExecution(selectedTokenIndex) {
             }
         }, 1000);
     } else {
-        // No clean move left → pass turn (works for both human & computer)
-        displayEducationalLog(`${upperColor}: No valid remaining moves. Passing turn.`);
-        setTimeout(() => {
-            if (isGamePaused) return;
-            passTurnSequence();
-        }, 1000);
+        // No clean move left → resolve turn end (double-six bonus or pass)
+        displayEducationalLog(`${upperColor}: No valid remaining moves. Resolving turn.`);
+        resolveTurnEndAfterMoves();
     }
 
     return;
@@ -162,11 +189,8 @@ function processTokenMovementExecution(selectedTokenIndex) {
         displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
         let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));
         if (!hasValidRemainingMove) {
-            displayEducationalLog(`${upperColor}: No valid options left for remaining values. Passing turn.`);
-            setTimeout(() => {
-                if (isGamePaused) return;
-                passTurnSequence();
-            }, 1500);
+            displayEducationalLog(`${upperColor}: No valid options left for remaining values. Resolving turn.`);
+            resolveTurnEndAfterMoves();
             return;
         }
 
@@ -179,24 +203,7 @@ function processTokenMovementExecution(selectedTokenIndex) {
         return;
     }
 
-    if (consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
-        displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
-        isDiceRolled = false; 
-        hasRolledThisTurn = false;
-        if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
-        
-        if (playerProfiles[currentTurn].mode === 'computer') {
-            setTimeout(() => {
-                if (isGamePaused) return;
-                if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
-            }, 1500);
-        }
-    } else {
-        setTimeout(() => {
-            if (isGamePaused) return;
-            passTurnSequence();
-        }, 500);
-    }
+    resolveTurnEndAfterMoves();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

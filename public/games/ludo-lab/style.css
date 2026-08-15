@@ -243,11 +243,12 @@ body {
 
 /* Wooden rim around the board, like a physical Ludo set. The frame sits
    OUTSIDE the canvas, so dice still bounce within the 600x600 play area and
-   visually rebound off the rim. Cosmetic only. */
+   visually rebound off the rim. Cosmetic only. Padding was halved (12px -> 6px)
+   so the rim reads as a slim frame, not a thick slab. */
 #board-frame {
     display: inline-block;
-    padding: 12px;
-    border-radius: 16px;
+    padding: 6px;
+    border-radius: 12px;
     background:
         linear-gradient(135deg, #a8783f 0%, #8b5a2b 22%, #6e451f 48%, #9a6b36 72%, #7a5230 100%);
     box-shadow:
@@ -258,13 +259,18 @@ body {
     box-sizing: border-box;
 }
 
-/* Control container scaling safely without squashing the canvas element properties */
-canvas { 
-    background: #ffffff; 
-    max-width: 94vw; 
-    max-height: 94vw; 
-    border-radius: 8px; 
+/* Control container scaling safely without squashing the canvas element properties.
+   The canvas FILLS the frame's content box (width:100%) instead of capping itself
+   at 94vw, which used to push it wider than the frame + padding and overflow the
+   wood rim on one side. height:auto keeps the board perfectly square. */
+canvas {
+    background: #ffffff;
     display: block;
+    width: 100%;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    border-radius: 8px;
     touch-action: pan-y; /* VERTICAL SCROLL GESTURES ON THE BOARD ITSELF; BLOCKS HORIZONTAL */
 }
 
