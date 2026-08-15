@@ -346,6 +346,35 @@ vm.runInContext('loadGameStateFromStorage();', sandbox);
 check('roll started but never finalized -> re-armed (isDiceRolled false)', T().isDiceRolled === false, T().isDiceRolled);
 check('re-armed keeps hasRolledThisTurn false', T().hasRolledThisTurn === false);
 
+console.log('\n== Spec: PAUSE / RESUME (manual pause must never eat the turn) ==');
+lockFreshMatch();
+vm.runInContext('currentTurn = "green"; isDiceRolled = false; hasRolledThisTurn = false; currentTurnMoves = [];', sandbox);
+vm.runInContext('toggleArenaPauseState();', sandbox);
+check('pause sets isGamePaused', T().isGamePaused === true);
+check('pause button reads Resume', els['pauseBtn'].innerText === '▶ Resume');
+vm.runInContext('toggleArenaPauseState();', sandbox);
+check('resume clears isGamePaused', T().isGamePaused === false);
+check('resume button reads Pause', els['pauseBtn'].innerText === '⏸ Pause');
+
+vm.runInContext('toggleArenaPauseState(); rollDiceEngine();', sandbox);
+check('dice click while paused is blocked (no roll starts)', T().isDiceRolled === false, T().isDiceRolled);
+vm.runInContext('toggleArenaPauseState();', sandbox);
+vm.runInContext('rollDiceEngine();', sandbox);
+check('dice click after resume starts the roll', T().isDiceRolled === true, T().isDiceRolled);
+
+vm.runInContext(`
+  window.setMatchStatus("in-progress"); matchOver = false;
+  window.tokens.green.forEach((t,i) => { t.pathIndex = i; t.stepsWalked = i; });
+  currentTurn = 'green'; isDiceRolled = true; hasRolledThisTurn = true; currentTurnMoves = [3,5];
+  toggleArenaPauseState();
+`, sandbox);
+check('paused before the move', T().isGamePaused === true);
+vm.runInContext('toggleArenaPauseState();', sandbox);
+const b2 = vm.runInContext('window.tokens.green[0].stepsWalked', sandbox);
+vm.runInContext('window.processTokenMovementExecution(0);', sandbox);
+const a2 = vm.runInContext('window.tokens.green[0].stepsWalked', sandbox);
+check('token tap after resume moves the piece', a2 === b2 + 3, `before=${b2} after=${a2}`);
+
 console.log('\n== DOUBLE-6 "Shoki": up to THREE bonus rolls then pass ==');
 lockFreshMatch();
 vm.runInContext('window.tokens.green.forEach((t,i) => { t.pathIndex = i; t.stepsWalked = i; t.c = 1; t.r = 6; }); currentTurn = "green"; isDiceRolled = true; hasRolledThisTurn = true;', sandbox);
@@ -409,6 +438,35 @@ check('3+5 with stale counter -> counter force-reset to 0', vm.runInContext('con
   // Drain any passTurnSequence timers left by the synchronous movement tests
   // so this final double-6 test is fully isolated (no turn-wrap flakiness).
   await new Promise(r => setTimeout(r, 900));
+
+  console.log('\n== Spec: PAUSE / RESUME async (roll completes, computer re-triggers) ==');
+  // Pause DURING the in-flight roll, resume, then the roll still finalizes.
+  lockFreshMatch();
+  vm.runInContext(`
+    currentTurn = 'green'; isDiceRolled = false; hasRolledThisTurn = false; currentTurnMoves = [];
+    window.tokens.green.forEach(t => { t.pathIndex = 0; t.stepsWalked = 0; });
+    toggleArenaPauseState();      // paused
+    rollDiceEngine();             // dice tapped while paused -> blocked
+  `, sandbox);
+  check('paused roll stays blocked', T().isDiceRolled === false, T().isDiceRolled);
+  vm.runInContext('toggleArenaPauseState();', sandbox);   // resume
+  await new Promise(r => setTimeout(r, 300));
+  check('after resume the human can roll again', T().isDiceRolled === true, T().isDiceRolled);
+  await new Promise(r => setTimeout(r, 1200));
+  check('in-flight roll after resume finalizes moves', Array.isArray(T().currentTurnMoves) && T().currentTurnMoves.length === 2, JSON.stringify(T().currentTurnMoves));
+
+  // Computer seat: pause then resume -> the automated roll re-triggers.
+  vm.runInContext(`
+    window.setMatchStatus("in-progress"); matchOver = false;
+    isDiceRolled = false; hasRolledThisTurn = false; currentTurnMoves = []; displayDiceOnBoard = false;
+    currentTurn = 'yellow';
+    toggleArenaPauseState();      // paused during the computer's turn
+  `, sandbox);
+  check('paused computer turn', T().isGamePaused === true);
+  vm.runInContext('toggleArenaPauseState();', sandbox);   // resume
+  check('resumed computer turn', T().isGamePaused === false);
+  await new Promise(r => setTimeout(r, 1300));
+  check('computer auto-roll re-triggered after resume', T().isDiceRolled === true, T().isDiceRolled);
 
   // 3rd double6 pass is scheduled via setTimeout(500) — verify it lands.
   vm.runInContext(`
