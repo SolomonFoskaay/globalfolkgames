@@ -162,6 +162,8 @@ async function rollDiceEngine(source) {
         return;
     }
 
+    if (typeof matchOver !== 'undefined' && matchOver) return;
+
     if (isGamePaused) {
         displayEducationalLog("PAUSED: Match is suspended. Click 'Resume' to continue.");
         return;

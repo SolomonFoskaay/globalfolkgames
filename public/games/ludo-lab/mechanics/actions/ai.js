@@ -4,13 +4,15 @@
  */
 
 function triggerAutomatedComputerDiceRoll() {
-    if (isGamePaused) return; 
+    if (isGamePaused) return;
+    if (typeof matchOver !== 'undefined' && matchOver) return;
     if (currentTurnMoves.length > 0 || isDiceRolled) return;
     rollDiceEngine('AI_CONFIRMED');
 }
 
 function executeAutomatedComputerMove() {
-    if (isGamePaused) return; 
+    if (isGamePaused) return;
+    if (typeof matchOver !== 'undefined' && matchOver) return;
     if (currentTurnMoves.length === 0) return;
 
     let activeTokens = tokens[currentTurn];

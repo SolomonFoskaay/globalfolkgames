@@ -54,9 +54,35 @@ function loadGameStateFromStorage() {
             playerProfiles[color].isUser = savedState.playerProfiles[color].isUser === true;
         }
 
-        // Restore crowns / finishing order so they survive page reloads.
+        // Restore crowns / finishing order + match outcome so they survive reloads.
         if (typeof window.hydrateWinState === 'function' && savedState.winState) {
             window.hydrateWinState(savedState.winState);
+        }
+
+        // A finished match restores to the ceremony (never resumes play).
+        const restoredStatus = (typeof window.getMatchStatus === 'function')
+            ? window.getMatchStatus() : 'in-progress';
+
+        // An abandoned match never resumes: clear the cache back to fresh setup.
+        if (restoredStatus === 'abandoned') {
+            localStorage.removeItem('gfg_ludo_persistence_state');
+            displayEducationalLog("Previous match was abandoned (never rewarded). Ready for a fresh match.");
+            if (typeof window.resetWinDetection === 'function') window.resetWinDetection();
+            setupConfigurationLocked = false;
+            const startBtn = document.getElementById('startMatchBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.style.background = '#2ecc71';
+                startBtn.style.color = '#fff';
+                startBtn.innerText = 'Start Arena Match';
+            }
+            turnSequence.forEach(color => {
+                const selectElement = document.getElementById(`type-${color}`);
+                if (selectElement) selectElement.disabled = false;
+            });
+            const diceBtn = document.getElementById('diceBtn');
+            if (diceBtn) diceBtn.disabled = true;
+            return true;
         }
 
         if (savedState.tokensSnapshot && typeof tokens !== 'undefined') {
@@ -119,8 +145,16 @@ function loadGameStateFromStorage() {
         
         if (typeof drawLudoLayout === 'function') drawLudoLayout();
 
+        // A finished match must NOT resume the loop — re-show the ceremony.
+        if (restoredStatus === 'finished') {
+            if (typeof window.markMatchOver === 'function') window.markMatchOver();
+            if (typeof window.showResultCeremony === 'function') window.showResultCeremony();
+            return true;
+        }
+
         if (setupConfigurationLocked && !isGamePaused && playerProfiles[currentTurn].mode === 'computer') {
             setTimeout(() => {
+                if (typeof matchOver !== 'undefined' && matchOver) return;
                 if (!isDiceRolled) {
                     if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
                 } else if (currentTurnMoves.length > 0) {
@@ -157,6 +191,12 @@ function handleConfirmationCallback(userApproved) {
 
     if (!userApproved) {
         displayEducationalLog("RESET ABORTED: Match sequence preserved safely.");
+        return;
+    }
+
+    // End Match: commit status=abandoned (never rewarded), then clear + reload.
+    if (typeof window.endMatchAbandon === 'function') {
+        window.endMatchAbandon();
         return;
     }
 

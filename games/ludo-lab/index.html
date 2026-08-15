@@ -113,6 +113,19 @@
         </div>
     </div>
 
+    <!-- Match Complete Result Ceremony (all seats finished: 1st..4th + Play Again) -->
+    <div id="result-ceremony-overlay">
+        <div class="ceremony-modal-box">
+            <h3>🏁 Match Complete</h3>
+            <p id="result-ceremony-msg"></p>
+            <div id="result-ceremony-list" class="ceremony-list"></div>
+            <div class="confirm-action-row">
+                <button id="play-again-btn" class="confirm-modal-btn" style="background:#2ecc71;" onclick="playAgainAfterCeremony()">Play Again</button>
+                <button id="ceremony-end-btn" class="confirm-modal-btn" onclick="endMatchAbandon()">End Match</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Global scripts (needed for points + auth) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>

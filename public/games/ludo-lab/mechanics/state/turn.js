@@ -17,6 +17,11 @@ let hasRolledThisTurn = false;
 // Pause Loop Execution Control States
 let isGamePaused = false;
 
+// Endgame state (M1 locked spec): once ALL active seats are finished the loop
+// STOPS (no infinite cycling, no reset-only ending) and a result ceremony
+// 1st..4th + "Play Again" is shown. matchOver guards every action.
+let matchOver = false;
+
 // Anti-Cheat Automation Settings Engine States
 let setupConfigurationLocked = false;
 // `isUser` marks the seat bound to the signed-in Dynamic user (the "You" seat).
@@ -70,6 +75,7 @@ function toggleArenaPauseState() {
 function lockSetupDropdowns() {
     if (setupConfigurationLocked) return;
     setupConfigurationLocked = true;
+    matchOver = false;
 
     // New match: arm exactly one fresh provably-fair proof roll (first human turn).
     if (typeof resetOnchainProofRollUsed === 'function') resetOnchainProofRollUsed();
@@ -149,10 +155,31 @@ function initiateArenaMatch() {
 
 function passTurnSequence() {
     if (isGamePaused) return;
+    if (matchOver) return;
+
+    // Endgame guard: when all active seats are finished the loop must STOP.
+    if (typeof window.allSeatsFinished === 'function' && window.allSeatsFinished()) {
+        return;
+    }
 
     let nextIndex = (turnSequence.indexOf(currentTurn) + 1) % turnSequence.length;
     currentTurn = turnSequence[nextIndex];
-    
+
+    // ENDGAME auto-skip: a finished seat (all 4 tokens off the board) has its
+    // turn auto-passed (~1.5s log) with NO dice roll and NO tap — for human
+    // AND computer seats alike. No skip-remaining toggle; End Match is the
+    // only speed escape hatch (per the locked spec).
+    if (typeof window.isSeatFinished === 'function' && window.isSeatFinished(currentTurn)) {
+        displayEducationalLog(`${currentTurn.toUpperCase()}: All tokens home - auto-skipping turn.`);
+        if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+        if (typeof drawLudoLayout === 'function') drawLudoLayout();
+        setTimeout(() => {
+            if (isGamePaused || matchOver) return;
+            passTurnSequence();
+        }, 1500);
+        return;
+    }
+
     isDiceRolled = false; 
     hasRolledThisTurn = false; 
     displayDiceOnBoard = false;
@@ -175,11 +202,139 @@ function passTurnSequence() {
 
     if (playerProfiles[currentTurn].mode === 'computer') {
         setTimeout(() => {
-            if (isGamePaused) return;
+            if (isGamePaused || matchOver) return;
             if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
         }, 1500);
     }
 }
+
+// ===== ENDGAME (M1 locked spec) =====
+// Called by win-detection.js the moment ALL active seats are finished. Stops
+// the loop, locks every action and hands control to the result ceremony.
+window.markMatchOver = function () {
+    matchOver = true;
+    isDiceRolled = true;
+    hasRolledThisTurn = true;
+    displayDiceOnBoard = false;
+    currentTurnMoves = [];
+    const diceBtn = document.getElementById('diceBtn');
+    if (diceBtn) diceBtn.disabled = true;
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+};
+
+// The result ceremony overlay: 1st..4th finish order + "Play Again".
+window.showResultCeremony = function () {
+    const overlay = document.getElementById('result-ceremony-overlay');
+    if (!overlay) return;
+
+    const order = (typeof window.getFinishOrder === 'function') ? window.getFinishOrder() : [];
+    const listEl = document.getElementById('result-ceremony-list');
+    if (listEl) {
+        const medals = ['🥇', '🥈', '🥉', '4'];
+        listEl.innerHTML = order.map((color, i) => {
+            const medal = medals[i] || (i + 1);
+            const isUser = window.playerProfiles && window.playerProfiles[color] && window.playerProfiles[color].isUser === true;
+            const label = isUser ? 'You' : (window.playerProfiles && window.playerProfiles[color] && window.playerProfiles[color].mode === 'human' ? 'Human' : 'Computer');
+            const name = color.charAt(0).toUpperCase() + color.slice(1);
+            return `<div class="ceremony-row"><span class="ceremony-medal">${medal}</span><span class="ceremony-seat" style="color:${colorsMap[color]}">${name}</span><span class="ceremony-actor">${label}</span></div>`;
+        }).join('');
+    }
+
+    const msgEl = document.getElementById('result-ceremony-msg');
+    if (msgEl) {
+        const winner = order && order[0];
+        const winnerIsUser = winner && window.playerProfiles && window.playerProfiles[winner] && window.playerProfiles[winner].isUser === true;
+        msgEl.innerText = winnerIsUser
+            ? 'You win! Match complete — all seats finished.'
+            : 'Match complete — all seats finished.';
+    }
+
+    overlay.classList.add('visible');
+};
+
+// "Play Again": start a fresh match with the SAME locked seat setup (no
+// re-lock, no reload). Clears the finish order + match-over state, resets the
+// board and drops straight back to the first turn.
+window.playAgainAfterCeremony = function () {
+    const overlay = document.getElementById('result-ceremony-overlay');
+    if (overlay) overlay.classList.remove('visible');
+
+    if (typeof window.resetWinDetection === 'function') window.resetWinDetection();
+    if (typeof resetOnchainProofRollUsed === 'function') resetOnchainProofRollUsed();
+    matchOver = false;
+    currentTurn = 'green';
+    isDiceRolled = false;
+    hasRolledThisTurn = false;
+    displayDiceOnBoard = false;
+    lastDiceRoll1 = 0;
+    lastDiceRoll2 = 0;
+    currentTurnMoves = [];
+    consecutiveDoubleSixes = 0;
+    if (typeof hideVerifyLink === 'function') hideVerifyLink();
+
+    // Reset every token back to its home yard slot.
+    Object.keys(window.tokens).forEach(color => {
+        const home = HOME_YARDS[color];
+        window.tokens[color].forEach((token, idx) => {
+            token.pathIndex = -1;
+            token.stepsWalked = 0;
+            if (home && home[idx]) {
+                token.c = home[idx].c;
+                token.r = home[idx].r;
+            }
+        });
+    });
+
+    const turnIndicator = document.getElementById('turn-indicator');
+    if (turnIndicator) {
+        turnIndicator.innerText = `${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}'s Turn`;
+        turnIndicator.style.color = colorsMap[currentTurn];
+    }
+
+    const diceBtn = document.getElementById('diceBtn');
+    if (diceBtn) diceBtn.disabled = false;
+
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+    if (typeof drawLudoLayout === 'function') drawLudoLayout();
+
+    displayEducationalLog(`${currentTurn.toUpperCase()}: New match started. Roll dice.`);
+    if (playerProfiles[currentTurn].mode === 'computer') {
+        setTimeout(() => {
+            if (isGamePaused || matchOver) return;
+            if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
+        }, 1200);
+    }
+};
+
+// End Match / ABANDONED: closes the match in game state as status=abandoned
+// (never rewarded, never emits the seam), then clears the cached board.
+window.endMatchAbandon = function () {
+    if (typeof window.setMatchStatus === 'function') {
+        window.setMatchStatus('abandoned');
+    }
+    matchOver = true;
+    if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+
+    const overlay = document.getElementById('result-ceremony-overlay');
+    if (overlay) overlay.classList.remove('visible');
+
+    // Best-effort on tab close: clear the cached board so no stale match
+    // resumes, then reload to the fresh setup.
+    localStorage.removeItem('gfg_ludo_persistence_state');
+    displayEducationalLog('MATCH ABANDONED: Match closed as abandoned (never rewarded).');
+    setTimeout(() => window.location.reload(), 500);
+};
+
+// Best-effort: if the tab closes mid-match, record status=abandoned so a
+// reload never resumes a match that was abandoned (and it can never reward).
+window.addEventListener('beforeunload', function () {
+    try {
+        if (setupConfigurationLocked && !matchOver && window.getMatchStatus && window.getMatchStatus() === 'in-progress') {
+            if (typeof window.setMatchStatus === 'function') window.setMatchStatus('abandoned');
+            if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+        }
+    } catch (e) { /* best-effort only */ }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     turnSequence.forEach(color => {

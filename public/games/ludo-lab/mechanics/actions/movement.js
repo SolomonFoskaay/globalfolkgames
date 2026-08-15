@@ -4,7 +4,8 @@
  */
 
 function handleInputInteraction(clientX, clientY) {
-    if (isGamePaused) return; 
+    if (isGamePaused) return;
+    if (typeof matchOver !== 'undefined' && matchOver) return;
     if (playerProfiles[currentTurn].mode === 'computer') return;
 
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
