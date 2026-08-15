@@ -79,11 +79,13 @@ function showChainDownBanner(message, persistent = false) {
         el.appendChild(msg);
 
         // Manual escape hatch: even if the 8s auto-monitor keeps failing, the
-        // player can force a fresh connectivity check at any moment.
+        // player can force a fresh connectivity check at any moment. If the
+        // stack is still unreachable the button refreshes the page so the
+        // persisted paused match re-establishes fresh RPC connections.
         if (!document.getElementById('chain-retry-btn')) {
             const retryBtn = document.createElement('button');
             retryBtn.id = 'chain-retry-btn';
-            retryBtn.textContent = 'Retry now';
+            retryBtn.textContent = 'Refresh';
             retryBtn.addEventListener('click', () => {
                 if (typeof retryChainNow === 'function') retryChainNow();
             });
@@ -151,7 +153,7 @@ function enterChainDownState() {
     if (diceBtn) diceBtn.disabled = true;
 
     ensureChainBannerElement();
-    showChainDownBanner('On-chain dice are unreachable. Your match is paused so nothing is falsely recorded. It resumes automatically, or press Retry once your internet is back.', true);
+    showChainDownBanner('On-chain dice are unreachable. Your match is paused so nothing is falsely recorded. It resumes automatically, or press Refresh once your internet is back.', true);
     displayEducationalLog(`${currentTurn.toUpperCase()}: On-chain dice unreachable. Match paused - will auto-resume when the network is back.`);
 
     // Persist the paused (pre-roll) state so a REFRESH during the outage
@@ -200,18 +202,31 @@ function resumeFromChainDown() {
     }, 1200);
 }
 
-// Banner Retry button: force a connectivity check right now.
+// Banner Refresh button: force a connectivity check right now. When the stack
+// is back this resumes immediately; when it is still unreachable the page is
+// reloaded so the persisted paused match re-establishes fresh RPC connections
+// (the restored chain-down state re-arms the banner + monitor, see
+// rearmChainDownState).
 async function retryChainNow() {
     const ok = await pingOnchainStack();
     if (ok && isChainDown) {
         resumeFromChainDown();
     } else if (!ok) {
-        displayEducationalLog(`${currentTurn.toUpperCase()}: Still offline - retrying automatically...`);
+        displayEducationalLog(`${currentTurn.toUpperCase()}: Still offline - refreshing to re-connect.`);
         if (typeof window.showAuthBanner === 'function') {
-            window.showAuthBanner('Still offline. Waiting for the network to return...');
+            window.showAuthBanner('Still offline. Refreshing to re-connect...');
         }
+        setTimeout(() => window.location.reload(), 600);
     }
 }
+
+// Re-arm the on-chain outage pause after a refresh that happened during an
+// outage. persistence restore calls this when the saved payload was chain-down
+// so the banner + monitor come back and the match stays paused until recovery.
+window.rearmChainDownState = function () {
+    isChainDown = false; // clear so enterChainDownState() can re-enter fresh
+    enterChainDownState();
+};
 
 // The banner + pause ONLY ever appears when a real on-chain roll attempt has
 // actually failed (see rollDiceEngine / enterChainDownState). There is NO

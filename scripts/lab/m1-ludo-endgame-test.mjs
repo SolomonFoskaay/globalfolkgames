@@ -83,6 +83,8 @@ const sandbox = {
   localStorage: null,
   setTimeout,
   clearTimeout,
+  setInterval,
+  clearInterval,
   Math, Date, JSON, Object, Array, String, Number, Boolean,
   parseInt, parseFloat, isNaN, isFinite, NaN, Infinity,
 };
@@ -525,6 +527,39 @@ check('3+5 with stale counter -> counter force-reset to 0', vm.runInContext('con
   check('tampered payload refused (returns false)', tamperLoad === false);
   check('tampered cache cleared', sandbox.localStorage.getItem('gfg_ludo_persistence_state') === null);
   check('tampered payload warns loudly', vm.runInContext('window.getLastPersistenceWarning() !== null', sandbox) === true);
+
+  console.log('\n== Spec: on-chain outage pause survives a refresh ==');
+  // A failed roll enters chain-down (banner + monitor, dice disabled) and the
+  // paused state is persisted. A refresh during the outage must restore into
+  // the SAME paused state (banner + monitor re-armed, no false roll) and the
+  // banner's Refresh button must recover once the stack answers again.
+  lockFreshMatch();
+  vm.runInContext(`
+    currentTurn = 'green'; isDiceRolled = false; hasRolledThisTurn = false; currentTurnMoves = [];
+    window.setChainDownState(false);
+    enterChainDownState();
+  `, sandbox);
+  check('outage sets chain-down', vm.runInContext('isChainDown', sandbox) === true);
+  check('outage disables the dice button', els['diceBtn'].disabled === true);
+  const savedChainDown = JSON.parse(sandbox.localStorage.getItem('gfg_ludo_persistence_state'));
+  check('outage state persisted (isChainDown true)', savedChainDown && savedChainDown.isChainDown === true, savedChainDown && JSON.stringify(savedChainDown.isChainDown));
+
+  // Simulate a refresh DURING the outage: fresh in-memory flags, restore from storage.
+  vm.runInContext(`
+    isChainDown = false; isGamePaused = false; setupConfigurationLocked = false;
+    currentTurn = 'green'; isDiceRolled = true; hasRolledThisTurn = true; currentTurnMoves = [6,6];
+    loadGameStateFromStorage();
+  `, sandbox);
+  check('refresh during outage re-arms chain-down', vm.runInContext('isChainDown', sandbox) === true);
+  check('refresh during outage re-disables the dice button', els['diceBtn'].disabled === true);
+  check('refresh during outage keeps the match locked', T().setupConfigurationLocked === true);
+  await new Promise(r => setTimeout(r, 1700));
+  check('no false auto-roll while chain-down restored', T().isDiceRolled === false, T().isDiceRolled);
+  vm.runInContext('resumeFromChainDown();', sandbox);
+  check('recovery clears chain-down', vm.runInContext('isChainDown', sandbox) === false);
+  check('recovery re-enables the dice button', els['diceBtn'].disabled === false);
+  sandbox.localStorage.removeItem('gfg_ludo_persistence_state');
+  sandbox.localStorage.removeItem('gfg_ludo_persistence_state_digest');
 
   console.log(`\n================  RESULT: ${passed} passed, ${failed} failed  ================`);
   process.exit(failed ? 1 : 0);

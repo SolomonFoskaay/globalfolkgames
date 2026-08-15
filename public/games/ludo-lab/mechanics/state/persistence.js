@@ -195,6 +195,7 @@ function saveGameStateToStorage() {
         consecutiveDoubleSixes,
         hasRolledThisTurn,
         isGamePaused,
+        isChainDown: (typeof isChainDown !== 'undefined') ? isChainDown : false,
         setupConfigurationLocked,
         playerProfiles,
         matchMode: (typeof matchMode !== 'undefined') ? matchMode : '4p',
@@ -413,7 +414,13 @@ function loadGameStateFromStorage() {
             return true;
         }
 
-        if (setupConfigurationLocked && !isGamePaused && playerProfiles[currentTurn].mode === 'computer') {
+        // An outage pause survives a refresh: re-arm the banner + monitor so the
+        // match stays paused (never a false roll) and auto-resumes on recovery.
+        if (savedState.isChainDown === true && typeof window.rearmChainDownState === 'function') {
+            window.rearmChainDownState();
+        }
+
+        if (setupConfigurationLocked && !isGamePaused && !isChainDown && playerProfiles[currentTurn].mode === 'computer') {
             setTimeout(() => {
                 if (typeof matchOver !== 'undefined' && matchOver) return;
                 if (!isDiceRolled) {
