@@ -220,6 +220,10 @@ function runDicePhysicsCalculations() {
         const speed = Math.abs(die.vx) + Math.abs(die.vy);
         if (speed > 0.3) {
             if (die.finalValue == null) die.value = Math.floor(Math.random() * 6) + 1;
+            // Re-kicked by a collision (e.g. the dice-vs-dice min impulse or a
+            // wall bounce) while already settled: drop the settled flag so the
+            // die re-snaps onto its VRF face once it calms again.
+            if (die._settledExact) die._settledExact = false;
             const ax = (-die.vy) * 0.9 + (Math.random() - 0.5);
             const ay = (die.vx) * 0.9 + (Math.random() - 0.5);
             const az = 0.5;
@@ -235,9 +239,16 @@ function runDicePhysicsCalculations() {
             const target = die._settleTarget || DICE_Q_COMPUTE_TARGET(die.finalValue, die);
             die._settleTarget = target;
             if (target && !die._settledExact) {
-                const eased = slerpQuat(die.q, target, 0.18);
+                // DETERMINISTIC SETTLE: the tumble is COSMETIC only — the
+                // final face is always exactly the ER VRF value. Ease fast
+                // toward the exact face-up orientation and, after a short
+                // frame budget, SNAP to it unconditionally, so a throttled or
+                // backgrounded mobile tab can never leave the die resting on a
+                // non-VRF face.
+                die._settleFrames = (die._settleFrames || 0) + 1;
+                const eased = slerpQuat(die.q, target, 0.32);
                 die.q = eased;
-                if (quatAngleBetween(eased, target) < 0.02) {
+                if (die._settleFrames > 12 || quatAngleBetween(eased, target) < 0.02) {
                     die.q = target;
                     die._settledExact = true;
                 } else {
@@ -254,7 +265,11 @@ function runDicePhysicsCalculations() {
         if (die.x < 0 || die.x > 600 - size) { die.vx = -die.vx * 0.8; die.x = Math.max(0, Math.min(die.x, 600 - size)); bounced = true; }
         if (die.y < 0 || die.y > 600 - size) { die.vy = -die.vy * 0.8; die.y = Math.max(0, Math.min(die.y, 600 - size)); bounced = true; }
         if (bounced) {
-            die.q = DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, 0.14), die.q));
+            // A SETTLED die keeps its VRF-locked face: never re-spin the cube
+            // off its exact target orientation, even if a wall bounces it.
+            if (!die._settledExact) {
+                die.q = DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, 0.14), die.q));
+            }
             if (Math.abs(die.vx) > 1.5 || Math.abs(die.vy) > 1.5) playDiceTick();
         }
     });
