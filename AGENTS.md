@@ -90,8 +90,12 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
     `subscription/` = M5, `point-sources/` = M6, `competitions/` = M7,
     `escrow/` = M8). A game plugs in ONCE (`publishGameResult`); a universal
     module subscribes ONCE (`onGameResult`) and updates inside its own folder
-    without touching the game. New universal capabilities land in this tree and
-    mirror into `architecture.json`.
+    without touching the game. UNIVERSAL MEANS REUSABLE BY NAME: a universal
+    module is game-agnostic - ANY M1 game (Ludo, Ayo Olopon, ...) plugs into it
+    and reuses it; it is NEVER tailored to one game the way M1 game code is.
+    M1-only game tooling (like the `/verify/` receipt explorer, proof-of-play)
+    is NOT a universal module and does NOT live in `public/universal/`. New
+    universal capabilities land in this tree and mirror into `architecture.json`.
 5. **Feature Tracker stays synced.** Roadmap items reference their module
    (e.g. "Earn competitions = M7"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.
@@ -113,8 +117,12 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 
 **Current module status (mirror of architecture.json, 2026-08-15):**
 - M1: in-progress — Ludo (ludo-lab) verified COMPLETE against its locked spec
-  A-Z (2026-08-16: 107/107 harness + 3D dice + Scope A/B/C shipped); the next
-  M1A game is Ayo Olopon (planned, spec not yet locked).
+  A-Z (2026-08-16: 107/107 harness + 3D dice + Scope A/B/C shipped). M1 also
+  owns its proof-of-play TOOLING: the `/verify/` receipt explorer (game-tooling,
+  NOT in `public/universal/` - it proves M1's rolls/matches on-chain by querying
+  the MagicBlock ER + base devnet RPC directly, and the win popup's "See
+  on-chain receipt" link opens it pre-filled). The next M1A game is Ayo Olopon
+  (planned, spec not yet locked).
 - M2: in-progress — universal result seam (built: `public/universal/result-seam/game-result.js`
   + the whole universal-modules tree `public/universal/` with homed folders for
   M3-M8; Ludo ludo-lab emits the envelope; subscribers for M3/M4/M7 land with

@@ -15,7 +15,8 @@
         "Any seat's roll has NO offline fallback: retry x3 then pause + monitor (never fake roll).",
         "A game emits into the universal result seam (M2) and knows nothing else. It NEVER knows how points/competitions work.",
         "Pluggable: M1A Ayo Olopon becomes the next game with the same proof-of-play contract + the same result seam.",
-        "Per-game locked specs: see the game dropdown below (M1A Ludo locked 2026-08-15)."
+        "Per-game locked specs: see the game dropdown below (M1A Ludo locked 2026-08-15).",
+        "PROOF OF PLAY (verifiable tooling, shipped 2026-08-16): the public /verify/ receipt explorer proves any GlobalFolkGames receipt on-chain, because ER receipts are NOT indexed by public explorers (SolanaFM/Solana only see base + settlement). Signature lookups query BOTH the ER RPC (getTransaction on devnet-us.magicblock.app) and the base devnet RPC (api.devnet.solana.com); account lookups always surface the permanent base-explorer (solana.fm) record plus recent rollup sigs (getSignaturesForAddress). The ludo-lab winners popup gains a 'See on-chain receipt' link opening /verify/?tx=<sig> pre-filled + auto-queried. Honesty rule kept: never link an ER sig on a standard explorer. Lives as M1 game-tooling (game-adjacent), NOT inside public/universal/ - it is proof-of-play support for M1 games, not a universal consumer module."
       ],
       "games": [
         {
@@ -62,7 +63,7 @@
         "Consumers subscribe via window.onGameResult(handler) + a 'gfg:game-result' DOM event. M3/M4/M7 (local points, global ledgers, competitions) subscribe here and NEVER read game internals.",
         "No game ships its own reward/competition plug. Adding a new game = emit the same envelope; the platform does not change.",
         "Ludo (ludo-lab) now emits this envelope on match completion (replaces the ad-hoc onGfgMatchResult seam).",
-        "PHYSICAL HOME (universal/): every universal module lives under public/universal/ (result-seam/ = M2, points/ = M3, ledgers/ = M4, subscription/ = M5, point-sources/ = M6, competitions/ = M7, escrow/ = M8). A game plugs in ONCE (window.publishGameResult); a universal module subscribes ONCE (window.onGameResult) and updates inside its own folder without ever touching a game."
+        "PHYSICAL HOME (universal/): every universal module lives under public/universal/ (result-seam/ = M2, points/ = M3, ledgers/ = M4, subscription/ = M5, point-sources/ = M6, competitions/ = M7, escrow/ = M8). A game plugs in ONCE (window.publishGameResult); a universal module subscribes ONCE (window.onGameResult) and updates inside its own folder without ever touching a game. UNIVERSAL MEANS REUSABLE BY NAME: a universal module is game-agnostic - any M1 game (Ludo, Ayo Olopon, ...) plugs into it and reuses it; it is NEVER tailored to one game the way M1 game code is."
       ]
     },
     {

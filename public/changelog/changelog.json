@@ -551,6 +551,23 @@
       "status": "in-progress",
       "approved": false,
       "added": "2026-08-16"
+    },
+    {
+      "title": "On-chain receipt explorer (verify any game receipt)",
+      "summary": "See the blockchain proof yourself. Copy any match receipt from the winners screen, paste it into the explorer, and watch it resolve as a confirmed transaction with the exact result the game showed you. You can check every claim, any time.",
+      "details": [
+        "Module: M1 (proof-of-play tooling, game-adjacent - NOT a universal module, so it does NOT live in public/universal/). Same build for every M1A game (Ludo now, Ayo Olopon later): it proves the game's own rolls/matches on-chain, it is not a reward/competition consumer.",
+        "New public page /verify/ (Vite input verify): anyone can paste a GameFolkGames receipt (or any Solana id) and get an honest on-chain answer.",
+        "Why: ER receipt signatures are NOT indexed by public explorers (SolanaFM/Solana see only the base chain + settlement), so the copyable ceremony receipt had no public lookup. This page is the real verification path: it queries MagicBlock ER RPC directly (getTransaction on devnet-us.magicblock.app) AND the base devnet RPC (api.devnet.solana.com).",
+        "Signature lookup: queries both ledgers. Found on base = permanent record with a working solana.fm link. Found on ER only = rollup execution, formatted readably (success/fail, fee, slot, time, Anchor Instruction: names from logMessages, programs invoked, involved accounts as chips). Neither = honest not-found card explaining rollup ephemerality and offering the account path.",
+        "Account lookup: getSignaturesForAddress on the ER (recent rollup sigs, each clickable) plus an ALWAYS-present working base-explorer (solana.fm) account link, because the one-time create+delegate transactions on the base chain are the permanent proof the account was really opened. One delegated session + one sign-in wallet covers every game on the same program, so a single onboarding tx is the proof; the page says so in plain language.",
+        "Auto-fill: /verify/?tx=<sig> (and ?account=) pre-fill the search bar and auto-run the query.",
+        "Win popup (ludo-lab, ceremony): the copyable receipt gains a small See on-chain receipt link that opens /verify/?tx=<receipt> in a new tab (keeps the popup uncluttered). The existing sponsored onboarding tx link below the receipt is kept unchanged.",
+        "Honesty rules kept: no fake links (never a Google/explorer link to an ER sig), no new security-sensitive data served to the client, devnet-only at this phase."
+      ],
+      "status": "in-progress",
+      "added": "2026-08-16",
+      "approved": false
     }
   ]
 }

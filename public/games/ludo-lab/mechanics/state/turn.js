@@ -413,7 +413,8 @@ window.showResultCeremony = function () {
             if (sig) {
                 const receipt = typeof sig === 'string' ? sig : '';
                 proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain game record (MagicBlock ER VRF).</span>'
-                    + (receipt ? '<span class="ceremony-proof-receipt">Receipt: <code class="ceremony-proof-sig" title="Click to copy">' + receipt + '</code></span>' : '');
+                    + (receipt ? '<span class="ceremony-proof-receipt">Receipt: <code class="ceremony-proof-sig" title="Click to copy">' + receipt + '</code></span>' : '')
+                    + (receipt ? ' <span class="ceremony-proof-status"><a href="/verify/?tx=' + encodeURIComponent(receipt) + '" target="_blank" rel="noopener noreferrer" style="color:#f39c12;text-decoration:underline;">See on-chain receipt</a></span>' : '');
                 const sigCode = proofEl.querySelector('.ceremony-proof-sig');
                 if (sigCode) {
                     sigCode.addEventListener('click', function (ev) {

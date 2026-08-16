@@ -36,7 +36,8 @@ export default defineConfig({
         'dashboard-endpoints': './dashboard/endpoints.html',
         'dashboard-activity': './dashboard/activity.html',
         'dashboard-accounts': './dashboard/accounts.html',
-        'dashboard-release': './dashboard/release.html'
+        'dashboard-release': './dashboard/release.html',
+        verify: './verify/index.html'
       }
     }
   },

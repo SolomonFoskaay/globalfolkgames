@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Receipt Explorer | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .v-shell { max-width: 720px; margin: 0 auto; padding: 6px 0 40px; }
+        .v-search { display: flex; gap: 8px; flex-wrap: wrap; }
+        .v-search input { flex: 1 1 260px; min-width: 0; }
+        .v-result { margin-top: 14px; }
+        .v-card { margin-top: 12px; }
+        .v-pill { font-size: 0.85rem; font-weight: 800; letter-spacing: 0.02em; }
+        .v-rows { list-style: none; margin: 10px 0 0; padding: 0; }
+        .v-rows li { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 0.9rem; }
+        .v-key { min-width: 118px; color: var(--muted); flex-shrink: 0; }
+        .v-val { word-break: break-all; color: #eee; }
+        .v-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .v-chip { display: inline-block; padding: 5px 9px; border-radius: 999px; border: 1px solid rgba(155,89,182,0.5); color: #f39c12; text-decoration: none; font-size: 0.78rem; background: rgba(155,89,182,0.10); }
+        .v-code { display: block; font-family: monospace; background: rgba(0,0,0,0.35); padding: 8px 10px; border-radius: 8px; font-size: 0.78rem; word-break: break-all; margin-top: 8px; }
+        .v-lead { font-size: 0.92rem; line-height: 1.55; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>🔎 Receipt explorer</h2>
+            <p class="auth-hint" id="verify-status" style="margin-top:8px;">Paste a receipt or an account id. This page asks the live ledgers directly and shows you what it finds.</p>
+        </section>
+
+        <section class="game-card">
+            <div class="v-search">
+                <input id="verify-input" type="text" placeholder="Paste a receipt or account id" autocomplete="off" spellcheck="false" style="background:rgba(0,0,0,0.4); border:1px solid rgba(243,156,18,0.35); border-radius:10px; padding:12px 14px; color:#fff; font-size:0.92rem;">
+                <button id="verify-btn" class="launch-btn" style="white-space:nowrap;">Check on-chain</button>
+            </div>
+            <p style="margin-top:8px; font-size:0.8rem; color:var(--muted);">Receipts are the codes shown on the winners screen after a match (click the code to copy it). Account ids are your wallet or game account addresses.</p>
+            <div id="verify-result" class="v-result" aria-live="polite"></div>
+        </section>
+
+        <section class="game-card">
+            <h3>Why this exists</h3>
+            <p>Every dice roll and every finished match in GlobalFolkGames is recorded on the Solana ledger. But the gasless game transactions run on a fast private layer (the rollup) that outside websites cannot see, so there was no public link to click. This page asks the rollup and the base ledger directly, so you can always check for yourself.</p>
+            <p style="margin-top:8px;">How to use it: copy a receipt from the winners screen, paste it above, and press Check on-chain. A green result means the transaction is confirmed with the exact outcome shown to you. You can also paste a wallet or game account address to see its permanent creation record on the base explorer.</p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/header.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script src="/verify/verify.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+        });
+    </script>
+</body>
+</html>
