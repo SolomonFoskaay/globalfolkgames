@@ -153,7 +153,14 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   re-fetch; global header "Local:" chip via initGlobalHeader({localPointsTag});
   ludo-lab ceremony "+N Ludo points banked on-chain"; client pointsPda(gameTag)
   powers the profile on-chain ledger card.
-- M4: planned — global ledgers (lifetime/spendable split; spendable is next).
+- M4: planned — global ledgers (M4a pure / M4b lifetime / M4c spendable).
+  Owner-locked 2026-08-16: ON-CHAIN via the same delegated gfg program (seed
+  [gfgpoints, 'global', player], new GlobalPoints account type + record_global/
+  spend_global instructions, gasless on the ER, no new program); Supabase is
+  backup/restore only (devnet-wipe recovery). Multiplier-blind flow-up: M4
+  banks the base unmultiplied win via the seam; M5 applies the tier boost as a
+  separate kind-1 credit (source e.g. 'tier2_boost') so M4a pure can never be
+  multiplied. Build after M3 stable, before M5.
 - M5: in-progress — S1 Active Tier + spendable sink.
 - M6: planned — referral / giveaways / sub buy-in.
 - M7: planned (deferred) — competitions.
