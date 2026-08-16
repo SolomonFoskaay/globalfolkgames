@@ -373,11 +373,11 @@ async function rollDiceEngine(source) {
     if (physicsAnimationLoop) cancelAnimationFrame(physicsAnimationLoop);
 
     // Dice are locked to the on-chain result (physics snaps to finalValue at rest).
-    // Each die gets a little random tumble (rotV) so they look thrown, and a
-    // natural rattle plays as they fly across the board.
+    // Each die starts with a little random 3D tilt (quaternion) so they look
+    // thrown, and a natural rattle plays as they fly across the board.
     physicalDice = [
-        { x: 200, y: 260, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[0], finalValue: rollValues[0], rotV: (Math.random() - 0.5) * 0.09 },
-        { x: 310, y: 300, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[1], finalValue: rollValues[1], rotV: (Math.random() - 0.5) * 0.09 }
+        { x: 200, y: 260, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[0], finalValue: rollValues[0], q: axisAngleToQuat(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, (Math.random() - 0.5) * 0.6) },
+        { x: 310, y: 300, vx: (Math.random() * 14) - 7, vy: (Math.random() * 14) - 7, value: rollValues[1], finalValue: rollValues[1], q: axisAngleToQuat(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, (Math.random() - 0.5) * 0.6) }
     ];
     if (typeof playDiceRattle === 'function') playDiceRattle();
 

@@ -2,10 +2,10 @@
 let physicalDice = [];
 let physicsAnimationLoop;
 
-// Die body size in board pixels (100% bigger than the original 46px so the
-// dice are clearly readable on small phone screens). Physics positions are
-// the die's TOP-LEFT corner in the 600x600 board space.
-const DICE_SIZE = 92;
+// Die body size in board pixels (25% smaller than the earlier 92px so the dice
+// stay readable without crowding the board on small phones). Physics positions
+// are the die's TOP-LEFT corner in the 600x600 board space.
+const DICE_SIZE = 69;
 
 // ============================ Natural dice sounds ============================
 // Synthesised with the Web Audio API (no binary assets to ship or license).
@@ -98,6 +98,108 @@ function playDiceTick() {
     } catch (e) { /* cosmetic */ }
 }
 
+// ======================= 3D orientation math (quaternions) ======================
+// The dice are REAL CSS-3D cubes, so each carries a unit quaternion [w,x,y,z].
+// All helpers here are pure math (no DOM), so the endgame harness can run the
+// physics loop headless. Face->normal map: opposite faces sum to 7.
+
+const DICE_FACE_NORMALS = {
+    1: [0, 0, 1],   // front
+    6: [0, 0, -1],  // back
+    3: [1, 0, 0],   // right
+    4: [-1, 0, 0],  // left
+    5: [0, 1, 0],   // top
+    2: [0, -1, 0],  // bottom
+};
+
+function DICE_Q_IDENTITY() { return [1, 0, 0, 0]; }
+
+function DICE_Q_NORMALIZE(q) {
+    const n = Math.hypot(q[0], q[1], q[2], q[3]);
+    if (!n || n === 0) return DICE_Q_IDENTITY();
+    return [q[0] / n, q[1] / n, q[2] / n, q[3] / n];
+}
+
+// Hamilton product: a applied after b (result rotates by b, then by a).
+function DICE_Q_MUL(a, b) {
+    return DICE_Q_NORMALIZE([
+        a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+        a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+        a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+        a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]
+    ]);
+}
+
+function axisAngleToQuat(x, y, z, angle) {
+    const l = Math.hypot(x, y, z) || 1;
+    const s = Math.sin(angle / 2);
+    return [Math.cos(angle / 2), (x / l) * s, (y / l) * s, (z / l) * s];
+}
+
+// Spherical interpolation (shortest arc), then normalized.
+function slerpQuat(a, b, t) {
+    let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+    let bb = b;
+    if (dot < 0) { dot = -dot; bb = [-b[0], -b[1], -b[2], -b[3]]; }
+    if (dot > 0.9995) {
+        return DICE_Q_NORMALIZE([
+            a[0] + t * (bb[0] - a[0]),
+            a[1] + t * (bb[1] - a[1]),
+            a[2] + t * (bb[2] - a[2]),
+            a[3] + t * (bb[3] - a[3])
+        ]);
+    }
+    const theta0 = Math.acos(dot);
+    const theta = theta0 * t;
+    const sinTheta = Math.sin(theta);
+    const sinTheta0 = Math.sin(theta0);
+    const sA = Math.cos(theta) - dot * sinTheta / sinTheta0;
+    const sB = sinTheta / sinTheta0;
+    return DICE_Q_NORMALIZE([
+        sA * a[0] + sB * bb[0],
+        sA * a[1] + sB * bb[1],
+        sA * a[2] + sB * bb[2],
+        sA * a[3] + sB * bb[3]
+    ]);
+}
+
+// Angular distance (radians, 0..PI) between two orientations.
+function quatAngleBetween(a, b) {
+    const d = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]);
+    const c = Math.min(1, Math.max(-1, 2 * d * d - 1));
+    return Math.acos(c);
+}
+
+// Quaternion that rotates the given face normal onto a target axis (unit).
+function _quatAlignToAxis(n, axis) {
+    const nl = Math.hypot(n[0], n[1], n[2]) || 1;
+    const nx = n[0] / nl, ny = n[1] / nl, nz = n[2] / nl;
+    const dot = Math.max(-1, Math.min(1, nx * axis[0] + ny * axis[1] + nz * axis[2]));
+    if (dot > 0.9999) return DICE_Q_IDENTITY();
+    if (dot < -0.9999) {
+        // Direct opposite: half-turn about any axis perpendicular to `axis`.
+        const perp = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        return axisAngleToQuat(perp[0], perp[1], perp[2], Math.PI);
+    }
+    // axis = cross(n, target)
+    const ax = ny * axis[2] - nz * axis[1];
+    const ay = nz * axis[0] - nx * axis[2];
+    const az = nx * axis[1] - ny * axis[0];
+    return axisAngleToQuat(ax, ay, az, Math.acos(dot));
+}
+
+// Settle orientation: the rolled VALUE face becomes the TOP of a real die lying
+// flat on the board (its normal -> +Y, the board's up axis), then a little spin
+// about that up axis varies the pips so dice don't land identically every roll.
+// The spin is cached on the die so the slerp target stays fixed while landing.
+function DICE_Q_COMPUTE_TARGET(value, die) {
+    const n = DICE_FACE_NORMALS[value];
+    if (!n) return DICE_Q_IDENTITY();
+    let spin = (die && typeof die._spinAngle === 'number') ? die._spinAngle : (Math.random() - 0.5) * 0.9;
+    if (die) die._spinAngle = spin;
+    return DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(0, 1, 0, spin), _quatAlignToAxis(n, [0, 1, 0])));
+}
+
 // ============================== Dice physics loop ==============================
 
 function runDicePhysicsCalculations() {
@@ -110,27 +212,51 @@ function runDicePhysicsCalculations() {
         die.y += die.vy;
         die.vx *= 0.94; // Natural velocity decay friction
         die.vy *= 0.94;
-        die.rot = (die.rot || 0) + (die.rotV || 0);
-        die.rotV = (die.rotV || 0) * 0.94;
-        die.rot *= 0.94; // Tumble settles back to level
 
-        // Shuffle temporary face numbers while velocity vectors are active
-        // (unless this die is locked to a provably-fair VRF result)
-        if (Math.abs(die.vx) > 0.15 || Math.abs(die.vy) > 0.15) {
+        // TRUE-3D tumble: dies are real CSS cubes carrying a quaternion
+        // orientation. While moving they roll end-over-end along the direction
+        // of travel (plus a wobble), so they spin naturally on the board.
+        if (!die.q) die.q = DICE_Q_IDENTITY();
+        const speed = Math.abs(die.vx) + Math.abs(die.vy);
+        if (speed > 0.3) {
             if (die.finalValue == null) die.value = Math.floor(Math.random() * 6) + 1;
+            const ax = (-die.vy) * 0.9 + (Math.random() - 0.5);
+            const ay = (die.vx) * 0.9 + (Math.random() - 0.5);
+            const az = 0.5;
+            const mag = Math.hypot(ax, ay, az) || 1;
+            const ang = Math.min(0.22, speed / 130 + 0.05);
+            die.q = DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(ax / mag, ay / mag, az / mag, ang), die.q));
             piecesStillMoving = true;
         } else if (die.finalValue != null) {
-            // Velocity stopped -> snap to the VRF-locked face
+            // Velocity stopped -> value locks to the VRF face, and the cube
+            // EASES (slerps) onto the orientation that shows that face, so it
+            // visibly lands instead of teleporting.
             die.value = die.finalValue;
+            const target = die._settleTarget || DICE_Q_COMPUTE_TARGET(die.finalValue, die);
+            die._settleTarget = target;
+            if (target && !die._settledExact) {
+                const eased = slerpQuat(die.q, target, 0.18);
+                die.q = eased;
+                if (quatAngleBetween(eased, target) < 0.02) {
+                    die.q = target;
+                    die._settledExact = true;
+                } else {
+                    piecesStillMoving = true;
+                }
+            }
         }
 
         // Boundary Collisions: Bounce off 600x600 canvas parameters like a
         // real die hitting the wooden rim — reverse with ~20% energy loss so
-        // it visibly rebounds instead of just stopping.
+        // it visibly rebounds instead of just stopping. The hit also imparts a
+        // 3D tumble kick so the cube tumbles off the rim like a real die.
         let bounced = false;
         if (die.x < 0 || die.x > 600 - size) { die.vx = -die.vx * 0.8; die.x = Math.max(0, Math.min(die.x, 600 - size)); bounced = true; }
         if (die.y < 0 || die.y > 600 - size) { die.vy = -die.vy * 0.8; die.y = Math.max(0, Math.min(die.y, 600 - size)); bounced = true; }
-        if (bounced && (Math.abs(die.vx) > 1.5 || Math.abs(die.vy) > 1.5)) playDiceTick();
+        if (bounced) {
+            die.q = DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5, 0.14), die.q));
+            if (Math.abs(die.vx) > 1.5 || Math.abs(die.vy) > 1.5) playDiceTick();
+        }
     });
 
     // Dice-vs-dice collision: the two dice bounce apart instead of overlapping.
@@ -180,151 +306,143 @@ function runDicePhysicsCalculations() {
 }
 
 // ============================== 3D dice rendering ==============================
+// The dice are REAL CSS-3D cubes: a transparent overlay stage sits exactly over
+// the 600x600 board canvas and holds two six-faced cubes oriented by each die's
+// quaternion every physics tick. The canvas itself never paints the dice any
+// more — the cubes rotate in actual 3D (perspective + preserve-3d) so they
+// tumble and bounce like physical objects on the board, and dice-vs-dice
+// separation lives in the physics loop above. All DOM access is guarded so the
+// headless endgame harness can run the physics loop without a renderer.
 
-function renderPhysicalDiceCubes() {
-    if (!displayDiceOnBoard || physicalDice.length !== 2) return;
+const DICE_FACE_PIPS = {
+    1: [[0.5, 0.5]],
+    2: [[0.28, 0.28], [0.72, 0.72]],
+    3: [[0.28, 0.28], [0.5, 0.5], [0.72, 0.72]],
+    4: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]],
+    5: [[0.28, 0.28], [0.72, 0.28], [0.5, 0.5], [0.28, 0.72], [0.72, 0.72]],
+    6: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.5], [0.72, 0.5], [0.28, 0.72], [0.72, 0.72]]
+};
 
-    physicalDice.forEach(die => {
-        const size = DICE_SIZE;
-        const x = die.x;
-        const y = die.y;
-        const cx = x + size / 2;
-        const cy = y + size / 2;
-        const r = Math.max(4, size * 0.12);
-        const value = die.value;
-        const rot = die.rot || 0;
+// Face order keeps opposites summing to 7 (front=1/back=6, right=3/left=4,
+// top=5/bottom=2) and matches the CSS face transform classes in style.css.
+const DICE_FACE_ORDER = [1, 6, 3, 4, 5, 2];
 
-        // How fast the die is currently spinning. While it tumbles, the cube
-        // shows DEEPER side faces (it looks like it is flipping end over end);
-        // when it settles the extrusion relaxes to a fixed 3D depth.
-        const spin = Math.min(1, Math.abs(die.rotV || 0) / 10);
-        const ext = size * (0.13 + 0.10 * spin);
+let _dice3dStage = null;
 
-        ctx.save();
+function canRenderDice3d() {
+    if (typeof document === 'undefined') return false;
+    return typeof document.createElement === 'function';
+}
 
-        // Contact shadow on the board, drawn OUTSIDE the tumble rotation so it
-        // stays planted under the die (sells the height of the cube).
-        const shadowW = size * 0.44 * (1 - spin * 0.22);
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
-        ctx.beginPath();
-        ctx.ellipse(cx + 5, cy + size * 0.44, shadowW, size * 0.15, 0, 0, Math.PI * 2);
-        ctx.fill();
+// Lazily build the overlay stage (two cubes, six faces each). Returns null in
+// DOM-less environments so the physics loop still runs headless.
+function buildDice3dStage() {
+    if (_dice3dStage) return _dice3dStage;
+    if (!canRenderDice3d()) return null;
+    const canvasEl = document.getElementById('ludoCanvas');
+    if (!canvasEl || !canvasEl.parentNode) return null;
 
-        // Small tumble rotation while in motion (settles back to level).
-        ctx.translate(cx, cy);
-        ctx.rotate(rot);
-        ctx.translate(-cx, -cy);
+    const parent = canvasEl.parentNode;
+    const stage = document.createElement('div');
+    stage.className = 'gfg-dice-3d-stage';
+    stage.style.display = 'none';
+    stage.id = 'gfg-dice-3d-stage';
 
-        // ---- Right face (side in shadow) ----
-        // Both side faces share one depth vector d = (+ext, -ext), so the cube
-        // is a proper axonometric projection receding toward the upper-right.
-        const rightGrad = ctx.createLinearGradient(cx, cy, cx + ext, cy);
-        rightGrad.addColorStop(0, '#cfd4da');
-        rightGrad.addColorStop(1, '#9aa1ab');
-        ctx.fillStyle = rightGrad;
-        ctx.strokeStyle = 'rgba(15,15,19,0.35)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(cx + size / 2, cy - size / 2);
-        ctx.lineTo(cx + size / 2, cy + size / 2);
-        ctx.lineTo(cx + size / 2 + ext, cy + size / 2 - ext);
-        ctx.lineTo(cx + size / 2 + ext, cy - size / 2 - ext);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+    const faceClass = { 1: 'front', 6: 'back', 3: 'right', 4: 'left', 5: 'top', 2: 'bottom' };
+    DICE_FACE_ORDER.forEach((value) => {
+        const die = document.createElement('div');
+        die.className = 'gfg-die';
 
-        // ---- Top face (lit from above) ----
-        const topGrad = ctx.createLinearGradient(cx, cy - size / 2 - ext, cx, cy - size / 2);
-        topGrad.addColorStop(0, '#ffffff');
-        topGrad.addColorStop(1, '#e9ebee');
-        ctx.fillStyle = topGrad;
-        ctx.strokeStyle = 'rgba(15,15,19,0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(cx - size / 2, cy - size / 2);
-        ctx.lineTo(cx + size / 2, cy - size / 2);
-        ctx.lineTo(cx + size / 2 + ext, cy - size / 2 - ext);
-        ctx.lineTo(cx - size / 2 + ext, cy - size / 2 - ext);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        const shadow = document.createElement('div');
+        shadow.className = 'gfg-die-shadow';
+        die.appendChild(shadow);
 
-        // Glossy streak along the top face (fake a specular reflection on the
-        // polished cube).
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(cx - size / 2 + 3, cy - size / 2 - 1.5);
-        ctx.lineTo(cx + size / 2 + ext - 3, cy - size / 2 - ext + 1.5);
-        ctx.stroke();
+        const cube = document.createElement('div');
+        cube.className = 'gfg-die-cube';
 
-        // ---- Front face (the rolled value) ----
-        const bodyGrad = ctx.createLinearGradient(x, y, x, y + size);
-        bodyGrad.addColorStop(0, '#ffffff');
-        bodyGrad.addColorStop(0.72, '#f3f4f6');
-        bodyGrad.addColorStop(1, '#d9dce1');
-
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + size, y, x + size, y + size, r);
-        ctx.arcTo(x + size, y + size, x, y + size, r);
-        ctx.arcTo(x, y + size, x, y, r);
-        ctx.arcTo(x, y, x + size, y, r);
-        ctx.closePath();
-
-        ctx.fillStyle = bodyGrad;
-        ctx.fill();
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // Bevel: bright inner highlight along the top edge, dark shade along
-        // the bottom — sells the "carved block" depth on any screen.
-        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y + 1.5);
-        ctx.arcTo(x + size, y + 1.5, x + size, y + size, r);
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.beginPath();
-        ctx.moveTo(x + r, y + size - 1.5);
-        ctx.arcTo(x + size - 1.5, y + size - 1.5, x, y + size - 1.5, r);
-        ctx.stroke();
-
-        // Pips as real dots (position map per face) — reliable on every device,
-        // unlike unicode die glyphs that render inconsistently on mobile.
-        const pipMap = {
-            1: [[0.5, 0.5]],
-            2: [[0.28, 0.28], [0.72, 0.72]],
-            3: [[0.28, 0.28], [0.5, 0.5], [0.72, 0.72]],
-            4: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]],
-            5: [[0.28, 0.28], [0.72, 0.28], [0.5, 0.5], [0.28, 0.72], [0.72, 0.72]],
-            6: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.5], [0.72, 0.5], [0.28, 0.72], [0.72, 0.72]]
-        }[value] || [[0.5, 0.5]];
-
-        const pipRadius = Math.max(3.5, size * 0.075);
-        pipMap.forEach(([fx, fy]) => {
-            const px = x + size * fx;
-            const py = y + size * fy;
-
-            // Tiny shadow offset so the pip reads as drilled into the die.
-            ctx.fillStyle = 'rgba(0,0,0,0.22)';
-            ctx.beginPath();
-            ctx.arc(px + 1.2, py + 1.4, pipRadius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Radial-gradient pip body for a slightly rounded, inked look.
-            const pipGrad = ctx.createRadialGradient(px - pipRadius * 0.3, py - pipRadius * 0.3, pipRadius * 0.15, px, py, pipRadius);
-            pipGrad.addColorStop(0, '#3a3a3a');
-            pipGrad.addColorStop(1, '#0f0f13');
-            ctx.fillStyle = pipGrad;
-            ctx.beginPath();
-            ctx.arc(px, py, pipRadius, 0, Math.PI * 2);
-            ctx.fill();
+        const face = document.createElement('div');
+        face.className = 'gfg-die-face gfg-die-face-' + faceClass[value];
+        (DICE_FACE_PIPS[value] || DICE_FACE_PIPS[1]).forEach(([fx, fy]) => {
+            const pip = document.createElement('span');
+            pip.className = 'gfg-pip';
+            pip.style.left = (fx * 100).toFixed(1) + '%';
+            pip.style.top = (fy * 100).toFixed(1) + '%';
+            face.appendChild(pip);
         });
+        cube.appendChild(face);
 
-        ctx.restore();
+        die.appendChild(cube);
+        stage.appendChild(die);
     });
+
+    parent.appendChild(stage);
+    _dice3dStage = stage;
+    return stage;
+}
+
+// Convert a unit quaternion to a CSS rotate3d string for the cube element.
+function quaternionToRotate3d(q) {
+    const w = Math.min(1, Math.max(-1, q[0]));
+    const angle = 2 * Math.acos(w);
+    const s = Math.sqrt(Math.max(0, 1 - w * w));
+    let ax = 1, ay = 0, az = 0;
+    if (s > 1e-4) { ax = q[1] / s; ay = q[2] / s; az = q[3] / s; }
+    return 'rotate3d(' + ax.toFixed(4) + ',' + ay.toFixed(4) + ',' + az.toFixed(4) + ',' + (angle * 180 / Math.PI).toFixed(2) + 'deg)';
+}
+
+function updateDice3dRender(dieEl, die, scale) {
+    if (!dieEl) return;
+    const px = die.x * scale;
+    const py = die.y * scale;
+    dieEl.style.left = px.toFixed(1) + 'px';
+    dieEl.style.top = py.toFixed(1) + 'px';
+    const side = (DICE_SIZE * scale).toFixed(1);
+    dieEl.style.width = side + 'px';
+    dieEl.style.height = side + 'px';
+    dieEl.style.setProperty('--die-size', side + 'px');
+    dieEl.style.setProperty('--pip-size', (Math.max(2.5, DICE_SIZE * scale * 0.16)).toFixed(1) + 'px');
+
+    const cube = dieEl.querySelector('.gfg-die-cube');
+    if (cube) {
+        // Presentation (camera pitch so dice rest flat with their TOP face up,
+        // plus a slight yaw) is applied AFTER the die's own orientation:
+        // rotateY+rotateX then rotate3d.
+        cube.style.transform = 'rotateY(18deg) rotateX(35deg) ' + quaternionToRotate3d(die.q || DICE_Q_IDENTITY());
+    }
+}
+
+// Entry point called by the capture.js drawLudoLayout wrapper on every physics
+// tick and every board redraw. Shows a DOM overlay of the two real 3D cubes
+// while dice are on the board; hides it (and its stale cubes) otherwise.
+function renderPhysicalDiceCubes() {
+    if (!canRenderDice3d()) return; // harness / SSR: physics runs headless
+
+    const canvasEl = document.getElementById('ludoCanvas');
+    if (!canvasEl) return;
+
+    const showing = !!displayDiceOnBoard && Array.isArray(physicalDice) && physicalDice.length === 2;
+    if (!showing) {
+        if (_dice3dStage) _dice3dStage.style.display = 'none';
+        return;
+    }
+
+    const stage = buildDice3dStage();
+    if (!stage) return;
+    stage.style.display = 'block';
+
+    // Scale board-space (600x600) to the canvas' on-screen size; the stage is
+    // pinned to the top-left of the canvas content box (offsetParent board-frame).
+    const scale = (canvasEl.clientWidth && canvasEl.width) ? canvasEl.clientWidth / canvasEl.width : 1;
+    if (stage._scale == null || Math.abs(stage._scale - scale) > 0.02) {
+        stage._scale = scale;
+        stage.style.left = (canvasEl.offsetLeft || 0) + 'px';
+        stage.style.top = (canvasEl.offsetTop || 0) + 'px';
+        stage.style.width = canvasEl.clientWidth + 'px';
+        stage.style.height = canvasEl.clientHeight + 'px';
+    }
+
+    const dies = stage.querySelectorAll('.gfg-die');
+    for (let i = 0; i < dies.length && i < physicalDice.length; i++) {
+        updateDice3dRender(dies[i], physicalDice[i], scale);
+    }
 }

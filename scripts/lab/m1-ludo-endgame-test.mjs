@@ -107,7 +107,17 @@ sandbox.magicblockDice = {
   getLastProofRollSignature: () => 'stub-proof-sig',
   ping: async () => true,
 };
-sandbox.requestAnimationFrame = (cb) => { let guard = 0; const loop = () => { if (guard++ < 600) cb(0); }; loop(); return guard; };
+// Browser-faithful rAF stub: DEFERS each frame to a later tick (a real rAF
+// never runs the callback synchronously inside the schedule call). The game's
+// idle render engine re-queues rAF while a token blinks, so a synchronous
+// loop here would recurse until the stack blows. A global frame cap keeps an
+// intentionally-stuck blink from spinning forever in the sandbox.
+sandbox.__rafFrames = 0;
+sandbox.requestAnimationFrame = (cb) => {
+  if (++sandbox.__rafFrames > 5000) return sandbox.__rafFrames;
+  setTimeout(() => { try { cb(0); } catch (e) { console.error('rAF callback error:', e && e.stack || e); } }, 0);
+  return sandbox.__rafFrames;
+};
 sandbox.cancelAnimationFrame = () => {};
 
 sandbox.localStorage = {

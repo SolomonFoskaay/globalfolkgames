@@ -336,6 +336,88 @@ canvas {
     touch-action: pan-y; /* VERTICAL SCROLL GESTURES ON THE BOARD ITSELF; BLOCKS HORIZONTAL */
 }
 
+/* ===== Real 3D rolled dice overlay (ludo-lab only) =====
+   The dice are genuine CSS-3D cubes built by physics.js and laid over the board
+   canvas on top of the wooden rim. The stage is fully transparent and ignores
+   pointer events, so the canvas underneath keeps every board interaction. */
+#board-frame {
+    position: relative;
+}
+
+.gfg-dice-3d-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    perspective: 900px;
+    transform-style: preserve-3d;
+    z-index: 20;
+}
+
+.gfg-die {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform, left, top;
+}
+
+.gfg-die-shadow {
+    position: absolute;
+    left: 4%;
+    top: 58%;
+    width: 92%;
+    height: 24%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.10) 55%, rgba(0,0,0,0) 75%);
+    transform: translateZ(0);
+    pointer-events: none;
+}
+
+.gfg-die-cube {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform-origin: 50% 50% 0;
+}
+
+.gfg-die-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, #ffffff 0%, #f4f4f7 55%, #e8eaee 100%);
+    border: 1px solid #b8bdc6;
+    border-radius: 14%;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.9),
+                inset 0 -3px 5px rgba(0,0,0,0.12);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.gfg-die-face-front  { transform: translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-back   { transform: rotateY(180deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-right  { transform: rotateY(90deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-left   { transform: rotateY(-90deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-top    { transform: rotateX(90deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-bottom { transform: rotateX(-90deg) translateZ(calc(var(--die-size) / 2)); }
+
+.gfg-pip {
+    position: absolute;
+    width: var(--pip-size);
+    height: var(--pip-size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #4c4c58 0%, #20202a 55%, #10101a 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
 /* Persistent Console Control Center Container */
 #dice-container {
     display: flex; 
