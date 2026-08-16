@@ -1,4 +1,4 @@
-// public/game-result.js
+// public/universal/result-seam/game-result.js
 // UNIVERSAL GAME RESULT BUS (platform-level, game-agnostic)
 //
 // The one seam every game emits into. M3 (local points), M4 (global ledgers),

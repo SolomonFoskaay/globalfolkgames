@@ -43,6 +43,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   because it is the platform's wiring, not a game and not a reward. Every game
   ends with `window.publishGameResult()`; every reward module subscribes via
   `window.onGameResult()`. 50 games = 1 reward plug, 1 competition plug.
+  Its canonical home + the whole universal-modules tree lives in
+  `public/universal/` (`result-seam/` = M2, plus homed folders for M3-M8).
 - **M3 — Local points (pure):** per-game board points, no platform rule. The
   old "+100 1st-place" rule is DROPPED; a game's own scoring is purely its own.
   Consumes the seam (M2).
@@ -76,12 +78,20 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    spendable (M4) buys tiers (M5) or enters events (M7). Never hard-wire one
    game into the platform.
 4. **Universal result seam (M2, the plug-and-play contract):** every game ends
-   by calling `window.publishGameResult()` (`public/game-result.js`, canonical
-   `gfg:game-result@1` envelope: `players[]` with seat/actor/position|score +
-   optional on-chain proof). M3/M4/M7 subscribe via `window.onGameResult()` and
-   NEVER read game internals. A game never ships its own reward/competition
-   plug — 50 games = 1 reward plug, 1 competition plug. Adding a new game =
-   emit the same envelope; the platform doesn't change.
+    by calling `window.publishGameResult()` (`public/universal/result-seam/game-result.js`,
+    canonical `gfg:game-result@1` envelope: `players[]` with seat/actor/position|score +
+    optional on-chain proof). M3/M4/M7 subscribe via `window.onGameResult()` and
+    NEVER read game internals. A game never ships its own reward/competition
+    plug — 50 games = 1 reward plug, 1 competition plug. Adding a new game =
+    emit the same envelope; the platform doesn't change.
+4b. **Universal modules folder (`public/universal/`):** every platform-side
+    module that plugs into any game has a canonical folder there
+    (`result-seam/` = M2, `points/` = M3, `ledgers/` = M4,
+    `subscription/` = M5, `point-sources/` = M6, `competitions/` = M7,
+    `escrow/` = M8). A game plugs in ONCE (`publishGameResult`); a universal
+    module subscribes ONCE (`onGameResult`) and updates inside its own folder
+    without touching the game. New universal capabilities land in this tree and
+    mirror into `architecture.json`.
 5. **Feature Tracker stays synced.** Roadmap items reference their module
    (e.g. "Earn competitions = M7"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.
@@ -102,10 +112,13 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    this.
 
 **Current module status (mirror of architecture.json, 2026-08-15):**
-- M1: in-progress — finalize Ludo (currently the focus; the game must be fully
-  done and tested before any other module product work).
-- M2: in-progress — universal result seam (built: public/game-result.js + Ludo
-  emits the envelope; subscribers for M3/M4/M7 land with those modules).
+- M1: in-progress — Ludo (ludo-lab) verified COMPLETE against its locked spec
+  A-Z (2026-08-16: 107/107 harness + 3D dice + Scope A/B/C shipped); the next
+  M1A game is Ayo Olopon (planned, spec not yet locked).
+- M2: in-progress — universal result seam (built: `public/universal/result-seam/game-result.js`
+  + the whole universal-modules tree `public/universal/` with homed folders for
+  M3-M8; Ludo ludo-lab emits the envelope; subscribers for M3/M4/M7 land with
+  those modules).
 - M3: planned — pure local points (no +100 rule).
 - M4: planned — global ledgers (lifetime/spendable split; spendable is next).
 - M5: in-progress — S1 Active Tier + spendable sink.

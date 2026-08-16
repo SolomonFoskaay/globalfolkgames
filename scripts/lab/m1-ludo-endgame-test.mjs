@@ -135,7 +135,7 @@ function loadFile(rel) {
 }
 
 // Load the REAL universal result bus FIRST (mirrors index.html)
-loadFile(path.join(__dirname, '..', '..', 'public', 'game-result.js'));
+loadFile(path.join(__dirname, '..', '..', 'public', 'universal', 'result-seam', 'game-result.js'));
 // Load order must mirror index.html
 loadFile('board.js');
 loadFile('physics.js');

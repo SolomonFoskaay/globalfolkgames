@@ -1,7 +1,7 @@
 // win-detection.js (M1 — game core only)
 // Detects winners, tracks the 1st..4th finish order, holds the match outcome
 // status (in-progress / finished / abandoned), and emits the universal GAME
-// RESULT envelope when the match completes (see /game-result.js). M1 knows
+// RESULT envelope when the match completes (see /universal/result-seam/game-result.js). M1 knows
 // NOTHING about points, tiers, competitions or rewards: it publishes a
 // canonical result and the platform bus fans it out to M3/M4/M7 consumers.
 //

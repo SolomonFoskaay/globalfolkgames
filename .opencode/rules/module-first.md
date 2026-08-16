@@ -27,7 +27,7 @@ module gate below. The owner will not repeat this; enforce it yourself every tim
    games plug in M1 -> M2 -> M3 ... cleanly. Keep AGENTS.md mirror + roadmap/
    economics references in sync.
 5. **Integrate through the seams, never standalone.** Consume via `window.onGameResult()`
-   (universal result seam, `public/game-result.js`) / source tags / module APIs. Never
+   (universal result seam, `public/universal/result-seam/game-result.js`) / source tags / module APIs. Never
    hard-wire one game into the platform.
 6. **Respect status.** M7/M8-style deferred modules: product work does NOT start until
    their dependencies (per `implementationOrder`) are stable. Never build ahead of a

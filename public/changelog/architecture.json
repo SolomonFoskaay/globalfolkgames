@@ -57,11 +57,12 @@
       "summary": "The single integration contract between every game and every reward module. One call per game finish, one subscription for all consumers. Standalone because it is the platform's wiring: 50 games = 1 reward plug, 1 competition plug.",
       "details": [
         "Standalone module: it does NOT fit under game core (M1) or any reward module. It is the bus every game emits into and every consumer subscribes to.",
-        "Canonical envelope gfg:game-result@1: players[] with seat/actor (user|house|local)/position|score + optional on-chain proof. Implemented in public/game-result.js.",
+        "Canonical envelope gfg:game-result@1: players[] with seat/actor (user|house|local)/position|score + optional on-chain proof. Implemented in public/universal/result-seam/game-result.js.",
         "Every M1 game ends with one call: window.publishGameResult({gameId, players, proof}). The bus validates/normalizes, attaches wallet identity to 'user' seats, and fans the result out.",
         "Consumers subscribe via window.onGameResult(handler) + a 'gfg:game-result' DOM event. M3/M4/M7 (local points, global ledgers, competitions) subscribe here and NEVER read game internals.",
         "No game ships its own reward/competition plug. Adding a new game = emit the same envelope; the platform does not change.",
-        "Ludo (ludo-lab) now emits this envelope on match completion (replaces the ad-hoc onGfgMatchResult seam)."
+        "Ludo (ludo-lab) now emits this envelope on match completion (replaces the ad-hoc onGfgMatchResult seam).",
+        "PHYSICAL HOME (universal/): every universal module lives under public/universal/ (result-seam/ = M2, points/ = M3, ledgers/ = M4, subscription/ = M5, point-sources/ = M6, competitions/ = M7, escrow/ = M8). A game plugs in ONCE (window.publishGameResult); a universal module subscribes ONCE (window.onGameResult) and updates inside its own folder without ever touching a game."
       ]
     },
     {
