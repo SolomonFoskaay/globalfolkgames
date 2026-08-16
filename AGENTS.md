@@ -161,6 +161,16 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   banks the base unmultiplied win via the seam; M5 applies the tier boost as a
   separate kind-1 credit (source e.g. 'tier2_boost') so M4a pure can never be
   multiplied. Build after M3 stable, before M5.
+  Owner-locked 2026-08-17 (spec in architecture.json): M4 ALSO owns the
+  on-chain INVENTORY/ASSET wallet ([gfgassets, player], new seed prefix) —
+  skins/items/sounds live IN the account (media bytes on-chain, "wallet is a
+  viewer": embedded wallet owns, frontend views the chain bytes directly, no
+  IPFS simplification), gasless grant/equip/revoke via session key, sliced
+  reads (dataSlice) so profile pages fetch only one asset's byte range.
+  MagicBlock-proven (Solana Generals map + Magic UNO cards all-on-chain
+  gasless; Session Keys = the documented "in-app NFTs purchase" pattern; Asset
+  Manager SDK stores images/sounds directly in an Assets account). Module lives
+  at public/universal/assets/ (window.gfgAssets).
 - M5: in-progress — S1 Active Tier + spendable sink.
 - M6: planned — referral / giveaways / sub buy-in.
 - M7: planned (deferred) — competitions.
@@ -451,6 +461,15 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   served) and becomes a public changelog entry only after it ships (fixed).
 - Keep all secrets out of client bundles and out of `public/`. If a role check
   can be edited from the browser, it protects nothing.
+- **Commit/push leak gate (HARD RULE, locked 2026-08-17):** before ANY
+  `git commit` or `git push`, run the automated leak scan in
+  `.opencode/rules/security-leak-scan.md` (auto-loaded every session): grep the
+  staged + worktree diff for private keys, keypair JSON (64-int array / base58
+  secret / `"secretKey"`), seed phrases/mnemonics, Supabase `service_role`,
+  JWTs/`eyJ`, API tokens, `.env`/`.gfg-*` files, embedded credentials. ANY hit
+  = HARD STOP: never commit/push, scrub or ask the owner first. A leaked secret
+  on any remote is a live compromise — never "push and fix later". Public
+  keys/program IDs are NOT secrets.
 
 ## Status / next steps
 
