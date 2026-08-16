@@ -568,6 +568,33 @@
       "status": "in-progress",
       "added": "2026-08-16",
       "approved": false
+    },
+    {
+      "title": "Local points ledger: pure + spendable per game, on-chain (M3)",
+      "summary": "Your points in each game get two permanent on-chain records: a lifetime score you can be proud of and a spendable balance you can use on that game's extras. Only real, verifiable wins count, and only you can earn them.",
+      "details": [
+        "Module: M3 (local points, per game, PURE + SPENDABLE, on-chain via ER). FIRST universal consumer of the M2 result seam - it proves the bus end-to-end. Owner-locked 2026-08-16 (D1/D2/D3).",
+        "TWO-TRACK ledger per game per player: LOCAL PURE (unspendable lifetime, undiluted, the native-game bragging-rights source of truth) + LOCAL SPENDABLE (spendable split of the same wins, drawn down only by that game's own in-game spends). ONE PDA holds both: seed [gfgpoints, game_tag, player].",
+        "PROGRAM DECISION (no new program): extend the existing delegated gfg program (game_tag is data, not code). MagicBlock public ER = gasless (tx fee 0; only session 0.0003 SOL at undelegation + commit 0.0001 SOL, paid by the sponsor, never the user). One delegated program = one ER session = one onboarding fee per player (~0.0086 SOL); every record_points/spend_local after that is FREE. A separate program would force a second delegation + second onboarding per player per game - unsustainable for 50+ games. Modularity lives in the M3 module (public/universal/points/) + game_tag seeds.",
+        "PROGRAM REWORK (same id, anchor build + redeploy): PlayerPoints gains pure_lifetime + spendable_balance + spend_count/last_spend_ref/last_spend_ts; seeds become [gfgpoints, game_tag, authority] on initialize_points/delegate_points; record_points(game_tag, points, reason, match_ref) credits BOTH tracks on a verified win; NEW spend_local(game_tag, amount, reason, spend_ref) decrements spendable ONLY (InsufficientBalance guard), gasless on ER.",
+        "RELAY: handleDelegate creates + delegates the tagged points PDA (ludo now) alongside dice + result PDAs, idempotent; spend ledger/caps unchanged.",
+        "CLIENT (src/magicblock-vrf.js): recordPoints(points, reason, matchRef, gameTag='ludo'), fetchPointsPda(gameTag), NEW spendLocal(gameTag, amount, reason, spendRef).",
+        "SCORING (D1, Ludo - config in the M3 module, NOT the game): 4P 1st=100 / 2nd=50 / 3rd=10 / 4th=0 (game auto-ends at 3 winners, 4th earns nothing); 2P 1st=100 only (auto-ends at 1st, 2nd earns nothing). ONLY the 'You' (user) seat earns at its own position; house/local seats never. Mode derived from envelope players[].length - no M2 change.",
+        "GATING: valid envelope proof signature required to bank; match_ref = first 8 bytes of the winning roll sig; idempotent by match_ref (module set + localStorage + program last_match_ref guard).",
+        "NO DILUTION: local pure NEVER receives signup/purchase/referral/giveaway/multiplier (those are M6 -> M4 only).",
+        "MODULE public/universal/points/ (game-agnostic): subscribes window.onGameResult, computes award from its per-game scoring config, banks via recordPoints(gameTag), exposes window.localPoints { get(gameTag), spend(gameTag, amount, reason, ref), subscribe(cb) }, fills data-local-points-pure/spendable slots. A new game = add its scoring table + emit the seam; no game-side reward code.",
+        "ludo-lab hosts the local-points display slot; the game ships NO reward code (already clean). Legacy public/games/ludo/ untouched (D3).",
+        "RECOVERY: Supabase backup is a later step (devnet-wipe restore); on-chain records replayable by game_tag/reason/match_ref.",
+        "TEST (benchmark = this spec): module harness (2P/4P x user 1st..4th x house/local seats -> exact 100/50/10/0, user-only, idempotency, spend_local) + on-chain ER harness (gasless record_points + spend_local from a 0-SOL session key).",
+        "SHIPPED 2026-08-16 (harness-verified): on-chain ER harness scripts/er-points-harness.mjs PASS - record_points +spend_local gasless on the ER from a 0-SOL player (sponsor signs): pure/spendable 0->150->300, spend_local 40 -> spendable 260, pure untouched, award_count correct. M3 module harness scripts/m3-module-harness.mjs 17/17 PASS against the locked scoring spec (4P 100/50/10/0, 2P 100/0, user-only, no-proof gate, duplicate match_ref single-bank, spend_local spendable-only).",
+        "migrate_points BUG FIXED + REDEPLOYED 2026-08-16: an intermediate pre-deploy build zeroed legacy [gfgpoints, player] ledgers instead of copying them (read-before-write ordering). Root cause fixed in the current build (read legacy fully first, copy to tagged, tombstone), redeployed (ELF byte-verified) and re-verified live: re-running migration on restored ledgers is a clean no-op (guard: destination award_count>0 -> skip; never zeroes).",
+        "RESTORE TOOL scripts/restore-points.mjs (new): data-preservation restore for wiped/zeroed ledgers. Explicit mode (<wallet>=<points>...) credits the tagged ledger via record_points (ER, sponsor signs, skip-guard on existing balance); --from-supabase mode rebuilds from point_transactions via profiles.solana_wallet. Used to restore the 3 orphaned legacy ledgers zeroed by the buggy build (400/200/5000, verified on-chain: pure=spendable=value, award_count=1; re-run SKIPs).",
+        "DISPLAY WIRING (shipped): M3 module now exposes lastAward + notifies subscribers with (gameTag, ledger, award) and re-fetches on gfg:auth-changed; global header chip feeds live from window.localPoints via initGlobalHeader({localPointsTag}) (ludo-lab opts in: Local: N chip, gasless read); ludo-lab win ceremony shows \"+N Ludo points banked on-chain\" the moment the award lands; client exposes magicblockDice.pointsPda(gameTag) so the profile on-chain ledger card works.",
+        "REST (remaining in M3): browser end-to-end (login -> win -> bank -> header/ceremony/profile update), spendable sink UI (S3 shop) draw, and the OFFICIAL display-source switch (global pill -> on-chain) when Supabase is retired."
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-16"
     }
   ]
 }

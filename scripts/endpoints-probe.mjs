@@ -199,8 +199,8 @@ async function buildAccountsTracker() {
     await add({ role: 'Sponsor / house wallet', kind: 'wallet', address: sponsorPubkey, gasless: 'App-owned key. Pays the one-time initialize+delegate (~0.0013 SOL) and every computer roll runs ER-gasless.' });
     const [housePda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'House dice PDA (computer rolls)', kind: 'dice-pda', address: housePda.toBase58(), gasless: 'Dice account for computer seats; rolls gasless on the ER VRF queue.' });
-    const [housePointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
-    await add({ role: 'House points PDA (Scope B ledger)', kind: 'points-pda', address: housePointsPda.toBase58(), gasless: 'Points ledger for the house seat; record_points runs gasless on the ER.' });
+    const [housePointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), Buffer.from('ludo'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'House points PDA (M3 ledger, game=ludo)', kind: 'points-pda', address: housePointsPda.toBase58(), gasless: 'Per-game points ledger for the house seat; record_points/spend_local run gasless on the ER.' });
     const [houseResultPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgresult'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'House result PDA (Scope C order)', kind: 'result-pda', address: houseResultPda.toBase58(), gasless: 'Finish-order ledger for the house seat; record_result runs gasless on the ER.' });
     const [compPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgcomp'), new PublicKey(sponsorPubkey).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
@@ -214,8 +214,8 @@ async function buildAccountsTracker() {
     await add({ role: 'Player wallet (sponsored)', kind: 'wallet', address: wallet, gasless: 'Player holds 0 SOL; app sponsors their first delegate.' });
     const [pda] = PublicKey.findProgramAddressSync([Buffer.from('gfgplayerd'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'Player dice PDA', kind: 'dice-pda', address: pda.toBase58(), gasless: 'This player\'s dice account; rolls gasless on the ER VRF queue.' });
-    const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
-    await add({ role: 'Player points PDA (Scope B ledger)', kind: 'points-pda', address: pointsPda.toBase58(), gasless: 'This player\'s on-chain points ledger; record_points runs gasless on the ER.' });
+    const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), Buffer.from('ludo'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
+    await add({ role: 'Player points PDA (M3 ledger, game=ludo)', kind: 'points-pda', address: pointsPda.toBase58(), gasless: 'This player\'s per-game on-chain points ledger; record_points/spend_local run gasless on the ER.' });
     const [resultPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgresult'), new PublicKey(wallet).toBytes()], new PublicKey(INVENTORY.gfgDiceProgram));
     await add({ role: 'Player result PDA (Scope C order)', kind: 'result-pda', address: resultPda.toBase58(), gasless: 'This player\'s on-chain finish-order ledger; record_result runs gasless on the ER.' });
   }

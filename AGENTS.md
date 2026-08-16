@@ -127,7 +127,21 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   + the whole universal-modules tree `public/universal/` with homed folders for
   M3-M8; Ludo ludo-lab emits the envelope; subscribers for M3/M4/M7 land with
   those modules).
-- M3: planned — pure local points (no +100 rule).
+- M3: in-progress — local points, two-track on-chain per game (PURE unspendable
+  lifetime + SPENDABLE split, one PDA seed [gfgpoints, game_tag, player], gasless
+  on the ER, extended gfg program, NO new program). Owner-locked 2026-08-16:
+  Ludo scoring 4P 1st=100/2nd=50/3rd=10/4th=0, 2P only 1st=100; ONLY the "You"
+  seat earns. Harness-verified live 2026-08-16: on-chain ER harness (0-SOL
+  player, gasless record_points + spend_local, spendable-only decrement) PASS;
+  M3 module harness 17/17 against the locked spec. migrate_points bug (an
+  intermediate build zeroed legacy ledgers) FIXED + redeployed (ELF-verified;
+  re-run on restored ledgers is a clean no-op). Restore tool
+  scripts/restore-points.mjs (explicit + --from-supabase) restored the 3
+  orphaned legacy accounts (400/200/5000, verified on-chain, idempotent).
+  Display wired: module lastAward + (gameTag,ledger,award) notify + gfg:auth-changed
+  re-fetch; global header "Local:" chip via initGlobalHeader({localPointsTag});
+  ludo-lab ceremony "+N Ludo points banked on-chain"; client pointsPda(gameTag)
+  powers the profile on-chain ledger card.
 - M4: planned — global ledgers (lifetime/spendable split; spendable is next).
 - M5: in-progress — S1 Active Tier + spendable sink.
 - M6: planned — referral / giveaways / sub buy-in.
@@ -390,6 +404,16 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 
 ## Security / anti-exploit rules (READ BEFORE CODING — non-negotiable)
 
+- **Solana upgrade safety (auto-loaded rule, non-negotiable):** upgrades NEVER
+  delete account data, but seed changes, layout changes, or program-ID changes
+  orphan it (then anyone can close it for rent = permanent loss). Full rules live
+  in `.opencode/rules/solana-upgrade-safety.md` (auto-loaded every session). The
+  short version: seeds + program ID are immutable once shipped; new capabilities
+  get NEW seed prefixes, never changed seeds; every breaking change ships a
+  permissionless, idempotent, verifiable `migrate_*` instruction in the SAME
+  deploy; never let `init_if_needed` silently re-seed an existing ledger; devnet
+  is the mainnet rehearsal (never wipe devnet data to dodge a migration); when in
+  doubt STOP and ask the owner for an approved migration plan.
 - **Golden rule:** NEVER build a security boundary that the client can fake.
   Any gate enforced only in browser JS is cosmetic, not a gate. Always flag
   designs where the client declares its own identity/roles/access (self-reported

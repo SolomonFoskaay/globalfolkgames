@@ -106,6 +106,13 @@
                 <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
             </div>
 
+            <!-- M3 local points (module-driven slots, filled by /universal/points/local-points.js) -->
+            <div id="local-points-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(155,89,182,0.08); border: 1px solid rgba(155,89,182,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; box-sizing: border-box;">
+                <div title="Lifetime wins in Ludo (never spent)">Pure: <span data-local-points-pure style="color:#f39c12;">0</span></div>
+                <div title="Spendable split for Ludo in-game items">Spendable: <span data-local-points-spendable style="color:#9b59b6;">0</span></div>
+                <div title="Last award banked on-chain">Last: <span data-local-points-last style="color:#2ecc71;">—</span></div>
+            </div>
+
             <!-- Clickable on-chain verification link (shown after each on-chain roll) -->
             <div id="verify-tx-link" style="display:none; margin-top:6px; font-size:0.78rem; text-align:center; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.35); border-radius:8px; padding:6px 8px; width:100%; box-sizing:border-box;"></div>
 
@@ -133,6 +140,7 @@
             <p id="result-ceremony-msg"></p>
             <div id="result-ceremony-list" class="ceremony-list"></div>
             <div id="result-ceremony-proof" class="ceremony-proof"></div>
+            <div id="result-ceremony-points" class="ceremony-points" style="display:none; margin-top:8px; text-align:center; font-size:0.9rem; font-weight:bold; color:#2ecc71;"></div>
             <div class="confirm-action-row">
                 <button id="play-again-btn" class="confirm-modal-btn" style="background:#2ecc71;" onclick="playAgainAfterCeremony()">Play Again</button>
                 <button id="ceremony-end-btn" class="confirm-modal-btn" onclick="endMatchAbandon()">End Match</button>
@@ -146,6 +154,7 @@
     <script src="/tamper-guard.js"></script>
     <script src="/gfg-explorer.js"></script>
     <script src="/universal/result-seam/game-result.js"></script>
+    <script src="/universal/points/local-points.js"></script>
     <script src="/profiles.js"></script>
     <script src="/header.js"></script>
 
@@ -163,10 +172,13 @@
     <script type="module" src="/src/main.js"></script>
 
     <script>
-        // Initialize the global header on the Ludo lab page
+        // Initialize the global header on the Ludo lab page. showLocal renders
+        // the on-chain local-points chip; localPointsTag live-feeds it from the
+        // M3 module (window.localPoints) so the global header reflects the
+        // player's on-chain Ludo points (gasless reads).
         document.addEventListener('DOMContentLoaded', function () {
             if (window.initGlobalHeader) {
-                window.initGlobalHeader();
+                window.initGlobalHeader({ showLocal: true, localPointsTag: 'ludo', gameName: 'Ludo Lab' });
             }
         });
     </script>

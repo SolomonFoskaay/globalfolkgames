@@ -58,20 +58,21 @@
     }
 
     // Load the signed-in user's own on-chain points PDA ledger (gasless read,
-    // own account only). Renders into el.
+    // own account only, per-game 'ludo' ledger). Renders into el.
     async function loadPointsLedger(el) {
         const magic = window.magicblockDice;
         if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
             el.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
             return;
         }
-        const pda = magic.pointsPda();
+        const gameTag = 'ludo';
+        const pda = magic.pointsPda(gameTag);
         if (!pda) {
             el.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
             return;
         }
         try {
-            const ledger = await magic.fetchPointsPda();
+            const ledger = await magic.fetchPointsPda(gameTag);
             if (!ledger) {
                 el.innerHTML = '<p class="empty">Your ledger account has no rewards yet. Win a match and your +100 reward is written here permanently.</p>';
                 return;
@@ -84,8 +85,12 @@
                 ? window.gfgExplorer.accountLink(pda) : esc(pda);
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <span style="color:var(--muted);">Total on-chain points</span>
-                    <b style="color:#f39c12; font-size:1.15rem;">${ledger.totalPoints}</b>
+                    <span style="color:var(--muted);">Lifetime points (pure)</span>
+                    <b style="color:#f39c12; font-size:1.15rem;">${ledger.pureLifetime}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Spendable points</span>
+                    <b style="color:#9b59b6;">${ledger.spendableBalance}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Rewards recorded</span>
@@ -99,8 +104,13 @@
                     <span style="color:var(--muted);">Last recorded</span>
                     <b style="font-size:0.82rem;">${esc(lastTs)}</b>
                 </div>
+                ${ledger.spendCount ? `
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Local spends</span>
+                    <b>${ledger.spendCount}</b>
+                </div>` : ''}
                 <div style="padding:8px 0;">
-                    <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours)</span>
+                    <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours, game: ludo)</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
                 </div>`;
         } catch (e) {

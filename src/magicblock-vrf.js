@@ -37,6 +37,11 @@ export const POINT_REASONS = Object.freeze({
   WIN_1ST: 1,     // first place in a match
 });
 
+// Reasons recorded against a local SPEND (mirrors the program's u8 codes).
+export const SPEND_REASONS = Object.freeze({
+  SHOP_ITEM: 1,   // in-game purchase from the S3 shop (cosmetics etc.)
+});
+
 const config = {
   baseRpcUrl: 'https://api.devnet.solana.com',
   erRpcUrl: 'https://devnet-us.magicblock.app/',
@@ -242,24 +247,26 @@ async function rollOnce() {
   throw new Error('VRF request timed out. Please try again.');
 }
 
-// scope B: Points recorded on-chain.
+// scope B: Points recorded on-chain (M3 — per-game local ledger).
 //
 // The relay's handleDelegate (idempotent) also creates + delegates a second
-// player PDA (points, seed 'gfgpoints'), so recordPoints() is a pure gasless
-// ER write signed by the player's session key — no SOL, no sponsor step here.
-// The returned transaction signature is the authoritative on-chain receipt of
-// the award, and the player's points PDA becomes the verifiable ledger of
-// their rewards (total_points, award_count, last_*).
+// player PDA per game (points, seed 'gfgpoints' + game_tag), so recordPoints()
+// is a pure gasless ER write signed by the player's session key — no SOL, no
+// sponsor step here. The returned transaction signature is the authoritative
+// on-chain receipt of the award, and the player's points PDA becomes the
+// verifiable two-track ledger of their rewards (local_pure_lifetime,
+// local_spendable_balance, award_count, last_*).
 //
-// `matchRef` = the proof-roll signature that earned the reward encoded as a
-// u64 (its first 8 bytes), matching what the program stores as last_match_ref
-// so the on-chain record is traceable back to the exact winning roll.
-export async function recordPoints(points, reason, matchRef) {
+// `gameTag` selects the per-game ledger (default 'ludo'). `matchRef` = the
+// proof-roll signature that earned the reward encoded as a u64 (its first 8
+// bytes), matching what the program stores as last_match_ref so the on-chain
+// record is traceable back to the exact winning roll.
+export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { program, wallet } = ctx;
-  const [pointsPda] = pointsPdaFor(wallet.publicKey);
+  const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
 
   // Relay is idempotent per PDA; it creates + delegates the points PDA if
   // missing, and is a no-op when already delegated. Once the ER validator has
@@ -268,7 +275,7 @@ export async function recordPoints(points, reason, matchRef) {
   await waitForErPickup(pointsPda);
 
   const sig = await program.methods
-    .recordPoints(new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+    .recordPoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       points: pointsPda,
       payer: wallet.publicKey,
@@ -279,9 +286,35 @@ export async function recordPoints(points, reason, matchRef) {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
-function pointsPdaFor(payerPubkey) {
+// M3 — local spendable draw-down: spends `amount` of the player's SPENDABLE
+// track (never the pure track) for that game's own in-game purchases (S3
+// shop). Gasless ER write; `reason` uses the SPEND_REASONS map and `spendRef`
+// is the purchase reference that makes the spend replayable.
+export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
+
+  await ensureDelegated(pointsPda, wallet.publicKey);
+  await waitForErPickup(pointsPda);
+
+  const sig = await program.methods
+    .spendLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+    .accounts({
+      points: pointsPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+function pointsPdaFor(gameTag, payerPubkey) {
   return PublicKey.findProgramAddressSync(
-    [POINTS_SEED, payerPubkey.toBytes()],
+    [POINTS_SEED, Buffer.from(gameTag, 'utf8'), payerPubkey.toBytes()],
     new PublicKey(config.programId),
   );
 }
@@ -346,13 +379,14 @@ function resultPdaFor(payerPubkey) {
 //
 // `compPda` identifies the competition (seed `gfgcomp` + sponsor pubkey, read
 // via the relay's GET /api/comp). `winnerIndex` = the player's slot in the
-// settled winner table (0, 1, 2). Returns the claim receipt signature.
-export async function claimComp(compPda, winnerIndex) {
+// settled winner table (0, 1, 2). `gameTag` selects which game's points ledger
+// receives the prize (default 'ludo'). Returns the claim receipt signature.
+export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { program, wallet } = ctx;
-  const [pointsPda] = pointsPdaFor(wallet.publicKey);
+  const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
 
   // The winner's points PDA must exist + be delegated for the claim to credit
   // it. Relay is idempotent: creates + delegates if missing, no-op if done.
@@ -364,7 +398,7 @@ export async function claimComp(compPda, winnerIndex) {
   const sponsorKey = new PublicKey(compAccount.sponsor);
 
   const sig = await program.methods
-    .claimComp(winnerIndex)
+    .claimComp(gameTag, winnerIndex)
     .accounts({
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
@@ -395,6 +429,7 @@ export function matchRefFromSignature(sig) {
 export function initMagicBlockDice() {
   // Reason codes for on-chain points records (shared with win-detection.js).
   window.POINT_REASONS = POINT_REASONS;
+  window.SPEND_REASONS = SPEND_REASONS;
   window.magicblockDice = {
     configure(opts = {}) {
       if (opts.programId) config.programId = opts.programId;
@@ -438,10 +473,19 @@ export function initMagicBlockDice() {
       return getLastResultDelegationSignature();
     },
 
-    // Scope B: records the award on the player's on-chain points PDA (gasless
-    // ER write, session key signs). Returns the receipt signature.
-    recordPoints(points, reason, matchRef) {
-      return recordPoints(points, reason, matchRef);
+    // Scope B (M3): records the award on the player's on-chain points PDA for
+    // `gameTag` (gasless ER write, session key signs). Accepts both
+    // (gameTag, points, reason, matchRef) and the legacy (points, reason,
+    // matchRef) form (defaults gameTag to 'ludo'). Returns the receipt sig.
+    recordPoints(a, b, c, d) {
+      if (typeof a === 'string') return recordPoints(a, b, c, d);
+      return recordPoints('ludo', a, b, c);
+    },
+
+    // M3 — local spendable draw-down for `gameTag` (gasless ER write). Returns
+    // the spend receipt signature.
+    spendLocal(gameTag, amount, reason, spendRef) {
+      return spendLocal(gameTag, amount, reason, spendRef);
     },
 
     // Scope C: commits the full 1st..4th finish order on-chain (gasless ER
@@ -452,9 +496,10 @@ export function initMagicBlockDice() {
 
     // S2: winner claims their competition allocation gasless on the ER
     // (session key signs, 0 SOL). `compPda` from the relay, `winnerIndex`
-    // from the settled winner table. Returns the claim receipt signature.
-    claimComp(compPda, winnerIndex) {
-      return claimComp(compPda, winnerIndex);
+    // from the settled winner table, `gameTag` selects the points ledger that
+    // receives the prize. Returns the claim receipt signature.
+    claimComp(compPda, winnerIndex, gameTag = 'ludo') {
+      return claimComp(compPda, winnerIndex, gameTag);
     },
 
     // First 8 bytes of a proof-roll signature as u64 — the match_ref the
@@ -463,11 +508,12 @@ export function initMagicBlockDice() {
       return matchRefFromSignature(sig);
     },
 
-    // The player's on-chain points PDA address (for own-account profile view).
-    pointsPda() {
+    // The player's on-chain points PDA address for `gameTag` (own-account
+    // profile view).
+    pointsPda(gameTag = 'ludo') {
       const wallet = getSolanaWalletAccount();
       if (!wallet) return null;
-      return pointsPdaFor(wallet.publicKey)[0].toBase58();
+      return pointsPdaFor(gameTag, wallet.publicKey)[0].toBase58();
     },
 
     // The player's on-chain game-record (result) PDA address.
@@ -477,23 +523,31 @@ export function initMagicBlockDice() {
       return resultPdaFor(wallet.publicKey)[0].toBase58();
     },
 
-    // Reads the player's on-chain points ledger from the ER (gasless, no sign).
-    // Returns { totalPoints, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount }
+    // Reads the player's on-chain points ledger for `gameTag` from the ER
+    // (gasless, no sign). Returns
+    // { pureLifetime, spendableBalance, lastPoints, lastReason, lastMatchRef,
+    //   lastRecordedTs, awardCount, lastSpendTs, lastSpendRef, lastSpendReason,
+    //   spendCount }
     // or null if the PDA isn't visible yet.
-    async fetchPointsPda() {
+    async fetchPointsPda(gameTag = 'ludo') {
       const ctx = getErProgram();
       if (!ctx) return null;
       const { program, wallet } = ctx;
-      const [pointsPda] = pointsPdaFor(wallet.publicKey);
+      const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
       try {
         const acct = await program.account.playerPoints.fetch(pointsPda);
         return {
-          totalPoints: Number(acct.totalPoints ?? acct.total_points),
-          lastPoints: Number(acct.lastPoints ?? acct.last_points),
-          lastReason: Number(acct.lastReason ?? acct.last_reason),
+          pureLifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime ?? 0),
+          spendableBalance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance ?? 0),
+          lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
+          lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
           lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
-          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts) * 1000,
-          awardCount: Number(acct.awardCount ?? acct.award_count),
+          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
+          awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
+          lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
+          lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
+          lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
+          spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
         };
       } catch (e) {
         return null;

@@ -291,6 +291,27 @@
         if (typeof window.refreshAuthHeader === 'function') {
             window.refreshAuthHeader();
         }
+
+        // Live on-chain local-points chip. When a page opts in via
+        // initGlobalHeader({ localPointsTag: 'ludo' }), the chip reads the M3
+        // module (window.localPoints — the universal points consumer) instead
+        // of a static value: an initial fetch, then every bank/spend refresh
+        // the module publishes updates the chip live. Reads are gasless.
+        if (options.localPointsTag) {
+            const chip = document.querySelector('.gfg-local-pts');
+            const tag = options.localPointsTag;
+            const apply = function (gameTag, ledger) {
+                if (!chip || gameTag !== tag) return;
+                const pts = ledger && ledger.pureLifetime != null ? ledger.pureLifetime : 0;
+                chip.textContent = 'Local: ' + Number(pts).toLocaleString();
+            };
+            if (window.localPoints) {
+                if (typeof window.localPoints.subscribe === 'function') {
+                    window.localPoints.subscribe(apply);
+                }
+                window.localPoints.fetch(tag).then(function (ledger) { apply(tag, ledger); }).catch(function () {});
+            }
+        }
     }
 
     // ---------- Generic confirm dialog (platform-styled, thumb-safe) ----------

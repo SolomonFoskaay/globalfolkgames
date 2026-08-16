@@ -186,19 +186,21 @@ export async function settleComp(winners, amounts, sponsorPubkey) {
 
 // Winner claims their allocation gasless on the ER (their session key signs).
 // `sponsorPubkey` identifies the comp PDA; `winnerKeypair` is the player.
-export async function claimComp(compPda, winnerIndex, winnerKeypair) {
+// `gameTag` selects which game's per-game points ledger receives the prize
+// (default 'ludo').
+export async function claimComp(compPda, winnerIndex, winnerKeypair, gameTag = 'ludo') {
   const conn = new Connection(ER_URL, 'confirmed');
   const provider = new AnchorProvider(conn, mkWallet(winnerKeypair), { commitment: 'confirmed', skipPreflight: true });
   const program = new Program(idl, provider);
   const [pointsPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from('gfgpoints'), winnerKeypair.publicKey.toBytes()], PROGRAM_ID);
+    [Buffer.from('gfgpoints'), Buffer.from(gameTag, 'utf8'), winnerKeypair.publicKey.toBytes()], PROGRAM_ID);
   const pda = new PublicKey(compPda);
 
   // Read the sponsor out of the comp account so the seed constraint passes.
   const comp = await program.account.competition.fetch(pda);
   const sponsorKey = new PublicKey(comp.sponsor);
   const sig = await sendEr(program, winnerKeypair,
-    program.methods.claimComp(winnerIndex)
+    program.methods.claimComp(gameTag, winnerIndex)
       .accounts({
         comp: pda,
         payer: winnerKeypair.publicKey,

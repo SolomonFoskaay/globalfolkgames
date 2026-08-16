@@ -40,6 +40,18 @@ const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
 
+// Registered M1A game tags (mirrors is_valid_game_tag in the program). Each
+// game owns its per-game points ledger seed [gfgpoints, game_tag, player].
+export function isValidGameTag(tag) {
+  return ['ludo', 'ayo_olopon', 'ludo_lab', 'ayo_lab', 'sandbox'].includes(tag);
+}
+
+// Legacy (pre-game_tag) points PDA derivation: [gfgpoints, player]. Used only
+// by the migration so old Scope B devnet points survive the seed change.
+export function legacyPointsPdaFor(player) {
+  return PublicKey.findProgramAddressSync([POINTS_SEED, player.toBytes()], PROGRAM_ID);
+}
+
 export function loadSponsor() {
   if (process.env.GFG_Gasless_Sponsor_Keypair) {
     return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.GFG_Gasless_Sponsor_Keypair)));
@@ -76,8 +88,10 @@ const ESTIMATED_STEP_COST_LAMPORTS = 0.0015 * 1e9; // 0.0015 SOL
 // AND their result PDA (Scope C).
 // Idempotent for each PDA individually.
 // playerPubkey: the player's Solana wallet address (seed basis for all PDAs).
-// Returns { pda, pointsPda, resultPda, delegated, steps: [{step, sig}] }.
-export async function handleDelegate(playerPubkey) {
+// gameTag: which game's per-game points ledger to onboard (default 'ludo').
+// Returns { pda, pointsPda, resultPda, gameTag, delegated, steps }.
+export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
+  if (!isValidGameTag(gameTag)) throw new Error(`invalid game_tag: ${gameTag}`);
   const player = new PublicKey(playerPubkey);
   const sponsor = loadSponsor();
   // Polling confirm: Alchemy's devnet endpoint doesn't implement the
@@ -88,7 +102,7 @@ export async function handleDelegate(playerPubkey) {
   const program = new Program(idl, provider);
 
   const [pda] = PublicKey.findProgramAddressSync([PLAYER_SEED, player.toBytes()], PROGRAM_ID);
-  const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, player.toBytes()], PROGRAM_ID);
+  const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, Buffer.from(gameTag, 'utf8'), player.toBytes()], PROGRAM_ID);
   const [resultPda] = PublicKey.findProgramAddressSync([RESULT_SEED, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
@@ -107,7 +121,7 @@ export async function handleDelegate(playerPubkey) {
   const pointsStatus = await retry(() => getDelegationStatus(conn, pointsPda));
   const resultStatus = await retry(() => getDelegationStatus(conn, resultPda));
   if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated) {
-    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), delegated: true, steps: [] };
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), gameTag, delegated: true, steps: [] };
   }
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
@@ -147,13 +161,13 @@ export async function handleDelegate(playerPubkey) {
     const pinfo = await retry(() => conn.getAccountInfo(pointsPda));
     if (!pinfo) {
       const sig = await sendAndConfirmBase(conn, sponsor,
-        await program.methods.initializePoints()
+        await program.methods.initializePoints(gameTag)
           .accounts({ points: pointsPda, payer: sponsor.publicKey, playerAuthority: player })
           .transaction()
       );
       steps.push({ step: 'initialize_points', sig });
     }
-    const sig = await delegatePointsPda(program, conn, sponsor, player, pointsPda);
+    const sig = await delegatePointsPda(program, conn, sponsor, player, pointsPda, gameTag);
     if (sig) steps.push({ step: 'delegate_points', sig });
   }
 
@@ -190,7 +204,61 @@ export async function handleDelegate(playerPubkey) {
     }
   }
 
-  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), delegated: true, steps };
+  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), gameTag, delegated: true, steps };
+}
+
+// M3 data-preservation migration (see .opencode/rules/solana-upgrade-safety.md).
+// Runs the on-chain `migrate_points` instruction on the base layer (sponsor
+// pays, anyone could). Copies a player's legacy Scope B points PDA
+// [gfgpoints, player] (old total_points layout) into the per-game ledger
+// [gfgpoints, gameTag, player] as both tracks (1:1), so no lifetime points
+// are lost across the seed change. Idempotent: no-ops when the legacy account
+// is absent or the destination already holds awards.
+// Returns { migrated: boolean, legacyPda, pointsPda, sig }.
+export async function handleMigratePoints(playerPubkey, gameTag = 'ludo') {
+  if (!isValidGameTag(gameTag)) throw new Error(`invalid game_tag: ${gameTag}`);
+  const player = new PublicKey(playerPubkey);
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
+  const program = new Program(idl, provider);
+
+  const [legacyPda] = legacyPointsPdaFor(player);
+  const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, Buffer.from(gameTag, 'utf8'), player.toBytes()], PROGRAM_ID);
+
+  const retry = async (fn, n = 4, delay = 400) => {
+    for (let i = 0; i < n; i++) {
+      try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); }
+    }
+    return null;
+  };
+
+  const legacyInfo = await retry(() => conn.getAccountInfo(legacyPda));
+  if (!legacyInfo) {
+    return { migrated: false, legacyPda: legacyPda.toBase58(), pointsPda: pointsPda.toBase58(), sig: null };
+  }
+  const destInfo = await retry(() => conn.getAccountInfo(pointsPda));
+  if (destInfo) {
+    // Already created — only re-run if it holds no awards yet (empty ledger).
+    const dest = program.coder.accounts.decode('playerPoints', destInfo.data);
+    if (dest && Number(dest.awardCount ?? dest.award_count ?? 0) > 0) {
+      return { migrated: false, legacyPda: legacyPda.toBase58(), pointsPda: pointsPda.toBase58(), sig: null };
+    }
+  }
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+    await program.methods.migratePoints(gameTag)
+      .accounts({
+        payer: sponsor.publicKey,
+        playerAuthority: player,
+        legacyPoints: legacyPda,
+        points: pointsPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .transaction()
+  );
+  console.log(`[relay] migrated legacy points ${legacyPda.toBase58()} -> ${pointsPda.toBase58()} (gameTag ${gameTag})`);
+  return { migrated: true, legacyPda: legacyPda.toBase58(), pointsPda: pointsPda.toBase58(), sig };
 }
 
 // Delegate a dice PDA into the ER session (pin our devnet ER validator).
@@ -233,12 +301,12 @@ async function delegateDicePda(program, conn, sponsor, player, pda) {
 
 // Delegate a points PDA into the ER session (Scope B). Mirrors delegateDicePda
 // but uses the points seed + delegate_points instruction accounts.
-async function delegatePointsPda(program, conn, sponsor, player, pointsPda) {  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pointsPda.toBytes()], PROGRAM_ID);
+async function delegatePointsPda(program, conn, sponsor, player, pointsPda, gameTag) {  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pointsPda.toBytes()], PROGRAM_ID);
   const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pointsPda.toBytes()], DELEGATION_PROGRAM);
   const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pointsPda.toBytes()], DELEGATION_PROGRAM);
 
   const sig = await sendAndConfirmBase(conn, sponsor,
-      await program.methods.delegatePoints()
+      await program.methods.delegatePoints(gameTag)
         .accounts({
           payer: sponsor.publicKey,
           playerAuthority: player,

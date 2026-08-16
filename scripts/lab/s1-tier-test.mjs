@@ -95,7 +95,7 @@ async function main() {
   const matchRef = matchRefFromSignature('6nX' + 'a'.repeat(85)); // synthetic proof-roll sig
   const t0 = Date.now();
   const sig = await erProgram.methods
-    .recordPoints(new BN(reward.total), 1 /* WIN_1ST */, matchRef)
+    .recordPoints('ludo', new BN(reward.total), 1 /* WIN_1ST */, matchRef)
     .accounts({ points: pointsPda, payer: player.publicKey, playerAuthority: player.publicKey })
     .rpc({ skipPreflight: true, commitment: 'confirmed' });
   console.log('[3] record_points receipt (gasless, 0 SOL):', sig, `(${Date.now() - t0}ms)`);
@@ -103,12 +103,14 @@ async function main() {
   // === Step 4: verify the PDA state on the ER ===
   console.log('\n[4] reading back player points PDA...');
   const acct = await erProgram.account.playerPoints.fetch(pointsPda);
-  const total = Number(acct.totalPoints ?? acct.total_points);
+  const pure = Number(acct.localPureLifetime ?? acct.local_pure_lifetime);
+  const spendable = Number(acct.localSpendableBalance ?? acct.local_spendable_balance);
   const awardCount = Number(acct.awardCount ?? acct.award_count);
-  console.log('[4] total_points:', total, '| award_count:', awardCount, '| last_reason:', Number(acct.lastReason ?? acct.last_reason));
-  if (total !== reward.total) throw new Error(`expected total ${reward.total}, got ${total}`);
+  console.log('[4] pure:', pure, '| spendable:', spendable, '| award_count:', awardCount, '| last_reason:', Number(acct.lastReason ?? acct.last_reason));
+  if (pure !== reward.total) throw new Error(`expected pure ${reward.total}, got ${pure}`);
+  if (spendable !== reward.total) throw new Error(`expected spendable ${reward.total}, got ${spendable}`);
   if (awardCount !== 1) throw new Error(`expected award_count 1, got ${awardCount}`);
-  console.log('\n✅ S1 tier mirror PASS — boosted win recorded on-chain, player paid 0 SOL');
+  console.log('\n✅ S1 tier mirror PASS — boosted win recorded on-chain (both tracks), player paid 0 SOL');
 }
 
 main().catch(e => { console.error('\n❌ S1 tier test failed:', e.message || e); process.exit(1); });

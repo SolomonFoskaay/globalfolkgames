@@ -10,7 +10,7 @@
 
 import { createServer } from 'http';
 import { Keypair } from '@solana/web3.js';
-import { handleDelegate } from './delegate-relay.mjs';
+import { handleDelegate, handleMigratePoints } from './delegate-relay.mjs';
 import { runProbe } from './endpoints-probe.mjs';
 import { handleHouseRoll } from './roll-relay.mjs';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState } from './comp-relay.mjs';
@@ -75,13 +75,29 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { player } = JSON.parse(body || '{}');
+      const { player, gameTag } = JSON.parse(body || '{}');
       if (!player) throw new Error('missing "player" pubkey');
-      const result = await handleDelegate(player);
+      const result = await handleDelegate(player, gameTag);
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('relay error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/migrate-points') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { player, gameTag } = JSON.parse(body || '{}');
+      if (!player) throw new Error('missing "player" pubkey');
+      const result = await handleMigratePoints(player, gameTag);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('migrate error:', e.message);
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
     }

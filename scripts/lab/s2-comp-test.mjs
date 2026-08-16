@@ -114,13 +114,13 @@ async function main() {
 
   const before = await fetchClaimablePda(w1);
   console.log('[5] winner 1 points PDA before:', before);
-  const claim = await claimComp(compPdaStr, 0, w1);
+  const claim = await claimComp(compPdaStr, 0, w1, 'ludo');
   console.log('[5] claim receipt:', claim.sig);
   await sleep(700);
   const after = await fetchClaimablePda(w1);
   console.log('[5] winner 1 points PDA after:', after);
-  if (after.total_points !== before.total_points + 5000) {
-    throw new Error(`claim did not credit 5,000: before ${before.total_points}, after ${after.total_points}`);
+  if (after.local_spendable_balance !== before.local_spendable_balance + 5000) {
+    throw new Error(`claim did not credit 5,000: before ${before.local_spendable_balance}, after ${after.local_spendable_balance}`);
   }
 
   // Claiming twice must be rejected by the program. On the ER, an errored
@@ -128,7 +128,7 @@ async function main() {
   // assert the invariant via on-chain state instead of an exception.
   console.log('[5] attempting double claim...');
   try {
-    const dupSig = await claimComp(settled.compPda, 0, w1);
+    const dupSig = await claimComp(settled.compPda, 0, w1, 'ludo');
     console.log('[5] second claim tx sent (sig exists), checking on-chain rejection...', dupSig.sig.slice(0, 8));
   } catch (e) {
     if (!/already claimed|AlreadyClaimed/i.test(e.message || '')) {
@@ -138,7 +138,7 @@ async function main() {
   const afterDup = await fetchClaimablePda(w1);
   const stateAfterDup = await fetchState(settled.compPda);
   const doubleRejected =
-    afterDup.total_points === before.total_points + 5000 &&
+    afterDup.local_spendable_balance === before.local_spendable_balance + 5000 &&
     stateAfterDup.winners[0].claimed === true;
   console.log('[5] double claim rejected:', doubleRejected);
   if (!doubleRejected) throw new Error('double claim was NOT rejected');
@@ -158,19 +158,20 @@ async function fetchClaimablePda(player) {
     async signAllTransactions(ts) { return Promise.all(ts.map(t => { t.partialSign(player); return t; })); },
   }, { commitment: 'confirmed', skipPreflight: true });
   const program = new Program(idl, provider);
-  const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), player.publicKey.toBytes()], new PublicKey(idl.address));
+  const [pointsPda] = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), Buffer.from('ludo'), player.publicKey.toBytes()], new PublicKey(idl.address));
   for (let i = 0; i < 40; i++) {
     await sleep(500);
     try {
       const acct = await program.account.playerPoints.fetch(pointsPda);
       return {
-        total_points: Number(acct.totalPoints ?? acct.total_points),
+        local_pure_lifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime),
+        local_spendable_balance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance),
         award_count: Number(acct.awardCount ?? acct.award_count),
         last_reason: Number(acct.lastReason ?? acct.last_reason),
       };
     } catch (e) { /* not picked up by ER yet */ }
   }
-  return { total_points: 0, award_count: 0, last_reason: 0 };
+  return { local_pure_lifetime: 0, local_spendable_balance: 0, award_count: 0, last_reason: 0 };
 }
 
 async function fetchState(compPda) {

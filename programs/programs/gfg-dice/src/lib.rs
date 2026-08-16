@@ -97,6 +97,16 @@ pub const COMP: &[u8] = b"gfgcomp";
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
 
+/// Registered M1A game tags for per-game point ledgers. Add a game here when
+/// its M1 spec locks. The tag is the seed basis that isolates each game's
+/// points PDA ([gfgpoints, game_tag, player]) so games never share ledgers.
+pub fn is_valid_game_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "ludo" | "ayo_olopon" | "ludo_lab" | "ayo_lab" | "sandbox"
+    )
+}
+
 #[ephemeral]
 #[program]
 pub mod gfg_dice {
@@ -190,19 +200,22 @@ pub mod gfg_dice {
         Ok(())
     }
 
-    /// Idempotent: creates the player's POINTS PDA if it does not exist yet.
-    /// Payer (sponsor) pays rent; the account belongs to `player_authority`.
-    pub fn initialize_points(ctx: Context<InitializePoints>) -> Result<()> {
+    /// Idempotent: creates the player's per-game POINTS PDA if it does not
+    /// exist yet. Seed [gfgpoints, game_tag, player_authority]. Payer (sponsor)
+    /// pays rent; the account belongs to `player_authority`.
+    pub fn initialize_points(ctx: Context<InitializePoints>, game_tag: String) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
         Ok(())
     }
 
-    /// Delegates the player's POINTS PDA into an ER session (base layer,
-    /// sponsor pays) so `record_points` runs gasless on the rollup.
-    pub fn delegate_points(ctx: Context<DelegatePointsInput>) -> Result<()> {
+    /// Delegates the player's per-game POINTS PDA into an ER session (base
+    /// layer, sponsor pays) so `record_points`/`spend_local` run gasless.
+    pub fn delegate_points(ctx: Context<DelegatePointsInput>, game_tag: String) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
         let authority = ctx.accounts.player_authority.key();
         ctx.accounts.delegate_points(
             &ctx.accounts.payer,
-            &[POINTS, authority.as_ref()],
+            &[POINTS, game_tag.as_bytes(), authority.as_ref()],
             DelegateConfig {
                 // Optionally set a specific validator from the first remaining account
                 validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
@@ -212,22 +225,35 @@ pub mod gfg_dice {
         Ok(())
     }
 
-    /// Appends a reward to the player's POINTS PDA. Runs GASLESS on the ER:
-    /// the player's session key is the only signer and no SOL is needed. The
-    /// transaction signature is the authoritative on-chain receipt of the award.
-    /// `match_ref` ties the record to the proof-roll transaction that earned it
-    /// (first 8 bytes of the roll signature as a u64).
+    /// Appends a reward to the player's per-game POINTS PDA (M3 — two-track
+    /// local ledger: local_pure_lifetime AND local_spendable_balance are credited together
+    /// on a verified win). Runs GASLESS on the ER: the player's session key is
+    /// the only signer and no SOL is needed. `game_tag` ('ludo', 'ayo_olopon',
+    /// ...) isolates each game's ledger via the PDA seed [gfgpoints, game_tag,
+    /// player]. `match_ref` ties the record to the proof-roll transaction that
+    /// earned it (first 8 bytes of the roll signature as a u64) and guards
+    /// idempotency: a match_ref can only be recorded once.
     pub fn record_points(
         ctx: Context<RecordPointsCtx>,
+        game_tag: String,
         points: u64,
         reason: u8,
         match_ref: u64,
     ) -> Result<()> {
         require!(points > 0, PointsError::ZeroPoints);
-
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
         let dest = &mut ctx.accounts.points;
-        dest.total_points = dest
-            .total_points
+        require!(
+            dest.award_count == 0 || dest.last_match_ref != match_ref,
+            PointsError::DuplicateMatchRef
+        );
+
+        dest.local_pure_lifetime = dest
+            .local_pure_lifetime
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        dest.local_spendable_balance = dest
+            .local_spendable_balance
             .checked_add(points)
             .ok_or(PointsError::Overflow)?;
         dest.last_points = points;
@@ -235,6 +261,68 @@ pub mod gfg_dice {
         dest.last_match_ref = match_ref;
         dest.last_recorded_ts = Clock::get()?.unix_timestamp;
         dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// (M3 — local spendable) Draws down the SPENDABLE track of a per-game
+    /// points PDA for that game's own in-game purchases (S3 shop). The PURE
+    /// track is never touched: local pure is the unspendable bragging-rights
+    /// source of truth. Runs GASLESS on the ER (session key signs, 0 SOL);
+    /// `spend_ref` is the client/backend-supplied purchase reference that makes
+    /// the spend replayable. `reason` uses the client reason tag map.
+    pub fn spend_local(
+        ctx: Context<SpendLocalCtx>,
+        game_tag: String,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let dest = &mut ctx.accounts.points;
+        require!(
+            dest.local_spendable_balance >= amount,
+            PointsError::InsufficientBalance
+        );
+
+        dest.local_spendable_balance = dest
+            .local_spendable_balance
+            .checked_sub(amount)
+            .ok_or(PointsError::InsufficientBalance)?;
+        dest.last_spend_reason = reason;
+        dest.last_spend_ref = spend_ref;
+        dest.last_spend_ts = Clock::get()?.unix_timestamp;
+        dest.spend_count = dest.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// (M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)
+    /// Permissionless one-time migration from the legacy pre-game_tag points
+    /// PDA `[gfgpoints, player]` (old `total_points` layout) into the new
+    /// per-game ledger `[gfgpoints, game_tag, player]`. Copies the legacy
+    /// total into BOTH new tracks (1:1 split) so no lifetime points are lost
+    /// across the seed change. Idempotent: skips when the destination already
+    /// holds awards. The legacy account is left in place as a tombstone; it is
+    /// never closed (closing would reclaim rent and destroy the data).
+    pub fn migrate_points(ctx: Context<MigratePointsCtx>, game_tag: String) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let dest = &mut ctx.accounts.points;
+        if dest.award_count > 0 {
+            return Ok(()); // already migrated
+        }
+        let legacy = &ctx.accounts.legacy_points;
+        if legacy.lamports() == 0 || legacy.try_borrow_data()?.len() <= 8 {
+            return Ok(()); // nothing to migrate
+        }
+        let mut data: &[u8] = &legacy.try_borrow_data()?[8..];
+        let old = LegacyPlayerPoints::deserialize(&mut data)?;
+        dest.local_pure_lifetime = old.total_points;
+        dest.local_spendable_balance = old.total_points;
+        dest.last_points = old.last_points;
+        dest.last_reason = old.last_reason;
+        dest.last_match_ref = old.last_match_ref;
+        dest.last_recorded_ts = old.last_recorded_ts;
+        dest.award_count = old.award_count;
         Ok(())
     }
 
@@ -395,12 +483,16 @@ pub mod gfg_dice {
     }
 
     /// A winner claims their allocation gasless on the ER. Requires the winner
-    /// to be a stored allocation. Credits the player's points PDA with the
-    /// allocation and marks it claimed (each allocation claims exactly once).
+    /// to be a stored allocation. Credits the SPENDABLE track of the player's
+    /// per-game points PDA with the allocation (competition winnings are
+    /// spendable) and marks it claimed (each allocation claims exactly once).
+    /// `game_tag` selects which game's points PDA receives the prize.
     pub fn claim_comp(
         ctx: Context<ClaimCompCtx>,
+        game_tag: String,
         winner_index: u8,
     ) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
         let comp = &mut ctx.accounts.comp;
         require!(
             comp.state == CompState::Settled as u8,
@@ -417,8 +509,12 @@ pub mod gfg_dice {
         alloc.claimed = true;
 
         let dest = &mut ctx.accounts.points;
-        dest.total_points = dest
-            .total_points
+        dest.local_spendable_balance = dest
+            .local_spendable_balance
+            .checked_add(alloc.amount)
+            .ok_or(PointsError::Overflow)?;
+        dest.local_pure_lifetime = dest
+            .local_pure_lifetime
             .checked_add(alloc.amount)
             .ok_or(PointsError::Overflow)?;
         dest.last_points = alloc.amount;
@@ -460,6 +556,7 @@ pub struct DelegateInput<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(game_tag: String)]
 pub struct InitializePoints<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -469,7 +566,7 @@ pub struct InitializePoints<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + PlayerPoints::INIT_SPACE,
-        seeds = [POINTS, player_authority.key().as_ref()],
+        seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()],
         bump
     )]
     pub points: Account<'info, PlayerPoints>,
@@ -604,12 +701,13 @@ pub struct SettleCompCtx<'info> {
 /// key is the payer; the competition PDA must be delegated and the winner's
 /// points PDA must exist + be delegated.
 #[derive(Accounts)]
+#[instruction(game_tag: String)]
 pub struct ClaimCompCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: The player's wallet authority (seed basis for the points PDA).
     pub player_authority: AccountInfo<'info>,
-    #[account(mut, seeds = [POINTS, player_authority.key().as_ref()], bump)]
+    #[account(mut, seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()], bump)]
     pub points: Account<'info, PlayerPoints>,
     /// The competition sponsor (read-only seed basis; not required to sign).
     /// CHECK: read-only, used only as the PDA seed.
@@ -626,13 +724,52 @@ pub struct ClaimCompCtx<'info> {
 /// Context for `record_points`. Runs on the ER (gasless): the player's session
 /// key is the payer, and the points PDA must already exist + be delegated.
 #[derive(Accounts)]
+#[instruction(game_tag: String)]
 pub struct RecordPointsCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: The player's wallet authority (seed basis for the PDA).
     pub player_authority: AccountInfo<'info>,
-    #[account(mut, seeds = [POINTS, player_authority.key().as_ref()], bump)]
+    #[account(mut, seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()], bump)]
     pub points: Account<'info, PlayerPoints>,
+}
+
+/// Context for `spend_local`. Runs on the ER (gasless): the player's session
+/// key is the payer, and the points PDA must already exist + be delegated.
+#[derive(Accounts)]
+#[instruction(game_tag: String)]
+pub struct SpendLocalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()], bump)]
+    pub points: Account<'info, PlayerPoints>,
+}
+
+/// Context for `migrate_points`. Runs on the base layer (one-time, sponsor or
+/// anyone pays): reads the legacy pre-game_tag PDA and seeds the new per-game
+/// ledger with the same data.
+#[derive(Accounts)]
+#[instruction(game_tag: String)]
+pub struct MigratePointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for both PDAs).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: Legacy (pre-game_tag) points PDA [gfgpoints, player]. Read-only
+    /// tombstone; never closed after migration.
+    #[account(seeds = [POINTS, player_authority.key().as_ref()], bump)]
+    pub legacy_points: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + PlayerPoints::INIT_SPACE,
+        seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()],
+        bump
+    )]
+    pub points: Account<'info, PlayerPoints>,
+    pub system_program: Program<'info, System>,
 }
 
 #[vrf]
@@ -682,19 +819,54 @@ pub struct PlayerDice {
     pub last_request_ts: i64,
 }
 
-/// On-chain points ledger for one player (Scope B — record_points).
+/// On-chain LOCAL points ledger for one player per game (M3 — two-track local
+/// points). One account per [game_tag, player]. Runs gasless on the ER.
+///
+/// Field naming: `local_` prefixed so the future M4 GLOBAL ledgers can live on
+/// the same program as `global_*` fields/accounts without ambiguity.
 ///
 /// Fields:
-///   - total_points     : cumulative lifetime points recorded on-chain.
+///   - local_pure_lifetime    : PURE (unspendable) lifetime points. Source of truth
+///                        for the player's on-chain bragging rights. Credits
+///                        on every verified win; never drawn down.
+///   - local_spendable_balance: SPENDABLE track credited alongside pure on every win
+///                        (1:1 for now). Can be spent via `spend_local` (local
+///                        in-game purchases) or `claim_comp` (competition
+///                        winnings credit this track).
 ///   - last_points      : the most recent award amount.
-///   - last_reason      : award reason tag (see client mapping: 1=ludo-win).
+///   - last_reason      : award reason tag (client mapping; see
+///                        `src/magicblock-vrf.js` POINT_REASONS).
 ///   - last_match_ref   : first 8 bytes (as u64) of the proof-roll tx signature
-///                        that earned the last award.
-///   - last_recorded_ts : unix ts of the most recent record.
-///   - award_count      : number of records written.
+///                        that earned the last award. Duplicate guard for the
+///                        idempotent 1x-per-match rule.
+///   - last_recorded_ts : unix ts of the most recent award.
+///   - award_count      : number of awards recorded.
+///   - last_spend_ts    : unix ts of the most recent local spend.
+///   - last_spend_ref   : client/backend purchase reference of the last spend.
+///   - last_spend_reason: spend reason tag of the last spend.
+///   - spend_count      : number of local spends recorded.
 #[account]
 #[derive(InitSpace)]
 pub struct PlayerPoints {
+    pub local_pure_lifetime: u64,
+    pub local_spendable_balance: u64,
+    pub last_points: u64,
+    pub last_reason: u8,
+    pub last_match_ref: u64,
+    pub last_recorded_ts: i64,
+    pub award_count: u64,
+    pub last_spend_ts: i64,
+    pub last_spend_ref: u64,
+    pub last_spend_reason: u8,
+    pub spend_count: u64,
+}
+
+/// Exact byte layout of the LEGACY (pre-game_tag) PlayerPoints account created
+/// by Scope B. Used only by `migrate_points` to read old accounts that predate
+/// the per-game seed change. Never ship this layout as a new account; it exists
+/// so old bytes keep deserializing and migrate cleanly (upgrade-safety R2).
+#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
+pub struct LegacyPlayerPoints {
     pub total_points: u64,
     pub last_points: u64,
     pub last_reason: u8,
@@ -764,6 +936,12 @@ pub enum PointsError {
     ZeroPoints,
     #[msg("points overflow")]
     Overflow,
+    #[msg("unknown or unregistered game tag")]
+    InvalidGameTag,
+    #[msg("match_ref already recorded (duplicate award guard)")]
+    DuplicateMatchRef,
+    #[msg("insufficient spendable balance for this local spend")]
+    InsufficientBalance,
     #[msg("only the competition sponsor can do this")]
     NotSponsor,
     #[msg("fund amount must be greater than zero")]

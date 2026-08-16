@@ -56,8 +56,10 @@
       "name": "claim_comp",
       "docs": [
         "A winner claims their allocation gasless on the ER. Requires the winner",
-        "to be a stored allocation. Credits the player's points PDA with the",
-        "allocation and marks it claimed (each allocation claims exactly once)."
+        "to be a stored allocation. Credits the SPENDABLE track of the player's",
+        "per-game points PDA with the allocation (competition winnings are",
+        "spendable) and marks it claimed (each allocation claims exactly once).",
+        "`game_tag` selects which game's points PDA receives the prize."
       ],
       "discriminator": [
         50,
@@ -98,6 +100,10 @@
                 ]
               },
               {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
                 "kind": "account",
                 "path": "player_authority"
               }
@@ -136,6 +142,10 @@
         }
       ],
       "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        },
         {
           "name": "winner_index",
           "type": "u8"
@@ -609,8 +619,8 @@
     {
       "name": "delegate_points",
       "docs": [
-        "Delegates the player's POINTS PDA into an ER session (base layer,",
-        "sponsor pays) so `record_points` runs gasless on the rollup."
+        "Delegates the player's per-game POINTS PDA into an ER session (base",
+        "layer, sponsor pays) so `record_points`/`spend_local` run gasless."
       ],
       "discriminator": [
         104,
@@ -778,7 +788,12 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "delegate_result",
@@ -1152,8 +1167,9 @@
     {
       "name": "initialize_points",
       "docs": [
-        "Idempotent: creates the player's POINTS PDA if it does not exist yet.",
-        "Payer (sponsor) pays rent; the account belongs to `player_authority`."
+        "Idempotent: creates the player's per-game POINTS PDA if it does not",
+        "exist yet. Seed [gfgpoints, game_tag, player_authority]. Payer (sponsor)",
+        "pays rent; the account belongs to `player_authority`."
       ],
       "discriminator": [
         128,
@@ -1194,6 +1210,10 @@
                 ]
               },
               {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
                 "kind": "account",
                 "path": "player_authority"
               }
@@ -1205,7 +1225,12 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "initialize_result",
@@ -1264,6 +1289,107 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "migrate_points",
+      "docs": [
+        "(M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)",
+        "Permissionless one-time migration from the legacy pre-game_tag points",
+        "PDA `[gfgpoints, player]` (old `total_points` layout) into the new",
+        "per-game ledger `[gfgpoints, game_tag, player]`. Copies the legacy",
+        "total into BOTH new tracks (1:1 split) so no lifetime points are lost",
+        "across the seed change. Idempotent: skips when the destination already",
+        "holds awards. The legacy account is left in place as a tombstone; it is",
+        "never closed (closing would reclaim rent and destroy the data)."
+      ],
+      "discriminator": [
+        244,
+        61,
+        207,
+        18,
+        80,
+        165,
+        169,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "legacy_points",
+          "docs": [
+            "tombstone; never closed after migration."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "process_undelegation",
@@ -1373,11 +1499,14 @@
     {
       "name": "record_points",
       "docs": [
-        "Appends a reward to the player's POINTS PDA. Runs GASLESS on the ER:",
-        "the player's session key is the only signer and no SOL is needed. The",
-        "transaction signature is the authoritative on-chain receipt of the award.",
-        "`match_ref` ties the record to the proof-roll transaction that earned it",
-        "(first 8 bytes of the roll signature as a u64)."
+        "Appends a reward to the player's per-game POINTS PDA (M3 — two-track",
+        "local ledger: local_pure_lifetime AND local_spendable_balance are credited together",
+        "on a verified win). Runs GASLESS on the ER: the player's session key is",
+        "the only signer and no SOL is needed. `game_tag` ('ludo', 'ayo_olopon',",
+        "...) isolates each game's ledger via the PDA seed [gfgpoints, game_tag,",
+        "player]. `match_ref` ties the record to the proof-roll transaction that",
+        "earned it (first 8 bytes of the roll signature as a u64) and guards",
+        "idempotency: a match_ref can only be recorded once."
       ],
       "discriminator": [
         117,
@@ -1418,6 +1547,10 @@
                 ]
               },
               {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
                 "kind": "account",
                 "path": "player_authority"
               }
@@ -1426,6 +1559,10 @@
         }
       ],
       "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        },
         {
           "name": "points",
           "type": "u64"
@@ -1693,6 +1830,85 @@
       ]
     },
     {
+      "name": "spend_local",
+      "docs": [
+        "(M3 — local spendable) Draws down the SPENDABLE track of a per-game",
+        "points PDA for that game's own in-game purchases (S3 shop). The PURE",
+        "track is never touched: local pure is the unspendable bragging-rights",
+        "source of truth. Runs GASLESS on the ER (session key signs, 0 SOL);",
+        "`spend_ref` is the client/backend-supplied purchase reference that makes",
+        "the spend replayable. `reason` uses the client reason tag map."
+      ],
+      "discriminator": [
+        95,
+        127,
+        213,
+        91,
+        224,
+        243,
+        3,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "undelegate",
       "docs": [
         "Commits the latest state and returns the PDA to this program (runs on ER)."
@@ -1823,51 +2039,66 @@
     },
     {
       "code": 6002,
+      "name": "InvalidGameTag",
+      "msg": "unknown or unregistered game tag"
+    },
+    {
+      "code": 6003,
+      "name": "DuplicateMatchRef",
+      "msg": "match_ref already recorded (duplicate award guard)"
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientBalance",
+      "msg": "insufficient spendable balance for this local spend"
+    },
+    {
+      "code": 6005,
       "name": "NotSponsor",
       "msg": "only the competition sponsor can do this"
     },
     {
-      "code": 6003,
+      "code": 6006,
       "name": "ZeroAmount",
       "msg": "fund amount must be greater than zero"
     },
     {
-      "code": 6004,
+      "code": 6007,
       "name": "NotOpen",
       "msg": "competition is not open"
     },
     {
-      "code": 6005,
+      "code": 6008,
       "name": "NotFunded",
       "msg": "competition is not funded"
     },
     {
-      "code": 6006,
+      "code": 6009,
       "name": "NotSettled",
       "msg": "competition is not settled"
     },
     {
-      "code": 6007,
+      "code": 6010,
       "name": "StillRunning",
       "msg": "competition still running (ends_at not reached)"
     },
     {
-      "code": 6008,
+      "code": 6011,
       "name": "OverAlloc",
       "msg": "winner allocations exceed the 70% winners bucket"
     },
     {
-      "code": 6009,
+      "code": 6012,
       "name": "NoSuchWinner",
       "msg": "no such winner index"
     },
     {
-      "code": 6010,
+      "code": 6013,
       "name": "NotYourAllocation",
       "msg": "allocation belongs to a different player"
     },
     {
-      "code": 6011,
+      "code": 6014,
       "name": "AlreadyClaimed",
       "msg": "allocation already claimed"
     }
@@ -1956,22 +2187,42 @@
     {
       "name": "PlayerPoints",
       "docs": [
-        "On-chain points ledger for one player (Scope B — record_points).",
+        "On-chain LOCAL points ledger for one player per game (M3 — two-track local",
+        "points). One account per [game_tag, player]. Runs gasless on the ER.",
+        "",
+        "Field naming: `local_` prefixed so the future M4 GLOBAL ledgers can live on",
+        "the same program as `global_*` fields/accounts without ambiguity.",
         "",
         "Fields:",
-        "- total_points     : cumulative lifetime points recorded on-chain.",
+        "- local_pure_lifetime    : PURE (unspendable) lifetime points. Source of truth",
+        "for the player's on-chain bragging rights. Credits",
+        "on every verified win; never drawn down.",
+        "- local_spendable_balance: SPENDABLE track credited alongside pure on every win",
+        "(1:1 for now). Can be spent via `spend_local` (local",
+        "in-game purchases) or `claim_comp` (competition",
+        "winnings credit this track).",
         "- last_points      : the most recent award amount.",
-        "- last_reason      : award reason tag (see client mapping: 1=ludo-win).",
+        "- last_reason      : award reason tag (client mapping; see",
+        "`src/magicblock-vrf.js` POINT_REASONS).",
         "- last_match_ref   : first 8 bytes (as u64) of the proof-roll tx signature",
-        "that earned the last award.",
-        "- last_recorded_ts : unix ts of the most recent record.",
-        "- award_count      : number of records written."
+        "that earned the last award. Duplicate guard for the",
+        "idempotent 1x-per-match rule.",
+        "- last_recorded_ts : unix ts of the most recent award.",
+        "- award_count      : number of awards recorded.",
+        "- last_spend_ts    : unix ts of the most recent local spend.",
+        "- last_spend_ref   : client/backend purchase reference of the last spend.",
+        "- last_spend_reason: spend reason tag of the last spend.",
+        "- spend_count      : number of local spends recorded."
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "total_points",
+            "name": "local_pure_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "local_spendable_balance",
             "type": "u64"
           },
           {
@@ -1992,6 +2243,22 @@
           },
           {
             "name": "award_count",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_spend_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_reason",
+            "type": "u8"
+          },
+          {
+            "name": "spend_count",
             "type": "u64"
           }
         ]

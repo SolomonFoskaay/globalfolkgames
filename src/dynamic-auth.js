@@ -221,6 +221,12 @@ async function handleVerifyOTP() {
   // Refresh header now that the wallet is guaranteed available
   if (window.refreshAuthHeader) await window.refreshAuthHeader();
 
+  // Tell universal modules (M3 local points, ...) the wallet is ready so they
+  // can re-fetch their on-chain ledgers for the now-signed-in player.
+  try {
+    window.dispatchEvent(new CustomEvent('gfg:auth-changed'));
+  } catch (e) { /* CustomEvent may be unavailable in odd sandboxes */ }
+
   } catch (err) {
     console.error('Verify OTP error:', err);
     if (window.showAuthBanner) window.showAuthBanner(err.message || 'Invalid code', true);
@@ -244,4 +250,8 @@ window.logoutDynamic = async function () {
   if (window.refreshAuthHeader) {
     window.refreshAuthHeader();
   }
+
+  try {
+    window.dispatchEvent(new CustomEvent('gfg:auth-changed'));
+  } catch (e) { /* ignore */ }
 };

@@ -456,6 +456,39 @@ window.showResultCeremony = function () {
         }
     }
 
+    // M3 — on-chain award line. The local-points module banks the 'You' seat's
+    // award gasless on the ER right after the seam fires; this line appears the
+    // moment the award lands so the winner SEES what they earned and where.
+    const ptsEl = document.getElementById('result-ceremony-points');
+    if (ptsEl) {
+        ptsEl.style.display = 'none';
+        const showAward = function (award) {
+            if (!award || award.gameTag !== 'ludo' || !award.points) return;
+            ptsEl.innerHTML = '+' + award.points + ' Ludo points banked on-chain'
+                + (award.position === 1 ? ' 🏆' : '');
+            ptsEl.style.display = 'block';
+        };
+        if (window.localPoints) {
+            const recent = window.localPoints.lastAward;
+            if (recent && Date.now() - recent.at < 15000) {
+                showAward(recent);
+            } else if (typeof window.localPoints.subscribe === 'function') {
+                const off = window.localPoints.subscribe(function (gameTag, ledger, award) {
+                    if (award) {
+                        showAward(award);
+                        off();
+                    }
+                });
+                // If the bank already happened before we subscribed (fast path),
+                // grab the latest award without waiting for the next one.
+                setTimeout(function () {
+                    const cur = window.localPoints.lastAward;
+                    if (cur && Date.now() - cur.at < 15000) { showAward(cur); off(); }
+                }, 1500);
+            }
+        }
+    }
+
     overlay.classList.add('visible');
 };
 
