@@ -349,7 +349,10 @@ function buildDice3dStage() {
     stage.id = 'gfg-dice-3d-stage';
 
     const faceClass = { 1: 'front', 6: 'back', 3: 'right', 4: 'left', 5: 'top', 2: 'bottom' };
-    DICE_FACE_ORDER.forEach((value) => {
+    // One REAL cube per die (two dice), EACH with all six faces. Building six
+    // single-face cubes (a regression) made die #2 invisible: its lone back face
+    // is backface-hidden, so only its shadow ever showed.
+    for (let i = 0; i < physicalDice.length; i++) {
         const die = document.createElement('div');
         die.className = 'gfg-die';
 
@@ -360,20 +363,22 @@ function buildDice3dStage() {
         const cube = document.createElement('div');
         cube.className = 'gfg-die-cube';
 
-        const face = document.createElement('div');
-        face.className = 'gfg-die-face gfg-die-face-' + faceClass[value];
-        (DICE_FACE_PIPS[value] || DICE_FACE_PIPS[1]).forEach(([fx, fy]) => {
-            const pip = document.createElement('span');
-            pip.className = 'gfg-pip';
-            pip.style.left = (fx * 100).toFixed(1) + '%';
-            pip.style.top = (fy * 100).toFixed(1) + '%';
-            face.appendChild(pip);
+        DICE_FACE_ORDER.forEach((value) => {
+            const face = document.createElement('div');
+            face.className = 'gfg-die-face gfg-die-face-' + faceClass[value];
+            (DICE_FACE_PIPS[value] || DICE_FACE_PIPS[1]).forEach(([fx, fy]) => {
+                const pip = document.createElement('span');
+                pip.className = 'gfg-pip';
+                pip.style.left = (fx * 100).toFixed(1) + '%';
+                pip.style.top = (fy * 100).toFixed(1) + '%';
+                face.appendChild(pip);
+            });
+            cube.appendChild(face);
         });
-        cube.appendChild(face);
 
         die.appendChild(cube);
         stage.appendChild(die);
-    });
+    }
 
     parent.appendChild(stage);
     _dice3dStage = stage;
