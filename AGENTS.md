@@ -133,7 +133,18 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   Ludo scoring 4P 1st=100/2nd=50/3rd=10/4th=0, 2P only 1st=100; ONLY the "You"
   seat earns. Harness-verified live 2026-08-16: on-chain ER harness (0-SOL
   player, gasless record_points + spend_local, spendable-only decrement) PASS;
-  M3 module harness 17/17 against the locked spec. migrate_points bug (an
+  M3 module harness 29/29 against the locked spec (scoring, user-only,
+  idempotency, spend, + resilience: retry-on-transient, confirm-timeout ledger
+  read-back recovery, hard-failure surfacing). LIVE-VERIFIED 2026-08-16 by the
+  owner: the +100 2P win banked on-chain (test wallet FBWcuv...VnbCN ludo PDA
+  7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB = pure 100/spendable 100/
+  award_count 1/reason WIN_1ST bound to proof match_ref 0x136f6555f6).
+  Earlier silent no-show root cause was browser-path error-swallowing; the
+  write path itself is proven by scripts/browser-path-repro.mjs (0-SOL player
+  as ER fee payer). CEREMONY NEVER-PROMISE RULE: ludo-lab shows "+N points
+  loading... don't refresh the page" in flight and a neutral no-amount pending
+  line on failure; "+N banked on-chain" appears ONLY once confirmed.
+  clearTransient() on Play Again. migrate_points bug (an
   intermediate build zeroed legacy ledgers) FIXED + redeployed (ELF-verified;
   re-run on restored ledgers is a clean no-op). Restore tool
   scripts/restore-points.mjs (explicit + --from-supabase) restored the 3

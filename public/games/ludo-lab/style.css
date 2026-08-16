@@ -404,8 +404,8 @@ canvas {
 .gfg-die-face-back   { transform: rotateY(180deg) translateZ(calc(var(--die-size) / 2)); }
 .gfg-die-face-right  { transform: rotateY(90deg) translateZ(calc(var(--die-size) / 2)); }
 .gfg-die-face-left   { transform: rotateY(-90deg) translateZ(calc(var(--die-size) / 2)); }
-.gfg-die-face-top    { transform: rotateX(90deg) translateZ(calc(var(--die-size) / 2)); }
-.gfg-die-face-bottom { transform: rotateX(-90deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-top    { transform: rotateX(-90deg) translateZ(calc(var(--die-size) / 2)); }
+.gfg-die-face-bottom { transform: rotateX(90deg) translateZ(calc(var(--die-size) / 2)); }
 
 .gfg-pip {
     position: absolute;
