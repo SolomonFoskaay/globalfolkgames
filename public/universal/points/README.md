@@ -21,8 +21,17 @@ per-game spendable split drawn only by that game's own in-game spends.
   ONCE and banks verified finishes (`actor === 'user'` only, at its own
   position) via `window.magicblockDice.recordPoints(gameTag, ...)`.
 - Exposes `window.localPoints = { get(gameTag), fetch(gameTag), spend(gameTag,
-  amount, reason, ref), subscribe(cb) }` and fills any DOM slots marked
+  amount, reason, ref), subscribe(cb), clearTransient(), lastAward,
+  lastSeenAward, lastError }` and fills any DOM slots marked
   `data-local-points-pure` / `data-local-points-spendable` on any game page.
+- Banking is resilient + observable: the write retries up to 3x (the on-chain
+  `DuplicateMatchRef` guard keeps retries idempotent), a confirm-timeout false
+  failure is recovered by re-reading the ledger (if the match_ref landed the
+  award is treated as banked), and any final failure publishes a
+  `status:'failed'` notification with `lastError` so ceremonies can explain a
+  pending state instead of showing nothing. Games call `clearTransient()` when
+  a new match starts so one finish's line can never leak into the next
+  ceremony.
 - Ludo scoring (owner-locked): 4P 1st=100/2nd=50/3rd=10/4th=0, 2P 1st=100
   only. The table lives HERE (module config), never in the game.
 

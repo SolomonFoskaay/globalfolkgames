@@ -40,6 +40,14 @@ const mockLedger = {
 const banks = [];
 const spends = [];
 
+// Failure injection for the resilience tests:
+//   failNextBankCount   -> throw this many recordPoints calls before banking.
+//   throwButLedgerLands -> throw every time, but STILL write the ledger (mimics
+//                          an ER confirm-timeout false failure).
+let failNextBankCount = 0;
+let throwButLedgerLands = false;
+const notifs = [];
+
 // Captured seam handler: the module subscribes to window.onGameResult at load
 // time, so we install the capturer BEFORE importing the module.
 let capturedSeamHandler = null;
@@ -50,6 +58,24 @@ globalThis.window = {
   onGameResult: (handler) => { capturedSeamHandler = handler; },
   magicblockDice: {
     recordPoints: async (gameTag, points, reason, matchRef) => {
+      if (throwButLedgerLands) {
+        // The write lands EXACTLY once; every retry of the same match_ref is
+        // rejected by the program's DuplicateMatchRef guard (lib.rs), exactly
+        // like the real chain. Then confirm throws (a false failure).
+        if (mockLedger.awardCount === 0) {
+          mockLedger.pureLifetime += points;
+          mockLedger.spendableBalance += points;
+          mockLedger.lastPoints = points;
+          mockLedger.lastReason = reason;
+          mockLedger.lastMatchRef = String(matchRef);
+          mockLedger.awardCount += 1;
+        }
+        throw new Error('ER confirm-timeout (false failure: the write landed)');
+      }
+      if (failNextBankCount > 0) {
+        failNextBankCount--;
+        throw new Error('transient ER error');
+      }
       banks.push({ gameTag, points, reason, matchRef: String(matchRef) });
       mockLedger.pureLifetime += points;
       mockLedger.spendableBalance += points;
@@ -86,6 +112,14 @@ await import(MODULE_URL);
 const emit = capturedSeamHandler; // captured seam handler
 if (typeof emit !== 'function') { console.error('HARNESS FAIL: module did not subscribe to onGameResult'); process.exit(1); }
 
+// Capture module state notifications (banking / banked / failed) for the
+// resilience checks.
+if (typeof window.localPoints.subscribe === 'function') {
+  window.localPoints.subscribe((gameTag, ledger, award) => {
+    if (award) notifs.push({ status: award.status || 'banked', points: award.points, error: award.error || null });
+  });
+}
+
 let sigCounter = 0;
 const nextSig = () => 'sig-' + (++sigCounter) + '-' + sigCounter + '-' + sigCounter + '-' + sigCounter;
 const envelope = (players, proofSig) => {
@@ -103,6 +137,21 @@ const seat = (seat, actor, position) => ({ seat, actor, position });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function run(env) { emit(env); await sleep(80); }
 
+// Resolves once the module has emitted a TERMINAL state (banked / failed /
+// recovered-as-banked) for the current bank, or after a safety timeout. The
+// bank runs async (it awaits the ledger write + retry backoffs), so checks
+// must wait for it to finish rather than racing 80ms.
+function waitForTerminal(timeoutMs = 10000) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const tick = () => {
+      if (notifs.some((n) => n.status !== 'banking') || Date.now() - started > timeoutMs) return resolve();
+      setTimeout(tick, 100);
+    };
+    tick();
+  });
+}
+
 let pass = 0, fail = 0;
 function check(name, cond) {
   if (cond) { pass++; console.log('  ok  ' + name); }
@@ -113,7 +162,11 @@ function resetMock() {
   mockLedger.pureLifetime = 0; mockLedger.spendableBalance = 0; mockLedger.lastPoints = 0;
   mockLedger.lastReason = 0; mockLedger.lastMatchRef = '0'; mockLedger.awardCount = 0;
   mockLedger.spendCount = 0; mockLedger.lastSpendRef = '0'; mockLedger.lastSpendReason = 0;
-  banks.length = 0; spends.length = 0;
+  banks.length = 0; spends.length = 0; notifs.length = 0;
+  failNextBankCount = 0; throwButLedgerLands = false;
+  if (window.localPoints && typeof window.localPoints.clearTransient === 'function') {
+    window.localPoints.clearTransient();
+  }
 }
 
 console.log('\n=== 4P scoring (1st=100 / 2nd=50 / 3rd=10 / 4th=0, user-only) ===');
@@ -177,6 +230,40 @@ await run(envelope([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('
 const fetched = await window.localPoints.fetch('ludo');
 check('fetch returns pure + spendable tracks', fetched && fetched.pureLifetime === 100 && fetched.spendableBalance === 100);
 check('award_count incremented', fetched.awardCount === 1);
+
+console.log('\n=== resilience: transient failure retried ===');
+resetMock();
+failNextBankCount = 1;
+const transDone = waitForTerminal();
+await run(envelope([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)]));
+await transDone;
+check('transient failure retried -> banks exactly once', banks.length === 1 && banks[0].points === 100);
+check('ledger landed after retry', mockLedger.pureLifetime === 100);
+check('notified banking -> banked', notifs.some(n => n.status === 'banking') && notifs.some(n => n.status === 'banked'));
+check('no lastError after success', window.localPoints.lastError === null);
+
+console.log('\n=== resilience: every attempt errors but the write landed (confirm-timeout) ===');
+resetMock();
+throwButLedgerLands = true;
+const recoveryDone = waitForTerminal();
+await run(envelope([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)]));
+await recoveryDone;
+check('ledger actually holds the points', mockLedger.pureLifetime === 100 && mockLedger.lastMatchRef !== '0');
+check('read-back recovery surfaces the award', window.localPoints.lastAward && window.localPoints.lastAward.points === 100 && Date.now() - window.localPoints.lastAward.at < 15000);
+check('no lastError (recovered)', window.localPoints.lastError === null);
+check('processed guard set so it never re-banks', mockLedger.awardCount === 1);
+
+console.log('\n=== resilience: hard failure surfaces failed state (never silent) ===');
+resetMock();
+const hardFail = new Error('program error: account not found');
+window.magicblockDice.recordPoints = async () => { throw hardFail; };
+const hardDone = waitForTerminal();
+await run(envelope([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)]));
+await hardDone;
+check('failed status notified (not silent)', notifs.some(n => n.status === 'failed'));
+check('lastError explains the failure', window.localPoints.lastError === hardFail.message);
+check('no award claimed on hard failure', !window.localPoints.lastAward || Date.now() - window.localPoints.lastAward.at > 15000);
+check('banking state was shown before the failure', notifs.some(n => n.status === 'banking'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

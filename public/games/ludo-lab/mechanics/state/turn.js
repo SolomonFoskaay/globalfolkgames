@@ -457,15 +457,24 @@ window.showResultCeremony = function () {
     }
 
     // M3 — on-chain award line. The local-points module banks the 'You' seat's
-    // award gasless on the ER right after the seam fires; this line appears the
-    // moment the award lands so the winner SEES what they earned and where.
+    // award gasless on the ER right after the seam fires. NEVER promise points
+    // that have not landed: while the write is in flight we only say the
+    // amount is "loading... don't refresh" (no banked claim), a failed write
+    // shows a neutral pending line with NO amount, and the definitive
+    // "+N banked on-chain" line appears ONLY once the award is confirmed.
     const ptsEl = document.getElementById('result-ceremony-points');
     if (ptsEl) {
         ptsEl.style.display = 'none';
         const showAward = function (award) {
             if (!award || award.gameTag !== 'ludo' || !award.points) return;
-            ptsEl.innerHTML = '+' + award.points + ' Ludo points banked on-chain'
-                + (award.position === 1 ? ' 🏆' : '');
+            if (award.status === 'banking') {
+                ptsEl.innerHTML = '+' + award.points + ' Ludo points loading... don\u2019t refresh the page (confirming on-chain)';
+            } else if (award.status === 'failed') {
+                ptsEl.innerHTML = 'Points pending (on-chain write hiccup, will re-sync automatically).';
+            } else {
+                ptsEl.innerHTML = '+' + award.points + ' Ludo points banked on-chain'
+                    + (award.position === 1 ? ' 🏆' : '');
+            }
             ptsEl.style.display = 'block';
         };
         if (window.localPoints) {
@@ -476,7 +485,9 @@ window.showResultCeremony = function () {
                 const off = window.localPoints.subscribe(function (gameTag, ledger, award) {
                     if (award) {
                         showAward(award);
-                        off();
+                        // Terminal states (banked / failed) stop the listener;
+                        // 'banking' keeps listening for the outcome.
+                        if (award.status !== 'banking') off();
                     }
                 });
                 // If the bank already happened before we subscribed (fast path),
@@ -502,6 +513,9 @@ window.playAgainAfterCeremony = function () {
     if (proofEl) proofEl.innerHTML = '';
     window.__onchainGameRecordPromise = null;
     window.__lastOnchainGameRecordSig = null;
+    if (window.localPoints && typeof window.localPoints.clearTransient === 'function') {
+        window.localPoints.clearTransient();
+    }
 
     if (typeof window.resetWinDetection === 'function') window.resetWinDetection();
     if (typeof resetOnchainProofRollUsed === 'function') resetOnchainProofRollUsed();

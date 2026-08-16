@@ -58,6 +58,8 @@
     var cached = {};        // gameTag -> ledger snapshot (latest known)
     var subscribers = [];   // callbacks invoked after a bank / spend / refresh
     var lastAward = null;   // last successfully banked award (shown by ceremonies)
+    var lastSeenAward = null; // award computed for the most recent finish (shown as "banking..." before it lands)
+    var lastError = null;   // last bank failure reason (ceremony shows it when the write hiccups)
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -146,34 +148,24 @@
 
     // Bank a verified finish. Never throws to the game — M3 banking is a
     // soft-fail best-effort gasless write that must never block the win UX.
+    // Resilient: retries the write (the on-chain DuplicateMatchRef guard keeps
+    // retries idempotent) and, if every attempt errored, re-reads the ledger in
+    // case the write actually landed (e.g. a confirm-timeout false failure).
     async function bank(env) {
         var award = computeAward(env);
         if (!award) return null;
+        lastSeenAward = award;
         var proofSig = env.proof && env.proof.signature;
         if (!proofSig) {
+            lastError = 'finish has no on-chain proof signature';
             console.warn('[local-points] finish has no on-chain proof signature — not banking', env.gameId);
             return null;
         }
         var matchRef = matchRefFor(proofSig);
-        if (processed[matchRef]) return null; // idempotent: already banked
-        if (!magicReady()) {
-            // magicblockDice not initialized yet (module script loads before
-            // main.js). Retry a few times, then give up for this event.
-            for (var attempt = 0; attempt < 5; attempt++) {
-                await new Promise(function (r) { setTimeout(r, 800); });
-                if (magicReady()) break;
-            }
-            if (!magicReady()) {
-                console.warn('[local-points] magicblockDice not ready — skipping bank', env.gameId);
-                return null;
-            }
-        }
-        try {
-            var sig = await window.magicblockDice.recordPoints(
-                award.gameTag, award.points, award.reason, matchRef,
-            );
-            processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
-            persistProcessed();
+        if (processed[matchRef]) {
+            // Already banked this match_ref (e.g. the same finish fired the seam
+            // twice, or a reload). Surface the earlier success to the UI anyway.
+            lastError = null;
             lastAward = {
                 gameTag: award.gameTag,
                 points: award.points,
@@ -182,14 +174,86 @@
                 matchRef: matchRef,
                 at: Date.now(),
             };
-            console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat) — ' + (sig || 'no sig'));
-            var ledger = await refreshLedger(award.gameTag);
-            notify(award.gameTag, ledger, lastAward);
-            return sig || null;
-        } catch (e) {
-            console.warn('[local-points] bank failed (soft-fail):', e.message || e);
+            notify(award.gameTag, cached[award.gameTag] || null, lastAward);
             return null;
         }
+        if (!magicReady()) {
+            // magicblockDice not initialized yet (module script loads before
+            // main.js). Retry a few times, then give up for this event.
+            for (var attempt = 0; attempt < 5; attempt++) {
+                await new Promise(function (r) { setTimeout(r, 800); });
+                if (magicReady()) break;
+            }
+            if (!magicReady()) {
+                lastError = 'magicblockDice not ready';
+                console.warn('[local-points] magicblockDice not ready — skipping bank', env.gameId);
+                return null;
+            }
+        }
+
+        // Tell the win ceremony the award is being written (it opens right
+        // after the seam fires, so this shows the in-flight state).
+        notify(award.gameTag, null, {
+            gameTag: award.gameTag, points: award.points, position: award.position,
+            reason: award.reason, matchRef: matchRef, status: 'banking', at: Date.now(),
+        });
+
+        var attempts = 0;
+        var lastErr = null;
+        while (attempts < 3) {
+            attempts++;
+            try {
+                var sig = await window.magicblockDice.recordPoints(
+                    award.gameTag, award.points, award.reason, matchRef,
+                );
+                processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
+                persistProcessed();
+                lastError = null;
+                lastAward = {
+                    gameTag: award.gameTag,
+                    points: award.points,
+                    position: award.position,
+                    reason: award.reason,
+                    matchRef: matchRef,
+                    at: Date.now(),
+                };
+                console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat) — ' + (sig || 'no sig'));
+                var ledger = await refreshLedger(award.gameTag);
+                notify(award.gameTag, ledger, lastAward);
+                return sig || null;
+            } catch (e) {
+                lastErr = (e && (e.message || e)) || String(e);
+                console.warn('[local-points] bank attempt ' + attempts + '/3 failed (soft-fail):', lastErr);
+                if (attempts < 3) await new Promise(function (r) { setTimeout(r, 1200); });
+            }
+        }
+
+        // Every attempt errored, but the write may have landed anyway (ER
+        // confirm-timeout false failure). Re-read the ledger: if this match_ref
+        // is now on-chain, treat the bank as successful.
+        var reLedger = await refreshLedger(award.gameTag);
+        if (reLedger && String(reLedger.lastMatchRef || '') === String(matchRef)) {
+            lastError = null;
+            lastAward = {
+                gameTag: award.gameTag,
+                points: award.points,
+                position: award.position,
+                reason: award.reason,
+                matchRef: matchRef,
+                at: Date.now(),
+            };
+            processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
+            persistProcessed();
+            notify(award.gameTag, reLedger, lastAward);
+            return null;
+        }
+        lastError = lastErr || 'on-chain write failed after retries';
+        console.warn('[local-points] bank failed after retries:', lastError);
+        notify(award.gameTag, reLedger, {
+            gameTag: award.gameTag, points: award.points, position: award.position,
+            reason: award.reason, matchRef: matchRef, status: 'failed', error: lastError, at: Date.now(),
+        });
+        return null;
     }
 
     function fillSlots(gameTag, ledger) {
@@ -248,6 +312,20 @@
         },
         // Last successfully banked award (shown by ceremonies), or null.
         get lastAward() { return lastAward; },
+        // Award computed for the most recent finish (may still be banking or
+        // failed — the ceremony uses it to show the in-flight state), or null.
+        get lastSeenAward() { return lastSeenAward; },
+        // Last bank failure reason (null when the last bank succeeded). Useful
+        // for the ceremony to explain a pending state honestly.
+        get lastError() { return lastError; },
+        // Forget the transient award/error state. Games call this when a new
+        // match starts so a previous finish's "banked/failed" line can never
+        // leak into the next ceremony.
+        clearTransient: function () {
+            lastAward = null;
+            lastSeenAward = null;
+            lastError = null;
+        },
     };
 
     // ---- seam subscription (the one plug) -------------------------------
