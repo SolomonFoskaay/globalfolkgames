@@ -271,22 +271,26 @@ function runDicePhysicsCalculations() {
             const nx = dx / dist;
             const ny = dy / dist;
             const overlap = (minDist - dist) / 2;
-            a.x -= nx * overlap; a.y -= ny * overlap;
-            b.x += nx * overlap; b.y += ny * overlap;
+            // Positional push-apart FIRST (at least 1.5px per frame) so two
+            // dice can never sit glued together, even at virtual rest.
+            const push = Math.max(overlap, 1.5);
+            a.x -= nx * push; a.y -= ny * push;
+            b.x += nx * push; b.y += ny * push;
 
-            // Equal-mass elastic exchange along the collision normal.
+            // Equal-mass elastic exchange along the collision normal (0.92
+            // restitution), with a minimum outward kick so the dice visibly
+            // BOUNCE apart the moment they touch instead of sticking.
             const relV = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-            if (relV < 0) {
-                const impulse = -relV * 0.92; // restitution
-                a.vx += impulse * nx; a.vy += impulse * ny;
-                b.vx -= impulse * nx; b.vy -= impulse * ny;
-                // Re-clamp after the push-apart so dice stay on the board.
-                a.x = Math.max(halfSize, Math.min(a.x, 600 - size));
-                a.y = Math.max(halfSize, Math.min(a.y, 600 - size));
-                b.x = Math.max(halfSize, Math.min(b.x, 600 - size));
-                b.y = Math.max(halfSize, Math.min(b.y, 600 - size));
-                playDiceTick();
-            }
+            let impulse = relV < 0 ? -relV * 0.92 : 0;
+            if (impulse < 1.2) impulse = 1.2;
+            a.vx += impulse * nx; a.vy += impulse * ny;
+            b.vx -= impulse * nx; b.vy -= impulse * ny;
+            // Re-clamp after the push-apart so dice stay on the board.
+            a.x = Math.max(halfSize, Math.min(a.x, 600 - size));
+            a.y = Math.max(halfSize, Math.min(a.y, 600 - size));
+            b.x = Math.max(halfSize, Math.min(b.x, 600 - size));
+            b.y = Math.max(halfSize, Math.min(b.y, 600 - size));
+            playDiceTick();
         }
     }
 
@@ -409,10 +413,12 @@ function updateDice3dRender(dieEl, die, scale) {
 
     const cube = dieEl.querySelector('.gfg-die-cube');
     if (cube) {
-        // Presentation (camera pitch so dice rest flat with their TOP face up,
+        // Presentation (camera tilt so dice rest flat with their TOP face up,
         // plus a slight yaw) is applied AFTER the die's own orientation:
-        // rotateY+rotateX then rotate3d.
-        cube.style.transform = 'rotateY(18deg) rotateX(35deg) ' + quaternionToRotate3d(die.q || DICE_Q_IDENTITY());
+        // rotateY+rotateX then rotate3d. The pitch stays SHALLOW: a steep one
+        // made the settled cube look like it landed on an edge (two to three
+        // faces on display) instead of the VRF value face clearly on top.
+        cube.style.transform = 'rotateY(12deg) rotateX(18deg) ' + quaternionToRotate3d(die.q || DICE_Q_IDENTITY());
     }
 }
 
