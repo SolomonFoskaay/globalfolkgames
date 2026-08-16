@@ -310,14 +310,23 @@ async function rollDiceEngine(source) {
                     onchainProofRollUsedThisMatch = true;
                     lastProofRollSignature = (window.magicblockDice && window.magicblockDice.getLastProofRollSignature)
                         ? window.magicblockDice.getLastProofRollSignature() : null;
-                    const explorerUrl = lastProofRollSignature
-                        ? (window.gfgExplorer && window.gfgExplorer.txUrl(lastProofRollSignature)) : null;
                     console.log(`[MagicBlock VRF on Solana Blockchain] Your roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
-                    console.log(`[Proof roll TX] ${explorerUrl ? explorerUrl : lastProofRollSignature}`);
+                    console.log(`[Proof roll TX] ${lastProofRollSignature}`);
                     displayEducationalLog(`${currentTurn.toUpperCase()}: VRF roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
-                    if (window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
-                        showVerifyLink(window.gfgExplorer.txLink(lastProofRollSignature, 'Verify this roll on-chain'));
+                    // ER rollup tx signatures are NOT indexed by any public
+                    // explorer (SolanaFM / Solana explorer only see the base
+                    // chain + settlement), so a per-roll explorer link would
+                    // always 404. We verify honestly instead: the roll happened
+                    // on-chain via the ER VRF, and the base-layer tx that
+                    // created+delegated this player's dice account IS
+                    // devnet-visible, so we link that as the real proof.
+                    let userVerifyLine = `${currentTurn.toUpperCase()}: roll resolved on-chain (MagicBlock ER VRF)`;
+                    const diceDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastDiceDelegationSignature === 'function')
+                        ? window.magicblockDice.getLastDiceDelegationSignature() : null;
+                    if (diceDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
+                        userVerifyLine += ` - dice account delegated on devnet: ${window.gfgExplorer.txLink(diceDelegateSig, 'view tx')}`;
                     }
+                    showVerifyLink(userVerifyLine);
                 }
             } catch (err) {
                 console.error(`[VRF] roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
@@ -337,14 +346,15 @@ async function rollDiceEngine(source) {
                     if (data && Number.isInteger(data.roll1) && Number.isInteger(data.roll2)) {
                         rollValues = [data.roll1, data.roll2];
                         activeDiceSource = 'onchain';
-                        const explorerUrl = data.signature
-                            ? (window.gfgExplorer && window.gfgExplorer.txUrl(data.signature)) : null;
                         console.log(`[MagicBlock VRF on Solana Blockchain] Computer roll resolved on-chain: ${data.roll1} + ${data.roll2} (seed ${data.seed})`);
-                        console.log(`[Computer roll TX] ${explorerUrl ? explorerUrl : data.signature}`);
+                        console.log(`[Computer roll TX] ${data.signature}`);
                         displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${data.roll1} + ${data.roll2} [MagicBlock VRF on Solana Blockchain]`);
-                        if (window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
-                            showVerifyLink(window.gfgExplorer.txLink(data.signature, 'Verify computer roll on-chain'));
-                        }
+                        // Same honest verification as the user seat: the ER
+                        // rollup's tx sigs 404 on every public explorer, so no
+                        // fake per-roll link. The house dice account is
+                        // sponsored + delegated server-side (key never leaves
+                        // the relay), and its rolls run on the same ER queue.
+                        showVerifyLink(`${currentTurn.toUpperCase()}: house roll resolved on-chain (MagicBlock ER VRF)`);
                     }
                 }
             } catch (err) {
@@ -416,6 +426,10 @@ function finalizeDiceScores() {
                     if (typeof executeAutomatedComputerMove === 'function') executeAutomatedComputerMove();
                 }, 1500);
             }
+            // Dice cleared: redraw now so the settled dice vanish and, for a
+            // human seat with valid moves, the movable tokens resume blinking
+            // (the idle blink loop otherwise stands down with no redraw).
+            if (typeof drawLudoLayout === 'function') drawLudoLayout();
         }
     }, 3500);
 }

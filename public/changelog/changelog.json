@@ -538,6 +538,19 @@
       "status": "in-progress",
       "approved": false,
       "added": "2026-08-15"
+    },
+    {
+      "title": "On-chain match record (full finish order)",
+      "summary": "Every match you finish leaves a permanent, tamper-proof game record on-chain that you can verify any time, and any match that fails to publish is easy to spot.",
+      "details": [
+        "SCOPE C IN-GAME WIRING: the winners ceremony now commits the FULL 1st..4th finish order to the player's on-chain game-record PDA (record_result, gasless ER, session key signs, soft-fail that never blocks the ceremony) and shows a status line with a click-to-copy receipt; when the relay freshly created the result account this session, a working devnet link to that base-layer creation tx is shown too.",
+        "Program instruction (record_result + PlayerResult PDA seed gfgresult), relay result-PDA delegation (handleDelegate, 3 PDAs/player) and client recordResult already existed + were harness-verified 2026-08-14; the missing piece was the game-level wiring (win-detection commitGameResultOnchain, proof-bound match_ref from the winning roll sig) + the ceremony UX (index.html #result-ceremony-proof, turn.js render w/ copy-on-click, style.css .ceremony-proof).",
+        "Render loop fix (ludo + ludo-lab): board no longer clears+redraws at 60fps forever; blink loop runs only while a token blinks, dice physics self-renders its tumble + one settled frame, canvas idle otherwise. Fixes CPU/battery thrash + wiped transient canvas painting.",
+        "Verify-link honesty fix (ludo + ludo-lab): ER (ephemeral rollup) tx sigs aren't indexed by any public explorer, so per-roll SolanaFM links 404'd. Replaced with an honest 'resolved on-chain (MagicBlock ER VRF)' line + the linkable base-chain tx (dice-account create/delegate) via magicblockDice.getLastDiceDelegationSignature. Rule: never link an ER tx sig on a standard explorer."
+      ],
+      "status": "in-progress",
+      "approved": false,
+      "added": "2026-08-16"
     }
   ]
 }

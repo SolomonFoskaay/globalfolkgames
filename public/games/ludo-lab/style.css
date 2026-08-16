@@ -407,6 +407,16 @@ canvas {
 .ceremony-seat { font-weight: bold; flex: 1; text-align: left; }
 .ceremony-actor { color: #9aa3b8; font-size: 0.82rem; }
 
+.ceremony-proof {
+    display: flex; flex-direction: column; gap: 6px; margin: 2px 0 16px;
+    padding: 10px 12px; background: #20232b; border: 1px solid #333a4a;
+    border-radius: 8px; font-size: 0.82rem; color: #aeb6c8; text-align: left;
+    word-break: break-all; line-height: 1.5;
+}
+.ceremony-proof-status { color: #9fd6a9; }
+.ceremony-proof-receipt { color: #cfd6e4; }
+.ceremony-proof-sig { font-family: monospace; font-size: 0.72rem; background: #16181f; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: #9fd6a9; }
+
 #play-again-btn { background: #2ecc71; color: #fff; }
 #ceremony-end-btn { background: #555; color: #fff; }
 

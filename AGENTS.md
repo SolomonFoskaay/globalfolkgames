@@ -431,6 +431,20 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       pip dots (not unicode glyphs that render inconsistently on mobile),
       drop shadow + bevel for depth. Physics boundary size bumped to 46 to
       match. Keep dice big/readable — do not regress to tiny 2D glyphs.
+- [x] **Render loop + verify-link honesty (fixed 2026-08-16, ludo + ludo-lab):**
+      the board no longer clears + redraws at 60fps forever (the old blink
+      engine rAF never stopped, thrashing CPU/battery and wiping transient
+      canvas painting). The loop now runs ONLY while a movable token blinks;
+      the dice physics loop self-renders its tumble + one settled frame, so
+      dice/overlays persist and the canvas idles (zero rAF) otherwise. And
+      per-roll "Verify on SolanaFM" links were removed: MagicBlock ER
+      (ephemeral rollup) tx signatures are NOT indexed by any public explorer
+      (SolanaFM/Solana explorer only index the base chain + settlement), so
+      every click 404'd. Replaced with an honest "Roll resolved on-chain
+      (MagicBlock ER VRF)" line plus, when the relay freshly sponsored it, a
+      WORKING devnet link via `window.magicblockDice.getLastDiceDelegationSignature()`
+      (the base-layer tx that created + delegated the player's dice account).
+      HARD RULE: never link an ER tx signature on a standard explorer.
 - [x] Player-account feature: mandatory sign-in to start a match; exactly one
       seat is the signed-in user ("You" via `playerProfiles[color].isUser`);
       reward requires 1st-place user seat AND a valid on-chain roll (every
@@ -615,8 +629,16 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
       * Verified live: gasless `record_points` from a 0-SOL player accumulated
         total_points/award_count on the delegated ER PDA; tracker shows both PDAs
         delegated to the ER validator. Supabase stays aggregation/fallback.
-- [ ] On-chain finish-order (Scope C, parked): commit full 1st..4th finish order
-      on-chain (same delegated program), not just reward points.
+- [x] **On-chain finish-order (Scope C, in-game):** the winners ceremony now
+      commits the FULL 1st..4th finish order on-chain via `record_result`
+      (gasless ER write, session key signs, soft-fail that never blocks the
+      win UX; win-detection `commitGameResultOnchain`, proof-bound `match_ref`
+      from the winning roll sig; relay idempotently creates+delegates the
+      result PDA `gfgresult`). The ceremony shows a copyable receipt and, when
+      the result account was freshly created this session, a working devnet
+      link to that base-layer creation tx. Program instruction + relay steps +
+      client `recordResult` existed and were harness-verified (2026-08-14);
+      the missing game-level wiring + ceremony UI landed 2026-08-16.
 - [ ] **Settled economics (2026-08-14, consult econ workspace, DO NOT re-litigate):**
       `public/changelog/economics.json` is the source of truth. econ-003 settled
       the ACTIVE TIER ladder (Tier 1 free 1x; Tier 2 = 1,000 spendable/mo -> 2x;

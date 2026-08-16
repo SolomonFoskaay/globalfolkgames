@@ -166,9 +166,16 @@ function runDicePhysicsCalculations() {
 
     if (piecesStillMoving) {
         physicsAnimationLoop = requestAnimationFrame(runDicePhysicsCalculations);
+        // Render every physics tick directly so the tumble animates even when
+        // the blink loop is idle (it no longer redraws at 60fps forever).
+        // drawLudoLayout also re-paints the dice via the capture.js wrapper.
+        if (typeof drawLudoLayout === 'function') drawLudoLayout();
     } else {
         // Velocity stopped -> lock stable final calculation parameters
         finalizeDiceScores();
+        // Draw one settled frame so the VRF-locked faces show immediately and
+        // stay on the canvas (the idle blink loop no longer wipes them).
+        if (typeof drawLudoLayout === 'function') drawLudoLayout();
     }
 }
 

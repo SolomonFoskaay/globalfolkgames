@@ -166,6 +166,41 @@
             // back to a plain log so the game still works standalone.
             console.log('[M1] Match complete — result:', result);
         }
+
+        // Commit the full 1st..4th finish order on-chain (Scope C).
+        commitGameResultOnchain(proofSig);
+    }
+
+    // Scope C (Ludo locked spec): commit the FULL finish order 1st..Nth plus
+    // the reward mirror on-chain, proof-bound to the match. Runs gasless on
+    // the ER (session key signs, 0 SOL); the relay idempotently creates +
+    // delegates the player's result PDA (seed 'gfgresult') if it is missing.
+    // Soft-fail by design: the seam envelope above is the source of truth for
+    // platform consumers, and the ceremony never waits on this write. A failed
+    // write is logged and surfaced in the ceremony as "pending/failed", never
+    // blocking the match-ending UX. Returns the receipt Promise (or null).
+    function commitGameResultOnchain(proofSig) {
+        if (!window.magicblockDice || typeof window.magicblockDice.recordResult !== 'function') return null;
+        try {
+            const matchRef = (proofSig && typeof window.magicblockDice.matchRefFromSignature === 'function')
+                ? window.magicblockDice.matchRefFromSignature(proofSig) : 0;
+            const promise = window.magicblockDice
+                .recordResult(finishOrder.slice(), 0, 1, matchRef)
+                .then((sig) => {
+                    window.__lastOnchainGameRecordSig = sig || null;
+                    console.log('[M1] Full game result committed on-chain:', sig || 'no receipt');
+                    return sig;
+                })
+                .catch((err) => {
+                    console.warn('[M1] On-chain game record commit failed (soft-fail):', err);
+                    return null;
+                });
+            window.__onchainGameRecordPromise = promise;
+            return promise;
+        } catch (err) {
+            console.warn('[M1] On-chain game record commit could not start (soft-fail):', err);
+            return null;
+        }
     }
 
     // Used by board.js to know who finished where

@@ -105,17 +105,22 @@
                         });
                 }
 
-                const explorerUrl = proofSig
-                    ? (window.gfgExplorer && window.gfgExplorer.txUrl(proofSig))
-                    : null;
                 console.log(`[REWARD] 1st place (you) +${awarded} — proof roll: ${proofSig}`);
-                if (explorerUrl) {
-                    console.log(`[REWARD] Verify on-chain → ${explorerUrl}`);
+                if (proofSig) {
+                    console.log(`[REWARD] Proof roll TX: ${proofSig}`);
                 }
-                if (proofSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
-                    if (typeof showVerifyLink === 'function') {
-                        showVerifyLink(window.gfgExplorer.txLink(proofSig, 'Verify your winning roll on-chain during this match'));
+                if (typeof showVerifyLink === 'function') {
+                    // The ER rollup tx sigs 404 on every public explorer, so no
+                    // fake per-roll link. The winning roll IS on-chain (ER VRF);
+                    // the on-chain account proof is shown as a real link when
+                    // the base-layer delegation tx is available.
+                    let verifyLine = 'Your winning roll resolved on-chain (MagicBlock ER VRF)';
+                    const diceDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastDiceDelegationSignature === 'function')
+                        ? window.magicblockDice.getLastDiceDelegationSignature() : null;
+                    if (diceDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
+                        verifyLine += ` - dice account delegated on devnet: ${window.gfgExplorer.txLink(diceDelegateSig, 'view tx')}`;
                     }
+                    showVerifyLink(verifyLine);
                 }
 
                 if (typeof window.showAuthBanner === 'function') {

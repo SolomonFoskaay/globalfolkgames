@@ -399,6 +399,49 @@ window.showResultCeremony = function () {
             : 'Match complete.';
     }
 
+    // On-chain game record line. The full 1st..4th finish order is committed
+    // to the player's on-chain result PDA (gasless ER write, initiated in
+    // win-detection.js). ER tx receipts aren't indexed by public explorers, so
+    // we show a truthful status with a copyable receipt and, when the relay
+    // freshly created the result account this session, a working devnet link
+    // to that base-layer tx (proves the account exists on-chain).
+    const proofEl = document.getElementById('result-ceremony-proof');
+    if (proofEl) {
+        proofEl.innerHTML = '';
+        const renderOnchainGameRecordLine = function (sig) {
+            if (!proofEl) return;
+            if (sig) {
+                const receipt = typeof sig === 'string' ? sig : '';
+                proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain game record (MagicBlock ER VRF).</span>'
+                    + (receipt ? '<span class="ceremony-proof-receipt">Receipt: <code class="ceremony-proof-sig" title="Click to copy">' + receipt + '</code></span>' : '');
+                const sigCode = proofEl.querySelector('.ceremony-proof-sig');
+                if (sigCode) {
+                    sigCode.addEventListener('click', function (ev) {
+                        ev.preventDefault();
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(receipt).catch(function () {});
+                        }
+                    });
+                }
+            } else {
+                proofEl.innerHTML = '<span class="ceremony-proof-status">Match result recorded. On-chain commit pending (receipt unavailable this session).</span>';
+            }
+            const resultDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastResultDelegationSignature === 'function')
+                ? window.magicblockDice.getLastResultDelegationSignature() : null;
+            if (resultDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
+                proofEl.innerHTML += ' <span class="ceremony-proof-status">Game record account created on devnet: ' + window.gfgExplorer.txLink(resultDelegateSig, 'view tx') + '.</span>';
+            }
+        };
+        if (window.__onchainGameRecordPromise) {
+            proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match: committing to the on-chain game record...</span>';
+            window.__onchainGameRecordPromise
+                .then(renderOnchainGameRecordLine)
+                .catch(() => renderOnchainGameRecordLine(null));
+        } else {
+            renderOnchainGameRecordLine(null);
+        }
+    }
+
     overlay.classList.add('visible');
 };
 
@@ -408,6 +451,10 @@ window.showResultCeremony = function () {
 window.playAgainAfterCeremony = function () {
     const overlay = document.getElementById('result-ceremony-overlay');
     if (overlay) overlay.classList.remove('visible');
+    const proofEl = document.getElementById('result-ceremony-proof');
+    if (proofEl) proofEl.innerHTML = '';
+    window.__onchainGameRecordPromise = null;
+    window.__lastOnchainGameRecordSig = null;
 
     if (typeof window.resetWinDetection === 'function') window.resetWinDetection();
     if (typeof resetOnchainProofRollUsed === 'function') resetOnchainProofRollUsed();

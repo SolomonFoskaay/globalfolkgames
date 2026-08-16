@@ -166,7 +166,34 @@ async function ensureDelegated(pda, playerPubkey) {
   const data = await res.json();
   if (!data.delegated) throw new Error('delegation relay did not delegate the account');
 
+  // Record the base-layer tx signatures the sponsor relay just ran (they ARE
+  // explorer-visible, unlike ER txs) so the game can offer real verify links.
+  lastDelegateSteps = Array.isArray(data.steps) ? data.steps.slice() : [];
+
   return waitForErPickup(pda);
+}
+
+// Most recent {step, sig} pairs from the sponsor relay. Only refreshed on a
+// real (non-idempotent) delegation; empty array once every PDA is delegated.
+let lastDelegateSteps = [];
+
+function findLastDelegateSig(stepNames) {
+  if (!Array.isArray(lastDelegateSteps)) return null;
+  for (let i = lastDelegateSteps.length - 1; i >= 0; i--) {
+    const s = lastDelegateSteps[i];
+    if (s && s.sig && stepNames.indexOf(s.step) !== -1) return s.sig;
+  }
+  return null;
+}
+
+// Base-layer tx sig for the player's DICE PDA ('initialize'/'delegate' steps).
+export function getLastDiceDelegationSignature() {
+  return findLastDelegateSig(['delegate', 'initialize']);
+}
+
+// Base-layer tx sig for the player's RESULT PDA (Scope C game-record account).
+export function getLastResultDelegationSignature() {
+  return findLastDelegateSig(['delegate_result', 'initialize_result']);
 }
 
 async function rollOnce() {
@@ -398,6 +425,19 @@ export function initMagicBlockDice() {
       return lastProofRollSignature;
     },
 
+    // Base-layer tx that created + delegated the player's DICE PDA (the sponsor
+    // relay runs these once, on devnet). Unlike ER rollup txs, this IS indexed
+    // by public explorers, so it is the linkable proof of the dice account.
+    getLastDiceDelegationSignature() {
+      return getLastDiceDelegationSignature();
+    },
+
+    // Base-layer tx that created + delegated the player's RESULT PDA (the
+    // Scope C game-record account). Also devnet-visible and linkable.
+    getLastResultDelegationSignature() {
+      return getLastResultDelegationSignature();
+    },
+
     // Scope B: records the award on the player's on-chain points PDA (gasless
     // ER write, session key signs). Returns the receipt signature.
     recordPoints(points, reason, matchRef) {
@@ -428,6 +468,13 @@ export function initMagicBlockDice() {
       const wallet = getSolanaWalletAccount();
       if (!wallet) return null;
       return pointsPdaFor(wallet.publicKey)[0].toBase58();
+    },
+
+    // The player's on-chain game-record (result) PDA address.
+    resultPda() {
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return resultPdaFor(wallet.publicKey)[0].toBase58();
     },
 
     // Reads the player's on-chain points ledger from the ER (gasless, no sign).

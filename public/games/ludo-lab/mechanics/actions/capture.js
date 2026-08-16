@@ -59,5 +59,11 @@ if (typeof drawLudoLayout === 'function') {
         if (typeof renderPhysicalDiceCubes === 'function') {
             renderPhysicalDiceCubes();
         }
+        // Any state change that redraws the board may need the blink loop again
+        // (movable tokens / dice tumble). Restart it if it stopped, so the
+        // canvas is never left stale when something is animating.
+        if (typeof window.ensureBoardAnimationLoop === 'function') {
+            window.ensureBoardAnimationLoop();
+        }
     };
 }

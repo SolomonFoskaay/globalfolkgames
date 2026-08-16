@@ -255,14 +255,53 @@ function drawAllTokens() {
     });
 }
 
+let blinkLoopActive = false;
+
+// True while at least one movable token needs the blink halo (the ONLY reason
+// the board needs to keep animating).
+function anyTokenBlinkNeeded() {
+    if (typeof tokens !== 'object' || !tokens) return false;
+    if (typeof isTokenMovable !== 'function') return false;
+    return Object.keys(tokens).some(color => {
+        if (!isSeatActive(color)) return false;
+        return tokens[color].some((token, index) => isTokenMovable(color, token, index));
+    });
+}
+
+// (Re)starts the board animation loop when it isn't already running. Called by
+// the drawLudoLayout wrapper (capture.js) on every game-state redraw, so the
+// loop lives only while something actually animates and dies when idle.
+window.ensureBoardAnimationLoop = function () {
+    if (blinkLoopActive) return;
+    blinkLoopActive = true;
+    requestAnimationFrame(runBlinkAnimationEngine);
+};
+
+// Renders ONLY while a token is blinking. When nothing is blinking the loop
+// stops scheduling frames entirely: the canvas keeps its last painted frame
+// (dice stay exactly where they landed, highlights persist) and the CPU is not
+// thrashed by a 60fps clear+redraw that wiped any transient painting between
+// frames.
 function runBlinkAnimationEngine() {
     if (blinkGrowing) {
         globalBlinkAlpha += 0.05; if (globalBlinkAlpha >= 1.0) blinkGrowing = false;
     } else {
         globalBlinkAlpha -= 0.05; if (globalBlinkAlpha <= 0.3) blinkGrowing = true;
     }
-    if (canvas && ctx) drawLudoLayout();
-    requestAnimationFrame(runBlinkAnimationEngine);
+    const needsBlink = anyTokenBlinkNeeded();
+    // While dice are on the board the physics loop owns rendering (it self
+    // renders every tick), so the blink loop stands down to avoid double
+    // drawing the whole canvas. It is restarted by the drawLudoLayout wrapper
+    // once the dice are cleared and a token becomes movable.
+    const diceBusy = typeof displayDiceOnBoard === 'boolean' && displayDiceOnBoard &&
+        Array.isArray(physicalDice) && physicalDice.length === 2;
+    if (needsBlink && !diceBusy && canvas && ctx) drawLudoLayout();
+    if (needsBlink && !diceBusy) {
+        blinkLoopActive = true;
+        requestAnimationFrame(runBlinkAnimationEngine);
+    } else {
+        blinkLoopActive = false;
+    }
 }
 
 function initBoard() {
@@ -271,4 +310,4 @@ function initBoard() {
     drawLudoLayout();
 }
 
-document.addEventListener('DOMContentLoaded', () => { initBoard(); runBlinkAnimationEngine(); });
+document.addEventListener('DOMContentLoaded', () => { initBoard(); });
