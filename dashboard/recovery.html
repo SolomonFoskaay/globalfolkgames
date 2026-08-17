@@ -446,8 +446,12 @@
         function fmtTs(ms) { return ms ? new Date(ms).toLocaleString() : '—'; }
         function fmtNum(n) { return (n || 0).toLocaleString(); }
         function reasonLabel(code) {
-            const labels = { 1: '1st place win' };
+            const labels = { 1: '1st place win', 2: 'signup bonus', 3: 'referral', 4: 'giveaway', 5: 'tier boost' };
             return labels[code] || ('reason ' + code);
+        }
+        function sourceLabel(byte) {
+            const sources = { 108: 'Ludo', 97: 'Ayo Olopon', 112: 'Platform' };
+            return sources[byte] || (byte ? String.fromCharCode(byte) : 'unknown');
         }
 
         const $results = document.getElementById('recovery-results');
@@ -585,7 +589,7 @@
                 <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#9b59b6;">${fmtNum(m4Data.lifetime)}</span></div>
                 <div class="recovery-row"><span class="label">Spendable</span><span class="value" style="color:#2ecc71;">${fmtNum(m4Data.spendable)}</span></div>
                 <div class="recovery-row"><span class="label">Award count</span><span class="value">${m4Data.awardCount}</span></div>
-                <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} (${reasonLabel(m4Data.lastReason)})</span></div>
+                <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} from ${sourceLabel(m4Data.lastSource)} (${reasonLabel(m4Data.lastReason)})</span></div>
                 <div class="recovery-row"><span class="label">Spends</span><span class="value">${m4Data.spendCount}</span></div>`;
             }
             html += '</div>';
