@@ -93,6 +93,7 @@ pub const PLAYER: &[u8] = b"gfgplayerd";
 pub const POINTS: &[u8] = b"gfgpoints";
 pub const RESULT: &[u8] = b"gfgresult";
 pub const COMP: &[u8] = b"gfgcomp";
+pub const GLOBAL_TAG: &[u8] = b"global"; // reserved M4 global points tag, no game may use this
 
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
@@ -524,6 +525,108 @@ pub mod gfg_dice {
         dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
         Ok(())
     }
+
+    // ── M4: Global Points (3-ledger site-wide framework) ──────────────────
+
+    /// Idempotent: creates the player's GLOBAL POINTS PDA if it does not
+    /// exist yet. Seed [gfgpoints, 'global', player_authority]. Payer (sponsor)
+    /// pays rent; the account belongs to `player_authority`.
+    pub fn initialize_global_points(ctx: Context<InitializeGlobalPoints>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Delegates the player's GLOBAL POINTS PDA into an ER session (base
+    /// layer, sponsor pays) so record_global_points / spend_global run gasless.
+    pub fn delegate_global_points(ctx: Context<DelegateGlobalPointsInput>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_global_points(
+            &ctx.accounts.payer,
+            &[POINTS, GLOBAL_TAG, authority.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Credits the player's GLOBAL POINTS PDA. Runs GASLESS on the ER (session
+    /// key signs, 0 SOL). `kind` determines which ledgers are credited:
+    ///   - 0 (GAME WIN): M4a pure + M4b lifetime + M4c spendable all credited.
+    ///   - 1 (OTHER — signup_bonus/referral/giveaway): M4b lifetime + M4c
+    ///     spendable only, M4a pure is untouched (the multiplier-blind flow-up
+    ///     contract: tier boosts are kind-1 credits).
+    /// `source_tag` is the game or event name ('Ludo', 'signup_bonus', etc.).
+    /// `match_ref` guards idempotency (first 8 bytes of the triggering tx sig).
+    pub fn record_global_points(
+        ctx: Context<RecordGlobalPointsCtx>,
+        kind: u8,
+        source_tag: String,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        require!(kind <= 1, PointsError::InvalidGameTag); // reuse: kind must be 0 or 1
+        let dest = &mut ctx.accounts.global_points;
+        require!(
+            dest.award_count == 0 || dest.last_match_ref != match_ref,
+            PointsError::DuplicateMatchRef
+        );
+
+        if kind == 0 {
+            // Game win: credit all three ledgers (M4a pure + M4b lifetime + M4c spendable)
+            dest.global_pure_lifetime = dest
+                .global_pure_lifetime
+                .checked_add(points)
+                .ok_or(PointsError::Overflow)?;
+        }
+        // kind 0 and 1 both credit lifetime + spendable (never pure for kind 1)
+        dest.global_lifetime = dest
+            .global_lifetime
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        dest.global_spendable_balance = dest
+            .global_spendable_balance
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+
+        dest.last_source = source_tag.as_bytes().first().copied().unwrap_or(0);
+        dest.last_points = points;
+        dest.last_reason = reason;
+        dest.last_match_ref = match_ref;
+        dest.last_recorded_ts = Clock::get()?.unix_timestamp;
+        dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// (M4 — global spendable) Draws down the SPENDABLE track of the global
+    /// points PDA. M4a pure and M4b lifetime are never touched. Runs GASLESS
+    /// on the ER (session key signs, 0 SOL); `spend_ref` is the
+    /// client/backend-supplied purchase reference for replayability.
+    pub fn spend_global(
+        ctx: Context<SpendGlobalCtx>,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        let dest = &mut ctx.accounts.global_points;
+        require!(
+            dest.global_spendable_balance >= amount,
+            PointsError::InsufficientBalance
+        );
+
+        dest.global_spendable_balance = dest
+            .global_spendable_balance
+            .checked_sub(amount)
+            .ok_or(PointsError::InsufficientBalance)?;
+        dest.last_spend_reason = reason;
+        dest.last_spend_ref = spend_ref;
+        dest.last_spend_ts = Clock::get()?.unix_timestamp;
+        dest.spend_count = dest.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -734,6 +837,62 @@ pub struct RecordPointsCtx<'info> {
     pub points: Account<'info, PlayerPoints>,
 }
 
+// ── M4: Global Points contexts ────────────────────────────────────────────
+
+#[derive(Accounts)]
+pub struct InitializeGlobalPoints<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority that owns this global points account.
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + GlobalPoints::INIT_SPACE,
+        seeds = [POINTS, GLOBAL_TAG, player_authority.key().as_ref()],
+        bump
+    )]
+    pub global_points: Account<'info, GlobalPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateGlobalPointsInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The global points PDA to delegate.
+    #[account(mut, del)]
+    pub global_points: UncheckedAccount<'info>,
+}
+
+/// Context for `record_global_points`. Runs on the ER (gasless): the player's
+/// session key is the payer, and the global points PDA must already exist +
+/// be delegated.
+#[derive(Accounts)]
+pub struct RecordGlobalPointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, GLOBAL_TAG, player_authority.key().as_ref()], bump)]
+    pub global_points: Account<'info, GlobalPoints>,
+}
+
+/// Context for `spend_global`. Runs on the ER (gasless): the player's session
+/// key is the payer, and the global points PDA must already exist + be
+/// delegated.
+#[derive(Accounts)]
+pub struct SpendGlobalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, GLOBAL_TAG, player_authority.key().as_ref()], bump)]
+    pub global_points: Account<'info, GlobalPoints>,
+}
+
 /// Context for `spend_local`. Runs on the ER (gasless): the player's session
 /// key is the payer, and the points PDA must already exist + be delegated.
 #[derive(Accounts)]
@@ -850,6 +1009,44 @@ pub struct PlayerDice {
 pub struct PlayerPoints {
     pub local_pure_lifetime: u64,
     pub local_spendable_balance: u64,
+    pub last_points: u64,
+    pub last_reason: u8,
+    pub last_match_ref: u64,
+    pub last_recorded_ts: i64,
+    pub award_count: u64,
+    pub last_spend_ts: i64,
+    pub last_spend_ref: u64,
+    pub last_spend_reason: u8,
+    pub spend_count: u64,
+}
+
+/// On-chain GLOBAL points ledger for one player (M4 — site-wide three-ledger
+/// framework). One account per player, seed [gfgpoints, 'global', player].
+/// Runs gasless on the ER.
+///
+/// Three tracks:
+///   - global_pure_lifetime    : sum of M3 local wins across ALL games, no
+///                               multiplier, no purchases, no bonus — the honest
+///                               cross-game skill total (M4a).
+///   - global_lifetime         : every point earned from ANY source (M3 game
+///                               wins + M5 multiplier credits + M6 signup/
+///                               referral/giveaway). Unspendable, permanent
+///                               reputation number (M4b).
+///   - global_spendable_balance: the spendable split of lifetime. Purchases,
+///                               Active Tier buys, comp entries, cosmetics
+///                               all flow here. Goes up and down (M4c).
+///
+/// `kind` field on credits:
+///   - 0 = GAME WIN: credits all three tracks (M4a + M4b + M4c).
+///   - 1 = OTHER (signup_bonus/referral/giveaway/tier_boost): credits M4b
+///         + M4c only. M4a pure is never multiplied or bonus-inflated.
+#[account]
+#[derive(InitSpace)]
+pub struct GlobalPoints {
+    pub global_pure_lifetime: u64,   // M4a: sum of verified game wins only
+    pub global_lifetime: u64,        // M4b: everything earned, unspendable
+    pub global_spendable_balance: u64, // M4c: spendable track
+    pub last_source: u8,             // first byte of the source_tag string
     pub last_points: u64,
     pub last_reason: u8,
     pub last_match_ref: u64,

@@ -1,6 +1,41 @@
 {
   "updated": "2026-08-15",
   "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. M1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Staff only.",
+  "overview": {
+    "title": "How the Platform Works",
+    "subtitle": "Living overview — keep updated when any module spec changes. The agent must read this before any feature work.",
+    "flowChain": [
+      { "from": "M1", "to": "M2", "label": "Game emits result envelope on match finish" },
+      { "from": "M2", "to": "M3", "label": "Seam fans envelope to local points subscriber" },
+      { "from": "M2", "to": "M4", "label": "Seam fans envelope to global ledgers subscriber" },
+      { "from": "M5", "to": "M4", "label": "Tier boost: kind-1 credit into M4b+M4c only (never M4a)" },
+      { "from": "M6", "to": "M4", "label": "Signup/referral/giveaway: kind-1 credit into M4b+M4c only" },
+      { "from": "M2", "to": "M7", "label": "Seam fans envelope to competitions subscriber" },
+      { "from": "M7", "to": "M8", "label": "Comp optionally attaches sponsor escrow" }
+    ],
+    "modules": [
+      { "id": "M1", "title": "Game core", "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into M2 on match finish." },
+      { "id": "M2", "title": "Result seam", "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to M3/M4/M7." },
+      { "id": "M3", "title": "Local points", "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE — every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE — the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns." },
+      { "id": "M4", "title": "Global ledgers", "what": "Site-wide three ledgers: (a) PURE — sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable. Also owns the on-chain inventory/asset wallet [gfgassets, player]." },
+      { "id": "M5", "title": "Active Tier", "what": "Monthly subscription bought from M4c spendable. 2x/3x/4x multiplier on base win points, applied as a SECOND kind-1 credit into M4b+M4c only (M4a pure is never multiplied)." },
+      { "id": "M6", "title": "Point sources", "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch M3 local or M4a pure." },
+      { "id": "M7", "title": "Competitions", "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (M2). Entry from M4c spendable. Deferred until M1-M4 stable." },
+      { "id": "M8", "title": "Sponsor escrow", "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build." }
+    ],
+    "flowDiagram": {
+      "label": "Data flow — every arrow is the universal result seam (M2)",
+      "path": "M1 Game → M2 Seam → M3 Local Bank (per-game pure+spendable) → M4 Global Bank (site-wide pure+lifetime+spendable) → M5 Tier Boost (kind-1 to lifetime+spendable only) / M6 Sources (kind-1 to lifetime+spendable only)"
+    },
+    "keyRules": [
+      "Every game ends by emitting into M2; no game knows about points, tiers, or competitions.",
+      "M3 local points are NEVER diluted: no multiplier, no purchase, no bonus, no giveaway, no referral.",
+      "Multiplier (M5) applies only at M4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
+      "Source-tagged: every M4 credit carries its game/event source ('Ludo', 'signup_bonus', 'tier2_boost').",
+      "Modules integrate through seams (M2), never hard-wires.",
+      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST → M5 → M6 → M7/M8. Never build ahead of the module status."
+    ]
+  },
   "modules": [
     {
       "id": "M1",

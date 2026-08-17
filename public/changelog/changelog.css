@@ -382,3 +382,68 @@
 /* Left-rail module navigation on architecture pages */
 .arch-module-link { text-decoration: none; }
 .arch-module-link:hover { text-decoration: underline; }
+
+/* ----- Architecture overview / Summary tab ----- */
+.ov-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+.ov-card {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(15, 15, 19, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ov-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.ov-card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #eee;
+}
+.ov-card-body {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #aaa;
+    line-height: 1.55;
+}
+.ov-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ov-arrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+}
+.ov-arrow-from, .ov-arrow-to {
+    font-weight: 700;
+    color: #f39c12;
+    white-space: nowrap;
+    min-width: 30px;
+}
+.ov-arrow-label {
+    color: #bbb;
+}
+.ov-flow-diagram {
+    margin-bottom: 10px;
+}
+.ov-flow-label {
+    color: #888;
+    font-size: 0.82rem;
+    margin: 0 0 4px;
+}
+.ov-flow-path {
+    color: #ccc;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.5;
+    word-break: break-word;
+}

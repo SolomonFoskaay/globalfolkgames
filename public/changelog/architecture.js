@@ -65,26 +65,83 @@
       </article>`;
   }
 
-  // ----- OVERVIEW mode (home: /changelog/architecture.html) -----
-  function renderOverview(cache, status) {
+  const OVERVIEW_TABS = [{ key: 'summary', label: 'Summary' }, ...STATUSES.map(s => ({ key: s, label: STATUS_LABEL[s] }))];
+
+  function renderSummaryTab(cache) {
+    const ov = cache.overview;
+    if (!ov) return `<p class="muted-note" style="color:#888;">No overview data in architecture.json.</p>`;
+    const fc = ov.flowChain || [];
+    const mods = ov.modules || [];
+    const rules = ov.keyRules || [];
+    const fd = ov.flowDiagram;
+
+    const flowCards = mods.map(m => {
+      const badge = (() => {
+        const mod = (cache.modules || []).find(x => x.id === m.id);
+        return mod ? statusBadge(mod.status) : '';
+      })();
+      return `
+        <div class="ov-card">
+          <div class="ov-card-head">
+            <span class="entry-version" style="font-size:0.95rem;">${esc(m.id)}</span>
+            <span class="ov-card-title">${esc(m.title)}</span>
+            ${badge}
+          </div>
+          <p class="ov-card-body">${esc(m.what)}</p>
+        </div>`;
+    }).join('');
+
+    const arrows = fc.map(a => `
+      <div class="ov-arrow">
+        <span class="ov-arrow-from">${esc(a.from)}</span>
+        <span class="ov-arrow-label">${esc(a.label)}</span>
+        <span class="ov-arrow-to">${esc(a.to)}</span>
+      </div>`).join('');
+
+    return `
+      <p class="econ-updated" style="margin-bottom:18px;">${esc(ov.subtitle || '')}</p>
+      ${fd ? `<div class="ov-flow-diagram"><h4 class="arch-block-title">Data flow</h4><p class="ov-flow-label">${esc(fd.label)}</p><p class="ov-flow-path">${esc(fd.path)}</p></div>` : ''}
+      <section class="arch-block">
+        <h3 class="arch-block-title">Modules at a glance</h3>
+        <div class="ov-cards">${flowCards}</div>
+      </section>
+      ${arrows.length ? `<section class="arch-block"><h3 class="arch-block-title">How they connect</h3><div class="ov-arrows">${arrows}</div></section>` : ''}
+      ${rules.length ? `<section class="arch-block"><h3 class="arch-block-title">Key rules (non-negotiable)</h3><ul>${rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></section>` : ''}
+      <hr class="arch-divider">
+      ${renderOrder(cache.implementationOrder)}
+    `;
+  }
+
+  function renderModuleListTab(cache, status) {
     const modules = (cache.modules || []).filter(m => m.status === status);
+    return `
+      ${modules.length
+        ? modules.map(moduleCard).join('')
+        : `<p class="empty">No modules in "${esc(STATUS_LABEL[status]).toLowerCase()}" right now.</p>`}
+    `;
+  }
+
+  // ----- OVERVIEW mode (home: /changelog/architecture.html) -----
+  function renderOverview(cache, activeTab) {
     const updated = cache.updated || '';
     return `
-      <nav class="changelog-tabs econ-tabs" role="tablist" aria-label="Module status">
-        ${STATUSES.map(s => `
-          <button class="changelog-tab econ-tab ${s === status ? 'active' : ''}"
-            role="tab" aria-selected="${s === status}"
-            data-status="${s}">${STATUS_LABEL[s]}</button>
+      <nav class="changelog-tabs econ-tabs" role="tablist" aria-label="Architecture tabs">
+        ${OVERVIEW_TABS.map(t => `
+          <button class="changelog-tab econ-tab ${t.key === activeTab ? 'active' : ''}"
+            role="tab" aria-selected="${t.key === activeTab}"
+            data-ov-tab="${t.key}">${esc(t.label)}</button>
         `).join('')}
       </nav>
       <p class="econ-updated">Workspace last updated: ${esc(updated)}</p>
       <p class="muted-note" style="color:#888;font-size:0.82rem;line-height:1.5;">Each module has its own page with full detail (use the ☰ left rail to navigate). M1 carries a searchable game dropdown with per-game LOCKED build specs. Click a module id to open it.</p>
-      ${modules.length
-        ? modules.map(moduleCard).join('')
-        : `<p class="empty">No modules in "${esc(STATUS_LABEL[status]).toLowerCase()}" right now.</p>`}
-      <hr class="arch-divider">
-      ${renderRules(cache.rules)}
-      ${renderOrder(cache.implementationOrder)}
+      ${activeTab === 'summary'
+        ? renderSummaryTab(cache)
+        : renderModuleListTab(cache, activeTab)}
+      ${activeTab !== 'summary' ? `
+        <hr class="arch-divider">
+        ${renderRules(cache.rules)}
+        ${renderOrder(cache.implementationOrder)}
+      ` : ''}
     `;
   }
 
@@ -232,14 +289,15 @@
     if (!out) return;
     try {
       if (!cache) cache = await loadJson(ARCH_JSON);
-      const state = { status: 'in-progress' };
-      out.dataset.status = state.status;
-      out.innerHTML = renderOverview(cache, state.status);
+      const activeTab = 'summary';
+      out.dataset.tab = activeTab;
+      out.innerHTML = renderOverview(cache, activeTab);
       out.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-status]');
+        const btn = e.target.closest('[data-ov-tab]');
         if (btn) {
-          out.dataset.status = btn.dataset.status;
-          out.innerHTML = renderOverview(cache, btn.dataset.status);
+          const tab = btn.dataset.ovTab;
+          out.dataset.tab = tab;
+          out.innerHTML = renderOverview(cache, tab);
         }
       });
     } catch (e) {
