@@ -124,6 +124,9 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
     <script type="module" src="/src/main.js"></script>
     <script src="/header.js"></script>
     <script src="/dash-nav.js"></script>
@@ -182,7 +185,7 @@
                 console.error('[recovery] IDL parse failed. Response was:', text.slice(0, 300));
                 throw new Error('IDL is not valid JSON: ' + text.slice(0, 80));
             }
-            programId = new PublicKey(idl.metadata.address);
+            programId = new PublicKey(idl.address || idl.metadata?.address);
             console.log('[recovery] IDL loaded, program:', idl.metadata.address);
         }
 

@@ -15,6 +15,8 @@ export default async function handler(req, res) {
   const DYNAMIC_API_TOKEN = process.env.DYNAMIC_API_TOKEN || '';
   const DYNAMIC_ENV_ID = process.env.DYNAMIC_ENV_ID || '';
 
+  console.log('[dynamic-search] env check: token=' + (DYNAMIC_API_TOKEN ? 'set (' + DYNAMIC_API_TOKEN.slice(0, 8) + '...)' : 'MISSING') + ' envId=' + (DYNAMIC_ENV_ID || 'MISSING'));
+
   if (!DYNAMIC_API_TOKEN || !DYNAMIC_ENV_ID) {
     return res.json({
       users: [],
@@ -25,14 +27,18 @@ export default async function handler(req, res) {
 
   try {
     const url = `https://api.dynamic.xyz/v1/quarters/${DYNAMIC_ENV_ID}/users?email=${encodeURIComponent(email)}`;
+    console.log('[dynamic-search] GET', url);
     const resp = await fetch(url, {
       headers: { Authorization: `Bearer ${DYNAMIC_API_TOKEN}` },
     });
+    console.log('[dynamic-search] response:', resp.status, resp.statusText);
     if (!resp.ok) {
       const body = await resp.text();
+      console.error('[dynamic-search] API error:', resp.status, body.slice(0, 300));
       return res.json({ users: [], source: 'dynamic', error: `Dynamic API returned ${resp.status}: ${body.slice(0, 200)}` });
     }
     const data = await resp.json();
+    console.log('[dynamic-search] data:', JSON.stringify(data).slice(0, 500));
     const users = (data.users || data || []).map((u) => ({
       id: u.id,
       email: u.email,
@@ -43,6 +49,7 @@ export default async function handler(req, res) {
     }));
     return res.json({ users, source: 'dynamic' });
   } catch (e) {
-    return res.json({ users: [], source: 'dynamic', error: e.message });
+    console.error('[dynamic-search] fetch error:', e.message, e.cause || '');
+    return res.json({ users: [], source: 'dynamic', error: e.message + (e.cause ? ' (' + e.cause + ')' : '') });
   }
 }
