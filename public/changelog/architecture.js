@@ -48,15 +48,33 @@
     return `<div class="entry-details"><h4>Dev notes</h4><ul>${items.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
   }
 
+  function contractSection(contract, label, icon) {
+    if (!contract || !contract.items || !contract.items.length) return '';
+    const statusNote = contract.status
+      ? `<span class="badge b-status planned" style="margin-left:8px;font-size:0.72rem;">${esc(contract.status)}</span>`
+      : '';
+    return `
+      <div class="arch-contract">
+        <h4 class="arch-contract-title">${icon} ${esc(label)}${statusNote}</h4>
+        ${contract.summary ? `<p class="arch-contract-summary">${esc(contract.summary)}</p>` : ''}
+        <ul class="arch-contract-list">${contract.items.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+      </div>`;
+  }
+
   function moduleCard(m) {
     const gameCount = Array.isArray(m.games) && m.games.length
       ? ` <span class="badge b-status in-progress">${m.games.length} game sub-module(s)</span>`
+      : '';
+    const inputCount = m.expectedInput && m.expectedInput.items ? m.expectedInput.items.length : 0;
+    const outputCount = m.expectedOutput && m.expectedOutput.items ? m.expectedOutput.items.length : 0;
+    const contractBadge = (inputCount || outputCount)
+      ? `<span class="badge b-status in-progress" style="font-size:0.72rem;">⬅️ ${inputCount} in / ➡️ ${outputCount} out</span>`
       : '';
     return `
       <article class="entry roadmap-entry econ-entry">
         <div class="entry-head">
           <a class="entry-version arch-module-link" href="/changelog/architecture-${m.id.toLowerCase()}.html">${esc(m.id)} →</a>
-          ${statusBadge(m.status)}${gameCount}
+          ${statusBadge(m.status)}${gameCount}${contractBadge}
         </div>
         <h3>${esc(m.title)}</h3>
         ${m.summary ? `<p class="entry-summary">${esc(m.summary)}</p>` : ''}
@@ -202,6 +220,8 @@
       </section>
       <div class="changelog-entries">
         <article class="entry">
+          ${contractSection(m.expectedInput, 'Expected Input', '⬅️')}
+          ${contractSection(m.expectedOutput, 'Expected Output', '➡️')}
           ${detailsHtml(m.details)}
         </article>
       </div>

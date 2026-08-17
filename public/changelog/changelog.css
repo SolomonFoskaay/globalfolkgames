@@ -325,6 +325,41 @@
     margin: 18px 0;
 }
 
+/* ----- Module Input/Output contract sections ----- */
+.arch-contract {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.arch-contract:has(.arch-contract-title) { border-left: 3px solid; }
+.arch-contract:first-child { border-left-color: #e74c3c; }
+.arch-contract:nth-child(2) { border-left-color: #2ecc71; }
+.arch-contract-title {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    color: #f39c12;
+}
+.arch-contract-summary {
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    color: #aaa;
+    line-height: 1.5;
+    font-style: italic;
+}
+.arch-contract-list {
+    margin: 0;
+    padding-left: 20px;
+    list-style: disc;
+}
+.arch-contract-list li {
+    color: #bbb;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-bottom: 6px;
+}
+
 /* ----- M1 per-game sub-module picker (searchable dropdown) ----- */
 .game-picker {
     position: relative;
