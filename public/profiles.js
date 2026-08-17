@@ -149,34 +149,40 @@
         return created;
     }
 
-    // Update the header UI
+    // Update the header UI. Points are ALWAYS on-chain (M4 global ledger).
+    // No Supabase fallback: if the chain is reachable, show the real number;
+    // if not, show a retry button so the user can tap to refresh manually.
     async function updateHeader(dynamicUser) {
         const pill = getPill();
         if (!pill) return;
 
         if (dynamicUser) {
             const profile = await ensureProfile(dynamicUser);
-            // Prefer M4 on-chain spendable over Supabase mirror.
-            const gl = window.globalLedger && window.globalLedger.get();
-            const points = (gl && gl.spendableBalance != null)
-                ? gl.spendableBalance : (profile ? profile.global_points : 0);
             const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
             const tier = (typeof window.getActiveTier === 'function')
                 ? window.getActiveTier()
                 : { tier: 1, mult: 1, label: 'Tier 1' };
             const tierBadge = (tier.tier > 1)
-                ? `<span class="tier-badge" title="Active ${tier.label} — ${tier.mult}x on win points">⚡${tier.mult}x</span>`
+                ? `<span class="tier-badge" title="Active ${tier.label} (${tier.mult}x on win points)">${tier.mult}x</span>`
                 : '';
 
-            // Order matters on mobile: the SIGN OUT button comes FIRST, and the
-            // points sit at the far right, directly beside the ☰ menu. A thumb
-            // reaching for the menu lands on the (harmless) points text, not the
-            // sign-out button, so tapping the menu can no longer log you out.
+            // Read on-chain M4 spendable. Never falls back to Supabase.
+            const gl = window.globalLedger && typeof window.globalLedger.get === 'function'
+                ? window.globalLedger.get() : null;
+            const onChainAvailable = gl && gl.spendableBalance != null;
+            const pointsText = onChainAvailable
+                ? gl.spendableBalance.toLocaleString()
+                : '';
+            const pointsId = onChainAvailable ? 'display-points' : 'display-points-unavail';
+
             pill.innerHTML = `
                 <button id="btn-signout" class="auth-btn-small">Sign out</button>
-                <span class="auth-user">· ${name}</span>
+                <span class="auth-user">, ${name}</span>
                 ${tierBadge}
-                <span id="display-points">⭐ ${points.toLocaleString()} Pts</span>
+                ${onChainAvailable
+                    ? '<span id="display-points">' + pointsText + ' Pts</span>'
+                    : '<button id="display-points-refresh" class="auth-btn-small" title="Tap to refresh points">Points unavailable, tap to retry</button>'
+                }
             `;
 
             const btn = document.getElementById('btn-signout');
@@ -202,6 +208,31 @@
                         }
                     }
                 };
+            }
+
+            // Refresh button: when chain is unreachable, the pill shows a
+            // retry button. Tapping it re-fetches the M4 global ledger and
+            // rebuilds the pill with the real on-chain number if the chain
+            // came back, or leaves the button if it's still down.
+            var refreshBtn = document.getElementById('display-points-refresh');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function () {
+                    refreshBtn.textContent = 'Loading...';
+                    refreshBtn.disabled = true;
+                    if (window.globalLedger && typeof window.globalLedger.fetch === 'function') {
+                        window.globalLedger.fetch().then(function (ledger) {
+                            if (ledger && ledger.spendableBalance != null) {
+                                updateHeader(dynamicUser);
+                            } else {
+                                refreshBtn.textContent = 'Points unavailable, tap to retry';
+                                refreshBtn.disabled = false;
+                            }
+                        }).catch(function () {
+                            refreshBtn.textContent = 'Points unavailable, tap to retry';
+                            refreshBtn.disabled = false;
+                        });
+                    }
+                });
             }
 
             window.currentUser = {

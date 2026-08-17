@@ -320,20 +320,26 @@
         // show the real on-chain points, not just the DB mirror.
         if (options.globalPointsTag) {
             var applyGlobal = function (ledger) {
-                // Re-query every time because updateHeader() rebuilds the pill DOM.
-                var el = document.getElementById('display-points');
-                if (!el || !ledger) return;
-                var spendable = ledger.spendableBalance != null ? ledger.spendableBalance : null;
+                var spendable = ledger && ledger.spendableBalance != null ? ledger.spendableBalance : null;
                 if (spendable === null) return;
-                el.textContent = '\u2B50 ' + Number(spendable).toLocaleString() + ' Pts';
+                // If the pill currently shows the refresh button, rebuild it
+                // with the real on-chain number (the chain came back).
+                var el = document.getElementById('display-points');
+                if (!el) {
+                    // updateHeader() rendered the "unavailable" button; re-run
+                    // the full header render so the user sees the real number.
+                    if (typeof window.refreshAuthHeader === 'function') {
+                        window.refreshAuthHeader();
+                    }
+                    return;
+                }
+                el.textContent = spendable.toLocaleString() + ' Pts';
             };
             if (window.globalLedger) {
                 if (typeof window.globalLedger.subscribe === 'function') {
                     window.globalLedger.subscribe(applyGlobal);
                 }
                 window.globalLedger.fetch().then(applyGlobal).catch(function () {});
-                // Re-fetch after sign-in/sign-out so the pill gets the on-chain
-                // value even if updateHeader() just rebuilt the DOM with Supabase data.
                 window.addEventListener('gfg:auth-changed', function () {
                     window.globalLedger.fetch().then(applyGlobal).catch(function () {});
                 });

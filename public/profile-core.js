@@ -58,14 +58,14 @@
     }
 
     // Load the signed-in user's own on-chain points PDA ledger (gasless read,
-    // own account only, per-game 'ludo' ledger). Renders into el.
-    async function loadPointsLedger(el) {
+    // own account only, per-game ledger). Renders into el.
+    async function loadPointsLedger(el, gameTag) {
+        gameTag = gameTag || 'ludo';
         const magic = window.magicblockDice;
         if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
             el.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
             return;
         }
-        const gameTag = 'ludo';
         const pda = magic.pointsPda(gameTag);
         if (!pda) {
             el.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
@@ -165,25 +165,20 @@
             el.innerHTML = `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Pure (unspendable, never multiplied)</span>
-                    <b style="color:#f39c12;font-size:1.15rem;">${fmt(ledger.globalPureLifetime)}</b>
+                    <b style="color:#f39c12;font-size:1.15rem;">${fmt(ledger.pureLifetime)}</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Lifetime (unspendable, all sources)</span>
-                    <b style="color:#9b59b6;">${fmt(ledger.globalLifetime)}</b>
+                    <b style="color:#9b59b6;">${fmt(ledger.lifetime)}</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Spendable</span>
-                    <b style="color:#2ecc71;">${fmt(ledger.globalSpendableBalance)}</b>
+                    <b style="color:#2ecc71;">${fmt(ledger.spendableBalance)}</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Game credits</span>
-                    <b>${ledger.gameCreditCount ?? 0}</b>
+                    <b>${ledger.awardCount ?? 0}</b>
                 </div>
-                ${ledger.otherCreditCount ? `
-                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <span style="color:var(--muted);">Other credits</span>
-                    <b>${ledger.otherCreditCount}</b>
-                </div>` : ''}
                 ${ledger.spendCount ? `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Spends</span>

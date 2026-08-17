@@ -71,7 +71,11 @@
     };
 
     window.getSpendablePoints = function () {
-        const p = getProfile();
+        // Prefer on-chain M4 spendable; fall back to Supabase mirror.
+        var gl = window.globalLedger && typeof window.globalLedger.get === 'function'
+            ? window.globalLedger.get() : null;
+        if (gl && gl.spendableBalance != null) return gl.spendableBalance;
+        var p = getProfile();
         return p && typeof p.global_points === 'number' ? p.global_points : 0;
     };
 
