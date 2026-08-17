@@ -580,6 +580,25 @@ export function initMagicBlockDice() {
       return matchRefFromSignature(sig);
     },
 
+    // M4 — records a global points credit on-chain (gasless ER write).
+    // kind: 0 = game win (pure+lifetime+spendable), 1 = other (lifetime+spendable only).
+    // sourceCode: u8 enum identifying the game/source. points/reason/matchRef mirror M3.
+    async recordGlobalPoints(kind, sourceCode, points, reason, matchRef) {
+      return recordGlobalPoints(kind, sourceCode, points, reason, matchRef);
+    },
+
+    // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.
+    async spendGlobal(amount, reason, spendRef) {
+      return spendGlobal(amount, reason, spendRef);
+    },
+
+    // The player's on-chain global points PDA address (own-account profile view).
+    globalPointsPda() {
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return globalPointsPdaFor(wallet.publicKey)[0].toBase58();
+    },
+
     // The player's on-chain points PDA address for `gameTag` (own-account
     // profile view).
     pointsPda(gameTag = 'ludo') {

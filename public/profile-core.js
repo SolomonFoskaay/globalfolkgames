@@ -146,7 +146,7 @@
             el.innerHTML = '<p class="empty">Global ledgers unavailable (wallet not ready).</p>';
             return;
         }
-        const pda = magic.globalPointsPdaFor();
+        const pda = magic.globalPointsPda();
         if (!pda) {
             el.innerHTML = '<p class="empty">Connect your wallet to see your global ledgers.</p>';
             return;

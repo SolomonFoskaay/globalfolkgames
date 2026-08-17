@@ -232,29 +232,15 @@ function runDicePhysicsCalculations() {
             die.q = DICE_Q_NORMALIZE(DICE_Q_MUL(axisAngleToQuat(ax / mag, ay / mag, az / mag, ang), die.q));
             piecesStillMoving = true;
         } else if (die.finalValue != null) {
-            // Velocity stopped -> value locks to the VRF face, and the cube
-            // EASES (slerps) onto the orientation that shows that face, so it
-            // visibly lands instead of teleporting.
+            // Velocity stopped -> IMMEDIATELY snap to the VRF face. No easing,
+            // no slerp, no frame budget. The moment the die slows down it
+            // locks onto the exact ER VRF orientation so the player always
+            // sees the correct result the instant the dice rest.
             die.value = die.finalValue;
-            const target = die._settleTarget || DICE_Q_COMPUTE_TARGET(die.finalValue, die);
+            const target = DICE_Q_COMPUTE_TARGET(die.finalValue, die);
+            die.q = target;
+            die._settledExact = true;
             die._settleTarget = target;
-            if (target && !die._settledExact) {
-                // DETERMINISTIC SETTLE: the tumble is COSMETIC only — the
-                // final face is always exactly the ER VRF value. Ease fast
-                // toward the exact face-up orientation and, after a short
-                // frame budget, SNAP to it unconditionally, so a throttled or
-                // backgrounded mobile tab can never leave the die resting on a
-                // non-VRF face.
-                die._settleFrames = (die._settleFrames || 0) + 1;
-                const eased = slerpQuat(die.q, target, 0.32);
-                die.q = eased;
-                if (die._settleFrames > 12 || quatAngleBetween(eased, target) < 0.02) {
-                    die.q = target;
-                    die._settledExact = true;
-                } else {
-                    piecesStillMoving = true;
-                }
-            }
         }
 
         // Boundary Collisions: Bounce off 600x600 canvas parameters like a

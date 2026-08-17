@@ -312,6 +312,33 @@
                 window.localPoints.fetch(tag).then(function (ledger) { apply(tag, ledger); }).catch(function () {});
             }
         }
+
+        // Live on-chain global-spendable points in the header pill. When a page
+        // opts in via initGlobalHeader({ globalPointsTag: true }), the pill
+        // subscribes to M4 (window.globalLedger) and overlays the on-chain
+        // spendable balance over the Supabase fallback. This makes every page
+        // show the real on-chain points, not just the DB mirror.
+        if (options.globalPointsTag) {
+            var applyGlobal = function (ledger) {
+                // Re-query every time because updateHeader() rebuilds the pill DOM.
+                var el = document.getElementById('display-points');
+                if (!el || !ledger) return;
+                var spendable = ledger.spendableBalance != null ? ledger.spendableBalance : null;
+                if (spendable === null) return;
+                el.textContent = '\u2B50 ' + Number(spendable).toLocaleString() + ' Pts';
+            };
+            if (window.globalLedger) {
+                if (typeof window.globalLedger.subscribe === 'function') {
+                    window.globalLedger.subscribe(applyGlobal);
+                }
+                window.globalLedger.fetch().then(applyGlobal).catch(function () {});
+                // Re-fetch after sign-in/sign-out so the pill gets the on-chain
+                // value even if updateHeader() just rebuilt the DOM with Supabase data.
+                window.addEventListener('gfg:auth-changed', function () {
+                    window.globalLedger.fetch().then(applyGlobal).catch(function () {});
+                });
+            }
+        }
     }
 
     // ---------- Generic confirm dialog (platform-styled, thumb-safe) ----------

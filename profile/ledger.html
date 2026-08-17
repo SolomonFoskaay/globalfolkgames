@@ -35,10 +35,11 @@
         <script src="/pager.js"></script>
 <script src="/header.js"></script>
     <script src="/dash-nav.js"></script>
+    <script src="/universal/ledgers/global-ledger.js"></script>
     <script type="module" src="/src/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.initGlobalHeader) window.initGlobalHeader();
+            if (window.initGlobalHeader) window.initGlobalHeader({ globalPointsTag: true });
 
             window.GFG_DASH_NAV.render({
                 brand: '👤 Profile',
