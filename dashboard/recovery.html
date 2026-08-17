@@ -445,6 +445,10 @@
         function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         function fmtTs(ms) { return ms ? new Date(ms).toLocaleString() : '—'; }
         function fmtNum(n) { return (n || 0).toLocaleString(); }
+        function reasonLabel(code) {
+            const labels = { 1: '1st place win' };
+            return labels[code] || ('reason ' + code);
+        }
 
         const $results = document.getElementById('recovery-results');
         const $email = document.getElementById('recovery-email');
@@ -581,7 +585,7 @@
                 <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#9b59b6;">${fmtNum(m4Data.lifetime)}</span></div>
                 <div class="recovery-row"><span class="label">Spendable</span><span class="value" style="color:#2ecc71;">${fmtNum(m4Data.spendable)}</span></div>
                 <div class="recovery-row"><span class="label">Award count</span><span class="value">${m4Data.awardCount}</span></div>
-                <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} (reason ${m4Data.lastReason})</span></div>
+                <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} (${reasonLabel(m4Data.lastReason)})</span></div>
                 <div class="recovery-row"><span class="label">Spends</span><span class="value">${m4Data.spendCount}</span></div>`;
             }
             html += '</div>';
