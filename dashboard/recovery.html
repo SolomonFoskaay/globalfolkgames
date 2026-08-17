@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Points Recovery - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .recovery-search { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+        .recovery-search input {
+            flex:1; min-width:200px; padding:10px 14px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+            color:#fff; font-size:0.9rem;
+        }
+        .recovery-search input::placeholder { color:#888; }
+        .recovery-search button {
+            padding:10px 20px; border-radius:8px; border:none; cursor:pointer;
+            font-weight:600; font-size:0.9rem;
+        }
+        .recovery-search .search-btn { background:#f39c12; color:#000; }
+        .recovery-search .search-btn:hover { background:#e67e22; }
+        .recovery-search .refresh-btn { background:rgba(255,255,255,0.08); color:#ccc; border:1px solid rgba(255,255,255,0.12); }
+        .recovery-search .refresh-btn:hover { background:rgba(255,255,255,0.12); }
+        .recovery-note {
+            background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2);
+            border-radius:8px; padding:12px 16px; margin-bottom:16px;
+            font-size:0.82rem; color:#ccc; line-height:1.6;
+        }
+        .recovery-note b { color:#f39c12; }
+        .recovery-card {
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+            border-radius:10px; padding:16px; margin-bottom:12px;
+        }
+        .recovery-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .recovery-card .label { color:var(--muted,#888); font-size:0.8rem; }
+        .recovery-card .value { color:#fff; font-weight:600; }
+        .recovery-card .mono { font-family:monospace; font-size:0.8rem; color:#9b59b6; word-break:break-all; }
+        .recovery-row {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);
+            flex-wrap:wrap; gap:4px;
+        }
+        .recovery-row:last-child { border-bottom:none; }
+        .recovery-badge {
+            display:inline-block; padding:2px 8px; border-radius:4px;
+            font-size:0.75rem; font-weight:600;
+        }
+        .badge-ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
+        .badge-warn { background:rgba(243,156,18,0.15); color:#f39c12; }
+        .badge-bad { background:rgba(231,76,60,0.15); color:#e74c3c; }
+        .badge-info { background:rgba(155,89,182,0.15); color:#9b59b6; }
+        .gap-banner {
+            padding:14px 18px; border-radius:10px; margin-bottom:12px;
+            font-weight:600; font-size:0.95rem; display:flex; justify-content:space-between;
+            align-items:center; flex-wrap:wrap; gap:8px;
+        }
+        .gap-ok { background:rgba(46,204,113,0.1); border:1px solid rgba(46,204,113,0.25); color:#2ecc71; }
+        .gap-found { background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.25); color:#f39c12; }
+        .backfill-btn {
+            padding:8px 16px; border-radius:6px; border:none; cursor:pointer;
+            font-weight:600; font-size:0.85rem;
+        }
+        .backfill-btn.primary { background:#f39c12; color:#000; }
+        .backfill-btn.primary:hover { background:#e67e22; }
+        .backfill-btn:disabled { opacity:0.4; cursor:not-allowed; }
+        .backfill-btn.success { background:#2ecc71; color:#000; }
+        .backfill-msg { font-size:0.8rem; margin-top:6px; }
+        .backfill-msg.ok { color:#2ecc71; }
+        .backfill-msg.err { color:#e74c3c; }
+        .empty-state { color:#888; font-size:0.85rem; text-align:center; padding:24px; }
+        .support-note {
+            background:rgba(155,89,182,0.06); border:1px solid rgba(155,89,182,0.15);
+            border-radius:8px; padding:12px 16px; margin-top:16px;
+            font-size:0.8rem; color:#bbb; line-height:1.6;
+        }
+        .support-note b { color:#9b59b6; }
+        .support-note ul { margin:6px 0 0 16px; padding:0; }
+        .support-note li { margin-bottom:4px; }
+        @media (max-width:600px) {
+            .recovery-search { flex-direction:column; }
+            .recovery-search input { min-width:unset; }
+            .recovery-search button { width:100%; }
+            .gap-banner { flex-direction:column; text-align:center; }
+        }
+    </style>
+</head>
+<body>
+    <header id="global-header"></header>
+
+    <main style="max-width:780px;margin:0 auto;padding:80px 16px 40px;">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Points Recovery</h1>
+        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
+            Diagnose and recover orphaned M3 local points that never credited to M4 global ledgers.
+        </p>
+
+        <div class="recovery-note">
+            <b>How it works:</b> Search a player by email or wallet address. The tool reads their
+            on-chain M3 local points (per game) and M4 global points, compares totals, and
+            shows any orphaned points that never reached the global ledger. One click to fix
+            (all gasless, no manual point entry).
+        </div>
+
+        <div class="recovery-search">
+            <input type="text" id="recovery-email" placeholder="Player email or wallet address..." autocomplete="off">
+            <button class="search-btn" id="recovery-search-btn">Search</button>
+            <button class="refresh-btn" id="recovery-refresh-btn" style="display:none;">Refresh</button>
+        </div>
+
+        <div id="recovery-results">
+            <div class="empty-state">Enter a player email or wallet address above to begin.</div>
+        </div>
+
+        <div class="support-note">
+            <b>When a player contacts support about missing points, ask for:</b>
+            <ul>
+                <li>Their <b>email address</b> (the one they sign in with)</li>
+                <li>Or their <b>wallet address</b> (shown on their profile page)</li>
+                <li><b>Which game</b> they played (Ludo, Ayo Olopon, etc.)</li>
+                <li><b>When</b> they played (approximate date/time)</li>
+                <li><b>What position</b> they finished (1st, 2nd, etc.)</li>
+            </ul>
+            The tool will auto-detect orphaned points and offer a one-click fix.
+        </div>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+    <script src="/header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script type="module">
+        import { Connection, PublicKey } from '@solana/web3.js';
+        import { AnchorProvider, Program } from '@anchor-lang/core';
+        import { BN } from 'bn.js';
+
+        window.GFG_DASH_NAV.render({
+            brand: '🛡 Dashboard',
+            active: 'recovery',
+            sections: [
+                { heading: 'Overview', items: [
+                    { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                ]},
+                { heading: 'Detail', items: [
+                    { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                    { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                    { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                    { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                    { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                    { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                ]},
+            ]
+        });
+
+        const IDL_URL = '/gfg-dice-idl.json';
+        const ER_URL = 'https://devnet-us.magicblock.app/';
+        const BASE_RPC = 'https://api.devnet.solana.com';
+        const KNOWN_GAMES = ['ludo'];
+        const POINTS_SEED = Buffer.from('gfgpoints', 'utf8');
+        const GLOBAL_SEED = Buffer.from('global', 'utf8');
+
+        let idl = null;
+        let programId = null;
+
+        async function loadIdl() {
+            if (idl) return;
+            const resp = await fetch(IDL_URL);
+            idl = await resp.json();
+            programId = new PublicKey(idl.metadata.address);
+        }
+
+        function pda(gameTag, playerPubkey) {
+            return PublicKey.findProgramAddressSync(
+                [POINTS_SEED, Buffer.from(gameTag, 'utf8'), playerPubkey.toBytes()],
+                programId,
+            )[0];
+        }
+
+        function globalPda(playerPubkey) {
+            return PublicKey.findProgramAddressSync(
+                [POINTS_SEED, GLOBAL_SEED, playerPubkey.toBytes()],
+                programId,
+            )[0];
+        }
+
+        async function fetchM3(connection, wallet) {
+            const playerPub = new PublicKey(wallet);
+            const results = [];
+            for (const game of KNOWN_GAMES) {
+                const addr = pda(game, playerPub);
+                try {
+                    const info = await connection.getAccountInfo(addr);
+                    if (!info) continue;
+                    const d = info.data;
+                    const ledger = {
+                        game,
+                        address: addr.toBase58(),
+                        pure: d.length >= 16 ? Number(d.readBigUInt64LE(8)) : 0,
+                        spendable: d.length >= 24 ? Number(d.readBigUInt64LE(16)) : 0,
+                        lastPoints: d.length >= 32 ? Number(d.readBigUInt64LE(24)) : 0,
+                        lastReason: d.length >= 33 ? d[32] : 0,
+                        lastMatchRef: d.length >= 41 ? Number(d.readBigUInt64LE(33)) : 0,
+                        lastRecordedTs: d.length >= 49 ? Number(d.readBigUInt64LE(41)) : 0,
+                        awardCount: d.length >= 57 ? Number(d.readBigUInt64LE(49)) : 0,
+                    };
+                    results.push(ledger);
+                } catch (_) {}
+            }
+            return results;
+        }
+
+        async function fetchM4(connection, wallet) {
+            const playerPub = new PublicKey(wallet);
+            const addr = globalPda(playerPub);
+            try {
+                const info = await connection.getAccountInfo(addr);
+                if (!info) return null;
+                const d = info.data;
+                return {
+                    address: addr.toBase58(),
+                    version: d[0],
+                    pure: d.length >= 10 ? Number(d.readBigUInt64LE(2)) : 0,
+                    lifetime: d.length >= 18 ? Number(d.readBigUInt64LE(10)) : 0,
+                    spendable: d.length >= 26 ? Number(d.readBigUInt64LE(18)) : 0,
+                    lastRecordedTs: d.length >= 34 ? Number(d.readBigUInt64LE(26)) : 0,
+                    lastReason: d.length >= 35 ? d[34] : 0,
+                    lastPoints: d.length >= 43 ? Number(d.readBigUInt64LE(35)) : 0,
+                    awardCount: d.length >= 51 ? Number(d.readBigUInt64LE(43)) : 0,
+                    otherCreditCount: d.length >= 59 ? Number(d.readBigUInt64LE(51)) : 0,
+                    gameCreditCount: d.length >= 67 ? Number(d.readBigUInt64LE(59)) : 0,
+                    spendCount: d.length >= 100 ? Number(d.readBigUInt64LE(92)) : 0,
+                };
+            } catch (_) { return null; }
+        }
+
+        async function searchUser(email) {
+            const resp = await fetch(`/api/dynamic-search?email=${encodeURIComponent(email)}`);
+            return resp.json();
+        }
+
+        function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmtTs(ms) { return ms ? new Date(ms).toLocaleString() : '—'; }
+        function fmtNum(n) { return (n || 0).toLocaleString(); }
+
+        const $results = document.getElementById('recovery-results');
+        const $email = document.getElementById('recovery-email');
+        const $searchBtn = document.getElementById('recovery-search-btn');
+        const $refreshBtn = document.getElementById('recovery-refresh-btn');
+        let currentWallet = null;
+
+        async function doSearch() {
+            const q = $email.value.trim();
+            if (!q) return;
+            $results.innerHTML = '<div class="empty-state">Searching...</div>';
+            $searchBtn.disabled = true;
+
+            try {
+                let wallet = null;
+                let userInfo = null;
+
+                // Check if it's already a wallet address (base58, 32-44 chars)
+                if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q)) {
+                    wallet = q;
+                    userInfo = { email: '(direct wallet)', wallet, source: 'direct' };
+                } else {
+                    const data = await searchUser(q);
+                    if (!data.users || data.users.length === 0) {
+                        $results.innerHTML = '<div class="empty-state">No user found with that email. Try the wallet address directly.</div>';
+                        $searchBtn.disabled = false;
+                        return;
+                    }
+                    userInfo = data.users[0];
+                    wallet = userInfo.wallet;
+                    if (!wallet) {
+                        $results.innerHTML = '<div class="empty-state">User found but has no wallet address on file.</div>';
+                        $searchBtn.disabled = false;
+                        return;
+                    }
+                }
+
+                currentWallet = wallet;
+                $refreshBtn.style.display = 'inline-block';
+                await loadWalletData(wallet, userInfo);
+            } catch (e) {
+                $results.innerHTML = `<div class="empty-state">Error: ${esc(e.message)}</div>`;
+            }
+            $searchBtn.disabled = false;
+        }
+
+        async function loadWalletData(wallet, userInfo) {
+            $results.innerHTML = '<div class="empty-state">Reading on-chain data...</div>';
+
+            await loadIdl();
+
+            // Read from both ER and base RPC (ER for fresh data, base for fallback)
+            const erConn = new Connection(ER_URL, 'confirmed');
+            const baseConn = new Connection(BASE_RPC, 'confirmed');
+
+            const [m3Data, m4Data] = await Promise.all([
+                fetchM3(erConn, wallet).catch(() => fetchM3(baseConn, wallet)),
+                fetchM4(erConn, wallet).catch(() => fetchM4(baseConn, wallet)),
+            ]);
+
+            const m3TotalPure = m3Data.reduce((s, g) => s + g.pure, 0);
+            const m4Pure = m4Data ? m4Data.pure : 0;
+            const gap = Math.max(0, m3TotalPure - m4Pure);
+
+            let html = '';
+
+            // User card
+            html += `<div class="recovery-card">
+                <h3>Player</h3>
+                <div class="recovery-row"><span class="label">Email</span><span class="value">${esc(userInfo.email)}</span></div>
+                <div class="recovery-row"><span class="label">Source</span><span class="recovery-badge badge-info">${esc(userInfo.source)}</span></div>
+                <div class="recovery-row"><span class="label">Wallet</span><span class="mono">${esc(wallet)}</span></div>
+            </div>`;
+
+            // M3 per-game
+            html += `<div class="recovery-card">
+                <h3>M3 Local Points (per game)</h3>`;
+            if (m3Data.length === 0) {
+                html += '<div class="empty-state">No on-chain M3 points found for any game.</div>';
+            } else {
+                for (const g of m3Data) {
+                    html += `<div class="recovery-row">
+                        <div>
+                            <span class="value" style="text-transform:capitalize;">${esc(g.game)}</span>
+                            <span class="label" style="margin-left:8px;">${fmtNum(g.awardCount)} win${g.awardCount !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="value" style="color:#f39c12;">${fmtNum(g.pure)}</span> <span class="label">pure</span>
+                            <span class="value" style="color:#9b59b6;margin-left:8px;">${fmtNum(g.spendable)}</span> <span class="label">spendable</span>
+                        </div>
+                    </div>
+                    <div class="recovery-row">
+                        <span class="label">Last award</span>
+                        <span class="label">+${fmtNum(g.lastPoints)} pts @ ${fmtTs(g.lastRecordedTs * 1000)}</span>
+                    </div>`;
+                }
+            }
+            html += '</div>';
+
+            // M4 global
+            html += `<div class="recovery-card">
+                <h3>M4 Global Points (site-wide)</h3>`;
+            if (!m4Data) {
+                html += '<div class="empty-state">No M4 global ledger found. Player has no global record yet.</div>';
+            } else {
+                html += `<div class="recovery-row"><span class="label">Pure (unspendable)</span><span class="value" style="color:#f39c12;">${fmtNum(m4Data.pure)}</span></div>
+                <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#9b59b6;">${fmtNum(m4Data.lifetime)}</span></div>
+                <div class="recovery-row"><span class="label">Spendable</span><span class="value" style="color:#2ecc71;">${fmtNum(m4Data.spendable)}</span></div>
+                <div class="recovery-row"><span class="label">Game credits (kind 0)</span><span class="value">${m4Data.gameCreditCount}</span></div>
+                <div class="recovery-row"><span class="label">Other credits (kind 1)</span><span class="value">${m4Data.otherCreditCount}</span></div>
+                <div class="recovery-row"><span class="label">Spends</span><span class="value">${m4Data.spendCount}</span></div>`;
+            }
+            html += '</div>';
+
+            // Gap banner
+            if (gap > 0) {
+                html += `<div class="gap-banner gap-found">
+                    <span>Orphaned: M3 has <b>${fmtNum(m3TotalPure)}</b> pure but M4 has only <b>${fmtNum(m4Pure)}</b> (${gap} missing)</span>
+                    <div>
+                        <button class="backfill-btn primary" id="backfill-btn" data-gap="${gap}">Add ${fmtNum(gap)} to Global</button>
+                        <div id="backfill-msg" class="backfill-msg"></div>
+                    </div>
+                </div>`;
+            } else if (m3TotalPure === 0 && m4Pure === 0) {
+                html += '<div class="gap-banner gap-ok"><span>No points on record yet.</span></div>';
+            } else {
+                html += `<div class="gap-banner gap-ok"><span>M3 (<b>${fmtNum(m3TotalPure)}</b>) matches M4 (<b>${fmtNum(m4Pure)}</b>) — no orphaned points.</span></div>`;
+            }
+
+            $results.innerHTML = html;
+
+            // Wire backfill button
+            const $backfill = document.getElementById('backfill-btn');
+            if ($backfill) {
+                $backfill.addEventListener('click', () => doBackfill(wallet, gap, m3Data));
+            }
+        }
+
+        async function doBackfill(wallet, gap, m3Data) {
+            const $btn = document.getElementById('backfill-btn');
+            const $msg = document.getElementById('backfill-msg');
+            if (!$btn || !$msg) return;
+            $btn.disabled = true;
+            $btn.textContent = 'Adding...';
+            $msg.textContent = '';
+
+            try {
+                // Build source tag from the game with the most points
+                const topGame = m3Data.sort((a, b) => b.pure - a.pure)[0];
+                const sourceTag = topGame ? topGame.game : 'ludo';
+                const matchRef = 'backfill-' + wallet.slice(0, 8) + '-' + Date.now();
+
+                const resp = await fetch('/api/backfill-global', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet, points: gap, sourceTag, matchRef }),
+                });
+                const result = await resp.json();
+
+                if (result.signature || result.ok) {
+                    $btn.textContent = 'Added!';
+                    $btn.classList.remove('primary');
+                    $btn.classList.add('success');
+                    $msg.className = 'backfill-msg ok';
+                    $msg.textContent = `Global ledger updated. ${result.signature ? 'Sig: ' + result.signature.slice(0, 16) + '...' : ''}`;
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (e) {
+                $btn.disabled = false;
+                $btn.textContent = 'Add ' + fmtNum(gap) + ' to Global';
+                $msg.className = 'backfill-msg err';
+                $msg.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        $searchBtn.addEventListener('click', doSearch);
+        $email.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+        $refreshBtn.addEventListener('click', () => {
+            if (currentWallet) {
+                const q = $email.value.trim();
+                loadWalletData(currentWallet, { email: q, wallet: currentWallet, source: 'refresh' });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -37,6 +37,7 @@ export default defineConfig({
         'dashboard-activity': './dashboard/activity.html',
         'dashboard-accounts': './dashboard/accounts.html',
         'dashboard-release': './dashboard/release.html',
+        'dashboard-recovery': './dashboard/recovery.html',
         verify: './verify/index.html'
       }
     }
