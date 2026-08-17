@@ -441,6 +441,17 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
 - Seeded/versioned docs: `docs/changelog/`; new engines notes land in
   `docs/changelog/unreleased.md`.
 
+## Content writing style (auto-loaded rule, non-negotiable)
+
+- **No AI dashes in user-facing content:** never use em dashes (—) or double
+  dashes (--) in any text players or visitors read. Replace with parentheses,
+  commas, "and", or full stops. Example: write `a big green "pea" (sent back
+  home)` not `a big green "pea" — sent back home`. Full rules in
+  `.opencode/rules/content-style-guide.md` (auto-loaded every session). Covers
+  changelog summaries, page copy, UI labels, error messages, forum posts,
+  README descriptions, and any other user-facing text. Does NOT apply to code
+  comments, git commits, or internal dev notes.
+
 ## Security / anti-exploit rules (READ BEFORE CODING — non-negotiable)
 
 - **Solana upgrade safety (auto-loaded rule, non-negotiable):** upgrades NEVER

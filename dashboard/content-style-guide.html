@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Content Style Guide | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .guide-card { background: #101014; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px 18px; margin-top: 12px; }
+        .guide-card h4 { color: #fff; font-size: 0.92rem; margin: 0 0 8px; }
+        .guide-card p { color: #ccc; font-size: 0.82rem; line-height: 1.6; margin: 4px 0; }
+        .guide-card .muted { color: var(--muted); }
+        .rule-box { background: #1a1a24; border-left: 3px solid #e74c3c; padding: 10px 14px; border-radius: 0 8px 8px 0; margin-top: 10px; }
+        .rule-box.good { border-left-color: #2ecc71; }
+        .rule-box code { font-family: monospace; color: #f39c12; font-size: 0.82rem; }
+        .rule-box .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; margin-bottom: 4px; }
+        .rule-box .label.bad { color: #e74c3c; }
+        .rule-box .label.good { color: #2ecc71; }
+        .rule-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.82rem; }
+        .rule-table th { text-align: left; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 6px 8px; border-bottom: 1px solid #23232b; }
+        .rule-table td { padding: 8px; border-bottom: 1px solid #1a1a24; color: #ddd; vertical-align: top; }
+        .rule-table .bad { color: #e74c3c; }
+        .rule-table .good { color: #2ecc71; }
+        .scope-list { list-style: none; padding: 0; margin: 8px 0; }
+        .scope-list li { padding: 4px 0; color: #ccc; font-size: 0.82rem; }
+        .scope-list li::before { content: "— "; color: var(--muted); }
+        .scope-list.check li::before { content: "✓ "; color: #2ecc71; }
+        .scope-list.cross li::before { content: "✗ "; color: #e74c3c; }
+        .back-link { color: #f39c12; font-size: 0.85rem; text-decoration: none; margin-bottom: 10px; display: inline-block; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <main class="mobile-container dash-rail-content" style="max-width:720px;">
+
+        <a href="/dashboard/" class="back-link">← Back to dashboard</a>
+
+        <section class="onboarding-billboard" style="border-color:#e74c3c;">
+            <h2>✏ Content Style Guide</h2>
+            <p class="auth-hint" style="margin-top:8px;">The rules every AI agent must follow when writing user-facing text. Enforced in <code>.opencode/rules/content-style-guide.md</code> (auto-loaded every session).</p>
+        </section>
+
+        <!-- Rule 1: No AI dashes -->
+        <div class="guide-card">
+            <h4>1. No em dashes or double dashes in user-facing content</h4>
+            <p>Em dashes (<code>—</code>) and double dashes (<code>--</code>) are the single biggest tell of AI-generated text. Every piece of user-facing copy must avoid them.</p>
+
+            <div class="rule-box">
+                <div class="label bad">Never write this</div>
+                <p><code>a big green "pea" — sent back home</code></p>
+                <p><code>play now — it's free</code></p>
+                <p><code>fast and fair — every roll on-chain</code></p>
+            </div>
+
+            <div class="rule-box good">
+                <div class="label good">Write this instead</div>
+                <p><code>a big green "pea" (sent back home)</code></p>
+                <p><code>play now, it's free</code></p>
+                <p><code>fast and fair, every roll on-chain</code></p>
+            </div>
+
+            <table class="rule-table">
+                <thead>
+                    <tr><th>Instead of</th><th>Use</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="bad">the app <code>—</code> free to play</td>
+                        <td class="good">the app (free to play)</td>
+                    </tr>
+                    <tr>
+                        <td class="bad">sign in <code>—</code> then play</td>
+                        <td class="good">sign in and then play</td>
+                    </tr>
+                    <tr>
+                        <td class="bad">Ludo <code>—</code> the classic board game</td>
+                        <td class="good">Ludo, the classic board game</td>
+                    </tr>
+                    <tr>
+                        <td class="bad">your games <code>—</code> your points <code>—</code> your history</td>
+                        <td class="good">your games, your points, and your history</td>
+                    </tr>
+                    <tr>
+                        <td class="bad">We built this <code>—</code> it works great</td>
+                        <td class="good">We built this. It works great.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Rule 2: Replacement patterns -->
+        <div class="guide-card">
+            <h4>2. What to use instead</h4>
+            <p>Replace the dash with whichever fits naturally:</p>
+            <ul class="scope-list check">
+                <li><strong>Parentheses</strong> for asides: <code>the app (free to play) works on any phone</code></li>
+                <li><strong>Commas</strong> for lists or pauses: <code>fast, fair, and fully on-chain</code></li>
+                <li><strong>"and"</strong> for connections: <code>sign in and start playing</code></li>
+                <li><strong>Full stop</strong> to split into two sentences: <code>The app is free. Every roll is on-chain.</code></li>
+            </ul>
+        </div>
+
+        <!-- Rule 3: Where it applies -->
+        <div class="guide-card">
+            <h4>3. Where this rule applies</h4>
+            <ul class="scope-list check">
+                <li>Changelog summaries (public user-facing text in <code>changelog.json</code>)</li>
+                <li>Page copy (about, support, forum, contact, profile, changelog intros)</li>
+                <li>UI labels and button text</li>
+                <li>Error messages shown to users</li>
+                <li>Forum posts, articles, announcements</li>
+                <li>README descriptions (public-facing ones)</li>
+                <li>Any text a player or visitor reads</li>
+            </ul>
+        </div>
+
+        <!-- Rule 4: Where it does NOT apply -->
+        <div class="guide-card">
+            <h4>4. Where this rule does NOT apply</h4>
+            <ul class="scope-list cross">
+                <li>Code comments (internal, never shown to users)</li>
+                <li>Git commit messages</li>
+                <li>Internal developer notes (<code>docs/changelog/</code>, <code>unreleased.md</code>)</li>
+                <li>Variable names, function names, technical identifiers</li>
+                <li>On-chain instruction names or account labels</li>
+            </ul>
+        </div>
+
+        <!-- Rule 5: Agent enforcement -->
+        <div class="guide-card">
+            <h4>5. How the agent enforces this</h4>
+            <p>The rule is loaded automatically at the start of every opencode session via <code>opencode.json</code> instructions. Before writing ANY user-facing content, the agent checks this guide. If the content contains an em dash or double dash, it is rewritten using parentheses, commas, "and", or full stops. No exceptions.</p>
+            <p class="muted">Rule file: <code>.opencode/rules/content-style-guide.md</code> (auto-loaded). Config: <code>opencode.json</code> instructions array.</p>
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/auth.js"></script>
+    <script src="/tamper-guard.js"></script>
+    <script src="/header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/dash-core.js"></script>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'content-guide',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                    { heading: 'Staff', items: [
+                        { key: 'content-guide', label: '✏ Content style guide', href: '/dashboard/content-style-guide.html' },
+                    ]},
+                ]
+            });
+        });
+    </script>
+</body>
+</html>
