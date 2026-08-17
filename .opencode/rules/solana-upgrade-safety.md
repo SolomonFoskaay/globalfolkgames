@@ -9,7 +9,7 @@ if a migration is not proven on devnet, it is not shippable.
 
 ## The ground truth (read this first)
 
-- **A program upgrade NEVER deletes account data.** `anchor deploy` (same program ID)
+- **A program upgrade NEVER deletes account data.** `solana program deploy` (same program ID)
   swaps the *code*; every PDA keeps its bytes on-chain.
 - Data is lost only three ways, all avoidable:
   1. **PDA seed change.** Old accounts keep their bytes but the new code can't find

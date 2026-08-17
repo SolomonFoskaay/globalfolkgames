@@ -39,12 +39,22 @@ program keypair must never be committed.
 
 ## Redeploy / upgrade
 
+**Do NOT use `anchor deploy` or `anchor program deploy`** — they route through
+the slow public devnet RPC (`devnet.rpcpool.com`) and frequently time out.
+Use the Solana CLI directly with the Alchemy RPC (fast, dedicated endpoint):
+
 ```bash
-cd programs
-anchor program deploy \
-  --program-keypair target/deploy/gfg_dice-keypair.json \
-  --provider.cluster https://api.devnet.solana.com
+cd /path/to/globalfolkgames
+source .env  # loads GFG_DEVNET_RPC (Alchemy)
+solana program deploy \
+  programs/target/deploy/gfg_dice.so \
+  --program-id programs/target/deploy/gfg_dice-keypair.json \
+  --url "$GFG_DEVNET_RPC" \
+  --skip-fee-check
 ```
+
+For mainnet, swap `GFG_DEVNET_RPC` for the mainnet Alchemy/Helius/Quicknode
+RPC in the env file — same command, same flow.
 
 Keep the deployer wallet (`~/.config/solana/id.json`) and the program keypair
 (`programs/target/deploy/gfg_dice-keypair.json`) backed up together. Losing both

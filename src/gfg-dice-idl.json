@@ -617,6 +617,180 @@
       "args": []
     },
     {
+      "name": "delegate_global_points",
+      "docs": [
+        "Delegates the player's GLOBAL POINTS PDA into an ER session (base",
+        "layer, sponsor pays) so record_global_points / spend_global run gasless."
+      ],
+      "discriminator": [
+        63,
+        144,
+        78,
+        4,
+        173,
+        71,
+        190,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "global_points"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "global_points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "global_points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "global_points",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "delegate_points",
       "docs": [
         "Delegates the player's per-game POINTS PDA into an ER session (base",
@@ -1165,6 +1339,76 @@
       ]
     },
     {
+      "name": "initialize_global_points",
+      "docs": [
+        "Idempotent: creates the player's GLOBAL POINTS PDA if it does not",
+        "exist yet. Seed [gfgpoints, 'global', player_authority]. Payer (sponsor)",
+        "pays rent; the account belongs to `player_authority`."
+      ],
+      "discriminator": [
+        207,
+        234,
+        110,
+        51,
+        79,
+        4,
+        26,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_points",
       "docs": [
         "Idempotent: creates the player's per-game POINTS PDA if it does not",
@@ -1493,6 +1737,98 @@
           "type": {
             "vec": "bytes"
           }
+        }
+      ]
+    },
+    {
+      "name": "record_global_points",
+      "docs": [
+        "Credits the player's GLOBAL POINTS PDA. Runs GASLESS on the ER (session",
+        "key signs, 0 SOL). `kind` determines which ledgers are credited:",
+        "- 0 (GAME WIN): M4a pure + M4b lifetime + M4c spendable all credited.",
+        "- 1 (OTHER — signup_bonus/referral/giveaway): M4b lifetime + M4c",
+        "spendable only, M4a pure is untouched (the multiplier-blind flow-up",
+        "contract: tier boosts are kind-1 credits).",
+        "`source_tag` is the game or event name ('Ludo', 'signup_bonus', etc.).",
+        "`match_ref` guards idempotency (first 8 bytes of the triggering tx sig)."
+      ],
+      "discriminator": [
+        167,
+        83,
+        145,
+        109,
+        225,
+        217,
+        23,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "source_tag",
+          "type": "string"
+        },
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -1830,6 +2166,86 @@
       ]
     },
     {
+      "name": "spend_global",
+      "docs": [
+        "(M4 — global spendable) Draws down the SPENDABLE track of the global",
+        "points PDA. M4a pure and M4b lifetime are never touched. Runs GASLESS",
+        "on the ER (session key signs, 0 SOL); `spend_ref` is the",
+        "client/backend-supplied purchase reference for replayability."
+      ],
+      "discriminator": [
+        98,
+        117,
+        126,
+        175,
+        30,
+        237,
+        72,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "spend_local",
       "docs": [
         "(M3 — local spendable) Draws down the SPENDABLE track of a per-game",
@@ -1984,6 +2400,19 @@
         22,
         221,
         106
+      ]
+    },
+    {
+      "name": "GlobalPoints",
+      "discriminator": [
+        154,
+        38,
+        161,
+        95,
+        202,
+        136,
+        77,
+        63
       ]
     },
     {
@@ -2156,6 +2585,88 @@
                 3
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalPoints",
+      "docs": [
+        "On-chain GLOBAL points ledger for one player (M4 — site-wide three-ledger",
+        "framework). One account per player, seed [gfgpoints, 'global', player].",
+        "Runs gasless on the ER.",
+        "",
+        "Three tracks:",
+        "- global_pure_lifetime    : sum of M3 local wins across ALL games, no",
+        "multiplier, no purchases, no bonus — the honest",
+        "cross-game skill total (M4a).",
+        "- global_lifetime         : every point earned from ANY source (M3 game",
+        "wins + M5 multiplier credits + M6 signup/",
+        "referral/giveaway). Unspendable, permanent",
+        "reputation number (M4b).",
+        "- global_spendable_balance: the spendable split of lifetime. Purchases,",
+        "Active Tier buys, comp entries, cosmetics",
+        "all flow here. Goes up and down (M4c).",
+        "",
+        "`kind` field on credits:",
+        "- 0 = GAME WIN: credits all three tracks (M4a + M4b + M4c).",
+        "- 1 = OTHER (signup_bonus/referral/giveaway/tier_boost): credits M4b",
+        "+ M4c only. M4a pure is never multiplied or bonus-inflated."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "global_pure_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "global_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "global_spendable_balance",
+            "type": "u64"
+          },
+          {
+            "name": "last_source",
+            "type": "u8"
+          },
+          {
+            "name": "last_points",
+            "type": "u64"
+          },
+          {
+            "name": "last_reason",
+            "type": "u8"
+          },
+          {
+            "name": "last_match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_recorded_ts",
+            "type": "i64"
+          },
+          {
+            "name": "award_count",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_spend_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_reason",
+            "type": "u8"
+          },
+          {
+            "name": "spend_count",
+            "type": "u64"
           }
         ]
       }

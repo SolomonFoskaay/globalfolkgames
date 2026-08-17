@@ -265,7 +265,17 @@ web3.js's opaque `Unknown action 'undefined'` error.
   GlobalFolkGames)...` then resolves instantly on-chain. Computer turns log
   `[Off-Chain Local Randomness] Computer turn — rolling locally`.
 - `npm run relay` runs just the relay.
-- Program work: `cd programs && anchor build && anchor deploy`.
+- **Program build + deploy (HARD RULE — fast path only, do not use `anchor deploy`):**
+  1. Build: `cd programs && anchor build`
+  2. Copy IDL: `cp programs/target/idl/gfg_dice.json src/gfg-dice-idl.json`
+  3. Deploy: `source .env && solana program deploy programs/target/deploy/gfg_dice.so --program-id programs/target/deploy/gfg_dice-keypair.json --url "$GFG_DEVNET_RPC" --skip-fee-check`
+  4. Do NOT use `anchor deploy` or `anchor program deploy` — they route through
+     the slow public RPC (`devnet.rpcpool.com`) and frequently time out on
+     devnet. The Alchemy RPC (`GFG_DEVNET_RPC` in `.env`) is a dedicated
+     devnet endpoint and deploys in seconds. The Solana CLI respects `--url`
+     as an override regardless of `solana config`.
+  5. For mainnet later, swap `GFG_DEVNET_RPC` for the mainnet Alchemy/
+     Helius/Quicknode RPC in the env file — same command, same flow.
 - Build: `npm run build` (vite).
 
 Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
