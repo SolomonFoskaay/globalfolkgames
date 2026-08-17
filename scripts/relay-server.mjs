@@ -35,7 +35,8 @@ async function handleDynamicSearch(email) {
   }
 
   try {
-    const url = `https://api.dynamic.xyz/v1/quarters/${DYNAMIC_ENV_ID}/users?email=${encodeURIComponent(email)}`;
+    const filter = JSON.stringify({ filterColumn: 'email', filterValue: email });
+    const url = `https://app.dynamicauth.com/api/v0/environments/${DYNAMIC_ENV_ID}/users?filter=${encodeURIComponent(filter)}&limit=5`;
     console.log('[dynamic-search] GET', url);
     const resp = await fetch(url, {
       headers: { Authorization: `Bearer ${DYNAMIC_API_TOKEN}` },
@@ -44,21 +45,27 @@ async function handleDynamicSearch(email) {
     if (!resp.ok) {
       const body = await resp.text();
       console.error('[dynamic-search] API error:', resp.status, body.slice(0, 300));
-      return { users: [], source: 'dynamic', error: `Dynamic API returned ${resp.status}: ${body.slice(0, 200)}` };
+      return { users: [], source: 'dynamic', error: `Dynamic API ${resp.status}: ${body.slice(0, 200)}` };
     }
     const data = await resp.json();
-    console.log('[dynamic-search] data:', JSON.stringify(data).slice(0, 500));
-    const users = (data.users || data || []).map((u) => ({
-      id: u.id,
-      email: u.email,
-      wallet: u.wallet?.public_key || u.wallet?.address || null,
-      walletChain: u.wallet?.chain || null,
-      createdAt: u.created_at,
-      source: 'dynamic',
-    }));
+    console.log('[dynamic-search] count:', data.count, 'users:', data.users?.length);
+    const users = (data.users || []).map((u) => {
+      let wallet = null;
+      let walletChain = null;
+      if (u.verifiedCredentials && Array.isArray(u.verifiedCredentials)) {
+        const solCred = u.verifiedCredentials.find(c => c.chain === 'SOL' || c.format === 'blockchain');
+        if (solCred) { wallet = solCred.address; walletChain = solCred.chain || 'SOL'; }
+      }
+      if (!wallet && u.wallets && Array.isArray(u.wallets)) {
+        const solWallet = u.wallets.find(w => w.chain === 'SOL');
+        if (solWallet) { wallet = solWallet.publicKey; walletChain = solWallet.chain; }
+      }
+      if (!wallet && u.walletPublicKey) wallet = u.walletPublicKey;
+      return { id: u.id, email: u.email, wallet, walletChain, createdAt: u.createdAt || u.created_at, source: 'dynamic' };
+    });
     return { users, source: 'dynamic' };
   } catch (e) {
-    console.error('[dynamic-search] fetch error:', e.message, e.cause || '');
+    console.error('[dynamic-search] error:', e.message, e.cause || '');
     return { users: [], source: 'dynamic', error: e.message + (e.cause ? ' (' + e.cause + ')' : '') };
   }
 }

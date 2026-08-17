@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     if (!wallet || !sourceTag || !matchRef) throw new Error('missing wallet/sourceTag/matchRef');
 
     const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-    const programId = new PublicKey(idl.metadata.address);
+    const programId = new PublicKey(idl.address || idl.metadata?.address);
     const playerPub = new PublicKey(wallet);
 
     const erConn = new Connection(ER_URL, 'confirmed');
