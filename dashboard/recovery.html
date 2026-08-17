@@ -259,36 +259,62 @@
             )[0];
 
             // Check delegation via Magic Router
+            const isDelegated = async () => {
+                try {
+                    const res = await fetch(baseConn.rpcEndpoint + '/getDelegationStatus', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: '2.0', id: 1,
+                            method: 'getDelegationStatus',
+                            params: [globalAddr.toBase58()],
+                        }),
+                    });
+                    const data = await res.json();
+                    return !!(data.result && data.result.isDelegated);
+                } catch (e) { return false; }
+            };
+
+            if (await isDelegated()) {
+                console.log('[recovery] Global PDA already delegated');
+                return globalAddr;
+            }
+
+            // Delegate via the sponsor relay (idempotent, sponsor pays).
+            // The relay does ALL on-chain work (init+delegate) first, then
+            // records spend to a file ledger. On Vercel the file write fails
+            // (EROFS) AFTER the PDA is already delegated, so a 500 does NOT
+            // mean delegation failed. We re-check after any relay error.
+            let relayOk = false;
             try {
-                const res = await fetch(baseConn.rpcEndpoint + '/getDelegationStatus', {
+                const resp = await fetch(RELAY_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 1,
-                        method: 'getDelegationStatus',
-                        params: [globalAddr.toBase58()],
-                    }),
+                    body: JSON.stringify({ player: playerWallet }),
                 });
-                const data = await res.json();
-                if (data.result && data.result.isDelegated) {
-                    console.log('[recovery] Global PDA already delegated');
+                if (resp.ok) {
+                    relayOk = true;
+                    const result = await resp.json();
+                    console.log('[recovery] Relay delegation:', result.delegated ? 'already' : 'fresh', 'steps:', result.steps?.length || 0);
+                } else {
+                    const errBody = await resp.text().catch(() => '');
+                    console.warn('[recovery] Relay returned', resp.status, '(on-chain delegation may have succeeded):', errBody.slice(0, 200));
+                }
+            } catch (e) {
+                console.warn('[recovery] Relay fetch failed (on-chain delegation may have succeeded):', e.message);
+            }
+
+            // Always re-check: the relay likely succeeded on-chain before the
+            // EROFS bookkeeping error. Give the ER a moment to pick it up.
+            if (!relayOk) {
+                await sleep(2000);
+                if (await isDelegated()) {
+                    console.log('[recovery] Global PDA delegated despite relay error');
                     return globalAddr;
                 }
-            } catch (e) { /* Router not reachable; fall through to relay */ }
-
-            // Delegate via the sponsor relay (idempotent, sponsor pays)
-            console.log('[recovery] Delegating global PDA via relay...');
-            const resp = await fetch(RELAY_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ player: playerWallet }),
-            });
-            if (!resp.ok) {
-                const errBody = await resp.text().catch(() => '');
-                throw new Error('Relay delegation failed: HTTP ' + resp.status + ' ' + errBody.slice(0, 200));
+                throw new Error('Relay delegation failed and PDA is not delegated. The relay may be misconfigured.');
             }
-            const result = await resp.json();
-            console.log('[recovery] Relay delegation result:', result.delegated ? 'already delegated' : 'fresh', 'steps:', result.steps?.length || 0);
+
             return globalAddr;
         }
 
@@ -366,19 +392,36 @@
                 const info = await withTimeout(connection.getAccountInfo(addr), RPC_TIMEOUT, 'M4-global');
                 if (!info) return null;
                 const d = info.data;
+                // GlobalPoints struct (NO version field). Anchor prepends a
+                // 8-byte account discriminator, so real fields start at offset 8:
+                //   8-15:  global_pure_lifetime  (u64)
+                //  16-23:  global_lifetime       (u64)
+                //  24-31:  global_spendable_balance (u64)
+                //  32:     last_source            (u8)
+                //  33-40:  last_points            (u64)
+                //  41:     last_reason            (u8)
+                //  42-49:  last_match_ref         (u64)
+                //  50-57:  last_recorded_ts       (i64)
+                //  58-65:  award_count            (u64)
+                //  66-73:  last_spend_ts          (i64)
+                //  74-81:  last_spend_ref         (u64)
+                //  82:     last_spend_reason      (u8)
+                //  83-90:  spend_count            (u64)
                 return {
                     address: addr.toBase58(),
-                    version: d[0],
-                    pure: d.length >= 10 ? Number(d.readBigUInt64LE(2)) : 0,
-                    lifetime: d.length >= 18 ? Number(d.readBigUInt64LE(10)) : 0,
-                    spendable: d.length >= 26 ? Number(d.readBigUInt64LE(18)) : 0,
-                    lastRecordedTs: d.length >= 34 ? Number(d.readBigUInt64LE(26)) : 0,
-                    lastReason: d.length >= 35 ? d[34] : 0,
-                    lastPoints: d.length >= 43 ? Number(d.readBigUInt64LE(35)) : 0,
-                    awardCount: d.length >= 51 ? Number(d.readBigUInt64LE(43)) : 0,
-                    otherCreditCount: d.length >= 59 ? Number(d.readBigUInt64LE(51)) : 0,
-                    gameCreditCount: d.length >= 67 ? Number(d.readBigUInt64LE(59)) : 0,
-                    spendCount: d.length >= 100 ? Number(d.readBigUInt64LE(92)) : 0,
+                    pure: d.length >= 16 ? Number(d.readBigUInt64LE(8)) : 0,
+                    lifetime: d.length >= 24 ? Number(d.readBigUInt64LE(16)) : 0,
+                    spendable: d.length >= 32 ? Number(d.readBigUInt64LE(24)) : 0,
+                    lastSource: d.length >= 33 ? d[32] : 0,
+                    lastPoints: d.length >= 41 ? Number(d.readBigUInt64LE(33)) : 0,
+                    lastReason: d.length >= 42 ? d[41] : 0,
+                    lastMatchRef: d.length >= 50 ? Number(d.readBigUInt64LE(42)) : 0,
+                    lastRecordedTs: d.length >= 58 ? Number(d.readBigInt64LE(50)) : 0,
+                    awardCount: d.length >= 66 ? Number(d.readBigUInt64LE(58)) : 0,
+                    lastSpendTs: d.length >= 74 ? Number(d.readBigInt64LE(66)) : 0,
+                    lastSpendRef: d.length >= 82 ? Number(d.readBigUInt64LE(74)) : 0,
+                    lastSpendReason: d.length >= 83 ? d[82] : 0,
+                    spendCount: d.length >= 91 ? Number(d.readBigUInt64LE(83)) : 0,
                 };
             } catch (e) {
                 console.warn('[recovery] M4 read error:', e.message);
@@ -537,8 +580,8 @@
                 html += `<div class="recovery-row"><span class="label">Pure (unspendable)</span><span class="value" style="color:#f39c12;">${fmtNum(m4Data.pure)}</span></div>
                 <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#9b59b6;">${fmtNum(m4Data.lifetime)}</span></div>
                 <div class="recovery-row"><span class="label">Spendable</span><span class="value" style="color:#2ecc71;">${fmtNum(m4Data.spendable)}</span></div>
-                <div class="recovery-row"><span class="label">Game credits (kind 0)</span><span class="value">${m4Data.gameCreditCount}</span></div>
-                <div class="recovery-row"><span class="label">Other credits (kind 1)</span><span class="value">${m4Data.otherCreditCount}</span></div>
+                <div class="recovery-row"><span class="label">Award count</span><span class="value">${m4Data.awardCount}</span></div>
+                <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} (reason ${m4Data.lastReason})</span></div>
                 <div class="recovery-row"><span class="label">Spends</span><span class="value">${m4Data.spendCount}</span></div>`;
             }
             html += '</div>';
