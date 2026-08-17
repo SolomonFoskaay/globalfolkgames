@@ -452,6 +452,26 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   README descriptions, and any other user-facing text. Does NOT apply to code
   comments, git commits, or internal dev notes.
 
+## Explain like a beginner (auto-loaded rule, non-negotiable)
+
+When explaining anything to the owner (architecture, errors, concepts, how things
+work), always write like you're talking to someone who is smart but new to the
+topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
+
+- **Use simple analogies:** "The backfill is like a bank teller fixing your
+  balance. You (the player) tell the teller what went wrong. The teller (sponsor
+  wallet) fixes it on your behalf. Your wallet doesn't touch the money."
+- **Never dump raw technical terms** without a one-line plain explanation first.
+- **Avoid stacking multiple concepts in one sentence.** Break them into short
+  numbered steps.
+- **When something fails, explain WHY it failed in plain words before showing
+  the fix.** "The code was looking for the wallet address in the wrong place.
+  Dynamic puts it here, not there."
+- **Never blame the user or assume they should know.** Assume they're seeing
+  this for the first time.
+- If the owner says "explain like I'm 5" or "that's confusing", immediately
+  rewrite with shorter words, more steps, and a real-world analogy.
+
 ## Commit conventions (enforced before every commit + push)
 
 - **Format:** `<type>(<scope>): <short summary>` where type is one of:

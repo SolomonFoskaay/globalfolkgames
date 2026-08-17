@@ -63,9 +63,9 @@ export default async function handler(req, res) {
     const program = new Program(idl, provider);
 
     const tx = await program.methods.recordGlobalPoints(
-      new BN(gap), 0, 1, new BN(Date.now()),
+      0, sourceTag, new BN(gap), 1, new BN(Date.now()),
     ).accounts({
-      globalPoints: m4Pda, payer: sponsor.publicKey, playerAuthority: playerPub,
+      payer: sponsor.publicKey, playerAuthority: playerPub, globalPoints: m4Pda,
     }).transaction();
 
     tx.feePayer = sponsor.publicKey;

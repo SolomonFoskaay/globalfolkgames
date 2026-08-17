@@ -117,9 +117,9 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
   const provider2 = new AP3(erConn2, mkW(sponsor2), { commitment: 'confirmed', skipPreflight: true });
   const program2 = new Prog3(idl2, provider2);
   const tx2 = await program2.methods.recordGlobalPoints(
-    new BN3(gap2), 0, 1, new BN3(Date.now()),
+    0, sourceTag, new BN3(gap2), 1, new BN3(Date.now()),
   ).accounts({
-    globalPoints: m4Pda2, payer: sponsor2.publicKey, playerAuthority: playerPub2,
+    payer: sponsor2.publicKey, playerAuthority: playerPub2, globalPoints: m4Pda2,
   }).transaction();
   tx2.feePayer = sponsor2.publicKey;
   const sig2 = await sendTx(erConn2, tx2, [sponsor2], { skipPreflight: true });
