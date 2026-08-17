@@ -39,6 +39,7 @@ const BASE_URL = baseRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
+const GLOBAL_TAG = Buffer.from('global');
 
 // Registered M1A game tags (mirrors is_valid_game_tag in the program). Each
 // game owns its per-game points ledger seed [gfgpoints, game_tag, player].
@@ -85,11 +86,11 @@ export function mkWallet(kp) {
 const ESTIMATED_STEP_COST_LAMPORTS = 0.0015 * 1e9; // 0.0015 SOL
 
 // Initialize + delegate a player's dice PDA AND their points PDA (Scope B)
-// AND their result PDA (Scope C).
+// AND their result PDA (Scope C) AND their global points PDA (M4).
 // Idempotent for each PDA individually.
 // playerPubkey: the player's Solana wallet address (seed basis for all PDAs).
 // gameTag: which game's per-game points ledger to onboard (default 'ludo').
-// Returns { pda, pointsPda, resultPda, gameTag, delegated, steps }.
+// Returns { pda, pointsPda, resultPda, globalPointsPda, gameTag, delegated, steps }.
 export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   if (!isValidGameTag(gameTag)) throw new Error(`invalid game_tag: ${gameTag}`);
   const player = new PublicKey(playerPubkey);
@@ -104,6 +105,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const [pda] = PublicKey.findProgramAddressSync([PLAYER_SEED, player.toBytes()], PROGRAM_ID);
   const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, Buffer.from(gameTag, 'utf8'), player.toBytes()], PROGRAM_ID);
   const [resultPda] = PublicKey.findProgramAddressSync([RESULT_SEED, player.toBytes()], PROGRAM_ID);
+  const [globalPointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, GLOBAL_TAG, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
   // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
@@ -120,8 +122,9 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const status = await retry(() => getDelegationStatus(conn, pda));
   const pointsStatus = await retry(() => getDelegationStatus(conn, pointsPda));
   const resultStatus = await retry(() => getDelegationStatus(conn, resultPda));
-  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated) {
-    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), gameTag, delegated: true, steps: [] };
+  const globalStatus = await retry(() => getDelegationStatus(conn, globalPointsPda));
+  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated) {
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), gameTag, delegated: true, steps: [] };
   }
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
@@ -132,7 +135,8 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const plannedSteps =
     (status && status.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pda)) ? 1 : 2)) +
     (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2)) +
-    (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2));
+    (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2)) +
+    (globalStatus && globalStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(globalPointsPda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
   const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
@@ -186,6 +190,21 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     if (sig) steps.push({ step: 'delegate_result', sig });
   }
 
+  // Global Points PDA: create if missing, then delegate if not delegated (M4).
+  if (!(globalStatus && globalStatus.isDelegated)) {
+    const ginfo = await retry(() => conn.getAccountInfo(globalPointsPda));
+    if (!ginfo) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initializeGlobalPoints()
+          .accounts({ globalPoints: globalPointsPda, payer: sponsor.publicKey, playerAuthority: player })
+          .transaction()
+      );
+      steps.push({ step: 'initialize_global_points', sig });
+    }
+    const sig = await delegateGlobalPointsPda(program, conn, sponsor, player, globalPointsPda);
+    if (sig) steps.push({ step: 'delegate_global_points', sig });
+  }
+
   // Record the REAL cost (balance delta), not the estimate, so the ledger
   // reflects actual sponsor spend. Caps were already enforced on the estimate.
   if (steps.length) {
@@ -204,7 +223,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     }
   }
 
-  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), gameTag, delegated: true, steps };
+  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), gameTag, delegated: true, steps };
 }
 
 // M3 data-preservation migration (see .opencode/rules/solana-upgrade-safety.md).
@@ -364,6 +383,41 @@ async function delegateResultPda(program, conn, sponsor, player, resultPda) {
       }
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
       throw new Error(`delegate_result failed: ${detail}`);
+    });
+  return sig;
+}
+
+// Delegate the global points PDA into the ER session (M4). Mirrors the other
+// delegate helpers but uses the global points seed + delegate_global_points.
+async function delegateGlobalPointsPda(program, conn, sponsor, player, globalPointsPda) {
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), globalPointsPda.toBytes()], PROGRAM_ID);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), globalPointsPda.toBytes()], DELEGATION_PROGRAM);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), globalPointsPda.toBytes()], DELEGATION_PROGRAM);
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.delegateGlobalPoints()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          globalPoints: globalPointsPda,
+          bufferGlobalPoints: buffer,
+          delegationRecordGlobalPoints: record,
+          delegationMetadataGlobalPoints: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
+    .catch(async (err) => {
+      await new Promise(r => setTimeout(r, 600));
+      const after = await getDelegationStatus(conn, globalPointsPda);
+      if (after && after.isDelegated) {
+        return null;
+      }
+      const detail = err.transactionMessage || err.transactionError?.message || err.message;
+      throw new Error(`delegate_global_points failed: ${detail}`);
     });
   return sig;
 }

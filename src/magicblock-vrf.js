@@ -31,6 +31,7 @@ const DELEGATION_PROGRAM = 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh';
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
+const GLOBAL_TAG = Buffer.from('global');
 
 // Reasons recorded against a points award (mirrors the program's u8 codes).
 export const POINT_REASONS = Object.freeze({
@@ -40,6 +41,19 @@ export const POINT_REASONS = Object.freeze({
 // Reasons recorded against a local SPEND (mirrors the program's u8 codes).
 export const SPEND_REASONS = Object.freeze({
   SHOP_ITEM: 1,   // in-game purchase from the S3 shop (cosmetics etc.)
+});
+
+// M4 record_global_points kind codes (mirrors the program's u8 codes).
+export const GLOBAL_KIND = Object.freeze({
+  GAME_WIN: 0,     // game win: credits M4a pure + M4b lifetime + M4c spendable
+  OTHER: 1,        // other (signup/referral/giveaway/tier_boost): M4b + M4c only
+});
+
+// Reasons recorded against a global SPEND (mirrors the program's u8 codes).
+export const GLOBAL_SPEND_REASONS = Object.freeze({
+  SHOP_ITEM: 1,
+  TIER_BUY: 2,
+  COMP_ENTRY: 3,
 });
 
 const config = {
@@ -319,6 +333,63 @@ function pointsPdaFor(gameTag, payerPubkey) {
   );
 }
 
+function globalPointsPdaFor(payerPubkey) {
+  return PublicKey.findProgramAddressSync(
+    [POINTS_SEED, GLOBAL_TAG, payerPubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
+}
+
+// M4 — global points credit: credits the player's GLOBAL POINTS PDA (M4a
+// pure + M4b lifetime + M4c spendable for kind=0 game wins; M4b+M4c only
+// for kind=1 other credits). Gasless on the ER; `matchRef` guards idempotency.
+export async function recordGlobalPoints(kind, sourceTag, points, reason, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [globalPda] = globalPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(globalPda, wallet.publicKey);
+  await waitForErPickup(globalPda);
+
+  const sig = await program.methods
+    .recordGlobalPoints(kind, sourceTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+    .accounts({
+      globalPoints: globalPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+// M4 — global spendable draw-down: spends `amount` of the player's GLOBAL
+// spendable balance (M4c). M4a pure and M4b lifetime are never touched.
+// Gasless on the ER; `spendRef` is the purchase reference for replayability.
+export async function spendGlobal(amount, reason, spendRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { program, wallet } = ctx;
+  const [globalPda] = globalPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(globalPda, wallet.publicKey);
+  await waitForErPickup(globalPda);
+
+  const sig = await program.methods
+    .spendGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+    .accounts({
+      globalPoints: globalPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc();
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
 // Scope C: commits the FULL 1st..4th finish order on-chain. Gasless on the ER
 // (session key signs, 0 SOL), mirroring recordPoints. The relay's handleDelegate
 // (idempotent) also creates + delegates the result PDA (seed 'gfgresult'), so
@@ -539,6 +610,39 @@ export function initMagicBlockDice() {
         return {
           pureLifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime ?? 0),
           spendableBalance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance ?? 0),
+          lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
+          lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
+          lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
+          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
+          awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
+          lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
+          lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
+          lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
+          spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+        };
+      } catch (e) {
+        return null;
+      }
+    },
+
+    // M4 — reads the player's on-chain GLOBAL points ledger from the ER
+    // (gasless, no sign). Returns
+    // { pureLifetime, lifetime, spendableBalance, lastSource, lastPoints,
+    //   lastReason, lastMatchRef, lastRecordedTs, awardCount,
+    //   lastSpendTs, lastSpendRef, lastSpendReason, spendCount }
+    // or null if the PDA isn't visible yet.
+    async fetchGlobalPointsPda() {
+      const ctx = getErProgram();
+      if (!ctx) return null;
+      const { program, wallet } = ctx;
+      const [globalPda] = globalPointsPdaFor(wallet.publicKey);
+      try {
+        const acct = await program.account.globalPoints.fetch(globalPda);
+        return {
+          pureLifetime: Number(acct.globalPureLifetime ?? acct.global_pure_lifetime ?? 0),
+          lifetime: Number(acct.globalLifetime ?? acct.global_lifetime ?? 0),
+          spendableBalance: Number(acct.globalSpendableBalance ?? acct.global_spendable_balance ?? 0),
+          lastSource: Number(acct.lastSource ?? acct.last_source ?? 0),
           lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
           lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
           lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
