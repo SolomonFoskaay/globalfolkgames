@@ -156,6 +156,7 @@
         const KNOWN_GAMES = ['ludo'];
         const POINTS_SEED = Buffer.from('gfgpoints', 'utf8');
         const GLOBAL_SEED = Buffer.from('global', 'utf8');
+        const RPC_TIMEOUT = 12000;
 
         let idl = null;
         let programId = null;
@@ -181,13 +182,20 @@
             )[0];
         }
 
+        function withTimeout(promise, ms, label) {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' timed out')), ms)),
+            ]);
+        }
+
         async function fetchM3(connection, wallet) {
             const playerPub = new PublicKey(wallet);
             const results = [];
             for (const game of KNOWN_GAMES) {
                 const addr = pda(game, playerPub);
                 try {
-                    const info = await connection.getAccountInfo(addr);
+                    const info = await withTimeout(connection.getAccountInfo(addr), RPC_TIMEOUT, `M3-${game}`);
                     if (!info) continue;
                     const d = info.data;
                     const ledger = {
@@ -211,7 +219,7 @@
             const playerPub = new PublicKey(wallet);
             const addr = globalPda(playerPub);
             try {
-                const info = await connection.getAccountInfo(addr);
+                const info = await withTimeout(connection.getAccountInfo(addr), RPC_TIMEOUT, 'M4-global');
                 if (!info) return null;
                 const d = info.data;
                 return {
@@ -233,6 +241,7 @@
 
         async function searchUser(email) {
             const resp = await fetch(`/api/dynamic-search?email=${encodeURIComponent(email)}`);
+            if (!resp.ok) throw new Error('Server returned ' + resp.status);
             return resp.json();
         }
 
@@ -262,6 +271,11 @@
                     userInfo = { email: '(direct wallet)', wallet, source: 'direct' };
                 } else {
                     const data = await searchUser(q);
+                    if (data.error) {
+                        $results.innerHTML = `<div class="empty-state">${esc(data.error)}</div>`;
+                        $searchBtn.disabled = false;
+                        return;
+                    }
                     if (!data.users || data.users.length === 0) {
                         $results.innerHTML = '<div class="empty-state">No user found with that email. Try the wallet address directly.</div>';
                         $searchBtn.disabled = false;
@@ -288,16 +302,30 @@
         async function loadWalletData(wallet, userInfo) {
             $results.innerHTML = '<div class="empty-state">Reading on-chain data...</div>';
 
-            await loadIdl();
+            try {
+                await loadIdl();
+            } catch (e) {
+                $results.innerHTML = `<div class="empty-state">Failed to load program IDL: ${esc(e.message)}</div>`;
+                return;
+            }
 
-            // Read from both ER and base RPC (ER for fresh data, base for fallback)
-            const erConn = new Connection(ER_URL, 'confirmed');
-            const baseConn = new Connection(BASE_RPC, 'confirmed');
+            // Read from ER first, fall back to base RPC
+            let m3Data = [];
+            let m4Data = null;
+            try {
+                const erConn = new Connection(ER_URL, 'confirmed');
+                m3Data = await fetchM3(erConn, wallet);
+                m4Data = await fetchM4(erConn, wallet);
+            } catch (_) {}
 
-            const [m3Data, m4Data] = await Promise.all([
-                fetchM3(erConn, wallet).catch(() => fetchM3(baseConn, wallet)),
-                fetchM4(erConn, wallet).catch(() => fetchM4(baseConn, wallet)),
-            ]);
+            // If ER returned nothing useful, try base RPC
+            if (m3Data.length === 0 && !m4Data) {
+                try {
+                    const baseConn = new Connection(BASE_RPC, 'confirmed');
+                    m3Data = await fetchM3(baseConn, wallet);
+                    m4Data = await fetchM4(baseConn, wallet);
+                } catch (_) {}
+            }
 
             const m3TotalPure = m3Data.reduce((s, g) => s + g.pure, 0);
             const m4Pure = m4Data ? m4Data.pure : 0;
@@ -396,6 +424,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ wallet, points: gap, sourceTag, matchRef }),
                 });
+                if (!resp.ok) {
+                    const errBody = await resp.text();
+                    throw new Error('Server ' + resp.status + ': ' + errBody.slice(0, 200));
+                }
                 const result = await resp.json();
 
                 if (result.signature || result.ok) {

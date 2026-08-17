@@ -24,59 +24,36 @@ async function handleDynamicSearch(email) {
   const DYNAMIC_API_KEY = process.env.DYNAMIC_API_KEY || '';
   const DYNAMIC_ENV_ID = process.env.DYNAMIC_ENV_ID || '';
 
-  // Try Dynamic Management API first
-  if (DYNAMIC_API_KEY && DYNAMIC_ENV_ID) {
-    try {
-      const url = `https://api.dynamic.xyz/v1/quarters/${DYNAMIC_ENV_ID}/users?email=${encodeURIComponent(email)}`;
-      const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${DYNAMIC_API_KEY}` },
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const users = (data.users || data || []).map((u) => ({
-          id: u.id,
-          email: u.email,
-          wallet: u.wallet?.public_key || u.wallet?.address || null,
-          walletChain: u.wallet?.chain || null,
-          createdAt: u.created_at,
-          source: 'dynamic',
-        }));
-        return { users, source: 'dynamic' };
-      }
-    } catch (e) {
-      console.warn('[dynamic-search] Dynamic API error, falling back to Supabase:', e.message);
-    }
+  if (!DYNAMIC_API_KEY || !DYNAMIC_ENV_ID) {
+    return {
+      users: [],
+      source: 'unconfigured',
+      error: 'Dynamic API not configured. Add DYNAMIC_API_KEY and DYNAMIC_ENV_ID to env. Or enter a wallet address directly.',
+    };
   }
 
-  // Fallback: Supabase profiles table
-  const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-  if (SUPABASE_URL && SUPABASE_KEY) {
-    try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
-      const { data, error } = await supa
-        .from('profiles')
-        .select('id, email, solana_wallet, created_at')
-        .ilike('email', email)
-        .limit(10);
-      if (!error && data) {
-        const users = data.map((r) => ({
-          id: r.id,
-          email: r.email,
-          wallet: r.solana_wallet || null,
-          walletChain: 'solana',
-          createdAt: r.created_at,
-          source: 'supabase',
-        }));
-        return { users, source: 'supabase' };
-      }
-    } catch (e) {
-      console.warn('[dynamic-search] Supabase error:', e.message);
+  try {
+    const url = `https://api.dynamic.xyz/v1/quarters/${DYNAMIC_ENV_ID}/users?email=${encodeURIComponent(email)}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${DYNAMIC_API_KEY}` },
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      return { users: [], source: 'dynamic', error: `Dynamic API returned ${resp.status}: ${body.slice(0, 200)}` };
     }
+    const data = await resp.json();
+    const users = (data.users || data || []).map((u) => ({
+      id: u.id,
+      email: u.email,
+      wallet: u.wallet?.public_key || u.wallet?.address || null,
+      walletChain: u.wallet?.chain || null,
+      createdAt: u.created_at,
+      source: 'dynamic',
+    }));
+    return { users, source: 'dynamic' };
+  } catch (e) {
+    return { users: [], source: 'dynamic', error: e.message };
   }
-
-  return { users: [], source: 'none', note: 'No Dynamic API key or Supabase configured' };
 }
 
 async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
