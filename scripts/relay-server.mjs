@@ -74,7 +74,7 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
   if (!wallet || !sourceTag || !matchRef) throw new Error('missing wallet/sourceTag/matchRef');
 
   const idl2 = JSON.parse(rfs(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-  const programId2 = new PubKey3(idl2.metadata.address);
+  const programId2 = new PubKey3(idl2.address || idl2.metadata?.address);
   const playerPub2 = new PubKey3(wallet);
   const POINTS_SEED2 = Buffer.from('gfgpoints', 'utf8');
   const GLOBAL_SEED2 = Buffer.from('global', 'utf8');

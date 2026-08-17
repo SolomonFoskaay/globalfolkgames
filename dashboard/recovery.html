@@ -127,36 +127,45 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
     <script src="/tamper-guard.js"></script>
-    <script type="module" src="/src/main.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/profiles.js"></script>
+    <script src="/tiers.js"></script>
     <script src="/header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/pager.js"></script>
     <script src="/dash-nav.js"></script>
-    <script type="module">
-        import { Connection, PublicKey } from '@solana/web3.js';
-        import { AnchorProvider, Program } from '@anchor-lang/core';
-        import { BN } from 'bn.js';
+    <script type="module" src="/src/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initGlobalHeader) window.initGlobalHeader();
 
-        if (window.initGlobalHeader) window.initGlobalHeader();
-
-        window.GFG_DASH_NAV.render({
-            brand: '🛡 Dashboard',
-            active: 'recovery',
-            sections: [
-                { heading: 'Overview', items: [
-                    { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
-                ]},
-                { heading: 'Detail', items: [
-                    { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
-                    { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
-                    { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
-                    { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
-                    { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
-                    { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'recovery',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
                     ]},
                     { heading: 'Staff', items: [
                         { key: 'content-guide', label: '✏ Content style guide', href: '/dashboard/content-style-guide.html' },
                     ]},
-            ]
+                ]
+            });
         });
+    </script>
+    <script type="module">
+        import { Connection, PublicKey } from '@solana/web3.js';
+        import { AnchorProvider, Program } from '@anchor-lang/core';
+        import { BN } from 'bn.js';
 
         const IDL_URL = '/gfg-dice-idl.json';
         const ER_URL = 'https://devnet-us.magicblock.app/';
@@ -186,7 +195,7 @@
                 throw new Error('IDL is not valid JSON: ' + text.slice(0, 80));
             }
             programId = new PublicKey(idl.address || idl.metadata?.address);
-            console.log('[recovery] IDL loaded, program:', idl.metadata.address);
+            console.log('[recovery] IDL loaded, program:', programId?.toBase58());
         }
 
         function pda(gameTag, playerPubkey) {
