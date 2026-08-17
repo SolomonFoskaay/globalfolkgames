@@ -165,15 +165,19 @@
     <script type="module">
         import { Connection, PublicKey } from '@solana/web3.js';
         import { AnchorProvider, Program } from '@anchor-lang/core';
+        import { getWalletAccounts } from '@dynamic-labs-sdk/client';
+        import { signTransaction as dynSignTx, signAllTransactions as dynSignAll } from '@dynamic-labs-sdk/solana';
         import { BN } from 'bn.js';
 
         const IDL_URL = '/gfg-dice-idl.json';
         const ER_URL = 'https://devnet-us.magicblock.app/';
         const BASE_RPC = 'https://api.devnet.solana.com';
+        const RELAY_URL = '/api/delegate';
         const KNOWN_GAMES = ['ludo'];
         const POINTS_SEED = Buffer.from('gfgpoints', 'utf8');
         const GLOBAL_SEED = Buffer.from('global', 'utf8');
         const RPC_TIMEOUT = 12000;
+        const ER_PICKUP_WAIT_MS = 15000;
 
         let idl = null;
         let programId = null;
@@ -196,6 +200,114 @@
             }
             programId = new PublicKey(idl.address || idl.metadata?.address);
             console.log('[recovery] IDL loaded, program:', programId?.toBase58());
+        }
+
+        // --- Gasless ER backfill helpers (mirror src/magicblock-vrf.js) ---
+
+        function getSolanaWalletAccount() {
+            try {
+                const client = window.dynamicClient;
+                if (!client) return null;
+                const accounts = getWalletAccounts(client);
+                const sol = accounts.find(w => w.chain === 'SOL' && w.address);
+                return sol ? { walletAccount: sol, publicKey: new PublicKey(sol.address) } : null;
+            } catch (e) {
+                console.warn('[recovery] Could not read Solana wallet account', e);
+                return null;
+            }
+        }
+
+        function getErProgram() {
+            if (!programId || !idl) return null;
+            const wallet = getSolanaWalletAccount();
+            if (!wallet) return null;
+
+            const connection = new Connection(ER_URL, 'confirmed');
+            const walletAdapter = {
+                publicKey: wallet.publicKey,
+                async signTransaction(transaction) {
+                    const { signedTransaction } = await dynSignTx({
+                        transaction,
+                        walletAccount: wallet.walletAccount,
+                    });
+                    return signedTransaction;
+                },
+                async signAllTransactions(transactions) {
+                    const { signedTransactions } = await dynSignAll({
+                        transactions,
+                        walletAccount: wallet.walletAccount,
+                    });
+                    return signedTransactions;
+                },
+            };
+            const provider = new AnchorProvider(connection, walletAdapter, {
+                commitment: 'confirmed',
+                skipPreflight: true,
+            });
+            return new Program(idl, provider);
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // Ensure the player's global PDA is initialized + delegated to the ER.
+        // Calls the sponsor relay (same as magicblock-vrf.js ensureDelegated).
+        async function ensureGlobalDelegated(playerWallet) {
+            const baseConn = new Connection(BASE_RPC, 'confirmed');
+            const globalAddr = PublicKey.findProgramAddressSync(
+                [POINTS_SEED, GLOBAL_SEED, new PublicKey(playerWallet).toBytes()],
+                programId,
+            )[0];
+
+            // Check delegation via Magic Router
+            try {
+                const res = await fetch(baseConn.rpcEndpoint + '/getDelegationStatus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0', id: 1,
+                        method: 'getDelegationStatus',
+                        params: [globalAddr.toBase58()],
+                    }),
+                });
+                const data = await res.json();
+                if (data.result && data.result.isDelegated) {
+                    console.log('[recovery] Global PDA already delegated');
+                    return globalAddr;
+                }
+            } catch (e) { /* Router not reachable; fall through to relay */ }
+
+            // Delegate via the sponsor relay (idempotent, sponsor pays)
+            console.log('[recovery] Delegating global PDA via relay...');
+            const resp = await fetch(RELAY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player: playerWallet }),
+            });
+            if (!resp.ok) {
+                const errBody = await resp.text().catch(() => '');
+                throw new Error('Relay delegation failed: HTTP ' + resp.status + ' ' + errBody.slice(0, 200));
+            }
+            const result = await resp.json();
+            console.log('[recovery] Relay delegation result:', result.delegated ? 'already delegated' : 'fresh', 'steps:', result.steps?.length || 0);
+            return globalAddr;
+        }
+
+        // Poll ER RPC until the delegated global PDA shows up (owned by our program).
+        async function waitForErPickup(pda) {
+            const erConn = new Connection(ER_URL, 'confirmed');
+            const deadline = Date.now() + ER_PICKUP_WAIT_MS;
+            while (Date.now() < deadline) {
+                try {
+                    const info = await erConn.getAccountInfo(pda);
+                    if (info && info.owner && info.owner.toBase58() === programId.toBase58() && info.data.length > 0) {
+                        console.log('[recovery] Global PDA picked up by ER');
+                        return true;
+                    }
+                } catch (e) { /* ER not ready */ }
+                await sleep(500);
+            }
+            console.warn('[recovery] ER pickup timeout (may still land)');
+            return false;
         }
 
         function pda(gameTag, playerPubkey) {
@@ -464,32 +576,57 @@
             $msg.textContent = '';
 
             try {
+                await loadIdl();
+
                 // Build source tag from the game with the most points
                 const topGame = m3Data.sort((a, b) => b.pure - a.pure)[0];
                 const sourceTag = topGame ? topGame.game : 'ludo';
-                const matchRef = 'backfill-' + wallet.slice(0, 8) + '-' + Date.now();
+                const matchRef = new BN(Date.now());
 
-                const resp = await fetch('/api/backfill-global', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ wallet, points: gap, sourceTag, matchRef }),
-                });
-                if (!resp.ok) {
-                    const errBody = await resp.text();
-                    throw new Error('Server ' + resp.status + ': ' + errBody.slice(0, 200));
-                }
-                const result = await resp.json();
+                // Step 1: Ensure the player's global PDA is initialized + delegated.
+                // The relay creates the base-layer account and delegates it to the ER
+                // (sponsor pays, idempotent). Same as magicblock-vrf.js ensureDelegated().
+                $msg.className = 'backfill-msg';
+                $msg.textContent = 'Ensuring delegation...';
+                const globalAddr = await ensureGlobalDelegated(wallet);
 
-                if (result.signature || result.ok) {
-                    $btn.textContent = 'Added!';
-                    $btn.classList.remove('primary');
-                    $btn.classList.add('success');
-                    $msg.className = 'backfill-msg ok';
-                    $msg.textContent = `Global ledger updated. ${result.signature ? 'Sig: ' + result.signature.slice(0, 16) + '...' : ''}`;
-                } else {
-                    throw new Error(result.error || 'Unknown error');
-                }
+                // Step 2: Wait for the ER validator to pick up the delegated account.
+                $msg.textContent = 'Waiting for ER pickup...';
+                await waitForErPickup(globalAddr);
+
+                // Step 3: Write via .rpc() on the ER AnchorProvider (gasless).
+                // The admin's Dynamic session key signs as payer. The ER sees the
+                // delegated global PDA and executes the tx gaslessly. This follows
+                // the same path as the client's recordGlobalPoints() in
+                // magicblock-vrf.js — NOT the base-layer Solana .transaction() +
+                // sendTransaction() path which costs SOL every time.
+                const program = getErProgram();
+                if (!program) throw new Error('No wallet connected. Please sign in first.');
+
+                $msg.textContent = 'Writing to global ledger (gasless on ER)...';
+                const playerPub = new PublicKey(wallet);
+                const [m4Pda] = PublicKey.findProgramAddressSync(
+                    [POINTS_SEED, GLOBAL_SEED, playerPub.toBytes()],
+                    programId,
+                );
+
+                const sig = await program.methods
+                    .recordGlobalPoints(0, sourceTag, new BN(gap), 1, matchRef)
+                    .accounts({
+                        globalPoints: m4Pda,
+                        payer: program.provider.wallet.publicKey,
+                        playerAuthority: playerPub,
+                    })
+                    .rpc();
+
+                $btn.textContent = 'Added!';
+                $btn.classList.remove('primary');
+                $btn.classList.add('success');
+                $msg.className = 'backfill-msg ok';
+                $msg.textContent = 'Global ledger updated (gasless). ' + (sig ? 'Sig: ' + String(sig).slice(0, 16) + '...' : '');
+                console.log('[recovery] Backfill ER sig:', sig);
             } catch (e) {
+                console.error('[recovery] Backfill failed:', e);
                 $btn.disabled = false;
                 $btn.textContent = 'Add ' + fmtNum(gap) + ' to Global';
                 $msg.className = 'backfill-msg err';
