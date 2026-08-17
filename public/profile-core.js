@@ -140,6 +140,68 @@
         });
     }
 
-    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, bindFolds };
+    async function loadGlobalLedger(el) {
+        const magic = window.magicblockDice;
+        if (!magic || typeof magic.fetchGlobalPointsPda !== 'function') {
+            el.innerHTML = '<p class="empty">Global ledgers unavailable (wallet not ready).</p>';
+            return;
+        }
+        const pda = magic.globalPointsPdaFor();
+        if (!pda) {
+            el.innerHTML = '<p class="empty">Connect your wallet to see your global ledgers.</p>';
+            return;
+        }
+        try {
+            const ledger = await magic.fetchGlobalPointsPda();
+            if (!ledger) {
+                el.innerHTML = '<p class="empty">No global ledger account yet. Win a match to create your cross-game record.</p>';
+                return;
+            }
+            const lastTs = ledger.lastRecordedTs
+                ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
+            const pdaLink = window.gfgExplorer
+                ? window.gfgExplorer.accountLink(pda) : esc(pda);
+            const fmt = (n) => (n ?? 0).toLocaleString();
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Pure (unspendable, never multiplied)</span>
+                    <b style="color:#f39c12;font-size:1.15rem;">${fmt(ledger.globalPureLifetime)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Lifetime (unspendable, all sources)</span>
+                    <b style="color:#9b59b6;">${fmt(ledger.globalLifetime)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Spendable</span>
+                    <b style="color:#2ecc71;">${fmt(ledger.globalSpendableBalance)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Game credits</span>
+                    <b>${ledger.gameCreditCount ?? 0}</b>
+                </div>
+                ${ledger.otherCreditCount ? `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Other credits</span>
+                    <b>${ledger.otherCreditCount}</b>
+                </div>` : ''}
+                ${ledger.spendCount ? `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Spends</span>
+                    <b>${ledger.spendCount}</b>
+                </div>` : ''}
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Last credit</span>
+                    <b style="font-size:0.82rem;">${esc(lastTs)}</b>
+                </div>
+                <div style="padding:8px 0;">
+                    <span style="color:var(--muted);font-size:0.82rem;">Global ledger account (yours, site-wide)</span>
+                    <div style="margin-top:4px;">${pdaLink}</div>
+                </div>`;
+        } catch (e) {
+            el.innerHTML = '<p class="empty">Could not read global ledgers (' + esc(e.message) + ').</p>';
+        }
+    }
+
+    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, loadGlobalLedger, bindFolds };
 
 })();

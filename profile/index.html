@@ -68,6 +68,18 @@
             </div>
         </section>
 
+        <section class="game-card dash-section" id="profile-global-ledger-card">
+            <div class="dash-fold-head">
+                <h3>🌐 Global ledgers (site-wide)</h3>
+                <button class="dash-fold-toggle" type="button">− Collapse</button>
+            </div>
+            <div class="dash-fold-summary">Your cross-game totals: pure skill, lifetime reputation, and spendable balance.</div>
+            <div class="dash-fold-body">
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Three on-chain ledgers tracking your total performance across every game. Pure = sum of verified wins only (never multiplied). Lifetime = everything earned from any source. Spendable = what you can use for tiers, items, and entries.</p>
+                <div id="profile-global-ledger"><p class="empty">Check your global ledgers…</p></div>
+            </div>
+        </section>
+
         <section class="game-card dash-section" id="profile-ontx-card">
             <div class="dash-fold-head">
                 <h3>🔗 Your on-chain activity</h3>
@@ -131,6 +143,7 @@
             const walletLinkEl = document.getElementById('profile-wallet-link');
             const ontxList = document.getElementById('profile-ontx-list');
             const ledgerEl = document.getElementById('profile-ledger');
+            const globalLedgerEl = document.getElementById('profile-global-ledger');
             const signinBtn = document.getElementById('profile-signin-btn');
 
             function render(signedIn) {
@@ -152,6 +165,7 @@
                     }
                     window.ProfileCore.loadOnchainActivity(ontxList, { full: false });
                     window.ProfileCore.loadPointsLedger(ledgerEl);
+                    window.ProfileCore.loadGlobalLedger(globalLedgerEl);
                 }
                 renderTierCard();
                 signinBtn.hidden = true;
