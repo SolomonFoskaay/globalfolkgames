@@ -22,6 +22,7 @@ export default defineConfig({
         'changelog-architecture-m6': './changelog/architecture-m6.html',
         'changelog-architecture-m7': './changelog/architecture-m7.html',
         'changelog-architecture-m8': './changelog/architecture-m8.html',
+        'changelog-architecture-m9': './changelog/architecture-m9.html',
         competitions: './competitions/index.html',
         about: './about/index.html',
         contact: './contact/index.html',
