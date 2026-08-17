@@ -21,21 +21,21 @@ import './load-env.mjs';
 const PORT = process.env.RELAY_PORT || 8787;
 
 async function handleDynamicSearch(email) {
-  const DYNAMIC_API_KEY = process.env.DYNAMIC_API_KEY || '';
+  const DYNAMIC_API_TOKEN = process.env.DYNAMIC_API_TOKEN || '';
   const DYNAMIC_ENV_ID = process.env.DYNAMIC_ENV_ID || '';
 
-  if (!DYNAMIC_API_KEY || !DYNAMIC_ENV_ID) {
+  if (!DYNAMIC_API_TOKEN || !DYNAMIC_ENV_ID) {
     return {
       users: [],
       source: 'unconfigured',
-      error: 'Dynamic API not configured. Add DYNAMIC_API_KEY and DYNAMIC_ENV_ID to env. Or enter a wallet address directly.',
+      error: 'Dynamic API not configured. Add DYNAMIC_API_TOKEN and DYNAMIC_ENV_ID to env. Or enter a wallet address directly.',
     };
   }
 
   try {
     const url = `https://api.dynamic.xyz/v1/quarters/${DYNAMIC_ENV_ID}/users?email=${encodeURIComponent(email)}`;
     const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${DYNAMIC_API_KEY}` },
+      headers: { Authorization: `Bearer ${DYNAMIC_API_TOKEN}` },
     });
     if (!resp.ok) {
       const body = await resp.text();
