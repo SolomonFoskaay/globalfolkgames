@@ -452,6 +452,23 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   README descriptions, and any other user-facing text. Does NOT apply to code
   comments, git commits, or internal dev notes.
 
+## Commit conventions (enforced before every commit + push)
+
+- **Format:** `<type>(<scope>): <short summary>` where type is one of:
+  - `feat` = new feature (e.g. `feat(profile): wallet copy button`)
+  - `fix` = bug fix (e.g. `fix(recovery): IDL load error logging`)
+  - `chore` = tooling, config, deps (e.g. `chore: update Vite config`)
+  - `docs` = docs only (e.g. `docs: update AGENTS.md commit rules`)
+  - `refactor` = restructure without behavior change
+- **Scope:** the module or area affected (e.g. `M3`, `M4`, `profile`, `recovery`, `dashboard`, `ludo`, `relay`).
+- **Summary:** imperative mood, lowercase, no period. Say WHAT changed, not HOW.
+- **Body (optional):** bullet points for non-obvious changes. Never include secrets, keys, or env values.
+- **Before commit + push, always:**
+  1. Run the leak scan (`.opencode/rules/security-leak-scan.md`) on staged + worktree diff.
+  2. Verify no private keys, keypair JSON, mnemonics, service_role keys, JWTs, API tokens, or `.env` values are in the diff.
+  3. ANY hit = HARD STOP. Never commit/push. Scrub or ask the owner.
+- **Never amend a pushed commit without explicit owner approval.** If the commit is already on the remote, make a new commit instead.
+
 ## Security / anti-exploit rules (READ BEFORE CODING — non-negotiable)
 
 - **Solana upgrade safety (auto-loaded rule, non-negotiable):** upgrades NEVER
