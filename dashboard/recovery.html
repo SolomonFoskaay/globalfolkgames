@@ -450,7 +450,9 @@
             return labels[code] || ('reason ' + code);
         }
         function sourceLabel(byte) {
-            const sources = { 108: 'Ludo', 97: 'Ayo Olopon', 112: 'Platform' };
+            // Map first byte of source_tag string to human name.
+            // Both casings mapped because old data may use lowercase.
+            const sources = { 76: 'Ludo', 108: 'Ludo', 97: 'Ayo Olopon', 112: 'Platform' };
             return sources[byte] || (byte ? String.fromCharCode(byte) : 'unknown');
         }
 
@@ -629,9 +631,12 @@
             try {
                 await loadIdl();
 
-                // Build source tag from the game with the most points
+                // Build source tag from the game with the most points.
+                // Must match the canonical sourceTag in global-ledger.js
+                // (capital L for "Ludo") so last_source byte is consistent.
                 const topGame = m3Data.sort((a, b) => b.pure - a.pure)[0];
-                const sourceTag = topGame ? topGame.game : 'ludo';
+                const SOURCE_TAGS = { ludo: 'Ludo' };
+                const sourceTag = topGame ? (SOURCE_TAGS[topGame.game] || topGame.game) : 'Ludo';
                 const matchRef = new BN(Date.now());
 
                 // Step 1: Ensure the player's global PDA is initialized + delegated.

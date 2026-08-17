@@ -68,6 +68,12 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    A feature that is important and standalone earns its OWN new module
    (recorded in `architecture.json` FIRST) — never bury it inside another
    module's details.
+1b. **Module-First is enforced in the agent.** The project rule at
+   `.opencode/rules/module-first.md` is auto-loaded into every opencode session
+   (`opencode.json` `instructions`). It MUST be followed for ANY feature work —
+   read `architecture.json` first, state the module, slot check, renumber by
+   build order when inserting a module. Never skip it; the owner will not repeat
+   this.
 2. **M7/M8 are deferred.** Competitions and sponsor escrow product work does NOT
    start until M1 + M2 + M3 + M4 are stable and verified for Ludo. The on-chain
    S2 escrow + Scope C finish-order code that ALREADY exists stays (program id

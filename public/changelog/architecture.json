@@ -1,6 +1,6 @@
 {
-  "updated": "2026-08-15",
-  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. M1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Staff only.",
+  "updated": "2026-08-17",
+  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. M1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Every module now carries expectedInput and expectedOutput sections defining its exact contract with upstream/downstream modules. Staff only.",
   "overview": {
     "title": "How the Platform Works",
     "subtitle": "Living overview — keep updated when any module spec changes. The agent must read this before any feature work.",
@@ -33,8 +33,9 @@
       "Every game ends by emitting into M2; no game knows about points, tiers, or competitions.",
       "M3 local points are NEVER diluted: no multiplier, no purchase, no bonus, no giveaway, no referral.",
       "Multiplier (M5) applies only at M4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
-      "Source-tagged: every M4 credit carries its game/event source ('Ludo', 'signup_bonus', 'tier2_boost').",
+      "Source-tagged: every M4 credit carries its game/event source. The gameId from the M2 envelope IS the source identity for game wins — downstream modules must NOT hardcode source strings or duplicate scoring tables.",
       "Modules integrate through seams (M2), never hard-wires.",
+      "BUILD CONTRACT (Input/Output): every module MUST have expectedInput and expectedOutput sections in architecture.json before building. The agent MUST read both sections of a module AND its upstream/downstream modules before, during, and after building. A module that duplicates another module's work (e.g. M4 recomputing M3's scoring) is a design bug caught by this contract.",
       "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST -> M5 -> M6 -> M9 -> M7/M8. Never build ahead of the module status."
     ],
     "universalFolder": {
@@ -58,6 +59,26 @@
       "title": "Game core + proof of play",
       "status": "in-progress",
       "summary": "Per-game engine + on-chain ER VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. M1 is ONE module; its game core sub-module M1A covers every game (Ludo locked now, Ayo Olopon planned next, then 50+) - the dropdown on this page differentiates the games. Each game's LOCKED spec lives there.",
+      "expectedOutput": {
+        "summary": "What M1 MUST emit for downstream modules (M2 seam consumers) to work. Every M1 game MUST produce exactly this. Nothing more, nothing less.",
+        "items": [
+          "SEAM ENVELOPE (via window.publishGameResult): the one contract M1 fulfills. Called once on match finish. Format: { gameId: string (e.g. 'ludo', 'ayo_olopon'), mode: string, startedAt: number (ms), finishedAt: number (ms), players: [{ seat: string (game-local color/position), actor: 'user'|'house'|'local', position: number|null (ranked), score: number|null (score-based), identity: string|null (wallet, resolved by bus for 'user') }], proof: { method: string, chain: string, signature: string|null, pda: string|null } | null }",
+          "GAME_ID (critical): the string gameId ('ludo', 'ayo_olopon') is the PRIMARY KEY that M3 uses to look up scoring tables and M4 uses as the source identity. It MUST be stable per game, lowercase, no spaces. This is the game's identity on the platform.",
+          "PLAYERS ARRAY (critical): every active seat in the match. actor='user' is the signed-in player (only this seat earns M3/M4 rewards). position is the ranked finish (1st..nth). The array length determines mode (2P vs 4P). ALL active seats must be present.",
+          "PROOF (critical for banking): envelope.proof.signature MUST be a valid on-chain tx signature (the winning roll or match-end proof). M3 and M4 use the first 8 bytes as match_ref for idempotency. If proof is null, no downstream module banks anything.",
+          "ON-CHAIN PDAs (M1 manages these, downstream modules read them): PlayerPoints PDA [gfgpoints, game_tag, player] (M3), GlobalPoints PDA [gfgpoints, 'global', player] (M4), MatchResult PDA [gfgresult, player, match_ref] (Scope C). These are created/delegated by the relay on first use."
+        ]
+      },
+      "expectedInput": {
+        "summary": "What M1 NEEDS from the platform to run. M1 is standalone — it does NOT receive anything from M3, M4, M5, M6, or M7. Its inputs are infrastructure, not modules.",
+        "items": [
+          "PLAYER IDENTITY: Dynamic wallet (email OTP sign-in) providing session key for gasless on-chain signing. M1 never sees raw private keys.",
+          "ON-CHAIN VRF: MagicBlock VRF via the ER (ephemeral rollup) for dice randomness. Every roll resolves on-chain, gasless. M1 calls the VRF through the delegated dice PDA.",
+          "SPONSOR RELAY: app-funded sponsor wallet that pays the one-time init+delegate cost per player (~0.0086 SOL for dice+points+result PDAs). After delegation, all rolls are free.",
+          "GAME CONFIGURATION: board layout, rules, timing constants (AI speed, roll delays, turn pacing). Each M1A game has its own LOCKED spec in the games dropdown.",
+          "SEAM SCRIPTS: public/universal/result-seam/game-result.js must be loaded BEFORE the game runs, so window.publishGameResult is available when the match finishes."
+        ]
+      },
       "details": [
         "M1A = the game core sub-module for ALL games (one sub-module, many games). The dropdown below differentiates them: M1A Ludo (locked), M1A Ayo Olopon (planned), more later.",
         "Ludo is the first M1A game (live, on-chain ER VRF dice for EVERY seat). LOCKED 2026-08-15.",
@@ -108,6 +129,25 @@
       "title": "Universal result seam (the plug-and-play contract bus)",
       "status": "in-progress",
       "summary": "The single integration contract between every game and every reward module. One call per game finish, one subscription for all consumers. Standalone because it is the platform's wiring: 50 games = 1 reward plug, 1 competition plug.",
+      "expectedOutput": {
+        "summary": "What M2 MUST emit after normalizing a game's envelope. Every downstream consumer (M3, M4, M7, future) receives exactly this normalized envelope.",
+        "items": [
+          "NORMALIZED ENVELOPE (emitted to all subscribers via onGameResult callback + gfg:game-result DOM event): { schema: 'gfg:game-result@1', gameId: string, mode: string, startedAt: number|null, finishedAt: number, players: [{ seat: string, actor: 'user'|'house'|'local', position: number|null, score: number|null, identity: string|null }], proof: { method: string, chain: string, signature: string|null, pda: string|null } | null }",
+          "GAME_ID PASSTHROUGH: the gameId from the raw emit is preserved exactly. This is the PRIMARY KEY downstream modules use (M3 maps it to gameTag for on-chain seed, M4 maps it to source identity). M2 does NOT modify gameId.",
+          "WALLET IDENTITY ATTACHMENT: for every player where actor='user', the bus resolves the connected wallet address and attaches it as player.identity. Downstream modules (M3, M4) use this to find the correct on-chain PDA.",
+          "VALIDATION: M2 rejects malformed envelopes with clear error messages (missing gameId, empty players, invalid actor, missing position/score). Games fix their emit; downstream modules never see bad data.",
+          "SUBSCRIPTION API: window.onGameResult(handler) → returns unsubscribe function. handler receives the normalized envelope. Also: window.gfgLastGameResult (last result), gfg:game-result DOM CustomEvent."
+        ]
+      },
+      "expectedInput": {
+        "summary": "What M2 RECEIVES from games (M1). This is the raw emit that M2 normalizes.",
+        "items": [
+          "RAW EMIT from window.publishGameResult({gameId, mode, startedAt, finishedAt, players[], proof}): the raw envelope from any M1 game. gameId is required. players[] must have 1-64 entries, each with seat + (position OR score). proof is optional.",
+          "GAME_ID: string identifying the game (e.g. 'ludo'). Must be stable, lowercase, no spaces. M2 passes it through unchanged.",
+          "PLAYERS: array of seat objects. actor defaults to 'local' if omitted. position OR score required per player.",
+          "PROOF: optional on-chain proof object. If present, must have method + chain. signature and pda are optional."
+        ]
+      },
       "details": [
         "Standalone module: it does NOT fit under game core (M1) or any reward module. It is the bus every game emits into and every consumer subscribes to.",
         "Canonical envelope gfg:game-result@1: players[] with seat/actor (user|house|local)/position|score + optional on-chain proof. Implemented in public/universal/result-seam/game-result.js.",
@@ -123,6 +163,26 @@
       "title": "Local points (per game, PURE + SPENDABLE, on-chain via ER)",
       "status": "in-progress",
       "summary": "Two on-chain local ledgers per game per player, both gasless on the MagicBlock ER: (1) LOCAL PURE (unspendable lifetime): every verified win point ever earned in that game, never diluted, never spent - the native-gamer bragging-rights source of truth; (2) LOCAL SPENDABLE: the spendable split of that same game's earned points, drawn down only by that game's own in-game spends (future shop), never a bragging-rights number. Only the signed-in 'You' seat ever earns; computers and non-You humans earn nothing regardless of position.",
+      "expectedInput": {
+        "summary": "What M3 RECEIVES from upstream modules and infrastructure. M3 subscribes to M2 and nothing else upstream.",
+        "items": [
+          "FROM M2 SEAM (via window.onGameResult): the normalized envelope { schema, gameId, mode, startedAt, finishedAt, players[], proof }. M3 reads: (a) gameId → maps to its internal GAMES config to find gameTag + scoring table, (b) players[] → finds actor='user' seat to get position, (c) proof.signature → first 8 bytes become match_ref for on-chain idempotency guard.",
+          "GAME_ID (critical input): the gameId from the envelope (e.g. 'ludo') is M3's PRIMARY KEY. M3 looks it up in its GAMES config to get: gameTag (the on-chain PDA seed), scoring table (position → points mapping), reason codes. M3 does NOT receive sourceTag from anyone — it DERIVES gameTag from gameId via its own config.",
+          "PLAYER WALLET: resolved by M2 bus as player.identity for actor='user' seats. M3 uses this to derive the on-chain PlayerPoints PDA address [gfgpoints, gameTag, player].",
+          "INFRASTRUCTURE: window.magicblockDice.recordPoints() for on-chain writes, .fetchPointsPda() for reads, .spendLocal() for spends, .matchRefFromSignature() for match_ref derivation. All gasless on the ER."
+        ]
+      },
+      "expectedOutput": {
+        "summary": "What M3 MUST expose for downstream modules (M4, M5, M6, UI). This is the contract M4 and other modules depend on. M4 MUST NOT duplicate M3's scoring tables or source identity logic.",
+        "items": [
+          "WINDOW API (window.localPoints): the programmatic contract for downstream modules. get(gameTag) → {pureLifetime, spendableBalance, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, lastSpendTs, lastSpendRef, lastSpendReason}. fetch(gameTag) → blocking version. spend(gameTag, amount, reason, ref) → on-chain spend. subscribe(cb) → returns unsubscribe fn. lastAward/get lastSeenAward/get lastError/get lastError → ceremony state. clearTransient() → reset.",
+          "GAME_TAG (the source identity downstream modules need): M3 knows the gameTag for every award it computes (derived from gameId via its GAMES config). This gameTag is the canonical source identity that M4 SHOULD receive and store on-chain — NOT a hardcoded string. M3 exposes it in lastAward.gameTag and in the subscribe callback's first argument.",
+          "AWARD METADATA (passed to subscribers): { gameTag, points, position, reason, matchRef }. This is exactly what M4 needs to credit the global ledger. M4 should consume this from M3 (or from the shared M2 envelope) rather than recomputing it.",
+          "DOM SLOTS: [data-local-points-pure] → pureLifetime value, [data-local-points-spendable] → spendableBalance value, [data-local-points-game] → gameTag string, [data-local-points-last] → '+ N pts' or '—'. Any game page can place these slots and M3 fills them.",
+          "ON-CHAIN: PlayerPoints PDA per game per player. Seed [gfgpoints, game_tag, player_authority]. Tracks: local_pure_lifetime (u64), local_spendable_balance (u64). Metadata: last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count. game_tag is IN THE SEED (not stored in the account).",
+          "NO DILUTION (hard rule, output guarantee): local pure NEVER receives signup bonus, purchases, referral, giveaways, or Active Tier multiplier. Those are M6→M4 only. This is an output contract — any consumer can trust that local pure is always honest gameplay."
+        ]
+      },
       "details": [
         "BUILD ORDER: M3 is the FIRST universal consumer of the result seam (M2) - it proves the bus end-to-end. Build after M1 (Ludo complete) + M2 (seam live). D1/D2/D3 owner-locked 2026-08-16.",
         "TWO-TRACK DESIGN (owner decision 2026-08-16): mirrors the global M4 lifetime/spendable split but PER GAME. Track 1 LOCAL PURE = cumulative lifetime won points in that game, unspendable, undiluted (no purchase/referral/giveaway/multiplier ever here) - source of truth for native-game competency. Track 2 LOCAL SPENDABLE = the spendable split of the same wins (credited together with pure on a verified win), decremented ONLY by that game's own in-game purchases/items (S3 shop), goes up and down, never a bragging-rights number. ONE PDA holds both tracks so one account = one delegation = one onboarding fee.",
@@ -149,12 +209,32 @@
       "title": "Global points (3 ledgers) + on-chain inventory wallet (site-wide, decoupled from gameplay)",
       "status": "planned",
       "summary": "M4a Global Pure (sum of M3 local wins across all games, no multiplier, honest cross-game skill total). M4b Global Lifetime (unspendable) - every point ever earned from any source. M4c Global Spendable - the spendable split of lifetime. The 2x/3x/4x multiplier applies ONLY at M4 flow-up, never on M3 or M4a. M4 ALSO owns the player's on-chain inventory/asset wallet ([gfgassets, player]): skins/items/sounds living IN the account (media bytes on-chain), the embedded wallet owns, the platform frontend views the chain bytes directly - 'the wallet is a viewer'.",
+      "expectedInput": {
+        "summary": "What M4 RECEIVES from upstream modules. M4 consumes the M2 seam (game wins) and receives programmatic credits from M5 (tier boosts) and M6 (signup/referral/giveaway). M4 does NOT recompute scoring or invent source identities.",
+        "items": [
+          "FROM M2 SEAM (via window.onGameResult): the normalized envelope { schema, gameId, mode, startedAt, finishedAt, players[], proof }. M4 reads: (a) gameId → this IS the source identity (e.g. 'ludo', 'ayo_olopon'). M4 stores gameId directly on-chain as source_tag. M4 must NOT hardcode its own sourceTag string or duplicate the scoring table — gameId is the source of truth. (b) players[] → finds actor='user' seat to get position. (c) proof.signature → first 8 bytes become match_ref.",
+          "FROM M5 (Active Tier) via window.globalLedger.credit(): { kind: 1, source: 'tier_boost' (the M5 module defines the exact tag), points: (multiplier-1)*base_points, reason: 5, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). M4 receives this as-is and stores source on-chain.",
+          "FROM M6 (Point Sources) via window.globalLedger.credit(): { kind: 1, source: 'signup_bonus'|'referral'|'giveaway' (M6 defines exact tags), points: <amount>, reason: 2|3|4, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). M4 receives this as-is and stores source on-chain.",
+          "CRITICAL RULE (learned from the source_tag bug): M4 must NEVER duplicate M3's scoring table or invent source identity strings. The gameId from the M2 envelope IS the source. For kind=0 game wins, M4 receives gameId and passes it to the program. For kind=1 credits, M5/M6 pass their own source tag. M4 is a BANK, not a scorer — it receives and stores, it does not compute.",
+          "INFRASTRUCTURE: window.magicblockDice.recordGlobalPoints() for on-chain writes, .fetchGlobalPointsPda() for reads, .spendGlobal() for spends. All gasless on the ER."
+        ]
+      },
+      "expectedOutput": {
+        "summary": "What M4 MUST expose for downstream modules (M5, M6, M7, UI). This is the contract that M5/M6 call into for credits and spends.",
+        "items": [
+          "WINDOW API (window.globalLedger): the programmatic contract. get() → {pureLifetime, lifetime, spendableBalance, lastSource, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, ...}. fetch() → blocking version. credit({source, kind, points, reason, matchRef}) → on-chain credit (M5/M6 call this). spend(amount, reason, ref) → on-chain spend. subscribe(cb) → returns unsubscribe fn. lastCredit/get lastSeenCredit/get lastError → ceremony state. clearTransient() → reset.",
+          "CREDIT API (the key downstream contract): window.globalLedger.credit({source, kind, points, reason, matchRef}) — this is how M5 (tier boost) and M6 (signup/referral/giveaway) add points to M4. M4 stores source on-chain as-is. kind=0 (game win) credits M4a+M4b+M4c. kind=1 (other) credits M4b+M4c only.",
+          "ON-CHAIN: GlobalPoints PDA per player. Seed [gfgpoints, 'global', player_authority]. Tracks: global_pure_lifetime (u64), global_lifetime (u64), global_spendable_balance (u64). Metadata: last_source (source tag stored on-chain), last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count.",
+          "DOM SLOTS: [data-global-pure] → pureLifetime, [data-global-lifetime] → lifetime, [data-global-spendable] → spendableBalance, [data-global-last] → '+ N pts' or '—'. Any page can place these and M4 fills them.",
+          "FLOW-UP GUARANTEE (output contract): M4a pure is NEVER multiplied or bonus-inflated. Multiplier (M5) applies only to M4b+M4c as kind=1 credits. M6 sources apply only to M4b+M4c as kind=1 credits. Any consumer can trust that global_pure_lifetime = sum of verified game wins across all games, period."
+        ]
+      },
       "details": [
         "M4a GLOBAL PURE: strictly the sum of M3 local wins across all games. No multiplier, no purchases, no bonus. The honest 'how good are you across the whole platform' number.",
         "M4b GLOBAL LIFETIME (unspendable): every point ever earned from ANY source (game wins, signup bonus, giveaways, referral, sub multiplier). Permanent reputation/level number.",
         "M4c GLOBAL SPENDABLE: the spendable split of lifetime. Purchases, Active Tier buys, comp entries, cosmetics all flow here. Goes up and down.",
         "Active Tier 2x/3x/4x multiplier applies ONLY at M4 flow-up (lifetime + spendable), NEVER on M3 local or M4a pure.",
-        "Source-tagged: every M4 credit carries its game/event source ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral', 'giveaway').",
+        "Source-tagged: every M4 credit carries its game/event source. For game wins (kind=0), the source IS the gameId from the M2 envelope (e.g. 'ludo'). For other credits (kind=1), the source is the tag from M5/M6 (e.g. 'signup_bonus', 'referral', 'tier_boost'). The program stores source as a u8 at last_source — this is a KNOWN BUG (discovered 2026-08-17): the field only stores the first byte of a string, making 'L' (for Ludo) ambiguous. FIX PLANNED: change source_tag parameter from String to u8 enum in the program, with explicit codes (1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, etc.). No layout change needed (still u8 at offset 32).",
         "ON-CHAIN (owner-locked 2026-08-16): the 3 global ledgers live on-chain via the SAME delegated gfg program, NOT in Supabase. Reuse the M3 decision: one delegated program = one ER session per player = one onboarding fee; every record_global / spend_global is gasless on the ER (session key signs, 0 fees). No new program.",
         "SEED (fits the existing per-game scheme, game_tag is data not code): GlobalPoints PDA = [gfgpoints, 'global', player_authority] - the reserved 'global' tag, documented so no future game uses it. NEW separate account type (GlobalPoints layout: global_pure_lifetime, global_lifetime, global_spendable_balance, last_source, last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_*, spend_count) - do NOT extend the PlayerPoints layout (upgrade-safety R2: layouts are versioned; a separate account avoids touching the live M3 schema). No migration needed: the old single global_points/lifetime_points was Supabase-only, there is no legacy on-chain global account.",
         "INSTRUCTIONS (same program id, new capability): initialize_global_points, delegate_global_points (seed [gfgpoints, 'global', authority]), record_global_points(kind u8, source_tag, points, reason, match_ref) where kind 0 = GAME WIN (credits M4a pure + M4b lifetime + M4c spendable) and kind 1 = OTHER credit (signup_bonus/referral/giveaway - credits M4b + M4c ONLY, never M4a pure), duplicate match_ref guard; spend_global(amount, reason, spend_ref) decrements M4c spendable ONLY (M4a/M4b untouched), InsufficientBalance guard, idempotent spend_ref. All gasless on the ER.",
@@ -175,6 +255,25 @@
       "title": "Monthly subscription (powers the multiplier)",
       "status": "in-progress",
       "summary": "The consistent-money module: a monthly subscription (Active Tier) bought from spendable points that powers the 2x/3x/4x win multiplier applied at M4 flow-up. The core recurring revenue stream.",
+      "expectedInput": {
+        "status": "pending discussion — finalize before M5 build",
+        "summary": "What M5 will RECEIVE. To be discussed and locked when M5 build starts.",
+        "items": [
+          "FROM M4: window.globalLedger.get() to read the player's current spendable balance (to verify they can afford the tier).",
+          "FROM M4: window.globalLedger.spend() to deduct the tier cost from M4c spendable.",
+          "FROM USER: tier selection (Tier 2/3/4) and confirmation.",
+          "FROM M2 SEAM: the current game win's base points (to compute the multiplier boost). M5 reads the envelope and calculates (multiplier-1)*base, then credits M4 via window.globalLedger.credit({kind:1, source:'tier_boost', points: boost, reason:5, matchRef})."
+        ]
+      },
+      "expectedOutput": {
+        "status": "pending discussion — finalize before M5 build",
+        "summary": "What M5 MUST expose. To be discussed and locked when M5 build starts.",
+        "items": [
+          "WINDOW API: window.activeTier.get() → current tier + expiry. window.activeTier.subscribe(cb).",
+          "CREDIT INTO M4: on each verified game win, M5 computes (multiplier-1)*base and calls window.globalLedger.credit({kind:1, source:'tier_boost', ...}) — this is M5's ONLY output to M4.",
+          "M4a PURE GUARANTEE: M5 never touches M3 or M4a pure. Multiplier is kind=1 only (M4b+M4c)."
+        ]
+      },
       "details": [
         "Standalone module because it is the consistent money engine: 1,000 / 2,500 / 5,000 spendable per month for 2x / 3x / 4x (econ-003 settled ladder).",
         "Multiplier applies ONLY at M4 flow-up (lifetime + spendable), never on M3 local or M4a pure. A player's pure local wins stay honest.",
@@ -188,6 +287,23 @@
       "title": "Point-source modules (referral, giveaway, signup, social earn)",
       "status": "planned",
       "summary": "The other point sources that feed M4 (lifetime + spendable) but NEVER M3 local. Signup bonus from day 1; referral, giveaway and social-share earn paths built early.",
+      "expectedInput": {
+        "status": "pending discussion — finalize before M6 build",
+        "summary": "What M6 will RECEIVE. To be discussed and locked when M6 build starts.",
+        "items": [
+          "FROM USER: referral code, social share action, or signup event.",
+          "FROM M4: window.globalLedger.credit() to write points into M4b+M4c.",
+          "FROM SUPABASE/PLATFORM: referral tracking (who invited whom), signup verification."
+        ]
+      },
+      "expectedOutput": {
+        "status": "pending discussion — finalize before M6 build",
+        "summary": "What M6 MUST expose. To be discussed and locked when M6 build starts.",
+        "items": [
+          "CREDIT INTO M4: M6 calls window.globalLedger.credit({kind:1, source:'signup_bonus'|'referral'|'giveaway', points, reason, matchRef}) — this is M6's ONLY output to M4.",
+          "M4a PURE GUARANTEE: M6 never touches M3 or M4a pure. All credits are kind=1 (M4b+M4c only)."
+        ]
+      },
       "details": [
         "SIGNUP BONUS: from day 1 a user joins the platform. Goes to M4c spendable (and M4b lifetime), NEVER M3 local, so bragging rights stay pure.",
         "REFERRAL: invites earn the referrer M4 points when the friend joins/plays. Early build - core acquisition.",
@@ -201,6 +317,26 @@
       "title": "Competitions (standalone, game-agnostic)",
       "status": "planned",
       "summary": "Entry config = points requirement + optional custom fields (e.g. phone number for airtime). Plugs into one / multiple / all games. Pluggable payout: airtime, escrow, manual. Runs fine with NO sponsor.",
+      "expectedInput": {
+        "status": "pending discussion — finalize before M7 build",
+        "summary": "What M7 will RECEIVE. To be discussed and locked when M7 build starts.",
+        "items": [
+          "FROM M2 SEAM: window.onGameResult — the normalized envelope for verified finishes. M7 reads gameId, player identity, position to determine leaderboard placement.",
+          "FROM M4: window.globalLedger.get() to read player's global points (for entry requirements and leaderboard ranking).",
+          "FROM M4: window.globalLedger.spend() to deduct entry fee from M4c spendable (if competition has an entry cost).",
+          "FROM M8 (OPTIONAL): sponsor escrow attached to a competition for brand-funded prizes.",
+          "FROM USER: competition entry form data (phone number for airtime, etc.)."
+        ]
+      },
+      "expectedOutput": {
+        "status": "pending discussion — finalize before M7 build",
+        "summary": "What M7 MUST expose. To be discussed and locked when M7 build starts.",
+        "items": [
+          "LEADERBOARD: per-competition rankings based on game finishes (consumes M2 envelope).",
+          "PAYOUT: pluggable (airtime via phone, escrow via M8, manual). M7 triggers the payout, never M4.",
+          "ENTRY GATE: M7 reads M4 to verify entry requirements, deducts entry cost via M4 spend."
+        ]
+      },
       "details": [
         "Game-agnostic: a competition selects which games' points count (one, several, or all), never tailored to a single game.",
         "Entry requirements: general (points threshold) + competition-specific custom fields (e.g. phone number for airtime rewards).",
@@ -215,11 +351,60 @@
       "title": "Sponsor escrow (optional plugin, separate from M7)",
       "status": "planned",
       "summary": "Brand-funded prize pool locked on-chain BEFORE the event, 30/70 rake at settle. A competition may use M8 or not. Optional plugin, not part of the core competition flow.",
+      "expectedInput": {
+        "status": "pending discussion — finalize before M8 build",
+        "summary": "What M8 will RECEIVE. To be discussed and locked when M8 build starts.",
+        "items": [
+          "FROM M7: competition ID, winner list, payout amounts.",
+          "FROM SPONSOR: SOL deposit to fund the escrow before the event.",
+          "ON-CHAIN: Competition account (fund/close/settle/claim instructions)."
+        ]
+      },
+      "expectedOutput": {
+        "status": "pending discussion — finalize before M8 build",
+        "summary": "What M8 MUST expose. To be discussed and locked when M8 build starts.",
+        "items": [
+          "ON-CHAIN ESCROW: Competition PDA holding sponsor's SOL, split 70/30 on settle.",
+          "CLAIM API: winners claim gasless via session key.",
+          "M7 ATTACHMENT: M7 optionally attaches M8 to a competition for brand-funded prizes."
+        ]
+      },
       "details": [
         "Program proof already built + verified on devnet (Competition account, fund/close/settle/claim, 70/30 winners bucket, one active comp per sponsor).",
         "Sponsor (brand) locks SOL on-chain before the event; winners claim gasless; platform keeps 30%.",
         "Kept SEPARATE from M7: a competition runs without M8 (airtime / manual payout). M8 is attached only when a brand wants a guaranteed escrowed prize.",
         "Mainnet legal framing: points entry + small fee, prizes in points, real value only via escrow with T&Cs."
+      ]
+    },
+    {
+      "id": "M9",
+      "title": "Player inventory",
+      "status": "planned",
+      "summary": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure.",
+      "expectedInput": {
+        "status": "pending discussion — finalize before M9 build",
+        "summary": "What M9 will RECEIVE. To be discussed and locked when M9 build starts.",
+        "items": [
+          "FROM M1 GAMES: item catalog definitions (what items exist, media bytes, metadata).",
+          "FROM USER: equip/unequip/revoke actions.",
+          "FROM M7 (OPTIONAL): competition rewards that are items (skins, sounds) instead of points.",
+          "INFRASTRUCTURE: window.magicblockDice for on-chain asset operations (grantAsset, updateAssetState, addAssetMedia)."
+        ]
+      },
+      "expectedOutput": {
+        "status": "pending discussion — finalize before M9 build",
+        "summary": "What M9 MUST expose. To be discussed and locked when M9 build starts.",
+        "items": [
+          "WINDOW API: window.gfgAssets.list() → owned items. open(assetId) → {mediaType, blobUrl}. equip(assetId). subscribe(cb).",
+          "ON-CHAIN: PlayerAssets PDA [gfgassets, player] holding item entries + media bytes.",
+          "GAME INTEGRATION: M1 games read the player's inventory to apply skins/sounds/cosmetics in-game."
+        ]
+      },
+      "details": [
+        "On-chain player-owned inventory. Media bytes stored directly in the account (the wallet is a viewer).",
+        "Per-game item catalogs: Ludo skins, Ayo Olopon sounds, etc. Games define their catalogs; M9 owns the wallet.",
+        "Gasless grant/equip/revoke via session key. Sliced reads (dataSlice) for efficient media loading.",
+        "M1 games define their own item catalogs; M9 owns the wallet infrastructure."
       ]
     }
   ],

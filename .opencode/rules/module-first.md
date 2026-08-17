@@ -21,18 +21,26 @@ module gate below. The owner will not repeat this; enforce it yourself every tim
      Add it to `architecture.json` as a new module (M8+) FIRST, then build it. A feature
      is never "unmodular". Do NOT bury an important standalone capability inside another
      module's details.
-4. **Renumber by build order.** Module numbers reflect the order modules are actually
+4. **Input/Output contract check (MANDATORY).** Read the `expectedInput` and
+   `expectedOutput` sections of BOTH the module you are building AND every module it
+   connects to (upstream and downstream). Verify:
+   - Your module's inputs exist and are defined in the upstream module's `expectedOutput`.
+   - Your module's outputs match what downstream modules expect in their `expectedInput`.
+   - You are NOT duplicating work another module already does (e.g. recomputing scoring
+     tables that M3 already owns). If you find a mismatch, STOP and fix the
+     architecture.json contract BEFORE writing code.
+5. **Renumber by build order.** Module numbers reflect the order modules are actually
    built/used (M1 game core -> M2 result seam -> M3 local points -> ... -> then
    next used module). When a new module is inserted, renumber the list so future
    games plug in M1 -> M2 -> M3 ... cleanly. Keep AGENTS.md mirror + roadmap/
    economics references in sync.
-5. **Integrate through the seams, never standalone.** Consume via `window.onGameResult()`
+6. **Integrate through the seams, never standalone.** Consume via `window.onGameResult()`
    (universal result seam, `public/universal/result-seam/game-result.js`) / source tags / module APIs. Never
    hard-wire one game into the platform.
-6. **Respect status.** M7/M8-style deferred modules: product work does NOT start until
+7. **Respect status.** M7/M8-style deferred modules: product work does NOT start until
    their dependencies (per `implementationOrder`) are stable. Never build ahead of a
    module's status.
-7. **M1A per-game LOCKED specs are the build + test benchmark (HARD RULE).** Each game
+8. **M1A per-game LOCKED specs are the build + test benchmark (HARD RULE).** Each game
    under M1 (M1A) has its own LOCKED spec stored in `public/changelog/architecture.json`
    under M1's `games` (dropdown: Ludo locked, Ayo Olopon planned, ...). When working on a
    game's M1:
