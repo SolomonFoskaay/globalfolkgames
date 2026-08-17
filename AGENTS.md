@@ -96,6 +96,11 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
     M1-only game tooling (like the `/verify/` receipt explorer, proof-of-play)
     is NOT a universal module and does NOT live in `public/universal/`. New
     universal capabilities land in this tree and mirror into `architecture.json`.
+    **BUILD RULE (hard):** when building ANY universal module (M2-M8), the code
+    MUST live in its canonical `public/universal/<folder>/` — never in `src/`,
+    never in a game folder, never scattered across the repo. The folder is the
+    module's home; its README documents the contract; `architecture.json` holds
+    the spec. Before writing any universal module code, check this tree first.
 5. **Feature Tracker stays synced.** Roadmap items reference their module
    (e.g. "Earn competitions = M7"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.

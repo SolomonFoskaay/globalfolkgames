@@ -447,3 +447,31 @@
     line-height: 1.5;
     word-break: break-word;
 }
+.ov-uf-path {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: #f39c12;
+}
+.ov-uf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.ov-uf-table th {
+    text-align: left;
+    color: #f39c12;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.ov-uf-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: #bbb;
+    vertical-align: top;
+}
+.ov-uf-table code {
+    color: #9b59b6;
+    font-size: 0.82rem;
+}
+.ov-uf-planned td { opacity: 0.5; }

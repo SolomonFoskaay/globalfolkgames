@@ -106,10 +106,31 @@
         <div class="ov-cards">${flowCards}</div>
       </section>
       ${arrows.length ? `<section class="arch-block"><h3 class="arch-block-title">How they connect</h3><div class="ov-arrows">${arrows}</div></section>` : ''}
+      ${renderUniversalFolder(ov.universalFolder)}
       ${rules.length ? `<section class="arch-block"><h3 class="arch-block-title">Key rules (non-negotiable)</h3><ul>${rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></section>` : ''}
       <hr class="arch-divider">
       ${renderOrder(cache.implementationOrder)}
     `;
+  }
+
+  function renderUniversalFolder(uf) {
+    if (!uf) return '';
+    var rows = (uf.layout || []).map(function (r) {
+      var mod = r.module || '';
+      var planned = !r.file || r.file === '(planned)';
+      return '<tr' + (planned ? ' class="ov-uf-planned"' : '') + '>'
+        + '<td class="ov-uf-folder"><code>' + esc(r.folder) + '</code></td>'
+        + '<td class="ov-uf-module"><span class="entry-version" style="font-size:0.82rem;">' + esc(mod) + '</span></td>'
+        + '<td class="ov-uf-desc">' + esc(r.desc) + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<section class="arch-block">'
+      + '<h3 class="arch-block-title">Codebase layout (universal modules)</h3>'
+      + '<p class="muted-note" style="color:#888;font-size:0.82rem;line-height:1.5;margin:0 0 10px;">' + esc(uf.note || '') + '</p>'
+      + '<p class="ov-uf-path"><code>' + esc(uf.path || '') + '</code></p>'
+      + '<table class="ov-uf-table"><thead><tr><th>Folder</th><th>Module</th><th>What lives here</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>'
+      + '</section>';
   }
 
   function renderModuleListTab(cache, status) {

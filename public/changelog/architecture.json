@@ -33,8 +33,21 @@
       "Multiplier (M5) applies only at M4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
       "Source-tagged: every M4 credit carries its game/event source ('Ludo', 'signup_bonus', 'tier2_boost').",
       "Modules integrate through seams (M2), never hard-wires.",
-      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST → M5 → M6 → M7/M8. Never build ahead of the module status."
-    ]
+      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST -> M5 -> M6 -> M7/M8. Never build ahead of the module status."
+    ],
+    "universalFolder": {
+      "path": "public/universal/",
+      "note": "ALL universal (game-agnostic) module code lives here. Never in src/, never in a game folder. Each module has its own subfolder; its README documents the contract; architecture.json holds the spec. Before writing any universal module code, check this tree first.",
+      "layout": [
+        { "folder": "result-seam/", "module": "M2", "file": "game-result.js", "desc": "The bus itself. Validates/normalizes the gfg:game-result@1 envelope, fans to subscribers." },
+        { "folder": "points/", "module": "M3", "file": "local-points.js", "desc": "Per-game two-track local ledger (PURE + SPENDABLE). Subscribes to M2, banks verified user-seat wins." },
+        { "folder": "ledgers/", "module": "M4", "file": "global-ledger.js", "desc": "Site-wide three ledgers (PURE + LIFETIME + SPENDABLE). Subscribes to M2, credits kind-0 game wins. M5/M6 drive kind-1 credits here." },
+        { "folder": "subscription/", "module": "M5", "file": "(planned)", "desc": "Active Tier monthly subscription. Drives kind-1 multiplier credits into M4b+M4c only." },
+        { "folder": "point-sources/", "module": "M6", "file": "(planned)", "desc": "Signup bonus, referral, giveaway, social earn. All drive kind-1 credits into M4b+M4c." },
+        { "folder": "competitions/", "module": "M7", "file": "(planned)", "desc": "Earn events + leaderboards. Subscribes to M2, entry from M4c spendable." },
+        { "folder": "escrow/", "module": "M8", "file": "(planned)", "desc": "Optional on-chain sponsor escrow plugin for M7." }
+      ]
+    }
   },
   "modules": [
     {
