@@ -11,21 +11,23 @@
       { "from": "M5", "to": "M4", "label": "Tier boost: kind-1 credit into M4b+M4c only (never M4a)" },
       { "from": "M6", "to": "M4", "label": "Signup/referral/giveaway: kind-1 credit into M4b+M4c only" },
       { "from": "M2", "to": "M7", "label": "Seam fans envelope to competitions subscriber" },
-      { "from": "M7", "to": "M8", "label": "Comp optionally attaches sponsor escrow" }
+      { "from": "M7", "to": "M8", "label": "Comp optionally attaches sponsor escrow" },
+      { "from": "M1", "to": "M9", "label": "Game grants item to player inventory on achievement/win" }
     ],
     "modules": [
       { "id": "M1", "title": "Game core", "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into M2 on match finish." },
       { "id": "M2", "title": "Result seam", "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to M3/M4/M7." },
       { "id": "M3", "title": "Local points", "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE — every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE — the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns." },
-      { "id": "M4", "title": "Global ledgers", "what": "Site-wide three ledgers: (a) PURE — sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable. Also owns the on-chain inventory/asset wallet [gfgassets, player]." },
+      { "id": "M4", "title": "Global ledgers", "what": "Site-wide three ledgers: (a) PURE — sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable." },
       { "id": "M5", "title": "Active Tier", "what": "Monthly subscription bought from M4c spendable. 2x/3x/4x multiplier on base win points, applied as a SECOND kind-1 credit into M4b+M4c only (M4a pure is never multiplied)." },
       { "id": "M6", "title": "Point sources", "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch M3 local or M4a pure." },
       { "id": "M7", "title": "Competitions", "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (M2). Entry from M4c spendable. Deferred until M1-M4 stable." },
-      { "id": "M8", "title": "Sponsor escrow", "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build." }
+      { "id": "M8", "title": "Sponsor escrow", "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build." },
+      { "id": "M9", "title": "Player inventory", "what": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure." }
     ],
     "flowDiagram": {
       "label": "Data flow — every arrow is the universal result seam (M2)",
-      "path": "M1 Game → M2 Seam → M3 Local Bank (per-game pure+spendable) → M4 Global Bank (site-wide pure+lifetime+spendable) → M5 Tier Boost (kind-1 to lifetime+spendable only) / M6 Sources (kind-1 to lifetime+spendable only)"
+      "path": "M1 Game → M2 Seam → M3 Local Bank (per-game pure+spendable) → M4 Global Bank (site-wide pure+lifetime+spendable) → M5 Tier Boost (kind-1 to lifetime+spendable only) / M6 Sources (kind-1 to lifetime+spendable only) | M1 Game → M9 Inventory (per-game items/skins/sounds on-chain)"
     },
     "keyRules": [
       "Every game ends by emitting into M2; no game knows about points, tiers, or competitions.",
@@ -33,7 +35,7 @@
       "Multiplier (M5) applies only at M4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
       "Source-tagged: every M4 credit carries its game/event source ('Ludo', 'signup_bonus', 'tier2_boost').",
       "Modules integrate through seams (M2), never hard-wires.",
-      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST -> M5 -> M6 -> M7/M8. Never build ahead of the module status."
+      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST -> M5 -> M6 -> M9 -> M7/M8. Never build ahead of the module status."
     ],
     "universalFolder": {
       "path": "public/universal/",
@@ -45,7 +47,8 @@
         { "folder": "subscription/", "module": "M5", "file": "(planned)", "desc": "Active Tier monthly subscription. Drives kind-1 multiplier credits into M4b+M4c only." },
         { "folder": "point-sources/", "module": "M6", "file": "(planned)", "desc": "Signup bonus, referral, giveaway, social earn. All drive kind-1 credits into M4b+M4c." },
         { "folder": "competitions/", "module": "M7", "file": "(planned)", "desc": "Earn events + leaderboards. Subscribes to M2, entry from M4c spendable." },
-        { "folder": "escrow/", "module": "M8", "file": "(planned)", "desc": "Optional on-chain sponsor escrow plugin for M7." }
+        { "folder": "escrow/", "module": "M8", "file": "(planned)", "desc": "Optional on-chain sponsor escrow plugin for M7." },
+        { "folder": "inventory/", "module": "M9", "file": "(planned)", "desc": "On-chain player inventory wallet. Per-game item catalogs (skins, sounds, items) stored as media bytes in the account. Gasless grant/equip/revoke." }
       ]
     }
   },
@@ -228,7 +231,7 @@
     "Multiplier only at M4 flow-up: 2x/3x/4x touches M4b lifetime + M4c spendable, never M3 or M4a.",
     "Everything slots together by source tag ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral').",
     "Modular + pluggable: each module is interchangeable and game-agnostic; no module is tailored to a single game.",
-    "Extensible: M1-M8 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M9+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
+    "Extensible: M1-M9 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M10+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
     "LOCKED PER-GAME SPECS ARE THE BENCHMARK (M1A rule): each game under M1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the M1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes M1 for that game when the build matches A-Z."
   ],
   "implementationOrder": [

@@ -30,7 +30,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 `/changelog/architecture.html`). Module status lives THERE, not in AGENTS.md
 (AGENTS.md only mirrors the current state).
 
-**Modules (M1-M8):**
+**Modules (M1-M9):**
 - **M1 — Game core:** the games themselves (Ludo now), board rules, moves,
   win detection, timing/AI constraints. Game-agnostic: adding a game = adding a
   game module, the rest of the platform doesn't care which game is running.
@@ -107,7 +107,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 6. **Admin visibility:** the Architecture workspace is admin-only, listed in the
    drawer Admin section below "Game Economics" and on the raw changelog header.
    Never move it to the public page.
-7. **The module list is extensible.** M1-M8 cover the current roadmap, but any
+7. **The module list is extensible.** M1-M9 cover the current roadmap, but any
    genuinely new domain (community/forum, support, profile, etc.) becomes a NEW
    module (M9+) recorded in `architecture.json` FIRST. A feature is never
    "unmodular" — either it slots into an existing module or it earns a new one.
@@ -158,30 +158,26 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   re-fetch; global header "Local:" chip via initGlobalHeader({localPointsTag});
   ludo-lab ceremony "+N Ludo points banked on-chain"; client pointsPda(gameTag)
   powers the profile on-chain ledger card.
-- M4: planned — global ledgers (M4a pure / M4b lifetime / M4c spendable).
-  Owner-locked 2026-08-16: ON-CHAIN via the same delegated gfg program (seed
-  [gfgpoints, 'global', player], new GlobalPoints account type + record_global/
-  spend_global instructions, gasless on the ER, no new program); Supabase is
-  backup/restore only (devnet-wipe recovery). Multiplier-blind flow-up: M4
-  banks the base unmultiplied win via the seam; M5 applies the tier boost as a
-  separate kind-1 credit (source e.g. 'tier2_boost') so M4a pure can never be
-  multiplied. Build after M3 stable, before M5.
-  Owner-locked 2026-08-17 (spec in architecture.json): M4 ALSO owns the
-  on-chain INVENTORY/ASSET wallet ([gfgassets, player], new seed prefix) —
-  skins/items/sounds live IN the account (media bytes on-chain, "wallet is a
-  viewer": embedded wallet owns, frontend views the chain bytes directly, no
-  IPFS simplification), gasless grant/equip/revoke via session key, sliced
-  reads (dataSlice) so profile pages fetch only one asset's byte range.
-  MagicBlock-proven (Solana Generals map + Magic UNO cards all-on-chain
-  gasless; Session Keys = the documented "in-app NFTs purchase" pattern; Asset
-  Manager SDK stores images/sounds directly in an Assets account). Module lives
-  at public/universal/assets/ (window.gfgAssets).
+- M4: in-progress — global ledgers (M4a pure / M4b lifetime / M4c spendable).
+  ON-CHAIN via the same delegated gfg program (seed [gfgpoints, 'global', player],
+  GlobalPoints account type + record_global/spend_global instructions, gasless on
+  the ER, no new program). Multiplier-blind flow-up: M4 banks the base unmultiplied
+  win via the seam; M5 applies the tier boost as a separate kind-1 credit so M4a
+  pure can never be multiplied. Track A complete: program deployed, relay wired,
+  client SDK (recordGlobalPoints/spendGlobal/fetchGlobalPointsPda), universal
+  module (public/universal/ledgers/global-ledger.js), profile 3-ledger card,
+  both harnesses pass (26/26).
+- M9: planned — player inventory (on-chain asset wallet [gfgassets, player]).
+  Per-game item catalogs (skins, items, sounds) stored as media bytes directly
+  on-chain. Each game defines its own catalog (like M1's game dropdown); M9
+  owns the wallet infrastructure. Gasless grant/equip/revoke via session key,
+  sliced reads (dataSlice). Module at public/universal/inventory/.
 - M5: in-progress — S1 Active Tier + spendable sink.
 - M6: planned — referral / giveaways / sub buy-in.
 - M7: planned (deferred) — competitions.
 - M8: planned (deferred) — sponsor escrow.
 
-**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> M5 (money) -> M6 -> M7/M8
+**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> M5 (money) -> M6 -> M9 (inventory) -> M7/M8
 -> S3 rails (on-ramp, cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never
 build ahead of its module status.
 
