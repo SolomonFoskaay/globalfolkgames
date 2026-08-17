@@ -132,6 +132,8 @@
         import { AnchorProvider, Program } from '@anchor-lang/core';
         import { BN } from 'bn.js';
 
+        if (window.initGlobalHeader) window.initGlobalHeader();
+
         window.GFG_DASH_NAV.render({
             brand: '🛡 Dashboard',
             active: 'recovery',
@@ -166,9 +168,22 @@
 
         async function loadIdl() {
             if (idl) return;
+            console.log('[recovery] Loading IDL from', IDL_URL);
             const resp = await fetch(IDL_URL);
-            idl = await resp.json();
+            if (!resp.ok) {
+                const txt = await resp.text().catch(() => '');
+                console.error('[recovery] IDL fetch failed:', resp.status, txt.slice(0, 200));
+                throw new Error('IDL fetch failed: HTTP ' + resp.status + ' (' + txt.slice(0, 80) + ')');
+            }
+            const text = await resp.text();
+            try {
+                idl = JSON.parse(text);
+            } catch (parseErr) {
+                console.error('[recovery] IDL parse failed. Response was:', text.slice(0, 300));
+                throw new Error('IDL is not valid JSON: ' + text.slice(0, 80));
+            }
             programId = new PublicKey(idl.metadata.address);
+            console.log('[recovery] IDL loaded, program:', idl.metadata.address);
         }
 
         function pda(gameTag, playerPubkey) {
@@ -213,7 +228,9 @@
                         awardCount: d.length >= 57 ? Number(d.readBigUInt64LE(49)) : 0,
                     };
                     results.push(ledger);
-                } catch (_) {}
+                } catch (e) {
+                    console.warn('[recovery] M3 read error for', game, ':', e.message);
+                }
             }
             return results;
         }
@@ -239,13 +256,23 @@
                     gameCreditCount: d.length >= 67 ? Number(d.readBigUInt64LE(59)) : 0,
                     spendCount: d.length >= 100 ? Number(d.readBigUInt64LE(92)) : 0,
                 };
-            } catch (_) { return null; }
+            } catch (e) {
+                console.warn('[recovery] M4 read error:', e.message);
+                return null;
+            }
         }
 
         async function searchUser(email) {
+            console.log('[recovery] Searching Dynamic for email:', email);
             const resp = await fetch(`/api/dynamic-search?email=${encodeURIComponent(email)}`);
-            if (!resp.ok) throw new Error('Server returned ' + resp.status);
-            return resp.json();
+            if (!resp.ok) {
+                const txt = await resp.text().catch(() => '');
+                console.error('[recovery] dynamic-search HTTP error:', resp.status, txt.slice(0, 300));
+                throw new Error('Server returned ' + resp.status + ': ' + txt.slice(0, 100));
+            }
+            const data = await resp.json();
+            console.log('[recovery] dynamic-search result:', data);
+            return data;
         }
 
         function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -297,6 +324,7 @@
                 $refreshBtn.style.display = 'inline-block';
                 await loadWalletData(wallet, userInfo);
             } catch (e) {
+                console.error('[recovery] Search failed:', e);
                 $results.innerHTML = `<div class="empty-state">Error: ${esc(e.message)}</div>`;
             }
             $searchBtn.disabled = false;
@@ -308,6 +336,7 @@
             try {
                 await loadIdl();
             } catch (e) {
+                console.error('[recovery] IDL load failed:', e);
                 $results.innerHTML = `<div class="empty-state">Failed to load program IDL: ${esc(e.message)}</div>`;
                 return;
             }
@@ -319,7 +348,10 @@
                 const erConn = new Connection(ER_URL, 'confirmed');
                 m3Data = await fetchM3(erConn, wallet);
                 m4Data = await fetchM4(erConn, wallet);
-            } catch (_) {}
+                console.log('[recovery] ER read: M3=', m3Data.length, 'M4=', !!m4Data);
+            } catch (e) {
+                console.warn('[recovery] ER read failed:', e.message);
+            }
 
             // If ER returned nothing useful, try base RPC
             if (m3Data.length === 0 && !m4Data) {
@@ -327,7 +359,10 @@
                     const baseConn = new Connection(BASE_RPC, 'confirmed');
                     m3Data = await fetchM3(baseConn, wallet);
                     m4Data = await fetchM4(baseConn, wallet);
-                } catch (_) {}
+                    console.log('[recovery] Base RPC read: M3=', m3Data.length, 'M4=', !!m4Data);
+                } catch (e) {
+                    console.warn('[recovery] Base RPC read failed:', e.message);
+                }
             }
 
             const m3TotalPure = m3Data.reduce((s, g) => s + g.pure, 0);

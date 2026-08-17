@@ -51,7 +51,11 @@
             </div>
             <div class="dash-fold-summary">Your wallet address, verifiable on-chain.</div>
             <div class="dash-fold-body">
-                <p id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all;">—</p>
+                <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px 12px; cursor:pointer;" id="wallet-copy-row" title="Tap to copy">
+                    <span id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all; flex:1; font-family:monospace;">—</span>
+                    <button id="wallet-copy-btn" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:6px 10px; color:#ccc; font-size:0.78rem; cursor:pointer; white-space:nowrap; flex-shrink:0;">Copy</button>
+                </div>
+                <p id="wallet-copy-toast" style="color:#2ecc71; font-size:0.78rem; margin:4px 0 0; opacity:0; transition:opacity 0.2s;">Copied to clipboard</p>
                 <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
             </div>
         </section>
@@ -141,6 +145,34 @@
             const lifetimeEl = document.getElementById('profile-lifetime');
             const walletEl = document.getElementById('profile-wallet');
             const walletLinkEl = document.getElementById('profile-wallet-link');
+            const walletCopyRow = document.getElementById('wallet-copy-row');
+            const walletCopyBtn = document.getElementById('wallet-copy-btn');
+            const walletCopyToast = document.getElementById('wallet-copy-toast');
+            let walletCopyTimeout = null;
+
+            async function copyWallet(address) {
+                try {
+                    await navigator.clipboard.writeText(address);
+                } catch (_) {
+                    const ta = document.createElement('textarea');
+                    ta.value = address;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                if (walletCopyToast) {
+                    walletCopyToast.style.opacity = '1';
+                    clearTimeout(walletCopyTimeout);
+                    walletCopyTimeout = setTimeout(() => { walletCopyToast.style.opacity = '0'; }, 1500);
+                }
+                if (walletCopyBtn) {
+                    walletCopyBtn.textContent = 'Copied!';
+                    setTimeout(() => { walletCopyBtn.textContent = 'Copy'; }, 1500);
+                }
+            }
             const ontxList = document.getElementById('profile-ontx-list');
             const ledgerEl = document.getElementById('profile-ledger');
             const globalLedgerEl = document.getElementById('profile-global-ledger');
@@ -160,6 +192,9 @@
                 const w = window.currentProfile.solana_wallet || window.getDynamicSolanaWallet?.() || null;
                 if (w) {
                     walletEl.textContent = w;
+                    if (walletCopyRow) {
+                        walletCopyRow.onclick = () => copyWallet(w);
+                    }
                     if (window.gfgExplorer) {
                         walletLinkEl.innerHTML = 'View this wallet on-chain: ' + window.gfgExplorer.accountLink(w);
                     }
