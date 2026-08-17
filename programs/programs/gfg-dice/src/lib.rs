@@ -556,12 +556,15 @@ pub mod gfg_dice {
     ///   - 1 (OTHER — signup_bonus/referral/giveaway): M4b lifetime + M4c
     ///     spendable only, M4a pure is untouched (the multiplier-blind flow-up
     ///     contract: tier boosts are kind-1 credits).
-    /// `source_tag` is the game or event name ('Ludo', 'signup_bonus', etc.).
+    /// `source_code` is a u8 enum identifying the game or event:
+    ///   1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway,
+    ///   13=tier_boost. M4 reads gameTag from M3's output (the scorer) and
+    ///   maps it to source_code (M4 is the bank, not the scorer).
     /// `match_ref` guards idempotency (first 8 bytes of the triggering tx sig).
     pub fn record_global_points(
         ctx: Context<RecordGlobalPointsCtx>,
         kind: u8,
-        source_tag: String,
+        source_code: u8,
         points: u64,
         reason: u8,
         match_ref: u64,
@@ -591,7 +594,7 @@ pub mod gfg_dice {
             .checked_add(points)
             .ok_or(PointsError::Overflow)?;
 
-        dest.last_source = source_tag.as_bytes().first().copied().unwrap_or(0);
+        dest.last_source = source_code;
         dest.last_points = points;
         dest.last_reason = reason;
         dest.last_match_ref = match_ref;
@@ -1046,7 +1049,7 @@ pub struct GlobalPoints {
     pub global_pure_lifetime: u64,   // M4a: sum of verified game wins only
     pub global_lifetime: u64,        // M4b: everything earned, unspendable
     pub global_spendable_balance: u64, // M4c: spendable track
-    pub last_source: u8,             // first byte of the source_tag string
+    pub last_source: u8,             // source_code enum: 1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost
     pub last_points: u64,
     pub last_reason: u8,
     pub last_match_ref: u64,

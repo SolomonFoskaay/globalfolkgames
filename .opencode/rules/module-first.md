@@ -59,3 +59,21 @@ module gate below. The owner will not repeat this; enforce it yourself every tim
 Skipping this gate is a regression. If you are about to write feature code without a
 stated module, STOP. Do the gate first. The owner's instruction is explicit: it is a
 MUST-enforced rule for any new feature.
+
+## Architecture is the source of truth (never change silently)
+
+`architecture.json` is the single source of truth for every module's spec, including
+its expectedInput, expectedOutput, details, status, and all sub-sections. When building
+a module, the final test is: does the built code match the architecture spec end to end?
+
+**NEVER modify architecture.json without the owner's explicit approval.** This means:
+- Do NOT add, remove, or reword any expectedInput/expectedOutput item silently.
+- Do NOT change a module's status (planned/in-progress/shipped) without being told.
+- Do NOT adjust details, summaries, or rules without the owner seeing and approving.
+- If you find a mismatch between the code and the architecture, STOP and tell the owner
+  what needs to change in the architecture BEFORE changing code to match. The owner
+  decides what the spec should be; you implement it.
+
+The architecture is the contract the owner approved. Changing it without approval breaks
+the trust that the spec matches what was agreed. Code must match the spec, never the
+other way around.

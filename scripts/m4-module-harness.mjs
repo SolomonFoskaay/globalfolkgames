@@ -58,7 +58,7 @@ globalThis.window = {
   addEventListener: () => {},
   onGameResult: (handler) => { capturedSeamHandler = handler; },
   magicblockDice: {
-    recordGlobalPoints: async (kind, sourceTag, points, reason, matchRef) => {
+    recordGlobalPoints: async (kind, sourceCode, points, reason, matchRef) => {
       if (hardFailError) throw hardFailError;
       if (throwButLedgerLands) {
         if (mockGlobal.gameCreditCount + mockGlobal.otherCreditCount === 0) {
@@ -79,7 +79,7 @@ globalThis.window = {
         failNextCreditCount--;
         throw new Error('transient ER error');
       }
-      credits.push({ kind, sourceTag, points, reason, matchRef: String(matchRef) });
+      credits.push({ kind, sourceCode, points, reason, matchRef: String(matchRef) });
       mockGlobal.globalPureLifetime += (kind === 0 ? points : 0);
       mockGlobal.globalLifetime += points;
       mockGlobal.globalSpendableBalance += points;
@@ -112,6 +112,18 @@ globalThis.document = {
   querySelector: () => null,
   querySelectorAll: () => [],
 };
+
+// Mock window.localPoints — M4 reads lastSeenAward from M3's output.
+// The harness sets this before each envelope emit.
+let mockLastSeenAward = null;
+window.localPoints = {
+  get lastSeenAward() { return mockLastSeenAward; },
+  get lastAward() { return mockLastSeenAward; },
+};
+function setMockAward(gameTag, points, reason, matchRef) {
+  mockLastSeenAward = { gameTag, points, reason, matchRef, position: 1, at: Date.now() };
+}
+function clearMockAward() { mockLastSeenAward = null; }
 
 globalThis.setTimeout = setTimeout;
 globalThis.console = console;
@@ -161,6 +173,15 @@ function check(name, cond) {
   else { fail++; console.log('  FAIL ' + name); }
 }
 
+// Helper: set M3's mock award + emit envelope in one call.
+// M3 computes award BEFORE M4's handler fires (M3 loads first in HTML).
+async function emitWithAward(players, proofSig, awardOpts) {
+  const { gameTag = 'ludo', points = 100, reason = 1 } = awardOpts || {};
+  setMockAward(gameTag, points, reason);
+  await run(envelope(players, proofSig));
+  clearMockAward();
+}
+
 function resetMock() {
   mockGlobal.globalPureLifetime = 0; mockGlobal.globalLifetime = 0;
   mockGlobal.globalSpendableBalance = 0; mockGlobal.gameCreditCount = 0;
@@ -178,10 +199,11 @@ function resetMock() {
 
 console.log('\n=== kind-0 game win: pure + lifetime + spendable all credited ===');
 resetMock();
-await run(envelope([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)]));
+await emitWithAward([seat('green', 'user', 1), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)]);
 await sleep(100);
 check('kind-0 credits exactly once', credits.length === 1);
 check('kind=0 (game win)', credits[0].kind === 0);
+check('sourceCode=1 (ludo)', credits[0].sourceCode === 1);
 check('pure += 100', mockGlobal.globalPureLifetime === 100);
 check('lifetime += 100', mockGlobal.globalLifetime === 100);
 check('spendable += 100', mockGlobal.globalSpendableBalance === 100);
@@ -190,8 +212,8 @@ check('gameCreditCount = 1', mockGlobal.gameCreditCount === 1);
 console.log('\n=== kind-1 other credit: pure UNCHANGED, lifetime + spendable credited ===');
 resetMock();
 credits.length = 0;
-// Manually call recordGlobalPoints kind=1 via the module API
-await window.globalLedger.credit({ kind: 1, source: 'referral', points: 50, reason: 1, matchRef: 'ref-1' });
+// Manually call recordGlobalPoints kind=1 via the module API (credit() now takes sourceCode)
+await window.globalLedger.credit({ kind: 1, sourceCode: 11, source: 'referral', points: 50, reason: 1, matchRef: 'ref-1' });
 await sleep(100);
 check('kind=1 credits once', credits.length === 1);
 check('pure UNCHANGED (0)', mockGlobal.globalPureLifetime === 0);

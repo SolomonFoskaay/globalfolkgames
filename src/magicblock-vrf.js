@@ -343,7 +343,8 @@ function globalPointsPdaFor(payerPubkey) {
 // M4 — global points credit: credits the player's GLOBAL POINTS PDA (M4a
 // pure + M4b lifetime + M4c spendable for kind=0 game wins; M4b+M4c only
 // for kind=1 other credits). Gasless on the ER; `matchRef` guards idempotency.
-export async function recordGlobalPoints(kind, sourceTag, points, reason, matchRef) {
+// `sourceCode` is a u8 enum (1=ludo, 2=ayo_olopon, 10=signup_bonus, etc.).
+export async function recordGlobalPoints(kind, sourceCode, points, reason, matchRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
@@ -354,7 +355,7 @@ export async function recordGlobalPoints(kind, sourceTag, points, reason, matchR
   await waitForErPickup(globalPda);
 
   const sig = await program.methods
-    .recordGlobalPoints(kind, sourceTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+    .recordGlobalPoints(kind, sourceCode, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       globalPoints: globalPda,
       payer: wallet.publicKey,

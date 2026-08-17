@@ -449,11 +449,10 @@
             const labels = { 1: '1st place win', 2: 'signup bonus', 3: 'referral', 4: 'giveaway', 5: 'tier boost' };
             return labels[code] || ('reason ' + code);
         }
-        function sourceLabel(byte) {
-            // Map first byte of source_tag string to human name.
-            // Both casings mapped because old data may use lowercase.
-            const sources = { 76: 'Ludo', 108: 'Ludo', 97: 'Ayo Olopon', 112: 'Platform' };
-            return sources[byte] || (byte ? String.fromCharCode(byte) : 'unknown');
+        function sourceLabel(code) {
+            // Map source_code enum (u8) to human name.
+            const sources = { 1: 'Ludo', 2: 'Ayo Olopon', 10: 'Signup bonus', 11: 'Referral', 12: 'Giveaway', 13: 'Tier boost' };
+            return sources[code] || (code ? ('source ' + code) : 'unknown');
         }
 
         const $results = document.getElementById('recovery-results');
@@ -631,12 +630,11 @@
             try {
                 await loadIdl();
 
-                // Build source tag from the game with the most points.
-                // Must match the canonical sourceTag in global-ledger.js
-                // (capital L for "Ludo") so last_source byte is consistent.
+                // Build source code enum from the game with the most points.
+                // Must match the SOURCE_CODES in global-ledger.js.
                 const topGame = m3Data.sort((a, b) => b.pure - a.pure)[0];
-                const SOURCE_TAGS = { ludo: 'Ludo' };
-                const sourceTag = topGame ? (SOURCE_TAGS[topGame.game] || topGame.game) : 'Ludo';
+                const SOURCE_CODES = { ludo: 1, ayo_olopon: 2 };
+                const sourceCode = topGame ? (SOURCE_CODES[topGame.game] || 1) : 1;
                 const matchRef = new BN(Date.now());
 
                 // Step 1: Ensure the player's global PDA is initialized + delegated.
@@ -667,7 +665,7 @@
                 );
 
                 const sig = await program.methods
-                    .recordGlobalPoints(0, sourceTag, new BN(gap), 1, matchRef)
+                    .recordGlobalPoints(0, sourceCode, new BN(gap), 1, matchRef)
                     .accounts({
                         globalPoints: m4Pda,
                         payer: program.provider.wallet.publicKey,

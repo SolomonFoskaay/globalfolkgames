@@ -22,25 +22,34 @@
 //   The Active Tier multiplier (M5) applies as a SEPARATE kind-1 credit, so
 //   M4a pure can NEVER be multiplied by construction.
 //
+// Architecture contract (M3 → M4):
+//   M4 does NOT compute awards or duplicate scoring tables. When the M2 seam
+//   fires, M4 reads M3's computed award (window.localPoints.lastAward) which
+//   already has: gameTag, points, position, reason, matchRef. M4 uses gameTag
+//   as the on-chain source identity (M3 is the scorer, M4 is the bank).
+//
 // Exposes window.globalLedger = { get(), credit({...}), spend(amount, reason,
 // ref), subscribe(cb), lastCredit, lastSeenCredit, lastError, clearTransient() }
 // and fills any DOM slot marked data-global-pure / data-global-lifetime /
 // data-global-spendable on any page.
 (function () {
 
-    // Per-game scoring table — mirrors M3's config so M4a pure = sum of M3
-    // local wins. Adding a game = add its table here; the game only emits
-    // the seam. Source tag = the on-chain source_tag string.
-    var GAMES = {
-        ludo: {
-            sourceTag: 'Ludo',
-            positions: {
-                4: { 1: 100, 2: 50, 3: 10, 4: 0 },
-                2: { 1: 100, 2: 0 },
-            },
-            reasons: { win1st: 1 },
-        },
+    // M4 source-code enum (mirrors the program's u8 source_code).
+    // Game wins: the gameId from the M2 envelope IS the source identity.
+    // Non-game sources: defined by M5/M6.
+    var SOURCE_CODES = {
+        ludo: 1,
+        ayo_olopon: 2,
+        signup_bonus: 10,
+        referral: 11,
+        giveaway: 12,
+        tier_boost: 13,
     };
+
+    function sourceCodeFor(gameId) {
+        if (SOURCE_CODES[gameId] != null) return SOURCE_CODES[gameId];
+        return 0; // unknown source
+    }
 
     // Client-side dedup (in-memory + localStorage) so a reload or duplicate
     // seam event never double-credits. The program also guards via
@@ -65,33 +74,6 @@
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    function configFor(gameId) {
-        return GAMES[gameId] || null;
-    }
-
-    // The 'user' seat earns AT ITS OWN finishing position, same as M3.
-    function computeAward(env) {
-        var cfg = configFor(env.gameId);
-        if (!cfg) return null;
-        var user = null;
-        for (var i = 0; i < env.players.length; i++) {
-            if (env.players[i].actor === 'user') { user = env.players[i]; break; }
-        }
-        if (!user) return null;
-        if (typeof user.position !== 'number') return null;
-        var n = env.players.length;
-        var mode = n <= 2 ? 2 : 4;
-        var table = cfg.positions[mode] || cfg.positions[4] || {};
-        var points = table[user.position] || 0;
-        if (points <= 0) return null;
-        return {
-            sourceTag: cfg.sourceTag,
-            points: points,
-            reason: cfg.reasons.win1st,
-            position: user.position,
-        };
     }
 
     function matchRefFor(proofSig) {
@@ -142,12 +124,28 @@
 
     // Bank a verified finish into the GLOBAL ledger. Soft-fail: never throws
     // to the game. Uses kind=0 (GAME WIN) to credit all 3 ledgers.
-    // Resilient: 3x retry (idempotent via DuplicateMatchRef), confirm-timeout
-    // read-back recovery.
+    //
+    // Architecture contract: M4 reads M3's lastAward (set synchronously when
+    // M3's handler fires before ours). M3 already computed {gameTag, points,
+    // position, reason, matchRef} from its own scoring table. M4 is the bank,
+    // not the scorer — it uses gameTag as source identity and points as-is.
     async function bank(env) {
-        var award = computeAward(env);
-        if (!award) return null;
-        lastSeenCredit = award;
+        // Read M3's computed award. M3 sets lastSeenAward synchronously in
+        // its own bank() handler, which fires before ours (M3 script loads
+        // first in the HTML). If M3 hasn't processed this envelope yet
+        // (shouldn't happen), wait briefly then check again.
+        var award = window.localPoints && window.localPoints.lastSeenAward;
+        if (!award) {
+            // M3 handler may not have run yet; wait one tick.
+            await new Promise(function (r) { setTimeout(r, 50); });
+            award = window.localPoints && window.localPoints.lastSeenAward;
+        }
+        if (!award || !award.gameTag || !award.points || award.points <= 0) {
+            lastError = 'M3 award not available or points <= 0';
+            console.warn('[global-ledger] M3 award not available for', env.gameId, '— skipping credit');
+            return null;
+        }
+
         var proofSig = env.proof && env.proof.signature;
         if (!proofSig) {
             lastError = 'finish has no on-chain proof signature';
@@ -155,17 +153,28 @@
             return null;
         }
         var matchRef = matchRefFor(proofSig);
+
+        // Map M3's gameTag to the on-chain source_code enum.
+        var sourceTag = award.gameTag; // e.g. 'ludo', 'ayo_olopon'
+        var sourceCode = sourceCodeFor(sourceTag);
+        if (sourceCode === 0) {
+            lastError = 'unknown source code for gameTag: ' + sourceTag;
+            console.warn('[global-ledger] unknown source code for gameTag:', sourceTag);
+            return null;
+        }
+
+        lastSeenCredit = {
+            sourceTag: sourceTag,
+            points: award.points,
+            position: award.position,
+            reason: award.reason,
+            kind: 0,
+            matchRef: matchRef,
+        };
+
         if (processed[matchRef]) {
             lastError = null;
-            lastCredit = {
-                sourceTag: award.sourceTag,
-                points: award.points,
-                position: award.position,
-                reason: award.reason,
-                kind: 0,
-                matchRef: matchRef,
-                at: Date.now(),
-            };
+            lastCredit = lastSeenCredit;
             notify(cached, lastCredit);
             return null;
         }
@@ -183,7 +192,7 @@
 
         // Notify subscribers the credit is in-flight.
         notify(null, {
-            sourceTag: award.sourceTag,
+            sourceTag: sourceTag,
             points: award.points,
             position: award.position,
             reason: award.reason,
@@ -200,13 +209,13 @@
             try {
                 // kind=0: GAME WIN — credits M4a pure + M4b lifetime + M4c spendable
                 var sig = await window.magicblockDice.recordGlobalPoints(
-                    0, award.sourceTag, award.points, award.reason, matchRef,
+                    0, sourceCode, award.points, award.reason, matchRef,
                 );
                 processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
                 persistProcessed();
                 lastError = null;
                 lastCredit = {
-                    sourceTag: award.sourceTag,
+                    sourceTag: sourceTag,
                     points: award.points,
                     position: award.position,
                     reason: award.reason,
@@ -214,7 +223,7 @@
                     matchRef: matchRef,
                     at: Date.now(),
                 };
-                console.log('[global-ledger] credited ' + award.points + 'pt (' + award.sourceTag + ' ' + award.position + 'st place, kind=0 game win) — ' + (sig || 'no sig'));
+                console.log('[global-ledger] credited ' + award.points + 'pt (' + sourceTag + ' source=' + sourceCode + ', kind=0 game win) — ' + (sig || 'no sig'));
                 var ledger = await refreshLedger();
                 notify(ledger, lastCredit);
                 return sig || null;
@@ -230,7 +239,7 @@
         if (reLedger && String(reLedger.lastMatchRef || '') === String(matchRef)) {
             lastError = null;
             lastCredit = {
-                sourceTag: award.sourceTag,
+                sourceTag: sourceTag,
                 points: award.points,
                 position: award.position,
                 reason: award.reason,
@@ -246,7 +255,7 @@
         lastError = lastErr || 'on-chain write failed after retries';
         console.warn('[global-ledger] credit failed after retries:', lastError);
         notify(reLedger, {
-            sourceTag: award.sourceTag,
+            sourceTag: sourceTag,
             points: award.points,
             position: award.position,
             reason: award.reason,
@@ -290,18 +299,23 @@
             return refreshLedger();
         },
         // Programmatic credit (for M5 tier boost, M6 signup/referral/giveaway).
-        // kind: 0 = game win, 1 = other. source: human-readable source tag.
+        // kind: 0 = game win, 1 = other. source: source-code enum (u8).
         // Points, reason, matchRef: same as the on-chain instruction.
         credit: async function (opts) {
             if (!magicReady()) return null;
             var kind = opts.kind != null ? opts.kind : 1;
-            var source = opts.source || 'platform';
+            var sourceTag = opts.source || 'platform';
+            var sourceCode = opts.sourceCode != null ? opts.sourceCode : (SOURCE_CODES[sourceTag] || 0);
+            if (sourceCode === 0) {
+                console.warn('[global-ledger] unknown source code for:', sourceTag);
+                return null;
+            }
             var points = opts.points || 0;
             var reason = opts.reason || 0;
             var matchRef = opts.matchRef || '0';
             try {
                 var sig = await window.magicblockDice.recordGlobalPoints(
-                    kind, source, points, reason, matchRef,
+                    kind, sourceCode, points, reason, matchRef,
                 );
                 await refreshLedger();
                 return sig || null;
