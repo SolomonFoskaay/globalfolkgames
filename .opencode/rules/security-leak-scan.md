@@ -7,6 +7,26 @@ no security or sensitive data/info is leaked through the code before ever
 committing and pushing.** A secret that lands on the remote (even a private
 repo, even devnet) is a live compromise; never "push and fix later".
 
+## Step 0: Self-verification (HARD RULE — run BEFORE the leak scan)
+
+Before the leak scan and before `git commit`, stop and answer honestly:
+
+**"Are you sure all features/fixes you just completed are done correctly
+and working fine?"**
+
+If you cannot answer a confident "yes", do NOT proceed. Instead:
+- Re-read every file you edited.
+- Trace the call paths: does the caller's method name match the callee?
+- Check DOM element IDs exist where referenced.
+- Confirm script loading order (does the module exist at the time it's called?).
+- Confirm `npm run build` passes.
+- Fix anything you find before continuing.
+
+This catches bugs like calling `magic.globalPointsPdaFor()` when the method is
+named `globalPointsPda()`, or referencing `window.globalLedger` on a page that
+never loads `global-ledger.js`, or capturing a DOM element that gets rebuilt
+after sign-in. The leak scan cannot catch logic errors; this step can.
+
 ## What counts as a leak (scan for ALL of these)
 
 1. **Solana secret key material:**
@@ -74,3 +94,6 @@ If the task is a feature/tooling change, this scan is ONE line in the final
 step list, not extra work: `commit` is not allowed to run before it. When the
 owner asks for a commit/push, still run the scan — never skip it because the
 owner asked. The scan protects the owner.
+
+**Remember the order:** Step 0 (self-verify your work) THEN the leak scan
+THEN commit/push. Never skip step 0 — the owner will not repeat this.

@@ -490,6 +490,14 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
 - **Summary:** imperative mood, lowercase, no period. Say WHAT changed, not HOW.
 - **Body (optional):** bullet points for non-obvious changes. Never include secrets, keys, or env values.
 - **Before commit + push, always:**
+  0. **Self-verification (HARD RULE):** stop and answer this honestly:
+     "Are you sure all features/fixes you just completed are done correctly
+     and working fine?" Re-analyze every change: read the edited files, trace
+     the call paths, check method names match between caller and callee, verify
+     DOM element IDs exist where referenced, confirm script loading order, and
+     confirm the build passes. Only when you can confirm "yes, all correct"
+     may you proceed. If ANY doubt remains, fix it first — never commit
+     half-checked work.
   1. Run the leak scan (`.opencode/rules/security-leak-scan.md`) on staged + worktree diff.
   2. Verify no private keys, keypair JSON, mnemonics, service_role keys, JWTs, API tokens, or `.env` values are in the diff.
   3. ANY hit = HARD STOP. Never commit/push. Scrub or ask the owner.
