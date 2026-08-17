@@ -6,226 +6,33 @@
     <title>Dashboard | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
-    <style>
-        .ops-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .ops-card {
-            background: #101014;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 10px 12px;
-        }
-        .ops-card .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
-        .ops-card .v { color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px; word-break: break-all; }
-        .ops-card .v.small { font-size: 0.82rem; }
-        .ops-card .v.ok { color: #2ecc71; }
-        .ops-card .v.warn { color: #f39c12; }
-        .ops-card .v.bad { color: #e74c3c; }
-
-        .ep-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 12px;
-            border: 1px solid #2a2a2a;
-            border-radius: 8px;
-            margin-top: 6px;
-            background: #16161c;
-        }
-        .ep-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .ep-dot.ok { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
-        .ep-dot.down { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
-        .ep-name { flex: 1 1 auto; font-weight: 600; font-size: 0.92rem; }
-        .ep-lat { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
-        .ep-detail { color: #999; font-size: 0.78rem; word-break: break-all; }
-        .ep-tag {
-            font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
-            text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
-        }
-        .ep-tag.user { background: #2ecc71; color: #1a1a1a; }
-        .ep-tag.staff { background: #f39c12; color: #1a1a1a; }
-        .ep-tag.infra { background: #8e44ad; color: #fff; }
-
-        .stats-tabbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-        .stats-tab {
-            padding: 9px 18px; background: #252535; border: 1px solid var(--border, #333);
-            color: var(--muted, #aaa); border-radius: 10px; font-weight: 600; font-size: 0.88rem;
-            cursor: pointer;
-        }
-        .stats-tab.active { background: var(--accent-purple, #9b59b6); border-color: var(--accent-purple, #9b59b6); color: #fff; }
-        .stats-panel { display: none; }
-        .stats-panel.active { display: block; }
-
-        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .mini-table th, .mini-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #23232b; }
-        .mini-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-        .mini-table td { color: #ddd; }
-        .mini-table .mono { font-family: monospace; font-size: 0.78rem; color: #9bd4ff; word-break: break-all; }
-        .refresh-btn {
-            background: var(--accent, #f39c12); color: #1a1a1a; border: none; border-radius: 8px;
-            padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px;
-        }
-        .refresh-btn:disabled { opacity: 0.5; }
-        .muted-note { color: var(--muted); font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
-        .last-checked { color: #888; font-size: 0.78rem; }
-
-        .gas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
-        .gas-cell { background: #101014; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 12px; }
-        .gas-cell-wide { grid-column: 1 / -1; }
-        .gas-cell .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
-        .gas-sub { color: #888; font-size: 0.78rem; margin: 8px 0 4px; }
-        .gas-note { color: #999; font-size: 0.78rem; line-height: 1.5; margin-top: 6px; }
-        .gas-big { font-size: 1.4rem; font-weight: 800; color: #fff; margin-top: 6px; }
-        .gas-unit { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
-        .gas-battery { position: relative; height: 26px; border: 2px solid #2a2a2a; border-radius: 8px; margin-top: 8px; background: #0d0d12; overflow: hidden; }
-        .gas-battery.full { border-color: #2ecc71; box-shadow: 0 0 10px rgba(46,204,113,0.35); }
-        .gas-battery.low { border-color: #f39c12; box-shadow: 0 0 10px rgba(243,156,18,0.35); }
-        .gas-battery.critical { border-color: #e74c3c; box-shadow: 0 0 10px rgba(231,76,60,0.45); animation: gas-pulse 1.2s ease-in-out infinite; }
-        .gas-battery.unknown { border-color: #6c7a89; box-shadow: 0 0 10px rgba(108,122,137,0.35); }
-        .gas-battery-fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
-        .gas-battery.full .gas-battery-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); }
-        .gas-battery.low .gas-battery-fill { background: linear-gradient(90deg, #e67e22, #f39c12); }
-        .gas-battery.critical .gas-battery-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); }
-        .gas-battery.unknown .gas-battery-fill { background: linear-gradient(90deg, #5a6672, #7a8694); }
-        .gas-battery-txt { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 0.72rem; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-        @keyframes gas-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
-        .gas-bar-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.78rem; }
-        .gas-bar-label { flex: 0 0 52px; color: var(--muted); text-align: right; }
-        .gas-bar-track { flex: 1; height: 12px; background: #1b1b23; border-radius: 6px; overflow: hidden; }
-        .gas-bar-fill { height: 100%; border-radius: 6px; min-width: 2px; }
-        .gas-bar-val { flex: 0 0 84px; color: #ccc; font-size: 0.74rem; }
-        .gas-legend { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.8rem; }
-        .gas-dot { width: 10px; height: 10px; border-radius: 4px; flex-shrink: 0; }
-        .gas-legend-label { flex: 1; color: #ddd; }
-        .gas-legend-val { color: var(--muted); font-size: 0.76rem; }
-    </style>
 </head>
 <body>
 
     <main class="mobile-container dash-rail-content dash-home">
-
         <section class="onboarding-billboard" style="border-color:#9b59b6;">
-            <h2>🛡 Admin Dashboard</h2>
-            <p class="auth-hint" style="margin-top:8px;">Staff view. Everything on this page is a compact overview: every group starts expanded, tap a header to collapse it. Use the ☰ on the left to jump to the full per-topic pages.</p>
+            <h2>Admin Dashboard</h2>
+            <p class="auth-hint" id="dash-status" style="margin-top:8px;">Checking account...</p>
         </section>
 
         <div class="dash-grid">
 
-        <!-- Ops panel (server-probed) -->
-        <section class="game-card dash-section" id="dash-ops" style="text-align:left; border:1px solid #9b59b6;">
-            <div class="dash-fold-head">
-                <h3>⚙️ Project ops</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Version, git ref, roadmap counts, sponsor balance, spend ledger + caps, and the on-chain inventory. Full page: <a href="/dashboard/ops.html" style="color:#f39c12;">ops.html →</a></div>
-            <div class="dash-fold-body"><div id="dash-ops-grid"><p class="empty">Loading…</p></div></div>
-        </section>
-
-        <!-- Gas analytics (server-probed spend-event log) -->
-        <section class="game-card dash-section" id="dash-gas" style="text-align:left; border:1px solid #f39c12;">
-            <div class="dash-fold-head">
-                <h3>⛽ Gas reserve &amp; spend analytics</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Gas reserve battery, what burns the reserve, top spenders, spend over time and forecasts. Full page: <a href="/dashboard/ops.html" style="color:#f39c12;">ops.html →</a></div>
-            <div class="dash-fold-body"><div id="dash-gas-grid"><p class="empty">Loading…</p></div></div>
-        </section>
-
-        <!-- Endpoint watchlist (server-probed) -->
-        <section class="game-card dash-section" id="dash-endpoints" style="text-align:left;">
-            <div class="dash-fold-head">
-                <h3>🩺 Endpoint watchlist <span class="last-checked" id="ep-last-checked"></span></h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Live health of the RPC chain, VRF queues, delegation program, ER validator and Supabase. Full page: <a href="/dashboard/endpoints.html" style="color:#f39c12;">endpoints.html →</a></div>
-            <div class="dash-fold-body">
-                <div id="dash-endpoints-list"><p class="empty">Loading…</p></div>
-                <button class="refresh-btn" id="ep-refresh">↻ Re-probe servers</button>
-            </div>
-        </section>
-
-        <!-- Player activity: On-chain / Off-chain -->
-        <section class="game-card dash-section" id="dash-users" style="text-align:left;">
-            <div class="dash-fold-head">
-                <h3>👥 Player activity</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Sponsored accounts and delegation status (on-chain) plus profiles and points ledger (off-chain). Full page: <a href="/dashboard/activity.html" style="color:#f39c12;">activity.html →</a></div>
-            <div class="dash-fold-body">
-                <div class="stats-tabbar">
-                    <button class="stats-tab active" data-tab="onchain">On-chain</button>
-                    <button class="stats-tab" data-tab="offchain">Off-chain</button>
-                </div>
-                <div class="stats-panel active" id="stats-onchain">
-                    <div id="dash-onchain"><p class="empty">Loading…</p></div>
-                </div>
-                <div class="stats-panel" id="stats-offchain">
-                    <div id="dash-offchain"><p class="empty">Loading…</p></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Wallets & accounts tracker -->
-        <section class="game-card dash-section" id="dash-accounts" style="text-align:left; border:1px solid #9b59b6;">
-            <div class="dash-fold-head">
-                <h3>🔑 Wallets &amp; accounts <span class="last-checked" id="acc-last-checked"></span></h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Every wallet and dice/points PDA the site touches: what it is, who pays (gasless), live ER delegation, latest txs. Full page: <a href="/dashboard/accounts.html" style="color:#f39c12;">accounts.html →</a></div>
-            <div class="dash-fold-body">
-                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-top:6px;">Every wallet and dice/points PDA the site touches: what it is, who pays (gasless), live ER delegation, and its latest on-chain transactions. Click a signature to verify directly on SolanaFM (alt link = official explorer).</p>
-                <div id="dash-accounts-list"><p class="empty">Loading…</p></div>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="dash-pipeline">
-            <div class="dash-fold-head">
-                <h3>📊 Release pipeline</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Current version, roadmap counts and pending approvals. Full page: <a href="/dashboard/release.html" style="color:#f39c12;">release.html →</a></div>
-            <div class="dash-fold-body"><p id="dash-pipeline-stats" style="color:var(--muted);">Loading…</p></div>
-        </section>
-
-        <!-- Pending user-page approvals (read-only) -->
-        <section class="game-card dash-section" id="dash-pending" style="text-align:left;">
-            <div class="dash-fold-head">
-                <h3>⏳ Pending approval (admin-only until approved)</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Roadmap items not yet approved for the user page. Full page: <a href="/dashboard/release.html" style="color:#f39c12;">release.html →</a></div>
-            <div class="dash-fold-body"><div id="dash-pending-list"><p class="empty">Loading…</p></div></div>
-        </section>
-
-        <!-- Tamper / integrity notices (staff only, read-only) -->
-        <section class="game-card dash-section" id="dash-notices" style="text-align:left; border:1px solid #e74c3c;">
-            <div class="dash-fold-head">
-                <h3>🚨 Security notices (tamper attempts)</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Audit trail of client-side integrity issues. Full page: <a href="/dashboard/release.html" style="color:#f39c12;">release.html →</a></div>
-            <div class="dash-fold-body"><div id="dash-notices-list"><p class="empty">Loading…</p></div></div>
-        </section>
-
-        <!-- Everything in the tracker (read-only) -->
-        <section class="game-card dash-section" id="dash-all" style="text-align:left;">
-            <div class="dash-fold-head">
-                <h3>🗂 Full tracker (roadmap + released)</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">All roadmap items and released changelog entries. Full page: <a href="/dashboard/release.html" style="color:#f39c12;">release.html →</a></div>
-            <div class="dash-fold-body"><div id="dash-all-list"><p class="empty">Loading…</p></div></div>
+        <section class="game-card">
+            <h3>Welcome to the dashboard</h3>
+            <p style="color:var(--muted); font-size:0.88rem; line-height:1.6; margin-top:8px;">Use the menu on the left to jump to a specific admin page:</p>
+            <ul style="color:var(--muted); font-size:0.88rem; line-height:2; margin-top:8px; padding-left:18px;">
+                <li><a href="/dashboard/ops.html" style="color:#f39c12;">Project ops</a> (version, sponsor balance, spend ledger, on-chain inventory)</li>
+                <li><a href="/dashboard/endpoints.html" style="color:#f39c12;">Endpoint watchlist</a> (RPC chain, VRF queues, ER validator, Supabase health)</li>
+                <li><a href="/dashboard/activity.html" style="color:#f39c12;">Player activity</a> (on-chain delegated accounts, off-chain profiles and points)</li>
+                <li><a href="/dashboard/accounts.html" style="color:#f39c12;">Wallets and accounts</a> (every wallet and PDA the site touches, delegation status)</li>
+                <li><a href="/dashboard/recovery.html" style="color:#f39c12;">Points recovery</a> (fix orphaned ledgers, restore from Supabase backup)</li>
+                <li><a href="/dashboard/release.html" style="color:#f39c12;">Release pipeline</a> (roadmap, pending approvals, full tracker)</li>
+                <li><a href="/dashboard/content-style-guide.html" style="color:#f39c12;">Content style guide</a> (writing rules for user-facing copy)</li>
+                <li><a href="/changelog/admin.html" style="color:#f39c12;">Full raw changelog</a></li>
+            </ul>
         </section>
 
         </div>
-
-        <section class="game-card" style="text-align:center;">
-            <p><a href="/changelog/admin.html" style="color:#f39c12;">Full raw changelog →</a></p>
-        </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -235,16 +42,13 @@
     <script src="/profiles.js"></script>
     <script src="/tiers.js"></script>
     <script src="/header.js"></script>
-    <script src="/changelog/render.js"></script>
     <script src="/dash-core.js"></script>
-        <script src="/pager.js"></script>
-<script src="/dash-nav.js"></script>
+    <script src="/dash-nav.js"></script>
     <script type="module" src="/src/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             if (window.initGlobalHeader) window.initGlobalHeader();
 
-            // Staff gate (same as before): admin/moderator only.
             const staff = await window.DashCore.gateStaff();
             if (!staff) return;
 
@@ -259,7 +63,7 @@
                         { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
                         { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
                         { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
-                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'accounts', label: '🔑 Wallets and accounts', href: '/dashboard/accounts.html' },
                         { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
                         { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
                     ]},
@@ -269,38 +73,7 @@
                 ]
             });
 
-            const dc = window.DashCore;
-
-            // Load every section's data (they render inside collapsed bodies).
-            dc.loadProbe({
-                opsEl: 'dash-ops-grid',
-                gasEl: 'dash-gas-grid',
-                epEl: 'dash-endpoints-list',
-                accountsEl: 'dash-accounts-list',
-                accountsLastEl: 'acc-last-checked',
-                refreshBtn: 'ep-refresh',
-                lastCheckedEl: 'ep-last-checked',
-            });
-            dc.bindStatsTabs();
-            dc.loadRoadmap({});
-            dc.loadNotices(document.getElementById('dash-notices-list'));
-
-            // Auto-expand one section when the data finishes? No: keep the home
-            // compact. Just re-enable the refresh listener.
-            document.getElementById('ep-refresh').addEventListener('click', () => {
-                dc.loadProbe({
-                    opsEl: 'dash-ops-grid',
-                    gasEl: 'dash-gas-grid',
-                    epEl: 'dash-endpoints-list',
-                    accountsEl: 'dash-accounts-list',
-                    accountsLastEl: 'acc-last-checked',
-                    refreshBtn: 'ep-refresh',
-                    lastCheckedEl: 'ep-last-checked',
-                });
-            });
-
-            // Collapsible sections: all start folded (default), toggle expands.
-            dc.bindFolds();
+            document.getElementById('dash-status').textContent = 'Staff view. Use the menu on the left to navigate.';
         });
     </script>
 </body>

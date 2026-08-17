@@ -156,7 +156,10 @@
 
         if (dynamicUser) {
             const profile = await ensureProfile(dynamicUser);
-            const points = profile ? profile.global_points : 0;
+            // Prefer M4 on-chain spendable over Supabase mirror.
+            const gl = window.globalLedger && window.globalLedger.get();
+            const points = (gl && gl.spendableBalance != null)
+                ? gl.spendableBalance : (profile ? profile.global_points : 0);
             const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
             const tier = (typeof window.getActiveTier === 'function')
                 ? window.getActiveTier()

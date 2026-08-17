@@ -3,30 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Points &amp; Level | Profile | GlobalFolkGames</title>
+    <title>Points and Level | Profile | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
     <main class="mobile-container dash-rail-content">
         <section class="onboarding-billboard">
-            <h2>⭐ Points &amp; Level</h2>
-            <p class="auth-hint" id="points-status" style="margin-top:8px;">Checking account…</p>
+            <h2>Points and Level</h2>
+            <p class="auth-hint" id="points-status" style="margin-top:8px;">Checking account...</p>
         </section>
+
+        <div class="dash-grid">
 
         <section class="game-card">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Current points</h3>
+                <h3>Spendable balance</h3>
                 <span id="points-total" style="font-size:1.6rem; color:#f39c12; font-weight:800;">0</span>
             </div>
             <p id="points-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
             <p id="points-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
-            <p style="color:var(--muted); font-size:0.8rem; margin-top:10px; line-height:1.5;">Points come from winning matches with a verifiable on-chain roll. A 1st-place finish with a valid roll earns +100 points, recorded both here and on-chain.</p>
+            <p style="color:var(--muted); font-size:0.8rem; margin-top:10px; line-height:1.5;">Points come from winning matches with a verifiable on-chain roll. A 1st-place finish with a valid roll earns +100 points, recorded on-chain.</p>
         </section>
 
-        <section class="game-card">
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <h3>Local points (Ludo, per-game)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your Ludo-specific on-chain ledger. Pure = verified wins only (never multiplied or diluted). Spendable = draws down for Ludo in-game purchases.</p>
+            <div id="points-local-ledger"><p class="empty">Loading on-chain ledger...</p></div>
+        </section>
+
+        <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
+            <h3>Global ledgers (site-wide)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Three on-chain ledgers tracking your total performance across every game. Pure = verified wins only (never multiplied). Lifetime = everything earned from any source. Spendable = what you can use for tiers, items, and entries.</p>
+            <div id="points-global-ledger"><p class="empty">Loading global ledgers...</p></div>
+        </section>
+
+        <section class="game-card" id="tier-card-section" style="border:1px solid var(--accent, #f39c12);">
+            <h3>Active Tier</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Boost your win points with a monthly Active Tier. Multiplies base match wins only (2x/3x/4x), capped at +1,000 boosted points per day.</p>
+            <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin-bottom:10px;">--</p>
+            <div id="tier-buy-row" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+            <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">--</p>
+        </section>
+
+        <section class="game-card" style="text-align:center;">
             <button id="points-signin-btn" class="auth-btn primary" hidden>Sign in</button>
         </section>
+
+        </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -35,6 +59,7 @@
     <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
     <script src="/tiers.js"></script>
+    <script src="/profile-core.js"></script>
     <script src="/header.js"></script>
     <script src="/dash-nav.js"></script>
     <script src="/universal/ledgers/global-ledger.js"></script>
@@ -51,7 +76,7 @@
                         { key: 'home', label: '🏠 Profile home', href: '/profile/' },
                     ]},
                     { heading: 'Detail', items: [
-                        { key: 'points', label: '⭐ Points & level', href: '/profile/points.html' },
+                        { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
                         { key: 'ledger', label: '🏆 On-chain ledger', href: '/profile/ledger.html' },
                         { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
                     ]},
@@ -62,6 +87,8 @@
             const totalEl = document.getElementById('points-total');
             const levelEl = document.getElementById('points-level');
             const lifetimeEl = document.getElementById('points-lifetime');
+            const localLedgerEl = document.getElementById('points-local-ledger');
+            const globalLedgerEl = document.getElementById('points-global-ledger');
             const signinBtn = document.getElementById('points-signin-btn');
 
             function render(signedIn) {
@@ -71,25 +98,84 @@
                     return;
                 }
                 const p = window.currentProfile;
-                statusEl.textContent = 'Signed in — welcome back!';
+                statusEl.textContent = 'Signed in, welcome back!';
                 levelEl.textContent = 'Level ' + (p.level || 0);
-                lifetimeEl.textContent = 'Lifetime points: ' + (p.lifetime_points || 0);
 
-                // Prefer M4 on-chain spendable; fall back to Supabase mirror.
+                // Prefer M4 on-chain values; fall back to Supabase.
                 const gl = window.globalLedger && window.globalLedger.get();
                 totalEl.textContent = (gl && gl.spendableBalance != null)
                     ? gl.spendableBalance : (p.global_points || 0);
-                if (gl && gl.lifetime != null) {
-                    lifetimeEl.textContent = 'Lifetime points: ' + gl.lifetime;
+                lifetimeEl.textContent = 'Lifetime points: '
+                    + ((gl && gl.lifetime != null) ? gl.lifetime : (p.lifetime_points || 0));
+
+                // Load on-chain ledger cards (own-account reads, gasless).
+                if (window.ProfileCore) {
+                    window.ProfileCore.loadPointsLedger(localLedgerEl);
+                    window.ProfileCore.loadGlobalLedger(globalLedgerEl);
                 }
+                renderTierCard();
                 signinBtn.hidden = true;
             }
+
+            function renderTierCard() {
+                if (typeof window.getActiveTier !== 'function') return;
+                const tier = window.getActiveTier();
+                const spendable = window.getSpendablePoints();
+                const statusEl = document.getElementById('tier-status');
+                const buyRow = document.getElementById('tier-buy-row');
+
+                if (tier.tier > 1) {
+                    const upgradeTarget = tier.tier < 4 ? (window.ACTIVE_TIERS || {})[tier.tier + 1] : null;
+                    const upgradeHint = upgradeTarget
+                        ? '<div style="margin-top:6px; font-size:0.8rem; color:var(--muted);">Upgrade: <b style="color:#f39c12;">' + upgradeTarget.name + ' (' + upgradeTarget.mult + 'x)</b> costs ' + upgradeTarget.cost.toLocaleString() + ' spendable points for another month.</div>'
+                        : '';
+                    statusEl.innerHTML = 'You have <b style="color:#f39c12;">' + tier.label + ' (' + tier.mult + 'x)</b> on wins, active until <b>' + new Date(tier.expiresAt).toLocaleDateString() + '</b>. Boosted points today: <span id="tier-used-today">' + ((window.TIER_DAILY_BOOST_CAP || 0) - (tier.remainingToday ?? 0)) + '</span> / ' + (window.TIER_DAILY_BOOST_CAP || 0).toLocaleString() + '.' + upgradeHint;
+                } else {
+                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. Buy a tier below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: every tier lasts one month, multiplies base win points only (100 becomes 200/300/400 at 2x/3x/4x), and is capped at +1,000 boosted points per day. Earn or top up spendable points, then tap a tier to activate it.</span>';
+                }
+
+                buyRow.innerHTML = '';
+                const ladder = window.ACTIVE_TIERS || {};
+                [2, 3, 4].forEach(level => {
+                    const t = ladder[level];
+                    if (!t) return;
+                    const btn = document.createElement('button');
+                    btn.className = 'launch-btn onchain';
+                    btn.style.marginTop = '0';
+                    btn.style.flex = '1';
+                    btn.style.minWidth = '110px';
+                    btn.textContent = t.name + ' · ' + t.mult + 'x · ' + t.cost.toLocaleString();
+                    btn.disabled = spendable < t.cost;
+                    btn.title = spendable < t.cost ? 'Not enough spendable points' : 'Buy for one month';
+                    btn.onclick = async function () {
+                        if (typeof window.buyActiveTier === 'function') {
+                            await window.buyActiveTier(level);
+                            if (window.refreshAuthHeader) {
+                                window.refreshAuthHeader().then(() => render(!!window.currentUser));
+                            }
+                            renderTierCard();
+                        }
+                    };
+                    buyRow.appendChild(btn);
+                });
+            }
+
+            window.__renderTierUI = function () {
+                if (window.currentProfile) renderTierCard();
+            };
 
             signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
             render(!!window.currentUser);
             if (window.refreshAuthHeader) {
                 window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+            }
+
+            // Re-render when global ledger updates (new game win etc.)
+            if (window.globalLedger && typeof window.globalLedger.subscribe === 'function') {
+                window.globalLedger.subscribe(() => {
+                    if (window.currentProfile) render(!!window.currentUser);
+                });
             }
         });
     </script>

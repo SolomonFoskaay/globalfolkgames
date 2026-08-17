@@ -10,99 +10,24 @@
 
     <main class="mobile-container dash-rail-content dash-home">
         <section class="onboarding-billboard">
-            <h2>My Profile 👤</h2>
-            <p class="auth-hint" id="profile-status" style="margin-top:8px;">Checking account…</p>
+            <h2>My Profile</h2>
+            <p class="auth-hint" id="profile-status" style="margin-top:8px;">Checking account...</p>
         </section>
 
         <div class="dash-grid">
 
-        <section class="game-card dash-section" id="profile-card">
-            <div class="dash-fold-head">
-                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <h3>Points &amp; Level</h3>
-                    <span id="profile-pts" style="font-size:1.4rem; color:#f39c12; font-weight:800;">0</span>
-                </div>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Your points, level and lifetime total. Full view: <a href="/profile/points.html" style="color:#f39c12;">points.html →</a></div>
-            <div class="dash-fold-body">
-                <p id="profile-level" style="color:var(--muted); margin-top:8px;">Level 0</p>
-                <p id="profile-lifetime" style="color:var(--muted); font-size:0.85rem; margin-top:4px;">Lifetime points: 0</p>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="profile-tier-card">
-            <div class="dash-fold-head">
-                <h3>⚡ Active Tier (S1)</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Boost your win points with a monthly Active Tier. Multiplies base match wins only (2x/3x/4x), capped at +1,000 boosted points/day.</div>
-            <div class="dash-fold-body">
-                <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin-bottom:10px;">—</p>
-                <div id="tier-buy-row" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
-                <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">—</p>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="profile-wallet-card">
-            <div class="dash-fold-head">
-                <h3>Blockchain identity</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Your wallet address, verifiable on-chain.</div>
-            <div class="dash-fold-body">
-                <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px 12px; cursor:pointer;" id="wallet-copy-row" title="Tap to copy">
-                    <span id="profile-wallet" style="color:var(--muted); font-size:0.85rem; word-break:break-all; flex:1; font-family:monospace;">—</span>
-                    <button id="wallet-copy-btn" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:6px 10px; color:#ccc; font-size:0.78rem; cursor:pointer; white-space:nowrap; flex-shrink:0;">Copy</button>
-                </div>
-                <p id="wallet-copy-toast" style="color:#2ecc71; font-size:0.78rem; margin:4px 0 0; opacity:0; transition:opacity 0.2s;">Copied to clipboard</p>
-                <p id="profile-wallet-link" style="margin-top:6px; font-size:0.85rem;"></p>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="profile-ledger-card">
-            <div class="dash-fold-head">
-                <h3>🏆 Your on-chain points ledger</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">The tamper-proof on-chain record of your rewards. Full view: <a href="/profile/ledger.html" style="color:#f39c12;">ledger.html →</a></div>
-            <div class="dash-fold-body">
-                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every reward you win is also written to a tamper-proof ledger on the Solana devnet (free for you to write). This is your own account, verified on-chain — not just a server record.</p>
-                <div id="profile-ledger"><p class="empty">Check your ledger…</p></div>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="profile-global-ledger-card">
-            <div class="dash-fold-head">
-                <h3>🌐 Global ledgers (site-wide)</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Your cross-game totals: pure skill, lifetime reputation, and spendable balance.</div>
-            <div class="dash-fold-body">
-                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Three on-chain ledgers tracking your total performance across every game. Pure = sum of verified wins only (never multiplied). Lifetime = everything earned from any source. Spendable = what you can use for tiers, items, and entries.</p>
-                <div id="profile-global-ledger"><p class="empty">Check your global ledgers…</p></div>
-            </div>
-        </section>
-
-        <section class="game-card dash-section" id="profile-ontx-card">
-            <div class="dash-fold-head">
-                <h3>🔗 Your on-chain activity</h3>
-                <button class="dash-fold-toggle" type="button">− Collapse</button>
-            </div>
-            <div class="dash-fold-summary">Every roll and win reward, verifiable on-chain. Full view: <a href="/profile/activity.html" style="color:#f39c12;">activity.html →</a></div>
-            <div class="dash-fold-body">
-                <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
-                <div id="profile-ontx-list"><p class="empty">Loading…</p></div>
-            </div>
+        <section class="game-card">
+            <h3>Welcome to your profile</h3>
+            <p style="color:var(--muted); font-size:0.88rem; line-height:1.6; margin-top:8px;">Use the menu on the left to explore the details of your profile:</p>
+            <ul style="color:var(--muted); font-size:0.88rem; line-height:2; margin-top:8px; padding-left:18px;">
+                <li><a href="/profile/points.html" style="color:#f39c12;">Points and level</a> (local + global on-chain ledgers)</li>
+                <li><a href="/profile/ledger.html" style="color:#f39c12;">On-chain ledger</a> (per-game rewards record)</li>
+                <li><a href="/profile/activity.html" style="color:#f39c12;">On-chain activity</a> (every roll and reward, verifiable)</li>
+            </ul>
         </section>
 
         <section class="game-card" style="text-align:center;">
             <button id="profile-signin-btn" class="auth-btn primary" hidden>Sign in</button>
-        </section>
-
-        <section class="game-card">
-            <h3>Your play</h3>
-            <p><a href="/games/ludo/" style="color:#f39c12;">Play Ludo →</a></p>
         </section>
 
         </div>
@@ -111,18 +36,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/auth.js"></script>
     <script src="/tamper-guard.js"></script>
-    <script src="/gfg-explorer.js"></script>
     <script src="/profiles.js"></script>
-    <script src="/tiers.js"></script>
-    <script src="/profile-core.js"></script>
-        <script src="/pager.js"></script>
-<script src="/header.js"></script>
+    <script src="/header.js"></script>
     <script src="/dash-nav.js"></script>
-    <script src="/universal/ledgers/global-ledger.js"></script>
-    <script type="module" src="/src/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.initGlobalHeader) window.initGlobalHeader({ globalPointsTag: true });
+            if (window.initGlobalHeader) window.initGlobalHeader();
 
             window.GFG_DASH_NAV.render({
                 brand: '👤 Profile',
@@ -132,138 +51,27 @@
                         { key: 'home', label: '🏠 Profile home', href: '/profile/' },
                     ]},
                     { heading: 'Detail', items: [
-                        { key: 'points', label: '⭐ Points & level', href: '/profile/points.html' },
+                        { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
                         { key: 'ledger', label: '🏆 On-chain ledger', href: '/profile/ledger.html' },
                         { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
                     ]},
                 ]
             });
-            window.ProfileCore && window.ProfileCore.bindFolds && window.ProfileCore.bindFolds();
 
             const statusEl = document.getElementById('profile-status');
-            const ptsEl = document.getElementById('profile-pts');
-            const levelEl = document.getElementById('profile-level');
-            const lifetimeEl = document.getElementById('profile-lifetime');
-            const walletEl = document.getElementById('profile-wallet');
-            const walletLinkEl = document.getElementById('profile-wallet-link');
-            const walletCopyRow = document.getElementById('wallet-copy-row');
-            const walletCopyBtn = document.getElementById('wallet-copy-btn');
-            const walletCopyToast = document.getElementById('wallet-copy-toast');
-            let walletCopyTimeout = null;
-
-            async function copyWallet(address) {
-                try {
-                    await navigator.clipboard.writeText(address);
-                } catch (_) {
-                    const ta = document.createElement('textarea');
-                    ta.value = address;
-                    ta.style.position = 'fixed';
-                    ta.style.opacity = '0';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                }
-                if (walletCopyToast) {
-                    walletCopyToast.style.opacity = '1';
-                    clearTimeout(walletCopyTimeout);
-                    walletCopyTimeout = setTimeout(() => { walletCopyToast.style.opacity = '0'; }, 1500);
-                }
-                if (walletCopyBtn) {
-                    walletCopyBtn.textContent = 'Copied!';
-                    setTimeout(() => { walletCopyBtn.textContent = 'Copy'; }, 1500);
-                }
-            }
-            const ontxList = document.getElementById('profile-ontx-list');
-            const ledgerEl = document.getElementById('profile-ledger');
-            const globalLedgerEl = document.getElementById('profile-global-ledger');
             const signinBtn = document.getElementById('profile-signin-btn');
 
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
-                    statusEl.textContent = 'Sign in to see your profile and points.';
+                    statusEl.textContent = 'Sign in to see your profile.';
                     signinBtn.hidden = false;
                     return;
                 }
                 const p = window.currentProfile;
-                statusEl.textContent = 'Signed in — welcome back!';
-                levelEl.textContent = 'Level ' + (p.level || 0);
-                lifetimeEl.textContent = 'Lifetime points: ' + (p.lifetime_points || 0);
-
-                // Prefer M4 on-chain spendable for the points display; fall back
-                // to the Supabase mirror if the on-chain read hasn't landed yet.
-                const gl = window.globalLedger && window.globalLedger.get();
-                ptsEl.textContent = (gl && gl.spendableBalance != null)
-                    ? gl.spendableBalance : (p.global_points || 0);
-                if (gl && gl.lifetime != null) {
-                    lifetimeEl.textContent = 'Lifetime points: ' + gl.lifetime;
-                }
-                const w = window.currentProfile.solana_wallet || window.getDynamicSolanaWallet?.() || null;
-                if (w) {
-                    walletEl.textContent = w;
-                    if (walletCopyRow) {
-                        walletCopyRow.onclick = () => copyWallet(w);
-                    }
-                    if (window.gfgExplorer) {
-                        walletLinkEl.innerHTML = 'View this wallet on-chain: ' + window.gfgExplorer.accountLink(w);
-                    }
-                    window.ProfileCore.loadOnchainActivity(ontxList, { full: false });
-                    window.ProfileCore.loadPointsLedger(ledgerEl);
-                    window.ProfileCore.loadGlobalLedger(globalLedgerEl);
-                }
-                renderTierCard();
+                const name = p.display_name || p.username || 'Player';
+                statusEl.textContent = 'Welcome, ' + name + '!';
                 signinBtn.hidden = true;
             }
-
-            function renderTierCard() {
-                if (typeof window.getActiveTier !== 'function') return;
-                const tier = window.getActiveTier();
-                const spendable = window.getSpendablePoints();
-                const statusEl = document.getElementById('tier-status');
-                const buyRow = document.getElementById('tier-buy-row');
-                const spendableEl = document.getElementById('tier-spendable');
-
-                if (tier.tier > 1) {
-                    const upgradeTarget = tier.tier < 4 ? (window.ACTIVE_TIERS || {})[tier.tier + 1] : null;
-                    const upgradeHint = upgradeTarget
-                        ? `<div style="margin-top:6px; font-size:0.8rem; color:var(--muted);">Upgrade: <b style="color:#f39c12;">${upgradeTarget.name} (${upgradeTarget.mult}x)</b> costs ${upgradeTarget.cost.toLocaleString()} spendable points for another month.</div>`
-                        : '';
-                    statusEl.innerHTML = `You have <b style="color:#f39c12;">${tier.label} (${tier.mult}x)</b> on wins, active until <b>${new Date(tier.expiresAt).toLocaleDateString()}</b>. Boosted points today: <span id="tier-used-today">${(window.TIER_DAILY_BOOST_CAP || 0) - (tier.remainingToday ?? 0)}</span> / ${(window.TIER_DAILY_BOOST_CAP || 0).toLocaleString()}.${upgradeHint}`;
-                } else {
-                    statusEl.innerHTML = `You are on the free <b>Tier 1 (1x)</b>. Buy a tier below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: every tier lasts one month, multiplies base win points only (100 → 200/300/400 at 2x/3x/4x), and is capped at +1,000 boosted points per day. Earn or top up spendable points, then tap a tier to activate it.</span>`;
-                }
-
-                buyRow.innerHTML = '';
-                const ladder = window.ACTIVE_TIERS || {};
-                [2, 3, 4].forEach(level => {
-                    const t = ladder[level];
-                    if (!t) return;
-                    const btn = document.createElement('button');
-                    btn.className = 'launch-btn onchain';
-                    btn.style.marginTop = '0';
-                    btn.style.flex = '1';
-                    btn.style.minWidth = '110px';
-                    btn.textContent = `${t.name} · ${t.mult}x · ${t.cost.toLocaleString()}`;
-                    btn.disabled = spendable < t.cost;
-                    btn.title = spendable < t.cost ? 'Not enough spendable points' : 'Buy for one month';
-                    btn.onclick = async function () {
-                        if (typeof window.buyActiveTier === 'function') {
-                            await window.buyActiveTier(level);
-                            if (window.refreshAuthHeader) {
-                                window.refreshAuthHeader().then(() => render(!!window.currentUser));
-                            }
-                            renderTierCard();
-                        }
-                    };
-                    buyRow.appendChild(btn);
-                });
-
-                spendableEl.innerHTML = `Spendable balance: <b>⭐ ${spendable.toLocaleString()}</b> · Lifetime (never spent): <b>${window.getLifetimePoints().toLocaleString()}</b>`;
-            }
-
-            window.__renderTierUI = function () {
-                if (window.currentProfile) renderTierCard();
-            };
 
             signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
