@@ -9,6 +9,7 @@ function triggerAutomatedComputerDiceRoll() {
     // 2P fix: a stale timer must never auto-roll on a seat that is now human.
     if (playerProfiles[currentTurn] && playerProfiles[currentTurn].mode !== 'computer') return;
     if (currentTurnMoves.length > 0 || isDiceRolled) return;
+    console.log(`[GFG LUDO] AI turn armed - computer seat ${currentTurn} triggering its on-chain roll.`);
     rollDiceEngine('AI_CONFIRMED');
 }
 
@@ -38,6 +39,7 @@ function executeAutomatedComputerMove() {
     }
 
     let targetTokenIndex = selectBestStrategicAIToken(movableTokenIndices, activeTokens);
+    console.log(`[GFG LUDO] AI decided a move | seat=${currentTurn} | dice=${currentTurnMoves.join(',')} | movableTokens=[${movableTokenIndices.join(',')}] | choseToken=${targetTokenIndex}`);
     
     if (targetTokenIndex !== -1) {
         processTokenMovementExecution(targetTokenIndex);

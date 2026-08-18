@@ -159,6 +159,8 @@
                 : null,
         };
 
+        console.log(`[GFG LUDO] Match finished | finishOrder=${finishOrder.map((c, i) => `${i + 1}:${c}`).join(' ')} | proofSig=${proofSig || 'none'} | seam envelope:`, result);
+
         if (typeof window.publishGameResult === 'function') {
             window.publishGameResult(result);
         } else {

@@ -270,15 +270,20 @@ function initiateArenaMatch() {
         return;
     }
 
-    // 2P fix: a fresh match must start on the signed-in user's seat (never an
-    // inactive seat). Reset turn flags so the new turn starts clean.
-    currentTurn = userSeat;
+    // Fresh-match start seat: classic Ludo turn order is GREEN → YELLOW → BLUE
+    // → RED regardless of 2P or 4P, so the match opens on the FIRST ACTIVE seat
+    // in that canonical order (4P = GREEN; 2P = whichever of the chosen colours
+    // comes first in GREEN/YELLOW/BLUE/RED). It is NEVER the user's seat and
+    // never an inactive seat. Reset turn flags so the new turn starts clean.
+    currentTurn = ALL_SEATS.find(color => activeSeats.indexOf(color) !== -1) || userSeat;
     isDiceRolled = false;
     hasRolledThisTurn = false;
     displayDiceOnBoard = false;
     lastDiceRoll1 = 0;
     lastDiceRoll2 = 0;
     currentTurnMoves = [];
+
+    console.log(`[GFG LUDO] Match started | mode=${matchMode} | activeSeats=${activeSeats.join(',')} | userSeat=${userSeat} | startingTurn=${currentTurn} | seatModes=${Object.keys(playerProfiles).map(c => `${c}:${playerProfiles[c].mode}`).join(',')}`);
 
     // Keep the dice-box turn label in sync with the actual starting seat
     // (previously it stayed on the HTML default "Green's Turn" until the first
@@ -314,12 +319,14 @@ function passTurnSequence() {
     const active = getActiveSeats();
     let nextIndex = (active.indexOf(currentTurn) + 1) % active.length;
     currentTurn = active[nextIndex];
+    console.log(`[GFG LUDO] Turn pass -> ${currentTurn} | activeSeats=${active.join(',')} | prevRolled=${lastDiceRoll1}+${lastDiceRoll2} | mode=${playerProfiles[currentTurn] ? playerProfiles[currentTurn].mode : '?'}`);
 
     // ENDGAME auto-skip: a finished seat (all 4 tokens off the board) has its
     // turn auto-passed (~1.5s log) with NO dice roll and NO tap — for human
     // AND computer seats alike. No skip-remaining toggle; End Match is the
     // only speed escape hatch (per the locked spec).
     if (typeof window.isSeatFinished === 'function' && window.isSeatFinished(currentTurn)) {
+        console.log(`[GFG LUDO] Seat ${currentTurn} finished (all tokens home) - auto-skipping its turns.`);
         displayEducationalLog(`${currentTurn.toUpperCase()}: All tokens home - auto-skipping turn.`);
         if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
         if (typeof drawLudoLayout === 'function') drawLudoLayout();
@@ -367,6 +374,7 @@ window.markMatchOver = function () {
     hasRolledThisTurn = true;
     displayDiceOnBoard = false;
     currentTurnMoves = [];
+    console.log(`[GFG LUDO] Match over (all active seats finished). Loop stopped, result ceremony starts.`);
     const diceBtn = document.getElementById('diceBtn');
     if (diceBtn) diceBtn.disabled = true;
     if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();

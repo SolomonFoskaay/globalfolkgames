@@ -146,6 +146,7 @@ function enterChainDownState() {
     displayDiceOnBoard = false;
     currentTurnMoves = [];
     if (typeof hideVerifyLink === 'function') hideVerifyLink();
+    console.warn(`[GFG LUDO] On-chain dice unreachable - match PAUSED (no fake local roll). Attempts exhausted for seat ${currentTurn}.`);
 
     const totalDisplay = document.getElementById('val-total');
     if (totalDisplay) totalDisplay.innerText = 'Awaiting network';
@@ -180,6 +181,7 @@ function resumeFromChainDown() {
     }
     isChainDown = false;
     hideChainDownBanner();
+    console.log(`[GFG LUDO] On-chain stack recovered - resuming the paused turn (seat ${currentTurn}).`);
     if (typeof window.showAuthBanner === 'function') {
         window.showAuthBanner('On-chain dice are back. Resuming your match.');
     }
@@ -275,6 +277,7 @@ async function rollDiceEngine(source) {
     hasRolledThisTurn = true;
     displayDiceOnBoard = true;
     activeDiceSource = 'offchain'; // reset until the VRF path confirms otherwise
+    console.log(`[GFG LUDO] Roll requested | seat=${currentTurn} | mode=${playerProfiles[currentTurn].mode} | source=${source || 'manual'} | userSeat=${playerProfiles[currentTurn].isUser}`);
 
     // Persist immediately so a page reload during the (up to ~1.3s) on-chain
     // round trip resumes with "rolled, awaiting result" instead of re-rolling.

@@ -39,7 +39,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---- On-chain inventory (public, stable addresses on devnet) ----
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-const ER_REGIONS = erRpcEndpoints(); // US / AS / EU (public devnet ER RPCs)
+const ER_REGIONS = erRpcEndpoints(); // AS / EU (US excluded 2026-08-18: "client temporarily banned")
 const INVENTORY = {
   gfgDiceProgram: idl.address,
   delegationProgram: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',

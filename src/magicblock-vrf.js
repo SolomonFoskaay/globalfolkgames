@@ -128,20 +128,30 @@ function isErNetworkError(e) {
 
 // Run `fn(ctx)` against the current best ER endpoint; on a network error,
 // rotate regions and retry once with a fresh provider. Program-level errors
-// bubble up immediately (they are not RPC outages).
-async function withErRetry(fn) {
+// bubble up immediately (they are not RPC outages). An optional label logs
+// WHICH operation is running and on WHICH region, so the console traces the
+// full path: wallet-sign (Dynamic email moment) -> send -> confirm.
+async function withErRetry(labelOrFn, maybeFn) {
+  const label = typeof labelOrFn === 'string' ? labelOrFn : (labelOrFn && labelOrFn.name) || 'op';
+  const fn = typeof labelOrFn === 'function' ? labelOrFn : maybeFn;
   let lastErr = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctx = getErProgram();
     if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
     const url = currentErUrl();
+    console.log(`[VRF] ER write '${label}' attempt ${attempt + 1}/2 -> submitting on region ${url}`);
     try {
       const out = await fn(ctx);
       markErRpcSuccess(url);
+      console.log(`[VRF] ER write '${label}' CONFIRMED on region ${url}:`, (typeof out === 'string') ? out : out);
       return out;
     } catch (e) {
       lastErr = e;
-      if (!isErNetworkError(e)) throw e;
+      if (!isErNetworkError(e)) {
+        console.error(`[VRF] ER write '${label}' failed (NOT an RPC outage - surfaced to the caller):`, e.message);
+        throw e;
+      }
+      console.warn(`[VRF] ER write '${label}' network error on region ${url} (${e.message}) - rotating regions.`);
       const next = rotateErRpc(url);
       erConns.delete(url); // drop the dead endpoint's cached connection
       if (attempt === 0 && next !== url) continue;
@@ -162,10 +172,12 @@ function getErProgram() {
   const walletAdapter = {
     publicKey: wallet.publicKey,
     async signTransaction(transaction) {
+      console.log(`[VRF] Wallet signature REQUESTED (Dynamic 'tx signed' email fires here) for ${wallet.publicKey.toBase58()}`);
       const { signedTransaction } = await signTransaction({
         transaction,
         walletAccount: wallet.walletAccount,
       });
+      console.log(`[VRF] Wallet signature OK - signed ${signedTransaction.signatures ? signedTransaction.signatures.length : 0} sig(s). Sending to the ER RPC next.`);
       return signedTransaction;
     },
     async signAllTransactions(transactions) {
@@ -303,12 +315,14 @@ async function rollOnce() {
   // The ER validator may need a moment to include the freshly delegated PDA.
   await waitForErPickup(pda);
 
+  console.log(`[VRF] Dice PDA ready (${pda.toBase58()}). Requesting the VRF roll - signing + submitting on region ${currentErUrl()}. If Dynamic emails you, that is the signature step below working; the failure (if any) is next, in submission/confirmation.`);
+
   // Unique entropy commitment for this roll (included in the VRF proof).
   // Generated fresh per attempt so a region-rotated retry never reuses a seed
   // that could confuse the callback check.
   let clientSeed = Math.floor(Math.random() * 256);
 
-  const proofResult = await withErRetry(async (ctx) => {
+  const proofResult = await withErRetry('roll_dice VRF request', async (ctx) => {
     clientSeed = Math.floor(Math.random() * 256);
     return ctx.program.methods
       .rollDice(clientSeed)
@@ -379,7 +393,7 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  const sig = await withErRetry(async (ctx) => ctx.program.methods
+  const sig = await withErRetry('record_points', async (ctx) => ctx.program.methods
     .recordPoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       points: pointsPda,
@@ -405,7 +419,7 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  const sig = await withErRetry(async (ctx) => ctx.program.methods
+  const sig = await withErRetry('spend_local', async (ctx) => ctx.program.methods
     .spendLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
       points: pointsPda,
@@ -445,7 +459,7 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
-  const sig = await withErRetry(async (ctx) => ctx.program.methods
+  const sig = await withErRetry('record_global_points', async (ctx) => ctx.program.methods
     .recordGlobalPoints(kind, sourceCode, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       globalPoints: globalPda,
@@ -470,7 +484,7 @@ export async function spendGlobal(amount, reason, spendRef) {
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
-  const sig = await withErRetry(async (ctx) => ctx.program.methods
+  const sig = await withErRetry('spend_global', async (ctx) => ctx.program.methods
     .spendGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
       globalPoints: globalPda,
@@ -509,7 +523,7 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
   );
   const order = Array.from({ length: 4 }, (_, i) => seatIndexes[i] ?? 0);
 
-  const sig = await withErRetry(async (ctx) => ctx.program.methods
+  const sig = await withErRetry('record_result (Scope C finish order)', async (ctx) => ctx.program.methods
     .recordResult(
       order,
       new BN(points),
@@ -556,7 +570,7 @@ export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  const sig = await withErRetry(async (ctx) => {
+  const sig = await withErRetry('claim_comp (S2 winner claim)', async (ctx) => {
     // Read the sponsor out of the comp account so the PDA seed constraint passes.
     const compAccount = await ctx.program.account.competition.fetch(new PublicKey(compPda));
     const sponsorKey = new PublicKey(compAccount.sponsor);

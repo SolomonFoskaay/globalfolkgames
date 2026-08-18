@@ -69,16 +69,17 @@ export function baseRpcUrl() {
 // The ER RPC is the gasless execution layer every dice roll and on-chain points
 // write runs on. A single hardcoded endpoint makes one regional outage or
 // rate-limit a platform-wide outage. HARDENING (2026-08-18): this registry lists
-// every public MagicBlock devnet ER endpoint (US / AS / EU; TEE is excluded
-// because it requires an auth token) and rotates with exponential backoff:
+// every public MagicBlock devnet ER endpoint and rotates with exponential
+// backoff (TEE is excluded because it requires an auth token):
 //   - pickErRpcUrl()     -> best current endpoint (prefers the last-known-good,
 //                           else any endpoint not in cooldown, else the one that
 //                           recovers first).
 //   - markErRpcSuccess/  -> call around each network op so a failing endpoint
 //     markErRpcFailure      goes to cooldown (5s -> 10s -> 20s -> 40s -> 60s).
 // Consumers must call pickErRpcUrl() per operation, never cache the URL.
+// US is EXCLUDED (2026-08-18): devnet-us.magicblock.app answers "-32005 client
+// temporarily banned", so only AS + EU are rotated.
 export const ER_ENDPOINTS = [
-  { url: 'https://devnet-us.magicblock.app/', region: 'US' },
   { url: 'https://devnet-as.magicblock.app/', region: 'AS' },
   { url: 'https://devnet-eu.magicblock.app/', region: 'EU' },
 ];

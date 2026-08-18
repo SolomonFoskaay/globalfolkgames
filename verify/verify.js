@@ -10,10 +10,11 @@
 (function () {
   'use strict';
 
+  // US excluded (2026-08-18): devnet-us answers "-32005 client temporarily
+  // banned", so only AS + EU are queried.
   var ER_REGIONS = [
     'https://devnet-as.magicblock.app/',
-    'https://devnet-eu.magicblock.app/',
-    'https://devnet-us.magicblock.app/'
+    'https://devnet-eu.magicblock.app/'
   ];
   var BASE_RPC = 'https://api.devnet.solana.com';
   // Sticky cursor: reads prefer the region that last answered, so a down/slow

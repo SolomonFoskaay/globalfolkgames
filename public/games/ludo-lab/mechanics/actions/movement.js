@@ -20,6 +20,7 @@
 function resolveTurnEndAfterMoves() {
     const upperColor = currentTurn.toUpperCase();
     const isDoubleSixRoll = lastDiceRoll1 === 6 && lastDiceRoll2 === 6;
+    console.log(`[GFG LUDO] Turn end | seat=${currentTurn} | isDoubleSix=${isDoubleSixRoll} | consecutiveDoubleSixes=${consecutiveDoubleSixes} | diceUsed=${lastDiceRoll1}+${lastDiceRoll2} | movesLeft=${currentTurnMoves.length}`);
     if (isDoubleSixRoll && consecutiveDoubleSixes > 0 && consecutiveDoubleSixes < 3) {
         displayEducationalLog(`${upperColor}: "Shoki" double six bonus turn! Roll again.`);
         isDiceRolled = false;
@@ -73,6 +74,7 @@ function processTokenMovementExecution(selectedTokenIndex) {
     let currentPiece = activeTokens[selectedTokenIndex];
     let isInsideYard = isTokenInHomeYard(currentTurn, currentPiece);
     let appliedMoveValue = isInsideYard ? 6 : (currentTurnMoves.includes(6) ? 6 : currentTurnMoves[0]);
+    console.log(`[GFG LUDO] Move executed | seat=${currentTurn} | tokenIndex=${selectedTokenIndex} | inYard=${isInsideYard} | value=${appliedMoveValue} | diceLeft=[${currentTurnMoves.join(',')}] | stepsWalked=${currentPiece.stepsWalked}`);
 
     if (isInsideYard) {
         currentPiece.pathIndex = START_INDEX[currentTurn];

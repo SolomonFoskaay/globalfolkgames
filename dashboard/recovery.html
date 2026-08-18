@@ -170,10 +170,11 @@
         import { BN } from 'bn.js';
 
         const IDL_URL = '/gfg-dice-idl.json';
+        // US excluded (2026-08-18): devnet-us answers "-32005 client
+        // temporarily banned", so only AS + EU are queried.
         const ER_REGIONS = [
             'https://devnet-as.magicblock.app/',
-            'https://devnet-eu.magicblock.app/',
-            'https://devnet-us.magicblock.app/'
+            'https://devnet-eu.magicblock.app/'
         ];
         // Sticky region cursor: each recovery action lands on the region that
         // last answered, so a down/throttled region is skipped on the next one.
