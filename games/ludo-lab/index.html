@@ -173,13 +173,11 @@
     <script type="module" src="/src/main.js"></script>
 
     <script>
-        // Initialize the global header on the Ludo lab page. showLocal renders
-        // the on-chain local-points chip; localPointsTag live-feeds it from the
-        // M3 module (window.localPoints) so the global header reflects the
-        // player's on-chain Ludo points (gasless reads).
+        // Initialize the global header on the Ludo lab page. Local points are
+        // shown in the game's own local header, not the global header.
         document.addEventListener('DOMContentLoaded', function () {
             if (window.initGlobalHeader) {
-                window.initGlobalHeader({ showLocal: true, localPointsTag: 'ludo', gameName: 'Ludo Lab' });
+                window.initGlobalHeader({ gameName: 'Ludo Lab' });
             }
         });
     </script>

@@ -55,11 +55,23 @@
         try { window.localStorage.setItem(PROCESSED_KEY, JSON.stringify(processed)); } catch (e) { /* ignore */ }
     }
 
+    var CACHE_KEY = 'gfg_local_points_cache_v1';
     var cached = {};        // gameTag -> ledger snapshot (latest known)
     var subscribers = [];   // callbacks invoked after a bank / spend / refresh
     var lastAward = null;   // last successfully banked award (shown by ceremonies)
     var lastSeenAward = null; // award computed for the most recent finish (shown as "banking..." before it lands)
     var lastError = null;   // last bank failure reason (ceremony shows it when the write hiccups)
+
+    // Restore cached ledgers from localStorage so page navigations show the
+    // last-known points immediately instead of flashing empty.
+    try {
+        var stored = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {};
+        if (typeof stored === 'object') cached = stored;
+    } catch (e) { /* ignore */ }
+
+    function persistCache() {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(cached)); } catch (e) { /* ignore */ }
+    }
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -137,6 +149,7 @@
                 var ledger = await window.magicblockDice.fetchPointsPda(gameTag);
                 if (ledger) {
                     cached[gameTag] = ledger;
+                    persistCache();
                     fillSlots(gameTag, ledger);
                     notify(gameTag, ledger);
                     return ledger;

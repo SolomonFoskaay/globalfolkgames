@@ -231,8 +231,6 @@
 
     // ---------- Global Header ----------
     function renderHeader(options = {}) {
-        const showLocal = options.showLocal || false;
-        const localPoints = options.localPoints || 0;
         const gameName = options.gameName || '';
 
         // Remove old header if it exists
@@ -246,7 +244,6 @@
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
-                    ${showLocal ? `<span class="gfg-local-pts">Local: ${localPoints}</span>` : ''}
                     <div class="gfg-user-pill" id="gfg-user-pill">
                         <span id="display-points">⭐ 0 Pts</span>
                     </div>
@@ -290,60 +287,6 @@
         // Tell profiles.js the header is ready
         if (typeof window.refreshAuthHeader === 'function') {
             window.refreshAuthHeader();
-        }
-
-        // Live on-chain local-points chip. When a page opts in via
-        // initGlobalHeader({ localPointsTag: 'ludo' }), the chip reads the M3
-        // module (window.localPoints — the universal points consumer) instead
-        // of a static value: an initial fetch, then every bank/spend refresh
-        // the module publishes updates the chip live. Reads are gasless.
-        if (options.localPointsTag) {
-            const chip = document.querySelector('.gfg-local-pts');
-            const tag = options.localPointsTag;
-            const apply = function (gameTag, ledger) {
-                if (!chip || gameTag !== tag) return;
-                const pts = ledger && ledger.pureLifetime != null ? ledger.pureLifetime : 0;
-                chip.textContent = 'Local: ' + Number(pts).toLocaleString();
-            };
-            if (window.localPoints) {
-                if (typeof window.localPoints.subscribe === 'function') {
-                    window.localPoints.subscribe(apply);
-                }
-                window.localPoints.fetch(tag).then(function (ledger) { apply(tag, ledger); }).catch(function () {});
-            }
-        }
-
-        // Live on-chain global-spendable points in the header pill. When a page
-        // opts in via initGlobalHeader({ globalPointsTag: true }), the pill
-        // subscribes to M4 (window.globalLedger) and overlays the on-chain
-        // spendable balance over the Supabase fallback. This makes every page
-        // show the real on-chain points, not just the DB mirror.
-        if (options.globalPointsTag) {
-            var applyGlobal = function (ledger) {
-                var spendable = ledger && ledger.spendableBalance != null ? ledger.spendableBalance : null;
-                if (spendable === null) return;
-                // If the pill currently shows the refresh button, rebuild it
-                // with the real on-chain number (the chain came back).
-                var el = document.getElementById('display-points');
-                if (!el) {
-                    // updateHeader() rendered the "unavailable" button; re-run
-                    // the full header render so the user sees the real number.
-                    if (typeof window.refreshAuthHeader === 'function') {
-                        window.refreshAuthHeader();
-                    }
-                    return;
-                }
-                el.textContent = spendable.toLocaleString() + ' Pts';
-            };
-            if (window.globalLedger) {
-                if (typeof window.globalLedger.subscribe === 'function') {
-                    window.globalLedger.subscribe(applyGlobal);
-                }
-                window.globalLedger.fetch().then(applyGlobal).catch(function () {});
-                window.addEventListener('gfg:auth-changed', function () {
-                    window.globalLedger.fetch().then(applyGlobal).catch(function () {});
-                });
-            }
         }
     }
 

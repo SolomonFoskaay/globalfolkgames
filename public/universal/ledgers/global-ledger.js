@@ -64,11 +64,23 @@
         try { window.localStorage.setItem(PROCESSED_KEY, JSON.stringify(processed)); } catch (e) { /* ignore */ }
     }
 
+    var CACHE_KEY = 'gfg_global_ledger_cache_v1';
     var cached = null;        // latest known ledger snapshot
     var subscribers = [];     // callbacks invoked after a credit / spend / refresh
     var lastCredit = null;    // last successfully credited (shown by ceremonies)
     var lastSeenCredit = null; // credit computed for the most recent finish
     var lastError = null;     // last credit failure reason
+
+    // Restore cached ledger from localStorage so page navigations show the
+    // last-known points immediately instead of flashing "unavailable".
+    try {
+        var stored = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (stored && stored.spendableBalance != null) cached = stored;
+    } catch (e) { /* ignore */ }
+
+    function persistCache(ledger) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(ledger)); } catch (e) { /* ignore */ }
+    }
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -113,6 +125,7 @@
                 var ledger = await window.magicblockDice.fetchGlobalPointsPda();
                 if (ledger) {
                     cached = ledger;
+                    persistCache(ledger);
                     fillSlots(ledger);
                     notify(ledger);
                     return ledger;

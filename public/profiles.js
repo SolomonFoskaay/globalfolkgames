@@ -150,8 +150,9 @@
     }
 
     // Update the header UI. Points are ALWAYS on-chain (M4 global ledger).
-    // No Supabase fallback: if the chain is reachable, show the real number;
-    // if not, show a retry button so the user can tap to refresh manually.
+    // Shows cached points immediately (from localStorage), then auto-updates
+    // when the async on-chain fetch completes. No "unavailable" flash.
+    var _globalLedgerUnsub = null;
     async function updateHeader(dynamicUser) {
         const pill = getPill();
         if (!pill) return;
@@ -166,23 +167,21 @@
                 ? `<span class="tier-badge" title="Active ${tier.label} (${tier.mult}x on win points)">${tier.mult}x</span>`
                 : '';
 
-            // Read on-chain M4 spendable. Never falls back to Supabase.
+            // Read on-chain M4 spendable. Cached value is available immediately
+            // from localStorage (populated on module init). If null (first visit),
+            // show a subtle loading indicator that auto-updates when the fetch completes.
             const gl = window.globalLedger && typeof window.globalLedger.get === 'function'
                 ? window.globalLedger.get() : null;
             const onChainAvailable = gl && gl.spendableBalance != null;
             const pointsText = onChainAvailable
                 ? gl.spendableBalance.toLocaleString()
-                : '';
-            const pointsId = onChainAvailable ? 'display-points' : 'display-points-unavail';
+                : 'Loading\u2026';
 
             pill.innerHTML = `
                 <button id="btn-signout" class="auth-btn-small">Sign out</button>
                 <span class="auth-user">, ${name}</span>
                 ${tierBadge}
-                ${onChainAvailable
-                    ? '<span id="display-points">' + pointsText + ' Pts</span>'
-                    : '<button id="display-points-refresh" class="auth-btn-small" title="Tap to refresh points">Points unavailable, tap to retry</button>'
-                }
+                <span id="display-points">${pointsText} Pts</span>
             `;
 
             const btn = document.getElementById('btn-signout');
@@ -210,28 +209,13 @@
                 };
             }
 
-            // Refresh button: when chain is unreachable, the pill shows a
-            // retry button. Tapping it re-fetches the M4 global ledger and
-            // rebuilds the pill with the real on-chain number if the chain
-            // came back, or leaves the button if it's still down.
-            var refreshBtn = document.getElementById('display-points-refresh');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', function () {
-                    refreshBtn.textContent = 'Loading...';
-                    refreshBtn.disabled = true;
-                    if (window.globalLedger && typeof window.globalLedger.fetch === 'function') {
-                        window.globalLedger.fetch().then(function (ledger) {
-                            if (ledger && ledger.spendableBalance != null) {
-                                updateHeader(dynamicUser);
-                            } else {
-                                refreshBtn.textContent = 'Points unavailable, tap to retry';
-                                refreshBtn.disabled = false;
-                            }
-                        }).catch(function () {
-                            refreshBtn.textContent = 'Points unavailable, tap to retry';
-                            refreshBtn.disabled = false;
-                        });
-                    }
+            // Subscribe to globalLedger ONCE so the pill auto-updates when
+            // the async on-chain fetch completes. No race, no blink.
+            if (window.globalLedger && typeof window.globalLedger.subscribe === 'function' && !_globalLedgerUnsub) {
+                _globalLedgerUnsub = window.globalLedger.subscribe(function (ledger) {
+                    var el = document.getElementById('display-points');
+                    if (!el || !ledger || ledger.spendableBalance == null) return;
+                    el.textContent = ledger.spendableBalance.toLocaleString() + ' Pts';
                 });
             }
 
@@ -246,6 +230,7 @@
         } else {
             // Logged out state: Sign in button first, points last (points sit
             // next to the menu, so a menu-tap never hits the sign-in button).
+            if (_globalLedgerUnsub) { _globalLedgerUnsub(); _globalLedgerUnsub = null; }
             pill.innerHTML = `
                 <button id="btn-open-auth" class="auth-btn-small">Sign in</button>
                 <span id="display-points">⭐ 0 Pts</span>
