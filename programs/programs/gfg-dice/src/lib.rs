@@ -339,6 +339,50 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Commits the latest state and returns the per-game POINTS PDA to this
+    /// program (runs on ER). Mirrors `undelegate` for the M3 points ledger so
+    /// a points PDA can leave a flaky region and be re-pinned to a healthy one
+    /// without a program that can drop its data. Additive, 2026-08-18.
+    pub fn undelegate_points(ctx: Context<CommitAndUndelegatePointsInput>, game_tag: String) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.points.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
+    /// Commits the latest state and returns the RESULT PDA to this program
+    /// (runs on ER). Mirrors `undelegate` for the Scope C result ledger so it
+    /// can be re-pinned to a healthy region. Additive, 2026-08-18.
+    pub fn undelegate_result(ctx: Context<CommitAndUndelegateResultInput>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.result.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
+    /// Commits the latest state and returns the GLOBAL POINTS PDA to this
+    /// program (runs on ER). Mirrors `undelegate` for the M4 global ledger so
+    /// it can be re-pinned to a healthy region. Additive, 2026-08-18.
+    pub fn undelegate_global_points(ctx: Context<CommitAndUndelegateGlobalPointsInput>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.global_points.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
     /// Idempotent: creates the player's RESULT PDA if it does not exist yet.
     /// Payer (sponsor) pays rent; the account belongs to `player_authority`.
     pub fn initialize_result(ctx: Context<InitializeResult>) -> Result<()> {
@@ -970,6 +1014,49 @@ pub struct CommitAndUndelegateInput<'info> {
     pub player_authority: AccountInfo<'info>,
     #[account(mut, seeds = [PLAYER, player_authority.key().as_ref()], bump)]
     pub player: Account<'info, PlayerDice>,
+}
+
+/// Context for `undelegate_points`: returns the per-game POINTS PDA to this
+/// program (runs on the ER). Mirrors CommitAndUndelegateInput for the M3
+/// points ledger. Additive, 2026-08-18.
+#[commit]
+#[derive(Accounts)]
+#[instruction(game_tag: String)]
+pub struct CommitAndUndelegatePointsInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, game_tag.as_bytes(), player_authority.key().as_ref()], bump)]
+    pub points: Account<'info, PlayerPoints>,
+}
+
+/// Context for `undelegate_result`: returns the RESULT PDA to this program
+/// (runs on the ER). Mirrors CommitAndUndelegateInput for the Scope C result
+/// ledger. Additive, 2026-08-18.
+#[commit]
+#[derive(Accounts)]
+pub struct CommitAndUndelegateResultInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [RESULT, player_authority.key().as_ref()], bump)]
+    pub result: Account<'info, PlayerResult>,
+}
+
+/// Context for `undelegate_global_points`: returns the GLOBAL POINTS PDA to
+/// this program (runs on the ER). Mirrors CommitAndUndelegateInput for the M4
+/// global ledger. Additive, 2026-08-18.
+#[commit]
+#[derive(Accounts)]
+pub struct CommitAndUndelegateGlobalPointsInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, GLOBAL_TAG, player_authority.key().as_ref()], bump)]
+    pub global_points: Account<'info, GlobalPoints>,
 }
 
 #[account]

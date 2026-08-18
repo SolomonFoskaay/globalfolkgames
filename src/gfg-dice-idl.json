@@ -2389,6 +2389,219 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "undelegate_global_points",
+      "docs": [
+        "Commits the latest state and returns the GLOBAL POINTS PDA to this",
+        "program (runs on ER). Mirrors `undelegate` for the M4 global ledger so",
+        "it can be re-pinned to a healthy region. Additive, 2026-08-18."
+      ],
+      "discriminator": [
+        26,
+        126,
+        1,
+        85,
+        198,
+        8,
+        23,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "undelegate_points",
+      "docs": [
+        "Commits the latest state and returns the per-game POINTS PDA to this",
+        "program (runs on ER). Mirrors `undelegate` for the M3 points ledger so",
+        "a points PDA can leave a flaky region and be re-pinned to a healthy one",
+        "without a program that can drop its data. Additive, 2026-08-18."
+      ],
+      "discriminator": [
+        202,
+        29,
+        233,
+        86,
+        198,
+        103,
+        9,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "undelegate_result",
+      "docs": [
+        "Commits the latest state and returns the RESULT PDA to this program",
+        "(runs on ER). Mirrors `undelegate` for the Scope C result ledger so it",
+        "can be re-pinned to a healthy region. Additive, 2026-08-18."
+      ],
+      "discriminator": [
+        199,
+        90,
+        219,
+        180,
+        201,
+        97,
+        106,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "result",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  115,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
