@@ -38,7 +38,7 @@
                 4: { 1: 100, 2: 50, 3: 10, 4: 0 },
                 2: { 1: 100, 2: 0 },
             },
-            reasons: { win1st: 1 },
+            reasons: { win1st: 1, win2nd: 2, win3rd: 3 },
         },
     };
 
@@ -55,22 +55,56 @@
         try { window.localStorage.setItem(PROCESSED_KEY, JSON.stringify(processed)); } catch (e) { /* ignore */ }
     }
 
-    var CACHE_KEY = 'gfg_local_points_cache_v1';
-    var cached = {};        // gameTag -> ledger snapshot (latest known)
+    // Ledger cache, keyed by WALLET so a shared browser never shows one signed-in
+    // user's numbers to another. cacheStore = { <wallet> : { gameTag: ledger } }.
+    var CACHE_KEY = 'gfg_local_points_cache_v2';
+    var cacheStore = {};
+    var cached = {};        // current wallet's gameTag -> ledger snapshot
     var subscribers = [];   // callbacks invoked after a bank / spend / refresh
     var lastAward = null;   // last successfully banked award (shown by ceremonies)
     var lastSeenAward = null; // award computed for the most recent finish (shown as "banking..." before it lands)
     var lastError = null;   // last bank failure reason (ceremony shows it when the write hiccups)
 
-    // Restore cached ledgers from localStorage so page navigations show the
-    // last-known points immediately instead of flashing empty.
-    try {
-        var stored = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {};
-        if (typeof stored === 'object') cached = stored;
-    } catch (e) { /* ignore */ }
+    // Best-known caller identity for cache isolation: the Dynamic Solana wallet
+    // address when available, else the profile wallet, else 'anon'.
+    function walletKey() {
+        try {
+            if (window.getDynamicSolanaWallet) {
+                var w = window.getDynamicSolanaWallet();
+                if (w && typeof w === 'string') return w.toLowerCase();
+                if (w && w.address) return String(w.address).toLowerCase();
+            }
+            if (window.currentProfile && window.currentProfile.solana_wallet) {
+                return String(window.currentProfile.solana_wallet).toLowerCase();
+            }
+        } catch (e) { /* ignore */ }
+        return 'anon';
+    }
+
+    function loadCache() {
+        try {
+            var raw = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {};
+            if (typeof raw === 'object') cacheStore = raw;
+        } catch (e) { cacheStore = {}; }
+    }
+
+    // Point `cached` at the current wallet's slice (empty until that wallet's
+    // ledger has been fetched).
+    function syncCacheToWallet() {
+        var wk = walletKey();
+        cached = (cacheStore[wk] && typeof cacheStore[wk] === 'object') ? cacheStore[wk] : {};
+    }
+
+    loadCache();
+    syncCacheToWallet();
 
     function persistCache() {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(cached)); } catch (e) { /* ignore */ }
+        try {
+            var wk = walletKey();
+            if (!cacheStore[wk]) cacheStore[wk] = {};
+            cacheStore[wk] = cached;
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheStore));
+        } catch (e) { /* ignore */ }
     }
 
     function esc(s) {
@@ -101,11 +135,18 @@
         var table = cfg.positions[mode] || cfg.positions[4] || {};
         var points = table[user.position] || 0;
         if (points <= 0) return null;                // nothing to bank
+        // Position-aware reason: 1st=WIN_1ST, 2nd=WIN_2ND, 3rd=WIN_3RD (the
+        // program stores any u8; the old code labelled every placed finish
+        // WIN_1ST, which mislabelled 2nd/3rd awards).
+        var reason = cfg.reasons.win1st;
+        if (cfg.reasons.win2nd && user.position === 2) reason = cfg.reasons.win2nd;
+        if (cfg.reasons.win3rd && user.position === 3) reason = cfg.reasons.win3rd;
         return {
             gameTag: cfg.gameTag,
             points: points,
-            reason: cfg.reasons.win1st,
+            reason: reason,
             position: user.position,
+            at: Date.now(),
         };
     }
 
@@ -156,7 +197,12 @@
                 }
             }
         } catch (e) { /* ledger not readable yet (not onboarded / wallet busy) */ }
-        return cached[gameTag] || null;
+        // Not readable this instant (wallet not restored, ER down): still render
+        // the last-known value so the DOM never sits on static 0 / em-dash while
+        // the player waits for the fetch to become possible.
+        var fallback = cached[gameTag] || null;
+        if (fallback) fillSlots(gameTag, fallback);
+        return fallback;
     }
 
     // Bank a verified finish. Never throws to the game — M3 banking is a
@@ -290,11 +336,12 @@
 
     // ---- public API -----------------------------------------------------
     window.localPoints = {
-        // Latest known ledger for a game (or null). Returns the snapshot first,
-        // then refreshes on-chain in the background.
+        // Latest known ledger for a game (or null). ALWAYS triggers a
+        // background refresh (stability contract: a cold page returns the cached
+        // snapshot if any, and the fetch fills it in the moment the wallet is up).
         get: function (gameTag) {
             var tag = gameTag || DEFAULT_TAG;
-            if (cached[tag]) refreshLedger(tag);
+            refreshLedger(tag);
             return cached[tag] || null;
         },
         // Blocking fetch of the ledger for a game (own account, gasless).
@@ -348,21 +395,62 @@
         });
     }
 
-    // Fill any static DOM slots once the page settles.
-    document.addEventListener('DOMContentLoaded', function () {
+    // The game tag to display/fetch on this page (defaults to 'ludo').
+    function pickGameTag() {
         var tag = DEFAULT_TAG;
         var auto = document.querySelector('[data-local-points-game]');
         if (auto) tag = auto.getAttribute('data-local-points-game') || tag;
-        refreshLedger(tag);
-    });
+        return tag;
+    }
+
+    // Render the current wallet's cached ledger into the DOM slots so a page
+    // shows the last-known numbers even before the first fresh fetch lands.
+    function renderCached(tag) {
+        if (cached[tag]) fillSlots(tag, cached[tag]);
+    }
+
+    // Refresh once the module is usable AND the Dynamic session/wallet has been
+    // restored. On a plain page load the wallet arrives AFTER DOMContentLoaded
+    // (async session restore), and gfg:auth-changed only fires on interactive
+    // sign-in/out — so without this poll the display could stay stuck on the
+    // pre-sign-in value/zero forever.
+    function refreshWhenWalletReady(tag, timeoutMs) {
+        var deadline = Date.now() + (timeoutMs || 12000);
+        (function poll() {
+            if (window.magicblockDice &&
+                typeof window.magicblockDice.available === 'function' &&
+                window.magicblockDice.available()) {
+                // The wallet just became known — re-anchor the cache to it so a
+                // silently restored session swaps in the right user's numbers.
+                syncCacheToWallet();
+                renderCached(tag);
+                refreshLedger(tag);
+                return;
+            }
+            if (Date.now() < deadline) setTimeout(poll, 700);
+        })();
+    }
+
+    function handleDomReady() {
+        var tag = pickGameTag();
+        renderCached(tag);
+        refreshWhenWalletReady(tag);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', handleDomReady);
+    } else {
+        handleDomReady();
+    }
 
     // Re-fetch when auth changes (sign-in / sign-out on the same page): the
-    // ledger only becomes readable once the Dynamic wallet is available.
+    // ledger only becomes readable once the Dynamic wallet is available, and
+    // the wallet identity change must swap the cached slice too.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
-            var tag = DEFAULT_TAG;
-            var auto = document.querySelector('[data-local-points-game]');
-            if (auto) tag = auto.getAttribute('data-local-points-game') || tag;
+            syncCacheToWallet();
+            var tag = pickGameTag();
+            renderCached(tag);
             refreshLedger(tag);
         });
     }

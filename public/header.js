@@ -349,7 +349,27 @@
     }
 
     // Public function used by every page
+    // Inject a plain script (the universal point modules are IIFE globals, so a
+    // classic loader is enough; they self-boot on DOM ready + wallet ready).
+    function ensureScript(src) {
+        const existing = document.querySelector('script[src="' + src + '"]');
+        if (existing) return;
+        const el = document.createElement('script');
+        el.src = src;
+        el.async = false;
+        document.body.appendChild(el);
+    }
+
     window.initGlobalHeader = function (options) {
+        // Ensure the universal point modules are present on EVERY page. The
+        // header pill reads M3/M4 ledgers via window.localPoints / window.
+        // globalLedger, so pages that don't explicitly load them would otherwise
+        // sit on a permanent loading state / zero. Loading the module scripts
+        // here when absent makes the pill always reflect the real balances.
+        ['/universal/points/local-points.js', '/universal/ledgers/global-ledger.js'].forEach(function (src) {
+            if (!window.localPoints && src.indexOf('local-points') >= 0) ensureScript(src);
+            if (!window.globalLedger && src.indexOf('global-ledger') >= 0) ensureScript(src);
+        });
         renderHeader(options || {});
         loadGameRegistry(); // keeps nav labels in sync with the games registry
     };

@@ -36,6 +36,8 @@ const GLOBAL_TAG = Buffer.from('global');
 // Reasons recorded against a points award (mirrors the program's u8 codes).
 export const POINT_REASONS = Object.freeze({
   WIN_1ST: 1,     // first place in a match
+  WIN_2ND: 2,     // second place in a match
+  WIN_3RD: 3,     // third place in a match
 });
 
 // Reasons recorded against a local SPEND (mirrors the program's u8 codes).

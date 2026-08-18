@@ -162,7 +162,9 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   lifetime + SPENDABLE split, one PDA seed [gfgpoints, game_tag, player], gasless
   on the ER, extended gfg program, NO new program). Owner-locked 2026-08-16:
   Ludo scoring 4P 1st=100/2nd=50/3rd=10/4th=0, 2P only 1st=100; ONLY the "You"
-  seat earns. Harness-verified live 2026-08-16: on-chain ER harness (0-SOL
+  seat earns. **Position-aware reason codes (2026-08-18):** 2nd banks WIN_2ND(2),
+  3rd banks WIN_3RD(3) (reason stored as u8; previously every placed award was
+  labelled WIN_1ST). Harness-verified live 2026-08-16: on-chain ER harness (0-SOL
   player, gasless record_points + spend_local, spendable-only decrement) PASS;
   M3 module harness 29/29 against the locked spec (scoring, user-only,
   idempotency, spend, + resilience: retry-on-transient, confirm-timeout ledger
@@ -175,7 +177,15 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   as ER fee payer). CEREMONY NEVER-PROMISE RULE: ludo-lab shows "+N points
   loading... don't refresh the page" in flight and a neutral no-amount pending
   line on failure; "+N banked on-chain" appears ONLY once confirmed.
-  clearTransient() on Play Again. migrate_points bug (an
+  clearTransient() on Play Again. **DISPLAY STABILITY CONTRACT (owner-approved
+  2026-08-18, source of truth = architecture.json M3):** window.localPoints.get()
+  ALWAYS background-refreshes; the last-known ledger renders into
+  data-local-points-* slots on load and on failed/wallet-not-ready refresh; the
+  cache is WALLET-KEYED (gfg_local_points_cache_v2, one wallet per user, so a
+  shared browser never cross-shows numbers); the module re-fetches on a bounded
+  wallet-ready poll after DOMContentLoaded in addition to gfg:auth-changed
+  (a silently restored Dynamic session otherwise leaves the display stuck).
+  migrate_points bug (an
   intermediate build zeroed legacy ledgers) FIXED + redeployed (ELF-verified;
   re-run on restored ledgers is a clean no-op). Restore tool
   scripts/restore-points.mjs (explicit + --from-supabase) restored the 3
@@ -192,7 +202,21 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   pure can never be multiplied. Track A complete: program deployed, relay wired,
   client SDK (recordGlobalPoints/spendGlobal/fetchGlobalPointsPda), universal
   module (public/universal/ledgers/global-ledger.js), profile 3-ledger card,
-  both harnesses pass (26/26).
+  both harnesses pass (M4 module harness 27/27 — the game-win scenarios fixed
+  2026-08-18 to set the M3 award mock per the locked spec). **M4 FLOW-UP +
+  DISPLAY STABILITY CONTRACT (owner-approved 2026-08-18, source of truth =
+  architecture.json M4):** M4 credits the global ledger from the SAME seam
+  envelope M3 banks, resolving the award by CROSS-MODULE match_ref against
+  M3's lastSeenAward/lastAward (read synchronously at bank entry, bounded ~2s
+  poll only when M3 hasn't set it yet — never a blind credit, never a stale
+  award). window.globalLedger.get() ALWAYS background-refreshes; cache is
+  WALLET-KEYED (gfg_global_ledger_cache_v2); the module renders cached numbers
+  on load/failure and re-fetches on wallet-ready + gfg:auth-changed. The
+  global-ledger module is loaded on EVERY page via header.js (it injects
+  /universal/ledgers/global-ledger.js + local-points.js when absent) so the
+  header pill never sits on a permanent Loading state. ludo-lab ceremony shows
+  an M4 "global points banked on-chain" credit line beside the M3 line
+  (never-promise rule); Play Again clears M4 transient state too.
 - M9: planned — player inventory (on-chain asset wallet [gfgassets, player]).
   Per-game item catalogs (skins, items, sounds) stored as media bytes directly
   on-chain. Each game defines its own catalog (like M1's game dropdown); M9

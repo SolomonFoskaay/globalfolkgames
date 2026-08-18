@@ -80,7 +80,9 @@
             const lastTs = ledger.lastRecordedTs
                 ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
             const reasonLabel = ledger.lastReason === 1 ? 'Match won (1st place)'
-                : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—');
+                : (ledger.lastReason === 2 ? 'Match won (2nd place)'
+                : (ledger.lastReason === 3 ? 'Match won (3rd place)'
+                : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—')));
             const pdaLink = window.gfgExplorer
                 ? window.gfgExplorer.accountLink(pda) : esc(pda);
             el.innerHTML = `

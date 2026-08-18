@@ -500,6 +500,43 @@ window.showResultCeremony = function () {
         }
     }
 
+    // M4 credit line (mirror of the M3 award line: banking / neutral pending /
+    // '+N global points banked on-chain', never-promise rule). Separate element
+    // so the platform-wide ledger (M4) and the per-game ledger (M3) stay
+    // distinct in the ceremony.
+    const gEl = document.getElementById('result-ceremony-global');
+    if (gEl) {
+        gEl.style.display = 'none';
+        const showCredit = function (credit) {
+            if (!credit || credit.points <= 0) return;
+            if (credit.status === 'banking') {
+                gEl.innerHTML = '+' + credit.points + ' global points loading... don\u2019t refresh the page (confirming on-chain)';
+            } else if (credit.status === 'failed') {
+                gEl.innerHTML = 'Global points pending (on-chain write hiccup, will re-sync automatically).';
+            } else {
+                gEl.innerHTML = '+' + credit.points + ' global points banked on-chain';
+            }
+            gEl.style.display = 'block';
+        };
+        if (window.globalLedger) {
+            const recentCredit = window.globalLedger.lastCredit;
+            if (recentCredit && Date.now() - recentCredit.at < 15000) {
+                showCredit(recentCredit);
+            } else if (typeof window.globalLedger.subscribe === 'function') {
+                const off = window.globalLedger.subscribe(function (ledger, credit) {
+                    if (credit) {
+                        showCredit(credit);
+                        if (credit.status !== 'banking') off();
+                    }
+                });
+                setTimeout(function () {
+                    const cur = window.globalLedger.lastCredit;
+                    if (cur && Date.now() - cur.at < 15000) { showCredit(cur); off(); }
+                }, 1500);
+            }
+        }
+    }
+
     overlay.classList.add('visible');
 };
 
@@ -511,10 +548,15 @@ window.playAgainAfterCeremony = function () {
     if (overlay) overlay.classList.remove('visible');
     const proofEl = document.getElementById('result-ceremony-proof');
     if (proofEl) proofEl.innerHTML = '';
+    const gProofEl = document.getElementById('result-ceremony-global');
+    if (gProofEl) gProofEl.innerHTML = '';
     window.__onchainGameRecordPromise = null;
     window.__lastOnchainGameRecordSig = null;
     if (window.localPoints && typeof window.localPoints.clearTransient === 'function') {
         window.localPoints.clearTransient();
+    }
+    if (window.globalLedger && typeof window.globalLedger.clearTransient === 'function') {
+        window.globalLedger.clearTransient();
     }
 
     if (typeof window.resetWinDetection === 'function') window.resetWinDetection();

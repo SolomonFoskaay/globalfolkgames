@@ -64,22 +64,53 @@
         try { window.localStorage.setItem(PROCESSED_KEY, JSON.stringify(processed)); } catch (e) { /* ignore */ }
     }
 
-    var CACHE_KEY = 'gfg_global_ledger_cache_v1';
-    var cached = null;        // latest known ledger snapshot
+    var CACHE_KEY = 'gfg_global_ledger_cache_v2';
+    var cacheStore = {};       // wallet -> ledger snapshot (latest known)
+    var cached = null;         // current wallet's ledger snapshot
     var subscribers = [];     // callbacks invoked after a credit / spend / refresh
     var lastCredit = null;    // last successfully credited (shown by ceremonies)
     var lastSeenCredit = null; // credit computed for the most recent finish
     var lastError = null;     // last credit failure reason
 
-    // Restore cached ledger from localStorage so page navigations show the
-    // last-known points immediately instead of flashing "unavailable".
-    try {
-        var stored = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-        if (stored && stored.spendableBalance != null) cached = stored;
-    } catch (e) { /* ignore */ }
+    // Best-known caller identity for cache isolation: the Dynamic Solana wallet
+    // address when available, else the profile wallet, else 'anon'.
+    function walletKey() {
+        try {
+            if (window.getDynamicSolanaWallet) {
+                var w = window.getDynamicSolanaWallet();
+                if (w && typeof w === 'string') return w.toLowerCase();
+                if (w && w.address) return String(w.address).toLowerCase();
+            }
+            if (window.currentProfile && window.currentProfile.solana_wallet) {
+                return String(window.currentProfile.solana_wallet).toLowerCase();
+            }
+        } catch (e) { /* ignore */ }
+        return 'anon';
+    }
+
+    function loadCache() {
+        try {
+            var raw = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {};
+            if (typeof raw === 'object') cacheStore = raw;
+        } catch (e) { cacheStore = {}; }
+    }
+
+    // Point `cached` at the current wallet's slice so a silently restored
+    // session (or a shared browser) never shows another user's numbers.
+    function syncCacheToWallet() {
+        var wk = walletKey();
+        var entry = cacheStore[wk];
+        cached = (entry && typeof entry === 'object' && entry.spendableBalance != null) ? entry : null;
+    }
+
+    loadCache();
+    syncCacheToWallet();
 
     function persistCache(ledger) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(ledger)); } catch (e) { /* ignore */ }
+        try {
+            cacheStore[walletKey()] = ledger;
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheStore));
+        } catch (e) { /* ignore */ }
     }
 
     function esc(s) {
@@ -132,7 +163,11 @@
                 }
             }
         } catch (e) { /* ledger not readable yet */ }
-        return cached || null;
+        // Not readable this instant (wallet not restored, ER down): still render
+        // the last-known value so pages never sit on static 0 / 'Loading…'.
+        var fallback = cached || null;
+        if (fallback) fillSlots(fallback);
+        return fallback;
     }
 
     // Bank a verified finish into the GLOBAL ledger. Soft-fail: never throws
@@ -142,23 +177,25 @@
     // M3's handler fires before ours). M3 already computed {gameTag, points,
     // position, reason, matchRef} from its own scoring table. M4 is the bank,
     // not the scorer — it uses gameTag as source identity and points as-is.
-    async function bank(env) {
-        // Read M3's computed award. M3 sets lastSeenAward synchronously in
-        // its own bank() handler, which fires before ours (M3 script loads
-        // first in the HTML). If M3 hasn't processed this envelope yet
-        // (shouldn't happen), wait briefly then check again.
-        var award = window.localPoints && window.localPoints.lastSeenAward;
-        if (!award) {
-            // M3 handler may not have run yet; wait one tick.
-            await new Promise(function (r) { setTimeout(r, 50); });
-            award = window.localPoints && window.localPoints.lastSeenAward;
-        }
-        if (!award || !award.gameTag || !award.points || award.points <= 0) {
-            lastError = 'M3 award not available or points <= 0';
-            console.warn('[global-ledger] M3 award not available for', env.gameId, '— skipping credit');
-            return null;
-        }
+    // M3's award for THIS envelope. M4 is the bank, not the scorer — the award
+    // comes from M3 (which banks the SAME match from the SAME seam envelope).
+    // Accept an award ONLY when it belongs to this match: exact match_ref match
+    // on lastAward (M3 sets matchRef once the write lands), or the very recent
+    // lastSeenAward (M3 sets it synchronously when its bank starts and its
+    // award carries no matchRef). A stale award is never credited.
+    function pickM3Award(matchRef) {
+        if (!window.localPoints) return null;
+        var now = Date.now();
+        var seen = window.localPoints.lastSeenAward;
+        var landed = window.localPoints.lastAward;
+        if (seen && seen.points > 0 && String(seen.matchRef || '') === matchRef) return seen;
+        if (landed && landed.points > 0 && String(landed.matchRef || '') === matchRef) return landed;
+        if (seen && seen.points > 0 && seen.at && (now - seen.at) < 15000) return seen;
+        if (landed && landed.points > 0 && landed.at && (now - landed.at) < 15000) return landed;
+        return null;
+    }
 
+    async function bank(env) {
         var proofSig = env.proof && env.proof.signature;
         if (!proofSig) {
             lastError = 'finish has no on-chain proof signature';
@@ -166,6 +203,25 @@
             return null;
         }
         var matchRef = matchRefFor(proofSig);
+
+        // Resolve M3's award for THIS envelope. M3's handler runs BEFORE M4's in
+        // the same seam pass and sets lastSeenAward synchronously, so read it
+        // NOW; only if it isn't there yet (M3 still walking to its first await)
+        // poll briefly for it.
+        var award = pickM3Award(matchRef);
+        if (!award) {
+            var awardDeadline = Date.now() + 2000;
+            while (Date.now() < awardDeadline) {
+                await new Promise(function (r) { setTimeout(r, 80); });
+                award = pickM3Award(matchRef);
+                if (award) break;
+            }
+        }
+        if (!award || !award.gameTag || !award.points || award.points <= 0) {
+            lastError = 'M3 award not available or points <= 0';
+            console.warn('[global-ledger] M3 award not available for', env.gameId, '— skipping credit');
+            return null;
+        }
 
         // Map M3's gameTag to the on-chain source_code enum.
         var sourceTag = award.gameTag; // e.g. 'ludo', 'ayo_olopon'
@@ -302,9 +358,11 @@
 
     // ---- public API -----------------------------------------------------
     window.globalLedger = {
-        // Latest known ledger snapshot (or null). Refreshes on-chain in background.
+        // Latest known ledger snapshot (or null). ALWAYS triggers a background
+        // refresh (stability contract: a cold page returns the cached snapshot
+        // if any, and the fetch fills it in the moment the wallet is up).
         get: function () {
-            if (cached) refreshLedger();
+            refreshLedger();
             return cached || null;
         },
         // Blocking fetch of the global ledger (own account, gasless).
@@ -374,14 +432,50 @@
         });
     }
 
-    // Fill static DOM slots once the page settles.
-    document.addEventListener('DOMContentLoaded', function () {
-        refreshLedger();
-    });
+    // Render the current wallet's cached ledger into the DOM slots so a page
+    // shows the last-known numbers even before the first fresh fetch lands.
+    function renderCached() {
+        if (cached) fillSlots(cached);
+    }
 
-    // Re-fetch when auth changes (sign-in / sign-out on the same page).
+    // Refresh once the module is usable AND the Dynamic session/wallet has been
+    // restored. On a plain page load the wallet arrives AFTER DOMContentLoaded
+    // (async session restore), and gfg:auth-changed only fires on interactive
+    // sign-in/out — so without this poll the display could stay stuck on the
+    // pre-sign-in value forever.
+    function refreshWhenWalletReady(timeoutMs) {
+        var deadline = Date.now() + (timeoutMs || 12000);
+        (function poll() {
+            if (window.magicblockDice &&
+                typeof window.magicblockDice.available === 'function' &&
+                window.magicblockDice.available()) {
+                syncCacheToWallet();
+                renderCached();
+                refreshLedger();
+                return;
+            }
+            if (Date.now() < deadline) setTimeout(poll, 700);
+        })();
+    }
+
+    function handleDomReady() {
+        renderCached();
+        refreshWhenWalletReady();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', handleDomReady);
+    } else {
+        handleDomReady();
+    }
+
+    // Re-fetch when auth changes (sign-in / sign-out on the same page): the
+    // ledger only becomes readable once the Dynamic wallet is available, and
+    // the wallet identity change must swap the cached slice too.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
+            syncCacheToWallet();
+            renderCached();
             refreshLedger();
         });
     }
