@@ -74,12 +74,13 @@
     //   2. right after a bank/spend write (so the board posts the new balance).
     // A player who doesn't win all day costs ~1-3 RPC hits for the whole
     // browser, not one per page view. __meta.checkedTags records which games
-    // were already verified so we never re-fetch them per page load; a
-    // zero-result (no account yet) is legitimately "checked" too. A checked
-    // marker older than ZERO_RECHECK_MS on a ZERO ledger is re-verified (a
-    // transient outage can't freeze a fresh zero forever); populated ledgers
-    // stay cached until the next win/spend.
-    var ZERO_RECHECK_MS = 8 * 3600 * 1000;
+    // were already verified so we never re-fetch them per page load. A
+    // zero-result (no account yet) is legitimately "checked" for display,
+    // but it does NOT freeze the wallet: a zero checkpoint is re-verified at
+    // each wallet-ready boot / auth change, so an on-chain balance that
+    // existed before the module was wired (migration-era ledgers) shows up
+    // once the wallet is ready, and a transient outage never freezes a fresh
+    // zero forever. Populated ledgers stay cached until the next win/spend.
     var refreshInFlight = {};  // gameTag -> in-flight refresh promise (dedup)
 
     // __meta lives INSIDE the wallet's cache slice so wallet isolation holds:
@@ -98,15 +99,16 @@
         persistCache();
     }
     // A game needs an auto first-check when it was never verified for this
-    // wallet, OR its only checkpoint was a zero ledger older than the recheck
-    // window. A wallet with a real (populated) ledger never needs a page-load
-    // recheck.
+    // wallet, OR its only checkpoint was a zero ledger (rechecked at every
+    // wallet-ready boot so a migration-era existing balance surfaces; there is
+    // no time freeze). A wallet with a real (populated) ledger never needs a
+    // page-load recheck.
     function needsFirstCheck(gameTag) {
         var m = metaFor();
         var c = m.checkedTags && m.checkedTags[gameTag];
         if (!c) return true;
         if (c.any) return false;
-        return (Date.now() - c.at) > ZERO_RECHECK_MS;
+        return true; // a zero checkpoint triggers one recheck at the wallet-ready boot
     }
     // A ledger display may render a "no rewards yet" line once a game has been
     // checked (even with nothing on-chain); before that it can only say "loading".
@@ -493,8 +495,8 @@
     // DOMContentLoaded (async session restore), and gfg:auth-changed only
     // fires on interactive sign-in/out — so without this poll a silently
     // restored session could leave the board stuck. It is the ONLY page-load
-    // fetch: limited to the first check for the wallet (and the rare zero-ledger
-    // re-verification after ZERO_RECHECK_MS). After that every page view reads
+    // fetch: limited to the first check for the wallet (and the zero-ledger
+    // recheck at every wallet-ready boot). After that every page view reads
     // the cached board and never consults the RPC until the next win/spend.
     function refreshWhenWalletReady(tag, timeoutMs) {
         var deadline = Date.now() + (timeoutMs || 12000);

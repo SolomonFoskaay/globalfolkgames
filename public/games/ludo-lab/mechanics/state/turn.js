@@ -628,7 +628,7 @@ window.endMatchAbandon = function () {
 
     // Best-effort on tab close: clear the cached board so no stale match
     // resumes, then reload to the fresh setup.
-    localStorage.removeItem('gfg_ludo_persistence_state');
+    localStorage.removeItem('gfg_ludo_lab_persistence_state');
     displayEducationalLog('MATCH ABANDONED: Match closed as abandoned (never rewarded).');
     setTimeout(() => window.location.reload(), 500);
 };

@@ -27,7 +27,7 @@ function displayEducationalLog(message) {
 // localStorage (some mobile browsers / private modes) degrades gracefully:
 // the game still plays, it just cannot resume after a refresh.
 // ---------------------------------------------------------------------------
-const PERSISTENCE_KEY = 'gfg_ludo_persistence_state';
+const PERSISTENCE_KEY = 'gfg_ludo_lab_persistence_state';
 const PERSISTENCE_HASH_KEY = PERSISTENCE_KEY + '_digest';
 
 function hashStateString(str) {
