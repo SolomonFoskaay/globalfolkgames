@@ -72,6 +72,16 @@
     var lastSeenCredit = null; // credit computed for the most recent finish
     var lastError = null;     // last credit failure reason
 
+    // RPC economy: a page boot (module self-poll, header pill get(), profile
+    // cards) calls get() several times; without a guard each call fetches the
+    // PDA again, hammering the ER RPC on every page load. refreshLedger
+    // therefore coalesces: never two fetches in flight, and a throttled call
+    // within MIN_INTERVAL of a successful read just serves the cached snapshot
+    // (credit/spend/read-backs pass force=true for fresh data).
+    var REFRESH_MIN_INTERVAL_MS = 6000;
+    var refreshInFlight = null; // in-flight refresh promise (dedup)
+    var refreshLastAt = 0;      // ms of the last SUCCESSFUL fetch
+
     // Best-known caller identity for cache isolation: the Dynamic Solana wallet
     // address when available, else the profile wallet, else 'anon'.
     function walletKey() {
@@ -150,24 +160,37 @@
         return !!(window.magicblockDice && typeof window.magicblockDice.recordGlobalPoints === 'function');
     }
 
-    async function refreshLedger() {
-        try {
-            if (window.magicblockDice && typeof window.magicblockDice.fetchGlobalPointsPda === 'function') {
-                var ledger = await window.magicblockDice.fetchGlobalPointsPda();
-                if (ledger) {
-                    cached = ledger;
-                    persistCache(ledger);
-                    fillSlots(ledger);
-                    notify(ledger);
-                    return ledger;
+    async function refreshLedger(force) {
+        if (!force && refreshLastAt && (Date.now() - refreshLastAt) < REFRESH_MIN_INTERVAL_MS) {
+            return cached || null; // throttled: serve the last-known ledger
+        }
+        if (refreshInFlight) return refreshInFlight; // share the in-flight fetch
+        refreshInFlight = (async function () {
+            try {
+                if (window.magicblockDice && typeof window.magicblockDice.fetchGlobalPointsPda === 'function') {
+                    var ledger = await window.magicblockDice.fetchGlobalPointsPda();
+                    if (ledger) {
+                        cached = ledger;
+                        persistCache(ledger);
+                        refreshLastAt = Date.now();
+                        fillSlots(ledger);
+                        notify(ledger);
+                        return ledger;
+                    }
                 }
-            }
-        } catch (e) { /* ledger not readable yet */ }
-        // Not readable this instant (wallet not restored, ER down): still render
-        // the last-known value so pages never sit on static 0 / 'Loading…'.
-        var fallback = cached || null;
-        if (fallback) fillSlots(fallback);
-        return fallback;
+            } catch (e) { /* ledger not readable yet */ }
+            // Not readable this instant (wallet not restored, ER down): still render
+            // the last-known value so pages never sit on static 0 / 'Loading…'.
+            // refreshLastAt is NOT touched so a later call retries promptly.
+            var fallback = cached || null;
+            if (fallback) fillSlots(fallback);
+            return fallback;
+        })();
+        try {
+            return await refreshInFlight;
+        } finally {
+            refreshInFlight = null;
+        }
     }
 
     // Bank a verified finish into the GLOBAL ledger. Soft-fail: never throws
@@ -293,7 +316,7 @@
                     at: Date.now(),
                 };
                 console.log('[global-ledger] credited ' + award.points + 'pt (' + sourceTag + ' source=' + sourceCode + ', kind=0 game win) — ' + (sig || 'no sig'));
-                var ledger = await refreshLedger();
+                var ledger = await refreshLedger(true);
                 notify(ledger, lastCredit);
                 return sig || null;
             } catch (e) {
@@ -304,7 +327,7 @@
         }
 
         // Every attempt errored — re-read to check if the write landed anyway.
-        var reLedger = await refreshLedger();
+        var reLedger = await refreshLedger(true);
         if (reLedger && String(reLedger.lastMatchRef || '') === String(matchRef)) {
             lastError = null;
             lastCredit = {
@@ -365,9 +388,11 @@
             refreshLedger();
             return cached || null;
         },
-        // Blocking fetch of the global ledger (own account, gasless).
+        // Blocking fetch of the global ledger (own account, gasless). Explicit
+        // fetch = fresh read (bypasses the throttled background refresh; still
+        // dedupes against one already in flight).
         fetch: function () {
-            return refreshLedger();
+            return refreshLedger(true);
         },
         // Programmatic credit (for M5 tier boost, M6 signup/referral/giveaway).
         // kind: 0 = game win, 1 = other. source: source-code enum (u8).
@@ -388,7 +413,7 @@
                 var sig = await window.magicblockDice.recordGlobalPoints(
                     kind, sourceCode, points, reason, matchRef,
                 );
-                await refreshLedger();
+                await refreshLedger(true);
                 return sig || null;
             } catch (e) {
                 console.warn('[global-ledger] credit failed (soft-fail):', e.message || e);
@@ -400,7 +425,7 @@
             if (!magicReady()) return null;
             try {
                 var sig = await window.magicblockDice.spendGlobal(amount, reason, ref);
-                await refreshLedger();
+                await refreshLedger(true);
                 return sig || null;
             } catch (e) {
                 console.warn('[global-ledger] spend failed (soft-fail):', e.message || e);
@@ -451,7 +476,7 @@
                 window.magicblockDice.available()) {
                 syncCacheToWallet();
                 renderCached();
-                refreshLedger();
+                refreshLedger(true);
                 return;
             }
             if (Date.now() < deadline) setTimeout(poll, 700);
@@ -476,7 +501,7 @@
         window.addEventListener('gfg:auth-changed', function () {
             syncCacheToWallet();
             renderCached();
-            refreshLedger();
+            refreshLedger(true);
         });
     }
 

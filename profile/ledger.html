@@ -67,9 +67,45 @@
                     return;
                 }
                 statusEl.textContent = 'Signed in — welcome back!';
-                window.ProfileCore.loadPointsLedger(ledgerEl);
+                // Serve the M3 module's cached/snapshot ledger (throttled
+                // refresh) instead of a fresh direct fetch on every page load.
+                const lp = window.localPoints;
+                if (lp && typeof lp.get === 'function') {
+                    const cur = lp.get('ludo');
+                    if (cur && cur.spendableBalance != null) {
+                        window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', cur);
+                    } else {
+                        ledgerEl.innerHTML = '<p class="empty">Check your ledger…</p>';
+                    }
+                } else {
+                    // Cold path: the module script hasn't landed yet, so a one-off
+                    // direct read still shows something now.
+                    window.ProfileCore.loadPointsLedger(ledgerEl);
+                }
                 signinBtn.hidden = true;
             }
+
+            // Auto-update the card when the M3 module pushes a refreshed ledger
+            // (page boot refresh, wallet restore, a new match award). Registered
+            // as soon as the module exists; then re-pulls the cached value once
+            // so a notify that landed before we subscribed isn't missed.
+            function wireLedger() {
+                if (!window.localPoints || typeof window.localPoints.subscribe !== 'function') {
+                    if (wireLedger._tries++ < 10) setTimeout(wireLedger, 400);
+                    return;
+                }
+                window.localPoints.subscribe(function (gameTag, ledger) {
+                    if (window.currentProfile && ledger && gameTag === 'ludo') {
+                        window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', ledger);
+                    }
+                });
+                const cur = window.localPoints.get('ludo');
+                if (cur && cur.spendableBalance != null) {
+                    window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', cur);
+                }
+            }
+            wireLedger._tries = 0;
+            wireLedger();
 
             signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 

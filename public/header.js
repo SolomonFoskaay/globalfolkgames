@@ -73,7 +73,7 @@
             {
                 heading: 'Play',
                 items: [
-                    { label: ludoNavLabel(), href: '/games/ludo/', match: 'ludo' },
+                    { label: ludoNavLabel(), href: '/games/ludo-lab/', match: 'ludo' },
                     { label: '🏆 Competitions', href: '/competitions/', match: 'competitions' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]

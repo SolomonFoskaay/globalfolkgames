@@ -57,35 +57,21 @@
         }
     }
 
-    // Load the signed-in user's own on-chain points PDA ledger (gasless read,
-    // own account only, per-game ledger). Renders into el.
-    async function loadPointsLedger(el, gameTag) {
-        gameTag = gameTag || 'ludo';
-        const magic = window.magicblockDice;
-        if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
-            el.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
-            return;
-        }
-        const pda = magic.pointsPda(gameTag);
-        if (!pda) {
-            el.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
-            return;
-        }
-        try {
-            const ledger = await magic.fetchPointsPda(gameTag);
-            if (!ledger) {
-                el.innerHTML = '<p class="empty">Your ledger account has no rewards yet. Win a match and your +100 reward is written here permanently.</p>';
-                return;
-            }
-            const lastTs = ledger.lastRecordedTs
-                ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
-            const reasonLabel = ledger.lastReason === 1 ? 'Match won (1st place)'
-                : (ledger.lastReason === 2 ? 'Match won (2nd place)'
-                : (ledger.lastReason === 3 ? 'Match won (3rd place)'
-                : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—')));
-            const pdaLink = window.gfgExplorer
-                ? window.gfgExplorer.accountLink(pda) : esc(pda);
-            el.innerHTML = `
+    // Render the signed-in user's per-game (M3) ledger card from a ledger
+    // snapshot (the module's cached/notified value, or a fresh fetch). Pure
+    // sync render — never re-fetches — so repeated updates never flicker.
+    function renderPointsLedgerCard(el, ledger, gameTag) {
+        const lastTs = ledger.lastRecordedTs
+            ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
+        const reasonLabel = ledger.lastReason === 1 ? 'Match won (1st place)'
+            : (ledger.lastReason === 2 ? 'Match won (2nd place)'
+            : (ledger.lastReason === 3 ? 'Match won (3rd place)'
+            : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—')));
+        const pda = window.magicblockDice && typeof window.magicblockDice.pointsPda === 'function'
+            ? window.magicblockDice.pointsPda(gameTag) : null;
+        const pdaLink = (pda && window.gfgExplorer)
+            ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
+        el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Lifetime points (pure)</span>
                     <b style="color:#f39c12; font-size:1.15rem;">${ledger.pureLifetime}</b>
@@ -112,11 +98,42 @@
                     <b>${ledger.spendCount}</b>
                 </div>` : ''}
                 <div style="padding:8px 0;">
-                    <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours, game: ludo)</span>
+                    <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours, game: ${esc(gameTag)})</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
                 </div>`;
+    }
+
+    // Load the signed-in user's own on-chain points PDA ledger (gasless read,
+    // own account only, per-game ledger). Pass a ledger snapshot to render it
+    // synchronously (no fetch, no flicker); without one it fetches then renders.
+    // Returns the ledger (or null).
+    async function loadPointsLedger(el, gameTag, ledger) {
+        gameTag = gameTag || 'ludo';
+        if (ledger && ledger.spendableBalance != null) {
+            renderPointsLedgerCard(el, ledger, gameTag);
+            return ledger;
+        }
+        const magic = window.magicblockDice;
+        if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
+            el.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
+            return null;
+        }
+        const pda = magic.pointsPda(gameTag);
+        if (!pda) {
+            el.innerHTML = '<p class="empty">Connect your wallet to see your on-chain ledger.</p>';
+            return null;
+        }
+        try {
+            const fetched = await magic.fetchPointsPda(gameTag);
+            if (!fetched) {
+                el.innerHTML = '<p class="empty">Your ledger account has no rewards yet. Win a match and your reward is written here permanently.</p>';
+                return null;
+            }
+            renderPointsLedgerCard(el, fetched, gameTag);
+            return fetched;
         } catch (e) {
             el.innerHTML = '<p class="empty">Could not read your ledger (' + esc(e.message) + ').</p>';
+            return null;
         }
     }
 
@@ -142,29 +159,18 @@
         });
     }
 
-    async function loadGlobalLedger(el) {
-        const magic = window.magicblockDice;
-        if (!magic || typeof magic.fetchGlobalPointsPda !== 'function') {
-            el.innerHTML = '<p class="empty">Global ledgers unavailable (wallet not ready).</p>';
-            return;
-        }
-        const pda = magic.globalPointsPda();
-        if (!pda) {
-            el.innerHTML = '<p class="empty">Connect your wallet to see your global ledgers.</p>';
-            return;
-        }
-        try {
-            const ledger = await magic.fetchGlobalPointsPda();
-            if (!ledger) {
-                el.innerHTML = '<p class="empty">No global ledger account yet. Win a match to create your cross-game record.</p>';
-                return;
-            }
-            const lastTs = ledger.lastRecordedTs
-                ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
-            const pdaLink = window.gfgExplorer
-                ? window.gfgExplorer.accountLink(pda) : esc(pda);
-            const fmt = (n) => (n ?? 0).toLocaleString();
-            el.innerHTML = `
+    // Render the global (M4) ledger card from a ledger snapshot. Pure sync
+    // render — never re-fetches — so repeated updates never flicker.
+    function renderGlobalLedgerCard(el, ledger) {
+        const lastTs = ledger.lastRecordedTs
+            ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
+        const pda = window.magicblockDice && typeof window.magicblockDice.globalPointsPda === 'function'
+            ? window.magicblockDice.globalPointsPda() : null;
+        const pdaLink = (pda && window.gfgExplorer)
+            ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
+        const fmt = (n) => (n ?? 0).toLocaleString();
+        const sourceLabel = GLOBAL_SOURCE_LABEL(ledger.lastSource);
+        el.innerHTML = `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Pure (unspendable, never multiplied)</span>
                     <b style="color:#f39c12;font-size:1.15rem;">${fmt(ledger.pureLifetime)}</b>
@@ -186,16 +192,61 @@
                     <span style="color:var(--muted);">Spends</span>
                     <b>${ledger.spendCount}</b>
                 </div>` : ''}
+                ${ledger.lastPoints ? `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Last credit</span>
-                    <b style="font-size:0.82rem;">${esc(lastTs)}</b>
+                    <b>+${fmt(ledger.lastPoints)} <span style="color:#666;font-size:0.78rem;">(${esc(sourceLabel)})</span></b>
                 </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Last credit time</span>
+                    <b style="font-size:0.82rem;">${esc(lastTs)}</b>
+                </div>` : ''}
                 <div style="padding:8px 0;">
                     <span style="color:var(--muted);font-size:0.82rem;">Global ledger account (yours, site-wide)</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
                 </div>`;
+    }
+
+    // Map an M4 lastSource code to a human label (mirrors global-ledger
+    // SOURCE_CODES). 0 / unknown -> a neutral line.
+    function GLOBAL_SOURCE_LABEL(code) {
+        switch (Number(code)) {
+            case 1: return 'Ludo win';
+            case 2: return 'Ayo Olopon win';
+            case 10: return 'Signup bonus';
+            case 11: return 'Referral';
+            case 12: return 'Giveaway';
+            case 13: return 'Active Tier boost';
+            default: return 'Award';
+        }
+    }
+
+    async function loadGlobalLedger(el, ledger) {
+        if (ledger && ledger.spendableBalance != null) {
+            renderGlobalLedgerCard(el, ledger);
+            return ledger;
+        }
+        const magic = window.magicblockDice;
+        if (!magic || typeof magic.fetchGlobalPointsPda !== 'function') {
+            el.innerHTML = '<p class="empty">Global ledgers unavailable (wallet not ready).</p>';
+            return null;
+        }
+        const pda = magic.globalPointsPda();
+        if (!pda) {
+            el.innerHTML = '<p class="empty">Connect your wallet to see your global ledgers.</p>';
+            return null;
+        }
+        try {
+            const fetched = await magic.fetchGlobalPointsPda();
+            if (!fetched) {
+                el.innerHTML = '<p class="empty">No global ledger account yet. Win a match to create your cross-game record.</p>';
+                return null;
+            }
+            renderGlobalLedgerCard(el, fetched);
+            return fetched;
         } catch (e) {
             el.innerHTML = '<p class="empty">Could not read global ledgers (' + esc(e.message) + ').</p>';
+            return null;
         }
     }
 

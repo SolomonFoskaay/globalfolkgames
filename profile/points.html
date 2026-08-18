@@ -26,19 +26,23 @@
             <p style="color:var(--muted); font-size:0.8rem; margin-top:10px; line-height:1.5;">Points come from winning matches with a verifiable on-chain roll. A 1st-place finish with a valid roll earns +100 points, recorded on-chain.</p>
         </section>
 
-        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Local points (per-game)</h3>
-                <select id="points-game-select" style="background:#1a1a24; color:#fff; border:1px solid #333; border-radius:6px; padding:4px 8px; font-size:0.82rem;"></select>
-            </div>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your game-specific on-chain ledger. Pure = verified wins only (never multiplied or diluted). Spendable = draws down for in-game purchases.</p>
-            <div id="points-local-ledger"><p class="empty">Loading on-chain ledger...</p></div>
-        </section>
-
         <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
             <h3>Global ledgers (site-wide)</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Three on-chain ledgers tracking your total performance across every game. Pure = verified wins only (never multiplied). Lifetime = everything earned from any source. Spendable = what you can use for tiers, items, and entries.</p>
             <div id="points-global-ledger"><p class="empty">Loading global ledgers...</p></div>
+        </section>
+
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Local points (per-game)</h3>
+            </div>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your game-specific on-chain ledger. Pure = verified wins only (never multiplied or diluted). Spendable = draws down for in-game purchases. Pick a game to see its full breakdown.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <input id="points-game-search" type="search" placeholder="Search games..." autocomplete="off"
+                       style="flex:1; min-width:140px; background:#1a1a24; color:#fff; border:1px solid #333; border-radius:6px; padding:6px 10px; font-size:0.82rem;">
+                <select id="points-game-select" style="background:#1a1a24; color:#fff; border:1px solid #333; border-radius:6px; padding:6px 8px; font-size:0.82rem;"></select>
+            </div>
+            <div id="points-local-ledger"><p class="empty">Select a game to see its ledger.</p></div>
         </section>
 
         <section class="game-card" id="tier-card-section" style="border:1px solid var(--accent, #f39c12);">
@@ -93,30 +97,129 @@
             const localLedgerEl = document.getElementById('points-local-ledger');
             const globalLedgerEl = document.getElementById('points-global-ledger');
             const gameSelect = document.getElementById('points-game-select');
+            const gameSearch = document.getElementById('points-game-search');
             const signinBtn = document.getElementById('points-signin-btn');
             let selectedGame = 'ludo';
+            let gameList = [];          // full registry list (for search filtering)
 
-            // Populate game dropdown from the games registry.
+            // Populate the game dropdown from the games registry (auto-loads the
+            // available games), filtered live by the search box. Falls back to
+            // Ludo if the registry can't be fetched.
+            function renderGameOptions(filter) {
+                filter = (filter || '').trim().toLowerCase();
+                const games = gameList.filter(g =>
+                    !filter || g.name.toLowerCase().indexOf(filter) >= 0 ||
+                    g.id.toLowerCase().indexOf(filter) >= 0 ||
+                    ((g.origin && g.origin.flag) || '').toLowerCase().indexOf(filter) >= 0
+                );
+                gameSelect.innerHTML = (games.length
+                    ? games.map(g =>
+                        '<option value="' + g.id + '">' + (g.origin && g.origin.flag ? g.origin.flag + ' ' : '') + g.name + '</option>'
+                    ).join('')
+                    : '<option value="">No matching games</option>');
+                // Keep the current selection when the filter still shows it.
+                if ([...gameSelect.options].some(o => o.value === selectedGame)) {
+                    gameSelect.value = selectedGame;
+                } else if (games.length) {
+                    selectedGame = games[0].id;
+                    gameSelect.value = selectedGame;
+                }
+            }
+
             async function loadGameList() {
                 try {
                     const res = await fetch('/games/registry.json', { cache: 'no-store' });
                     const data = await res.json();
-                    const games = (data && data.games) || [];
-                    gameSelect.innerHTML = games.map(g =>
-                        '<option value="' + g.id + '">' + (g.origin && g.origin.flag ? g.origin.flag + ' ' : '') + g.name + '</option>'
-                    ).join('');
+                    gameList = (data && data.games) || [];
                 } catch (e) {
-                    gameSelect.innerHTML = '<option value="ludo">Ludo</option>';
+                    gameList = [{ id: 'ludo', name: 'Ludo' }];
                 }
+                renderGameOptions(gameSearch.value);
             }
             loadGameList();
 
+            if (gameSearch) {
+                gameSearch.addEventListener('input', function () {
+                    renderGameOptions(gameSearch.value);
+                });
+            }
+
             gameSelect.addEventListener('change', function () {
                 selectedGame = gameSelect.value || 'ludo';
-                if (window.ProfileCore && window.currentUser) {
-                    window.ProfileCore.loadPointsLedger(localLedgerEl, selectedGame);
-                }
+                renderLocalCard(selectedGame);
             });
+
+            // Render the local (M3) card. With a ledger snapshot: pure sync, no
+            // fetch. Without one, read the module's cached value (get() returns
+            // it immediately and background-refreshes via the module's throttled
+            // path — never a second, unbounded direct fetch). With no value yet,
+            // show a loading line until the subscribe (wired below) delivers.
+            function renderLocalCard(gameTag, ledger) {
+                if (ledger && ledger.spendableBalance != null) {
+                    window.ProfileCore.loadPointsLedger(localLedgerEl, gameTag, ledger);
+                    return;
+                }
+                const cur = window.localPoints ? window.localPoints.get(gameTag) : null;
+                if (cur && cur.spendableBalance != null) {
+                    window.ProfileCore.loadPointsLedger(localLedgerEl, gameTag, cur);
+                    return;
+                }
+                localLedgerEl.innerHTML = '<p class="empty">Loading ' + (gameTag || selectedGame) + ' ledger...</p>';
+            }
+
+            // Render the header totals + global (M4) card from a ledger snapshot.
+            // Never fetches here: get() already refreshed in the background and
+            // subscribe pushes fresh ledgers, so this path stays flicker-free.
+            function renderGlobal(ledger) {
+                if (ledger && ledger.spendableBalance != null) {
+                    totalEl.textContent = ledger.spendableBalance.toLocaleString();
+                    lifetimeEl.textContent = 'Lifetime points: ' + (ledger.lifetime != null ? ledger.lifetime.toLocaleString() : '--');
+                    window.ProfileCore.loadGlobalLedger(globalLedgerEl, ledger);
+                }
+            }
+
+            // One-shot boot: once the wallet client is actually ready, snapshot
+            // the current ledgers and start the sync. Repeated attempts are a
+            // bounded poll (the Dynamic session restores AFTER DOMContentLoaded).
+            let walletPoll = 0;
+            let subscriptionsWired = false;
+            function wireSubscriptions() {
+                if (subscriptionsWired) return;
+                // The module scripts are injected by header.js DURING this
+                // DOMContentLoaded run, so window.localPoints / globalLedger may
+                // not exist yet when pageload starts; re-enter until they do.
+                if (!(window.globalLedger && typeof window.globalLedger.subscribe === 'function') ||
+                    !(window.localPoints && typeof window.localPoints.subscribe === 'function')) {
+                    return;
+                }
+                subscriptionsWired = true;
+                if (typeof window.globalLedger.subscribe === 'function') {
+                    window.globalLedger.subscribe(function (ledger) {
+                        if (window.currentProfile) {
+                            render(!!window.currentUser);
+                            renderGlobal(ledger);
+                        }
+                    });
+                }
+                if (typeof window.localPoints.subscribe === 'function') {
+                    window.localPoints.subscribe(function (gameTag, ledger) {
+                        if (window.currentProfile && ledger && gameTag === selectedGame) {
+                            render(!!window.currentUser);
+                            renderLocalCard(gameTag, ledger);
+                        }
+                    });
+                }
+            }
+            function bootOnWalletReady() {
+                wireSubscriptions();
+                const magic = window.magicblockDice;
+                if (magic && typeof magic.available === 'function' && magic.available()) {
+                    renderGlobal(window.globalLedger ? window.globalLedger.get() : null);
+                    renderLocalCard(selectedGame);
+                    return;
+                }
+                if (walletPoll++ < 24) setTimeout(bootOnWalletReady, 600); // ~15s budget
+            }
 
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
@@ -127,22 +230,6 @@
                 const p = window.currentProfile;
                 statusEl.textContent = 'Signed in, welcome back!';
                 levelEl.textContent = 'Level ' + (p.level || 0);
-
-                // On-chain only: show real M4 data or "unavailable" (no Supabase fallback).
-                const gl = window.globalLedger && window.globalLedger.get();
-                if (gl && gl.spendableBalance != null) {
-                    totalEl.textContent = gl.spendableBalance.toLocaleString();
-                    lifetimeEl.textContent = 'Lifetime points: ' + (gl.lifetime != null ? gl.lifetime.toLocaleString() : '--');
-                } else {
-                    totalEl.textContent = '--';
-                    lifetimeEl.textContent = 'Lifetime points: --';
-                }
-
-                // Load on-chain ledger cards (own-account reads, gasless).
-                if (window.ProfileCore) {
-                    window.ProfileCore.loadPointsLedger(localLedgerEl, selectedGame);
-                    window.ProfileCore.loadGlobalLedger(globalLedgerEl);
-                }
                 renderTierCard();
                 signinBtn.hidden = true;
             }
@@ -197,14 +284,28 @@
             signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
             render(!!window.currentUser);
+
+            // Wallet client boots asynchronously (main.js is a module); poll
+            // until it's ready, then snapshot the ledgers once. wireSubscriptions
+            // (inside) registers the push-driven M3/M4 notifiers once the module
+            // scripts land.
+            bootOnWalletReady();
             if (window.refreshAuthHeader) {
-                window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+                window.refreshAuthHeader().then(() => {
+                    render(!!window.currentUser);
+                    wireSubscriptions();
+                    bootOnWalletReady();
+                }).catch(() => render(false));
             }
 
-            // Re-render when global ledger updates (new game win etc.)
-            if (window.globalLedger && typeof window.globalLedger.subscribe === 'function') {
-                window.globalLedger.subscribe(() => {
-                    if (window.currentProfile) render(!!window.currentUser);
+            // Re-sync on auth changes (sign-in / sign-out on the same page).
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('gfg:auth-changed', function () {
+                    wireSubscriptions();
+                    if (window.currentProfile) {
+                        render(!!window.currentUser);
+                        bootOnWalletReady();
+                    }
                 });
             }
         });

@@ -65,6 +65,16 @@
     var lastSeenAward = null; // award computed for the most recent finish (shown as "banking..." before it lands)
     var lastError = null;   // last bank failure reason (ceremony shows it when the write hiccups)
 
+    // RPC economy: a page boot (module self-poll, header pill get(), profile
+    // cards) can call get() several times; without a guard each call fetches
+    // the PDA again, hammering the ER RPC on every page load. refreshLedger
+    // therefore coalesces: never two fetches in flight for the same game, and
+    // a throttled call within MIN_INTERVAL of a successful read just serves the
+    // cached snapshot (bank/spend/read-backs pass force=true for fresh data).
+    var REFRESH_MIN_INTERVAL_MS = 6000;
+    var refreshInFlight = {};  // gameTag -> in-flight refresh promise (dedup)
+    var refreshLastAt = {};    // gameTag -> ms of the last SUCCESSFUL fetch
+
     // Best-known caller identity for cache isolation: the Dynamic Solana wallet
     // address when available, else the profile wallet, else 'anon'.
     function walletKey() {
@@ -184,25 +194,40 @@
         return !!(window.magicblockDice && typeof window.magicblockDice.recordPoints === 'function');
     }
 
-    async function refreshLedger(gameTag) {
-        try {
-            if (window.magicblockDice && typeof window.magicblockDice.fetchPointsPda === 'function') {
-                var ledger = await window.magicblockDice.fetchPointsPda(gameTag);
-                if (ledger) {
-                    cached[gameTag] = ledger;
-                    persistCache();
-                    fillSlots(gameTag, ledger);
-                    notify(gameTag, ledger);
-                    return ledger;
+    async function refreshLedger(gameTag, force) {
+        gameTag = gameTag || DEFAULT_TAG;
+        if (!force && refreshLastAt[gameTag] &&
+            (Date.now() - refreshLastAt[gameTag]) < REFRESH_MIN_INTERVAL_MS) {
+            return cached[gameTag] || null; // throttled: serve the last-known ledger
+        }
+        if (refreshInFlight[gameTag]) return refreshInFlight[gameTag]; // share the in-flight fetch
+        refreshInFlight[gameTag] = (async function () {
+            try {
+                if (window.magicblockDice && typeof window.magicblockDice.fetchPointsPda === 'function') {
+                    var ledger = await window.magicblockDice.fetchPointsPda(gameTag);
+                    if (ledger) {
+                        cached[gameTag] = ledger;
+                        persistCache();
+                        refreshLastAt[gameTag] = Date.now();
+                        fillSlots(gameTag, ledger);
+                        notify(gameTag, ledger);
+                        return ledger;
+                    }
                 }
-            }
-        } catch (e) { /* ledger not readable yet (not onboarded / wallet busy) */ }
-        // Not readable this instant (wallet not restored, ER down): still render
-        // the last-known value so the DOM never sits on static 0 / em-dash while
-        // the player waits for the fetch to become possible.
-        var fallback = cached[gameTag] || null;
-        if (fallback) fillSlots(gameTag, fallback);
-        return fallback;
+            } catch (e) { /* ledger not readable yet (not onboarded / wallet busy) */ }
+            // Not readable this instant (wallet not restored, ER down): still render
+            // the last-known value so the DOM never sits on static 0 / em-dash while
+            // the player waits for the fetch to become possible. refreshLastAt is
+            // NOT touched so a later call retries promptly.
+            var fallback = cached[gameTag] || null;
+            if (fallback) fillSlots(gameTag, fallback);
+            return fallback;
+        })();
+        try {
+            return await refreshInFlight[gameTag];
+        } finally {
+            delete refreshInFlight[gameTag];
+        }
     }
 
     // Bank a verified finish. Never throws to the game — M3 banking is a
@@ -277,7 +302,7 @@
                     at: Date.now(),
                 };
                 console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat) — ' + (sig || 'no sig'));
-                var ledger = await refreshLedger(award.gameTag);
+                var ledger = await refreshLedger(award.gameTag, true);
                 notify(award.gameTag, ledger, lastAward);
                 return sig || null;
             } catch (e) {
@@ -290,7 +315,7 @@
         // Every attempt errored, but the write may have landed anyway (ER
         // confirm-timeout false failure). Re-read the ledger: if this match_ref
         // is now on-chain, treat the bank as successful.
-        var reLedger = await refreshLedger(award.gameTag);
+        var reLedger = await refreshLedger(award.gameTag, true);
         if (reLedger && String(reLedger.lastMatchRef || '') === String(matchRef)) {
             lastError = null;
             lastAward = {
@@ -345,8 +370,10 @@
             return cached[tag] || null;
         },
         // Blocking fetch of the ledger for a game (own account, gasless).
+        // Explicit fetch = fresh read (bypasses the throttled background
+        // refresh; still dedupes against one already in flight).
         fetch: function (gameTag) {
-            return refreshLedger(gameTag || DEFAULT_TAG);
+            return refreshLedger((gameTag || DEFAULT_TAG), true);
         },
         // Spendable draw-down for that game's own in-game spends. `ref` is the
         // purchase reference that makes the spend replayable. Soft-fail.
@@ -355,7 +382,7 @@
             if (!magicReady()) return null;
             try {
                 var sig = await window.magicblockDice.spendLocal(tag, amount, reason, ref);
-                await refreshLedger(tag);
+                await refreshLedger(tag, true);
                 return sig || null;
             } catch (e) {
                 console.warn('[local-points] spend failed (soft-fail):', e.message || e);
@@ -424,7 +451,7 @@
                 // silently restored session swaps in the right user's numbers.
                 syncCacheToWallet();
                 renderCached(tag);
-                refreshLedger(tag);
+                refreshLedger(tag, true);
                 return;
             }
             if (Date.now() < deadline) setTimeout(poll, 700);
@@ -451,7 +478,7 @@
             syncCacheToWallet();
             var tag = pickGameTag();
             renderCached(tag);
-            refreshLedger(tag);
+            refreshLedger(tag, true);
         });
     }
 
