@@ -31,7 +31,7 @@ import { execFileSync } from 'child_process';
 import { PublicKey, Keypair } from '@solana/web3.js';
 import './load-env.mjs';
 import { routerUrl } from '../src/gfg-rpc.js';
-import { createConnection, getDelegationStatus } from '../src/gfg-rpc.js';
+import { createConnection, getDelegationStatus, erRpcEndpoints, pickErRpcUrl, erEndpointStates } from '../src/gfg-rpc.js';
 import { spendCaps, loadLedger, spendTotals, spendAnalytics, gasForecast } from './spend-ledger.mjs';
 import { fetchCompState, compPda } from './comp-relay.mjs';
 
@@ -39,14 +39,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---- On-chain inventory (public, stable addresses on devnet) ----
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-const ER_RPC = 'https://devnet-us.magicblock.app/';
+const ER_REGIONS = erRpcEndpoints(); // US / AS / EU (public devnet ER RPCs)
 const INVENTORY = {
   gfgDiceProgram: idl.address,
   delegationProgram: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
   erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
   erVrfQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc',
   baseVrfQueue: 'Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh',
-  erRpc: ER_RPC,
+  erRpc: 'https://devnet-as.magicblock.app/', // canonical display (rotation governed by the registry; see ops.erRotation)
 };
 
 // ---- Sponsor key resolution (mirrors delegate-relay) ----
@@ -296,8 +296,15 @@ export async function runProbe() {
   await probe('Base VRF queue (paid)', 'accounts', 'infra', accountProbe('base-vrf', INVENTORY.baseVrfQueue));
   await probe('ER validator (US)', 'accounts', 'infra', accountProbe('er-validator', INVENTORY.erValidator));
 
-  // 3. ER RPC (infra)
-  await probe('ER RPC (devnet-us.magicblock.app)', 'http', 'infra', () => probeHttp(ER_RPC.replace(/\/+$/, '') + '/'));
+  // 3. ER RPC (infra) — probe EVERY public ER region with a real JSON-RPC call
+  //    (an HTTP GET can answer 200 while the endpoint bans POST RPCs), plus
+  //    report which region the client rotation currently targets.
+  for (const ep of ER_REGIONS) {
+    await probe(`ER RPC (${ep.region} region)`, 'rpc', 'infra', () =>
+      probeRpc(createConnection(ep.url, 'confirmed', 15000), 'getLatestBlockhash', [{ commitment: 'confirmed' }]));
+  }
+  await probe('ER RPC preferred (rotation target)', 'rpc', 'infra', () =>
+    probeRpc(createConnection(pickErRpcUrl(), 'confirmed', 15000), 'getLatestBlockhash', [{ commitment: 'confirmed' }]));
 
   // 4. Supabase (infra)
   await probe('Supabase (profiles store)', 'db', 'infra', () => probeHttp('https://ywrgxynjjgdicdzizpue.supabase.co'));
@@ -407,6 +414,10 @@ export async function runProbe() {
       roadmapCounts: changelog.roadmapCounts,
       gitRef: gitRef(),
       inventory: INVENTORY,
+      erRotation: {
+        preferred: pickErRpcUrl(),
+        endpoints: erEndpointStates(),
+      },
       accounts: accountsTracker,
       compState,
     },

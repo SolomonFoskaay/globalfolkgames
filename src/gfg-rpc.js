@@ -64,19 +64,113 @@ export function baseRpcUrl() {
   return baseRpcEndpoints()[0];
 }
 
+// ---- Ephemeral Rollup (ER) RPC registry + failover rotation ----
+//
+// The ER RPC is the gasless execution layer every dice roll and on-chain points
+// write runs on. A single hardcoded endpoint makes one regional outage or
+// rate-limit a platform-wide outage. HARDENING (2026-08-18): this registry lists
+// every public MagicBlock devnet ER endpoint (US / AS / EU; TEE is excluded
+// because it requires an auth token) and rotates with exponential backoff:
+//   - pickErRpcUrl()     -> best current endpoint (prefers the last-known-good,
+//                           else any endpoint not in cooldown, else the one that
+//                           recovers first).
+//   - markErRpcSuccess/  -> call around each network op so a failing endpoint
+//     markErRpcFailure      goes to cooldown (5s -> 10s -> 20s -> 40s -> 60s).
+// Consumers must call pickErRpcUrl() per operation, never cache the URL.
+export const ER_ENDPOINTS = [
+  { url: 'https://devnet-us.magicblock.app/', region: 'US' },
+  { url: 'https://devnet-as.magicblock.app/', region: 'AS' },
+  { url: 'https://devnet-eu.magicblock.app/', region: 'EU' },
+];
+
+const ER_STATE = new Map(ER_ENDPOINTS.map(e => [e.url, { failures: 0, cooldownUntil: 0 }]));
+let erPreferredUrl = null; // last endpoint that answered; preferred while healthy
+let erStartIdx = 0;        // rotates the tie-break start so fresh sessions don't all land on one region
+
+function erCooldownMs(attempt) {
+  return Math.min(5000 * 2 ** Math.min(attempt, 4), 60000); // 5s..60s cap
+}
+
+export function erEndpointStates() {
+  return ER_ENDPOINTS.map(e => ({ url: e.url, region: e.region, ...ER_STATE.get(e.url) }));
+}
+
+export function markErRpcSuccess(url) {
+  const st = ER_STATE.get(url);
+  if (!st) return;
+  st.failures = 0;
+  st.cooldownUntil = 0;
+  erPreferredUrl = url;
+}
+
+export function markErRpcFailure(url) {
+  const st = ER_STATE.get(url);
+  if (!st) return;
+  st.failures += 1;
+  st.cooldownUntil = Date.now() + erCooldownMs(st.failures);
+  if (erPreferredUrl === url) erPreferredUrl = null;
+}
+
+export function erRpcEndpoints() {
+  return ER_ENDPOINTS.slice();
+}
+
+export function pickErRpcUrl() {
+  const now = Date.now();
+  if (erPreferredUrl && ER_STATE.get(erPreferredUrl).cooldownUntil <= now) return erPreferredUrl;
+  let healthiest = null;
+  let healthiestFailures = Infinity;
+  let firstToRecover = null;
+  let firstRecoverAt = Infinity;
+  const n = ER_ENDPOINTS.length;
+  const start = erStartIdx % n;
+  for (let k = 0; k < n; k++) {
+    const e = ER_ENDPOINTS[(start + k) % n];
+    const st = ER_STATE.get(e.url);
+    if (st.cooldownUntil <= now && st.failures < healthiestFailures) {
+      healthiest = e.url;
+      healthiestFailures = st.failures;
+    }
+    if (st.cooldownUntil < firstRecoverAt) {
+      firstToRecover = e.url;
+      firstRecoverAt = st.cooldownUntil;
+    }
+  }
+  erStartIdx = (erStartIdx + 1) % n; // spread fresh-session first picks across regions
+  return healthiest || firstToRecover || ER_ENDPOINTS[start].url;
+}
+
+// Mark `failedUrl` down, then hand back the best next endpoint to retry on.
+export function rotateErRpc(failedUrl) {
+  markErRpcFailure(failedUrl);
+  return pickErRpcUrl();
+}
+
+// A confirmed/backoff-enabled Connection to the current best ER endpoint.
+// ER confirmations poll with an ascending backoff so a hanging tx never
+// hammers the RPC; 30s cap matches the legacy confirm timeout.
+const ER_CONFIRM_BACKOFF = [400, 800, 1200, 1800, 2500];
+export function createErConnection(timeoutMs = 30000) {
+  return createConnection(pickErRpcUrl(), 'confirmed', timeoutMs, { backoffMs: ER_CONFIRM_BACKOFF });
+}
+
 // Create a Solana Connection whose confirmTransaction polls getSignatureStatuses
 // instead of subscribing via websocket. This mirrors MagicBlock's own
 // confirmMagicTransaction (polling is their documented strategy) and, unlike
 // signatureSubscribe, works on EVERY RPC in the failover chain (Alchemy's
 // devnet endpoint does not implement the WS method, so web3's default confirm
 // would hang even when the tx landed).
-export function createConnection(url, commitment = 'confirmed', timeoutMs = 30000) {
+export function createConnection(url, commitment = 'confirmed', timeoutMs = 30000, opts = {}) {
   const conn = new Connection(url, commitment);
+  // Poll interval for confirmTransaction. Default [500] = one poll every 500ms
+  // (unchanged legacy behavior). Pass an ascending array (e.g. ER backoff) so a
+  // slow-to-confirm tx stops hammering the RPC as it waits.
+  const delays = Array.isArray(opts.backoffMs) && opts.backoffMs.length ? opts.backoffMs : [500];
   conn.confirmTransaction = async (strategy, commit) => {
     const signature = typeof strategy === 'string' ? strategy : strategy.signature;
     const comm = commit || conn.commitment || 'confirmed';
     const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
+    for (let i = 0; Date.now() < deadline; i++) {
       const { value } = await conn.getSignatureStatuses([signature]);
       const status = value && value[0];
       if (status) {
@@ -87,7 +181,7 @@ export function createConnection(url, commitment = 'confirmed', timeoutMs = 3000
           return { value: status };
         }
       }
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, delays[Math.min(i, delays.length - 1)]));
     }
     throw new Error(`Transaction was not confirmed in ${timeoutMs / 1000}s (${signature})`);
   };

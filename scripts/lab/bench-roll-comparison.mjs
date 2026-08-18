@@ -17,10 +17,11 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { PublicKey, Keypair, Connection } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
+import { pickErRpcUrl } from '../../src/gfg-rpc.js';
 
 const PROGRAM_ID = new PublicKey('CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ');
-const ER_URL = 'https://devnet-us.magicblock.app/';
-const ER_WS = 'wss://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
+const ER_WS = ER_URL.replace(/^https:\/\//, 'wss://');
 const BASE_ENDPOINT = 'https://rpc.magicblock.app/devnet';
 const ER_QUEUE = new PublicKey('5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc'); // free ER VRF queue
 const BASE_QUEUE = new PublicKey('Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh'); // paid base queue

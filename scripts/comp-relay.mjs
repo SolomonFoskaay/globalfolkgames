@@ -28,14 +28,14 @@ import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import './load-env.mjs';
-import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus, pickErRpcUrl } from '../src/gfg-rpc.js';
 import { loadSponsor, mkWallet } from './delegate-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM_ID = new PublicKey(idl.address);
 const COMP_SEED = Buffer.from('gfgcomp');
 const BASE_URL = baseRpcUrl();
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
 const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 

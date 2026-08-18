@@ -4,11 +4,12 @@ import { readFileSync } from 'fs';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import './scripts/load-env.mjs'; // load .env before resolving the RPC chain
-import { baseRpcUrl, createConnection, sendMagicTx } from './src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, pickErRpcUrl } from './src/gfg-rpc.js';
 // NOTE: baseRpcUrl() returns the Magic Router (MagicBlock-first): init+delegate
-// auto-route through it to base Solana. ER rolls stay pinned to the US region
-// ER RPC (that is where the PDA is delegated); roll results are only readable
-// on that region endpoint until undelegate commits state back to base.
+// auto-route through it to base Solana. ER rolls run on the rotation-aware ER
+// region endpoint (src/gfg-rpc.js registry, US/AS/EU failover); roll results
+// are only readable on that region endpoint until undelegate commits state back
+// to base.
 
 const idl = JSON.parse(readFileSync(new URL('./src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 
@@ -18,7 +19,7 @@ const ER_VRF_QUEUE = new PublicKey('5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc
 const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
 
 const BASE_URL = baseRpcUrl();
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));

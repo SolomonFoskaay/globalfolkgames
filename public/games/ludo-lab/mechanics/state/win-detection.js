@@ -184,8 +184,16 @@
         try {
             const matchRef = (proofSig && typeof window.magicblockDice.matchRefFromSignature === 'function')
                 ? window.magicblockDice.matchRefFromSignature(proofSig) : 0;
+            // Mirror the banked award in the on-chain result record: read M3's
+            // award for this match (the landed one, or the in-flight one at
+            // worst), so the result's points column matches what M3/M4 banked
+            // for the user seat. Multiplier stays 1 (M4 banks the base,
+            // unmultiplied win; M5's tier boost is a separate kind-1 credit).
+            const m3Award = window.localPoints
+                && (window.localPoints.lastAward || window.localPoints.lastSeenAward);
+            const mirrorPoints = (m3Award && m3Award.points > 0) ? m3Award.points : 0;
             const promise = window.magicblockDice
-                .recordResult(finishOrder.slice(), 0, 1, matchRef)
+                .recordResult(finishOrder.slice(), mirrorPoints, 1, matchRef)
                 .then((sig) => {
                     window.__lastOnchainGameRecordSig = sig || null;
                     console.log('[M1] Full game result committed on-chain:', sig || 'no receipt');

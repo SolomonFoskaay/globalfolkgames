@@ -17,8 +17,9 @@ import { fileURLToPath } from 'url';
 import { PublicKey, Keypair } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState, compPda } from '../comp-relay.mjs';
+import { pickErRpcUrl } from '../../src/gfg-rpc.js';
 
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const idl = JSON.parse(readFileSync(new URL('../../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const STATE_FILE = join(dirname(fileURLToPath(import.meta.url)), '.gfg-s2-comp.json');
 

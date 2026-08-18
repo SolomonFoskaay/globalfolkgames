@@ -23,7 +23,14 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { signTransaction, signAllTransactions } from '@dynamic-labs-sdk/solana';
-import { getDelegationStatus } from './gfg-rpc.js';
+import {
+  getDelegationStatus,
+  createConnection,
+  pickErRpcUrl,
+  markErRpcSuccess,
+  markErRpcFailure,
+  rotateErRpc,
+} from './gfg-rpc.js';
 import bs58 from 'bs58';
 import { BN } from 'bn.js';
 
@@ -60,7 +67,11 @@ export const GLOBAL_SPEND_REASONS = Object.freeze({
 
 const config = {
   baseRpcUrl: 'https://api.devnet.solana.com',
-  erRpcUrl: 'https://devnet-us.magicblock.app/',
+  // Vestigial: the actual ER endpoint is chosen per operation by the rotation
+  // registry in src/gfg-rpc.js (pickErRpcUrl, US/AS/EU failover). Kept as a
+  // non-banned default (AS) so nothing ever falls back to the region that has
+  // been returning "-32005 client temporarily banned".
+  erRpcUrl: 'https://devnet-as.magicblock.app/',
   erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
   // Devnet ER VRF queue (free VRF). Base-layer queue: Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh
   oracleQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc',
@@ -84,6 +95,62 @@ function getSolanaWalletAccount() {
   }
 }
 
+// ---- ER RPC rotation (registry lives in src/gfg-rpc.js) ----
+// Connections are cached per endpoint so a session reuses the good one; when an
+// endpoint fails we drop its connection and rotate to a fresh region.
+const erConns = new Map();
+let erCurrentUrl = null;
+
+function currentErUrl() {
+  erCurrentUrl = pickErRpcUrl();
+  return erCurrentUrl;
+}
+
+function erConnFor(url) {
+  let conn = erConns.get(url);
+  if (!conn) {
+    conn = createConnection(url, 'confirmed', 30000, { backoffMs: [400, 800, 1200, 1800, 2500] });
+    erConns.set(url, conn);
+  }
+  return conn;
+}
+
+// True when an error means the ER endpoint itself is unhealthy (network/HTTP
+// transport, rate-limit, gateway) — i.e. we should rotate regions. Program
+// revert errors and "account not settled yet" conditions are NOT RPC failures.
+function isErNetworkError(e) {
+  if (!e || !e.message) return false;
+  const m = String(e.message);
+  if (/fetch failed|Failed to fetch|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ESOCKET|UND_ERR|socket hang up|network error|aborted|timed out|timeout|banned/i.test(m)) return true;
+  if (/\b429\b|\b50[0-9]\b|\brate limit|too many requests|service unavailable|bad gateway|internal server error/i.test(m)) return true;
+  return false;
+}
+
+// Run `fn(ctx)` against the current best ER endpoint; on a network error,
+// rotate regions and retry once with a fresh provider. Program-level errors
+// bubble up immediately (they are not RPC outages).
+async function withErRetry(fn) {
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctx = getErProgram();
+    if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+    const url = currentErUrl();
+    try {
+      const out = await fn(ctx);
+      markErRpcSuccess(url);
+      return out;
+    } catch (e) {
+      lastErr = e;
+      if (!isErNetworkError(e)) throw e;
+      const next = rotateErRpc(url);
+      erConns.delete(url); // drop the dead endpoint's cached connection
+      if (attempt === 0 && next !== url) continue;
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
 // Provider pointed at the Ephemeral Rollup. Transactions here are gasless, so
 // the player's wallet (session key) can be the fee payer with zero SOL.
 function getErProgram() {
@@ -91,7 +158,7 @@ function getErProgram() {
   const wallet = getSolanaWalletAccount();
   if (!wallet) return null;
 
-  const connection = new Connection(config.erRpcUrl, 'confirmed');
+  const connection = erConnFor(currentErUrl());
   const walletAdapter = {
     publicKey: wallet.publicKey,
     async signTransaction(transaction) {
@@ -142,18 +209,25 @@ let lastProofRollSignature = null;
 // account with data on the ER RPC is the correct "picked up" signal — NOT
 // owner===DELEGATION_PROGRAM (that would never match on an ER RPC).
 async function waitForErPickup(pda) {
-  const conn = new Connection(config.erRpcUrl, 'confirmed');
   const deadline = Date.now() + config.erPickupWaitMs;
+  let url = currentErUrl();
   while (Date.now() < deadline) {
     try {
-      const info = await conn.getAccountInfo(pda);
+      const info = await erConnFor(url).getAccountInfo(pda);
       if (info && info.owner.toBase58() === config.programId && info.data.length > 0) {
+        markErRpcSuccess(url);
         return true;
       }
     } catch (e) {
-      // ER not ready yet; keep polling.
+      if (isErNetworkError(e)) {
+        // Endpoint down: rotate to a fresh region and retry the poll there.
+        markErRpcFailure(url);
+        erConns.delete(url);
+        url = currentErUrl();
+      }
+      // Else: account not picked up by the ER validator yet; keep polling.
     }
-    await sleep(500);
+    await sleep(650);
   }
   return false;
 }
@@ -221,7 +295,7 @@ async function rollOnce() {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [pda] = playerPda(wallet.publicKey);
 
   await ensureDelegated(pda, wallet.publicKey);
@@ -230,31 +304,46 @@ async function rollOnce() {
   await waitForErPickup(pda);
 
   // Unique entropy commitment for this roll (included in the VRF proof).
-  const clientSeed = Math.floor(Math.random() * 256);
+  // Generated fresh per attempt so a region-rotated retry never reuses a seed
+  // that could confuse the callback check.
+  let clientSeed = Math.floor(Math.random() * 256);
 
-  const proofResult = await program.methods
-    .rollDice(clientSeed)
-    .accounts({
-      player: pda,
-      payer: wallet.publicKey,
-      playerAuthority: wallet.publicKey,
-      oracleQueue: new PublicKey(config.oracleQueue),
-    })
-    .rpc();
+  const proofResult = await withErRetry(async (ctx) => {
+    clientSeed = Math.floor(Math.random() * 256);
+    return ctx.program.methods
+      .rollDice(clientSeed)
+      .accounts({
+        player: pda,
+        payer: wallet.publicKey,
+        playerAuthority: wallet.publicKey,
+        oracleQueue: new PublicKey(config.oracleQueue),
+      })
+      .rpc();
+  });
   lastProofRollSignature = (typeof proofResult === 'string' && proofResult)
     ? proofResult
     : (proofResult && (proofResult.signature || proofResult.txSig)) || null;
 
   // Wait for the VRF oracle to fulfill and callback into our program.
   const deadline = Date.now() + config.requestTimeoutMs;
+  let pollCtx = getErProgram();
+  let pollUrl = currentErUrl();
   while (Date.now() < deadline) {
-    await sleep(500);
+    await sleep(800);
     try {
-      const account = await program.account.playerDice.fetch(pda);
+      const account = await pollCtx.program.account.playerDice.fetch(pda);
       if (account.lastClientSeed === clientSeed) {
+        markErRpcSuccess(pollUrl);
         return [Number(account.lastRoll1), Number(account.lastRoll2)];
       }
     } catch (e) {
+      if (isErNetworkError(e)) {
+        // Endpoint died mid-wait: rotate and continue polling on a fresh region.
+        markErRpcFailure(pollUrl);
+        erConns.delete(pollUrl);
+        pollUrl = currentErUrl();
+        pollCtx = getErProgram();
+      }
       // Account not settled yet; keep polling.
     }
   }
@@ -281,7 +370,7 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
 
   // Relay is idempotent per PDA; it creates + delegates the points PDA if
@@ -290,14 +379,14 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  const sig = await program.methods
+  const sig = await withErRetry(async (ctx) => ctx.program.methods
     .recordPoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       points: pointsPda,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc();
+    .rpc());
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -310,20 +399,20 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
 
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  const sig = await program.methods
+  const sig = await withErRetry(async (ctx) => ctx.program.methods
     .spendLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
       points: pointsPda,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc();
+    .rpc());
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -350,20 +439,20 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [globalPda] = globalPointsPdaFor(wallet.publicKey);
 
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
-  const sig = await program.methods
+  const sig = await withErRetry(async (ctx) => ctx.program.methods
     .recordGlobalPoints(kind, sourceCode, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
       globalPoints: globalPda,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc();
+    .rpc());
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -375,20 +464,20 @@ export async function spendGlobal(amount, reason, spendRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [globalPda] = globalPointsPdaFor(wallet.publicKey);
 
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
-  const sig = await program.methods
+  const sig = await withErRetry(async (ctx) => ctx.program.methods
     .spendGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
       globalPoints: globalPda,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc();
+    .rpc());
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -406,7 +495,7 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [resultPda] = resultPdaFor(wallet.publicKey);
 
   // Relay is idempotent per PDA; it creates + delegates the result PDA if
@@ -420,7 +509,7 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
   );
   const order = Array.from({ length: 4 }, (_, i) => seatIndexes[i] ?? 0);
 
-  const sig = await program.methods
+  const sig = await withErRetry(async (ctx) => ctx.program.methods
     .recordResult(
       order,
       new BN(points),
@@ -432,7 +521,7 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
       playerAuthority: wallet.publicKey,
       result: resultPda,
     })
-    .rpc();
+    .rpc());
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -459,7 +548,7 @@ export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
-  const { program, wallet } = ctx;
+  const { wallet } = ctx;
   const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
 
   // The winner's points PDA must exist + be delegated for the claim to credit
@@ -467,20 +556,22 @@ export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
-  // Read the sponsor out of the comp account so the PDA seed constraint passes.
-  const compAccount = await program.account.competition.fetch(new PublicKey(compPda));
-  const sponsorKey = new PublicKey(compAccount.sponsor);
+  const sig = await withErRetry(async (ctx) => {
+    // Read the sponsor out of the comp account so the PDA seed constraint passes.
+    const compAccount = await ctx.program.account.competition.fetch(new PublicKey(compPda));
+    const sponsorKey = new PublicKey(compAccount.sponsor);
 
-  const sig = await program.methods
-    .claimComp(gameTag, winnerIndex)
-    .accounts({
-      payer: wallet.publicKey,
-      playerAuthority: wallet.publicKey,
-      points: pointsPda,
-      sponsor: sponsorKey,
-      comp: new PublicKey(compPda),
-    })
-    .rpc();
+    return ctx.program.methods
+      .claimComp(gameTag, winnerIndex)
+      .accounts({
+        payer: wallet.publicKey,
+        playerAuthority: wallet.publicKey,
+        points: pointsPda,
+        sponsor: sponsorKey,
+        comp: new PublicKey(compPda),
+      })
+      .rpc();
+  });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -689,16 +780,25 @@ export function initMagicBlockDice() {
   };
 }
 
+const pingConnCache = new Map();
+
 async function pingOnchainStack() {
   const probe = async (url) => {
-    const conn = new Connection(url, 'confirmed');
+    let conn = pingConnCache.get(url);
+    if (!conn) {
+      conn = createConnection(url, 'confirmed', 15000);
+      pingConnCache.set(url, conn);
+    }
     let timer;
     try {
-      const slotPromise = conn.getSlot();
+      // getLatestBlockhash (not getSlot): every MagicBlock devnet endpoint AND
+      // the base devnet RPC answer it, so a healthy stack never pings a method
+      // it does not implement.
+      const blockhashPromise = conn.getLatestBlockhash('confirmed');
       const timeout = new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('ping timeout')), 5000);
       });
-      await Promise.race([slotPromise, timeout]);
+      await Promise.race([blockhashPromise, timeout]);
       return true;
     } catch (e) {
       console.warn(`[VRF] ping failed for ${url}`, e.message || e);
@@ -707,6 +807,9 @@ async function pingOnchainStack() {
       clearTimeout(timer);
     }
   };
-  const results = await Promise.all([probe(config.baseRpcUrl), probe(config.erRpcUrl)]);
-  return results.every(Boolean);
+  const base = await probe(config.baseRpcUrl);
+  const erUrl = currentErUrl();
+  const er = await probe(erUrl);
+  if (er) markErRpcSuccess(erUrl); else markErRpcFailure(erUrl);
+  return base && er;
 }

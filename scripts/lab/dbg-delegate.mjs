@@ -5,13 +5,13 @@ import { join } from 'path';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import '../load-env.mjs'; // load .env (Alchemy key) before resolving the RPC chain
-import { baseRpcUrl, createConnection } from '../../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, pickErRpcUrl } from '../../src/gfg-rpc.js';
 
 const PROGRAM_ID = new PublicKey('CkzrmH8NjyT4GPxq4qvK3v4HLujnJcPHyLJViqrpHFcj');
 const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
 const BASE_URL = baseRpcUrl();
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const GAME_SEED = Buffer.from('gfgmove');
 const idl = JSON.parse(readFileSync('/home/foskaay/globalfolkgames/programs/target/idl/gfg_move.json', 'utf8'));
 

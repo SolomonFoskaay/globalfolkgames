@@ -20,11 +20,11 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import './load-env.mjs';
-import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, pickErRpcUrl } from '../src/gfg-rpc.js';
 import { handleDelegate, loadSponsor, mkWallet } from './delegate-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const GLOBAL_SEED = Buffer.from('global', 'utf8');
 const POINTS_SEED = Buffer.from('gfgpoints', 'utf8');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

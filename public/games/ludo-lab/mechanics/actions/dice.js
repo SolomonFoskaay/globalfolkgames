@@ -41,7 +41,7 @@ function currentDiceSourceTag() {
 // paused turn (computer seats re-trigger, the human's turn gets re-armed).
 const MAX_ROLL_ATTEMPTS = 3;
 const ONCHAIN_RETRY_DELAY_MS = 1500;
-const CHAIN_MONITOR_INTERVAL_MS = 8000;
+const CHAIN_MONITOR_INTERVAL_MS = 20000;
 
 let isChainDown = false;
 let chainMonitorTimer = null;

@@ -16,6 +16,7 @@ import { handleDelegate, handleMigratePoints } from './delegate-relay.mjs';
 import { runProbe } from './endpoints-probe.mjs';
 import { handleHouseRoll } from './roll-relay.mjs';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState } from './comp-relay.mjs';
+import { pickErRpcUrl } from '../src/gfg-rpc.js';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -85,7 +86,7 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
   const playerPub2 = new PubKey3(wallet);
   const POINTS_SEED2 = Buffer.from('gfgpoints', 'utf8');
   const GLOBAL_SEED2 = Buffer.from('global', 'utf8');
-  const ER_URL2 = 'https://devnet-us.magicblock.app/';
+  const ER_URL2 = pickErRpcUrl();
   const erConn2 = new Conn3(ER_URL2, 'confirmed');
 
   // Re-derive gap from chain

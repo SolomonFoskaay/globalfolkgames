@@ -104,7 +104,7 @@ After delegation, every `roll_dice` runs **gasless on the ER** and VRF is free
 | ER validator (US)     | `MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd`                      |
 | ER VRF queue (free)   | `5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc`                     |
 | Base VRF queue (paid) | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh`                     |
-| ER RPC                | `https://devnet-us.magicblock.app/` (CORS `*`, wss ok)              |
+| ER RPC                | rotation registry in `src/gfg-rpc.js` (US `devnet-us.magicblock.app` / AS `devnet-as.magicblock.app` / EU `devnet-eu.magicblock.app`; CORS `*`, wss ok). Clients/relay/probe pick the best region per operation with exponential-backoff failover; a banned region is skipped until its cooldown expires. |
 | Magic program         | `Magic11111111111111111111111111111111111111`                       |
 | Magic context         | `MagicContext1111111111111111111111111111111`                       |
 

@@ -21,18 +21,27 @@ import { readFileSync } from 'fs';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import './load-env.mjs';
-import { createConnection } from '../src/gfg-rpc.js';
+import { createConnection, pickErRpcUrl, markErRpcSuccess, markErRpcFailure } from '../src/gfg-rpc.js';
 import { handleDelegate, loadSponsor } from './delegate-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM_ID = new PublicKey(idl.address);
 const PLAYER_SEED = Buffer.from('gfgplayerd');
-const ER_RPC = 'https://devnet-us.magicblock.app/';
 const ER_QUEUE = new PublicKey('5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc'); // devnet ER VRF queue (free)
 const ER_PICKUP_WAIT_MS = 10000;
 const CALLBACK_WAIT_MS = 25000;
 
+// True when an error means the ER endpoint itself is unhealthy (transport /
+// rate-limit / gateway) — i.e. we should rotate to another region. Program
+// revert errors and "not settled yet" are not RPC failures.
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const isErNetworkError = (e) => {
+  if (!e || !e.message) return false;
+  const m = String(e.message);
+  if (/fetch failed|Failed to fetch|ECONN|ETIMEDOUT|ESOCKET|UND_ERR|socket hang up|network error|timeout|aborted|timed out|banned/i.test(m)) return true;
+  if (/\b429\b|\b50[0-9]\b|\brate limit|too many requests|service unavailable|bad gateway/i.test(m)) return true;
+  return false;
+};
 
 // Rotating seed so two consecutive rolls never reuse the same clientSeed
 // (a repeated seed can confuse the VRF callback check).
@@ -68,8 +77,12 @@ async function houseRollOnce() {
   const warm = Date.now() - lastEnsuredAt < DELEGATION_TTL_MS && lastRollSucceeded;
   if (!warm) await handleDelegate(housePubkey.toBase58());
 
+  // ER connection on the current best region; rotates when an endpoint errors.
+  const makeConn = () => createConnection(pickErRpcUrl(), 'confirmed', 30000, { backoffMs: [400, 800, 1200, 1800, 2500] });
+  let erConn = makeConn();
+  let erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
+
   // 2) Wait until the ER validator has picked the account up.
-  const erConn = createConnection(ER_RPC, 'confirmed');
   if (!warm) {
     const pickupDeadline = Date.now() + ER_PICKUP_WAIT_MS;
     let pickedUp = false;
@@ -77,44 +90,68 @@ async function houseRollOnce() {
       try {
         const info = await erConn.getAccountInfo(pda);
         if (info && info.owner.toBase58() === PROGRAM_ID.toBase58() && info.data.length > 0) {
+          markErRpcSuccess(erUrl);
           pickedUp = true;
           break;
         }
-      } catch (e) { /* ER not ready yet; keep polling */ }
-      await sleep(400);
+      } catch (e) {
+        if (isErNetworkError(e)) {
+          // Region down: rotate to a fresh one and resume the pickup poll.
+          markErRpcFailure(erUrl);
+          erConn = makeConn();
+          erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
+        }
+        // else ER not ready yet; keep polling.
+      }
+      await sleep(600);
     }
     if (!pickedUp) throw new Error('House dice account never picked up by the ER validator');
   }
 
-  // 3) Gasless rollDice on the ER, signed by the house key.
+  // 3) Gasless rollDice on the ER, signed by the house key. Retry once on a
+  //    fresh region if the first region's RPC errors mid-send.
   const walletAdapter = {
     publicKey: housePubkey,
     async signTransaction(t) { t.partialSign(sponsor); return t; },
     async signAllTransactions(ts) { ts.forEach(t => t.partialSign(sponsor)); return ts; },
   };
-  const provider = new AnchorProvider(erConn, walletAdapter, { commitment: 'confirmed', skipPreflight: true });
-  const program = new Program(idl, provider);
+  const providerFor = (conn) => new AnchorProvider(conn, walletAdapter, { commitment: 'confirmed', skipPreflight: true });
 
   seedCounter = (seedCounter + 1) % 256;
   const clientSeed = seedCounter;
 
-  const signature = await program.methods
-    .rollDice(clientSeed)
-    .accounts({
-      player: pda,
-      payer: housePubkey,
-      playerAuthority: housePubkey,
-      oracleQueue: ER_QUEUE,
-    })
-    .rpc();
+  let program = new Program(idl, providerFor(erConn));
+  let signature = null;
+  for (let attempt = 0; attempt < 2 && !signature; attempt++) {
+    try {
+      signature = await program.methods
+        .rollDice(clientSeed)
+        .accounts({
+          player: pda,
+          payer: housePubkey,
+          playerAuthority: housePubkey,
+          oracleQueue: ER_QUEUE,
+        })
+        .rpc();
+      markErRpcSuccess(erUrl);
+    } catch (e) {
+      if (!isErNetworkError(e) || attempt === 1) throw e;
+      markErRpcFailure(erUrl);
+      erConn = makeConn();
+      erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
+      program = new Program(idl, providerFor(erConn));
+    }
+  }
 
-  // 4) Wait for the VRF oracle to callback into the program.
+  // 4) Wait for the VRF oracle to callback into the program. Poll the current
+  //    region; if it dies mid-wait, rotate and keep polling on a fresh one.
   const callbackDeadline = Date.now() + CALLBACK_WAIT_MS;
   while (Date.now() < callbackDeadline) {
-    await sleep(500);
+    await sleep(750);
     try {
       const account = await program.account.playerDice.fetch(pda);
       if (account.lastClientSeed === clientSeed) {
+        markErRpcSuccess(erUrl);
         lastEnsuredAt = Date.now();
         lastRollSucceeded = true;
         return {
@@ -125,7 +162,15 @@ async function houseRollOnce() {
           pda: pda.toString(),
         };
       }
-    } catch (e) { /* not settled yet; keep polling */ }
+    } catch (e) {
+      if (isErNetworkError(e)) {
+        markErRpcFailure(erUrl);
+        erConn = makeConn();
+        erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
+        program = new Program(idl, providerFor(erConn));
+      }
+      // else not settled yet; keep polling.
+    }
   }
 
   lastRollSucceeded = false;

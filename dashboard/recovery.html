@@ -170,7 +170,15 @@
         import { BN } from 'bn.js';
 
         const IDL_URL = '/gfg-dice-idl.json';
-        const ER_URL = 'https://devnet-us.magicblock.app/';
+        const ER_REGIONS = [
+            'https://devnet-as.magicblock.app/',
+            'https://devnet-eu.magicblock.app/',
+            'https://devnet-us.magicblock.app/'
+        ];
+        // Sticky region cursor: each recovery action lands on the region that
+        // last answered, so a down/throttled region is skipped on the next one.
+        let erCursor = 0;
+        const pickErUrl = () => ER_REGIONS[erCursor % ER_REGIONS.length];
         const BASE_RPC = 'https://api.devnet.solana.com';
         const RELAY_URL = '/api/delegate';
         const KNOWN_GAMES = ['ludo'];
@@ -222,7 +230,7 @@
             const wallet = getSolanaWalletAccount();
             if (!wallet) return null;
 
-            const connection = new Connection(ER_URL, 'confirmed');
+            const connection = new Connection(pickErUrl(), 'confirmed');
             const walletAdapter = {
                 publicKey: wallet.publicKey,
                 async signTransaction(transaction) {
@@ -320,7 +328,7 @@
 
         // Poll ER RPC until the delegated global PDA shows up (owned by our program).
         async function waitForErPickup(pda) {
-            const erConn = new Connection(ER_URL, 'confirmed');
+            const erConn = new Connection(pickErUrl(), 'confirmed');
             const deadline = Date.now() + ER_PICKUP_WAIT_MS;
             while (Date.now() < deadline) {
                 try {
@@ -521,7 +529,7 @@
             let m3Data = [];
             let m4Data = null;
             try {
-                const erConn = new Connection(ER_URL, 'confirmed');
+                const erConn = new Connection(pickErUrl(), 'confirmed');
                 m3Data = await fetchM3(erConn, wallet);
                 m4Data = await fetchM4(erConn, wallet);
                 console.log('[recovery] ER read: M3=', m3Data.length, 'M4=', !!m4Data);

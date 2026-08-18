@@ -10,8 +10,15 @@
 (function () {
   'use strict';
 
-  var ER_RPC = 'https://devnet-us.magicblock.app/';
+  var ER_REGIONS = [
+    'https://devnet-as.magicblock.app/',
+    'https://devnet-eu.magicblock.app/',
+    'https://devnet-us.magicblock.app/'
+  ];
   var BASE_RPC = 'https://api.devnet.solana.com';
+  // Sticky cursor: reads prefer the region that last answered, so a down/slow
+  // region is skipped on the next query instead of retried every time.
+  var erCursor = 0;
 
   var PROG_LABELS = {
     'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ': 'GlobalFolkGames (dice, points, match record)',
@@ -49,6 +56,25 @@
       if (data.error) throw new Error(data.error.message || (method + ' error'));
       return data.result;
     });
+  }
+
+  // Rollup query that fails over across every public ER region. If one region
+  // is down or rate-limiting, the next one is tried before giving up.
+  function erRpc(method, params) {
+    var attempts = ER_REGIONS.length;
+    var attempt = 0;
+    function tryNext() {
+      var url = ER_REGIONS[(erCursor + attempt) % attempts];
+      attempt++;
+      return rpc(url, method, params).then(function (r) {
+        erCursor = (erCursor + attempt - 1) % attempts; // remember the winner
+        return r;
+      }).catch(function (e) {
+        if (attempt >= attempts) throw e;
+        return tryNext();
+      });
+    }
+    return tryNext();
   }
 
   function pill(text, tone) {
@@ -143,7 +169,7 @@
     out.innerHTML = '<div class="v-card">' + pill('Checking both ledgers...', 'idle') + '</div>';
     var erTx = null, baseTx = null;
     Promise.all([
-      rpc(ER_RPC, 'getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0, encoding: 'json' }])
+      erRpc('getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0, encoding: 'json' }])
         .then(function (t) { erTx = t; }).catch(function () {}),
       rpc(BASE_RPC, 'getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0, encoding: 'json' }])
         .then(function (t) { baseTx = t; }).catch(function () {})
@@ -168,7 +194,7 @@
       + '<div class="v-card"><div class="v-key" style="margin-bottom:6px;">Recent activity on the rollup</div><div id="v-acc-sigs"><p class="v-lead">Asking the rollup ledger...</p></div></div>';
 
     out.innerHTML = html;
-    rpc(ER_RPC, 'getSignaturesForAddress', [addr, { commitment: 'confirmed', limit: 25 }])
+    erRpc('getSignaturesForAddress', [addr, { commitment: 'confirmed', limit: 25 }])
       .then(function (sigs) {
         var box = $('v-acc-sigs');
         if (!box) return;

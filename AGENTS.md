@@ -258,7 +258,7 @@ build ahead of its module status.
 | ER validator (US) | `MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd` |
 | ER VRF queue (free) | `5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc` |
 | Base VRF queue (paid) | `Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh` |
-| ER RPC | `https://devnet-us.magicblock.app/` (CORS `*`, wss ok) |
+| ER RPC | `https://devnet-us.magicblock.app/` (CORS `*`, wss ok) — **rotation (2026-08-18):** the client/relay/probe use `src/gfg-rpc.js` ER registry + failover (US / AS `devnet-as.magicblock.app` / EU `devnet-eu.magicblock.app`; TEE excluded, needs a token). A failing/banned region goes to exponential cooldown and all readers/writers rotate to a healthy one. |
 | Magic program | `Magic11111111111111111111111111111111111111` |
 | Magic context | `MagicContext1111111111111111111111111111111` |
 
@@ -590,6 +590,7 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
 
 ## Status / next steps
 
+- [x] **ER RPC hardening (2026-08-18, shipped):** single-point `devnet-us.magicblock.app` (which began answering `-32005 client temporarily banned`) replaced with a 3-region registry + failover in `src/gfg-rpc.js` (`ER_ENDPOINTS` US/AS/EU, `pickErRpcUrl`/`markErRpcFailure`/`markErRpcSuccess`/`rotateErRpc`, exponential cooldown 5s→60s, round-robin fresh-session start so sessions don't all land on the same region). Every ER consumer rotates: `src/magicblock-vrf.js` (rolls + M3/M4/Scope C writes via `withErRetry`, `waitForErPickup`, callback polls; `banned` counts as a network error), `scripts/roll-relay.mjs` (house rolls), `scripts/endpoints-probe.mjs` (now probes every ER region with a real `getLatestBlockhash` RPC + reports `ops.erRotation`), `verify/verify.js` + `dashboard/recovery.html` (per-region failover), and the backfill/restore/harness scripts. `createConnection` gained a backoff-confirm option (`{backoffMs:[400,800,1200,1800,2500]}`) so a slow-to-confirm tx never hammers the RPC; the outage-monitor ping now probes `getLatestBlockhash` (works on every endpoint) instead of `getSlot`, and its interval went 8s→20s in ludo + ludo-lab. Verified live: rotation unit smoke PASS; devnet-us answers "client temporarily banned" while devnet-as + devnet-eu answer `getLatestBlockhash`; probe watchlist shows US DOWN / AS+EU OK.
 - [x] Program upgraded to ER (ephemeral/delegate/commit/undelegate), deployed.
 - [x] IDL synced to `src/gfg-dice-idl.json`.
 - [x] Sponsor relay (local + Vercel fn) built and tested.

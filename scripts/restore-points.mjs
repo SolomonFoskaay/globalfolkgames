@@ -23,11 +23,11 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import './load-env.mjs';
-import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, pickErRpcUrl } from '../src/gfg-rpc.js';
 import { handleDelegate, loadSponsor, mkWallet } from './delegate-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const SUPABASE_URL = 'https://ywrgxynjjgdicdzizpue.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_qbrLQtG1fx51sBIiDm_zGQ_dR6BcqEb';
 

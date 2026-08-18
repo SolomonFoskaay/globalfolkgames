@@ -7,11 +7,13 @@ import { readFileSync } from 'fs';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
+import { pickErRpcUrl, createConnection } from '../src/gfg-rpc.js';
 
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const BASE_RPC = 'https://api.devnet.solana.com';
 const POINTS_SEED = Buffer.from('gfgpoints', 'utf8');
 const GLOBAL_SEED = Buffer.from('global', 'utf8');
+const ER_BACKOFF = [400, 800, 1200, 1800, 2500];
 
 function loadSponsor() {
   const raw = process.env.GFG_Gasless_Sponsor_Keypair;
@@ -34,7 +36,7 @@ export default async function handler(req, res) {
     const programId = new PublicKey(idl.address || idl.metadata?.address);
     const playerPub = new PublicKey(wallet);
 
-    const erConn = new Connection(ER_URL, 'confirmed');
+    const erConn = createConnection(ER_URL, 'confirmed', 30000, { backoffMs: ER_BACKOFF });
     const baseConn = new Connection(BASE_RPC, 'confirmed');
 
     // Read M3 local pure

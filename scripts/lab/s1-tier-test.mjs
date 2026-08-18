@@ -20,8 +20,9 @@ import { PublicKey, Keypair, Connection } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import bs58 from 'bs58';
 import { BN } from 'bn.js';
+import { pickErRpcUrl } from '../../src/gfg-rpc.js';
 
-const ER_URL = 'https://devnet-us.magicblock.app/';
+const ER_URL = pickErRpcUrl();
 const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 
