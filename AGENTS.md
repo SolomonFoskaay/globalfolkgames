@@ -62,6 +62,26 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   The escrow proof-of-life; product build waits behind M1-M4.
 
 **HARD RULES (do not regress):**
+0. **Surgical edits only, never rewrite.** When updating any code (adding a
+   feature, fixing a bug, or changing behavior), the agent MUST:
+   - **Read the entire file first** to understand what it does and every side
+     effect it has (DOM manipulation, event listeners, global state, script
+     loading order, other pages that depend on it).
+   - **Identify the exact lines** that need to change for the specific task.
+   - **Edit only those lines.** Never rewrite, reformat, or "clean up" unrelated
+     code. Never remove existing functionality to make room for new code. Never
+     reorder imports, script tags, or CSS unless the task explicitly requires it.
+   - **Preserve all existing behavior** that is not part of the task. If the file
+     has admin gates, auth checks, role rendering, event listeners, or any other
+     side effect, those MUST continue working exactly as before.
+   - **Check cross-file dependencies.** Before editing a shared file (header.js,
+     profiles.js, auth.js, etc.), check EVERY page that loads it and confirm
+     the edit won't break any of those pages.
+   - **Ask the owner before removing anything.** If the agent thinks a piece of
+     code is dead or unnecessary, it MUST ask the owner first, never silently
+     remove it. The owner decides what stays and what goes.
+   This rule exists because repeated rewrites have broken admin gates, auth
+   checks, global header behavior, and menu rendering across multiple pages.
 1. **Every feature = a module.** Before writing ANY feature code, state which
    module it belongs to and confirm it slots in (via the module status in
    `architecture.json`). If it doesn't fit a module, it does not get built.
