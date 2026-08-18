@@ -72,15 +72,54 @@
     var lastSeenCredit = null; // credit computed for the most recent finish
     var lastError = null;     // last credit failure reason
 
-    // RPC economy: a page boot (module self-poll, header pill get(), profile
-    // cards) calls get() several times; without a guard each call fetches the
-    // PDA again, hammering the ER RPC on every page load. refreshLedger
-    // therefore coalesces: never two fetches in flight, and a throttled call
-    // within MIN_INTERVAL of a successful read just serves the cached snapshot
-    // (credit/spend/read-backs pass force=true for fresh data).
-    var REFRESH_MIN_INTERVAL_MS = 6000;
+    // SINGLE-SOURCE-OF-TRUTH RPC ECONOMY (owner design, 2026-08-18): the
+    // localStorage cache is the ONLY display source. Pages read it with
+    // get() (pure read, never fetches). The RPC is hit ONLY when:
+    //   1. the ledger is FIRST checked for this wallet after a login page boot
+    //      (so a silently restored session / new device never shows a wrong
+    //      zero), and
+    //   2. right after a credit/spend write (so the board posts the new number).
+    // A player who doesn't win all day costs ~1-3 RPC hits for the whole
+    // browser, not one per page view. A zero-result (no account yet) is
+    // legitimately "checked" too; only a zero ledger older than
+    // ZERO_RECHECK_MS is re-verified (a transient outage can't freeze a fresh
+    // zero forever). Populated ledgers stay cached until the next win/spend.
+    // The check-time marker lives in a SEPARATE localStorage key so the v2
+    // ledger-slice shape (wallet -> ledger) stays untouched.
+    var ZERO_RECHECK_MS = 8 * 3600 * 1000;
+    var META_KEY = 'gfg_global_ledger_meta_v2';
+    var metaStore = {};        // wallet -> { at, any }
     var refreshInFlight = null; // in-flight refresh promise (dedup)
-    var refreshLastAt = 0;      // ms of the last SUCCESSFUL fetch
+
+    function loadMeta() {
+        try {
+            metaStore = JSON.parse(localStorage.getItem(META_KEY) || '{}') || {};
+        } catch (e) { metaStore = {}; }
+    }
+    function markChecked(any) {
+        metaStore[walletKey()] = { at: Date.now(), any: !!any };
+        try { localStorage.setItem(META_KEY, JSON.stringify(metaStore)); } catch (e) { /* ignore */ }
+    }
+    // A first auto-check is needed when this wallet was never verified, or its
+    // only checkpoint was a zero-ledger result older than the recheck window.
+    // A real (populated) ledger never needs a page-load recheck.
+    function needsFirstCheck() {
+        var m = metaStore[walletKey()];
+        if (!m) return true;
+        if (m.any) return false;
+        return (Date.now() - m.at) > ZERO_RECHECK_MS;
+    }
+    // True once this wallet has been verified at all (even with nothing
+    // on-chain), so displays can show a real "no ledger yet" instead of
+    // loading forever.
+    function hasChecked() {
+        return !!metaStore[walletKey()];
+    }
+    // True when there is a real player wallet behind the current cache slice
+    // (dynamic wallet or profile wallet), false for the logged-out 'anon' state.
+    function hasRealWallet() {
+        return walletKey() !== 'anon';
+    }
 
     // Best-known caller identity for cache isolation: the Dynamic Solana wallet
     // address when available, else the profile wallet, else 'anon'.
@@ -115,6 +154,7 @@
 
     loadCache();
     syncCacheToWallet();
+    loadMeta();
 
     function persistCache(ledger) {
         try {
@@ -161,27 +201,31 @@
     }
 
     async function refreshLedger(force) {
-        if (!force && refreshLastAt && (Date.now() - refreshLastAt) < REFRESH_MIN_INTERVAL_MS) {
-            return cached || null; // throttled: serve the last-known ledger
-        }
         if (refreshInFlight) return refreshInFlight; // share the in-flight fetch
+        var firstCheck = !hasChecked(); // notify once when a zero check lands
         refreshInFlight = (async function () {
+            var ledger = null;
             try {
                 if (window.magicblockDice && typeof window.magicblockDice.fetchGlobalPointsPda === 'function') {
-                    var ledger = await window.magicblockDice.fetchGlobalPointsPda();
+                    ledger = await window.magicblockDice.fetchGlobalPointsPda();
                     if (ledger) {
                         cached = ledger;
+                        if (hasRealWallet()) markChecked(true);
                         persistCache(ledger);
-                        refreshLastAt = Date.now();
                         fillSlots(ledger);
                         notify(ledger);
                         return ledger;
                     }
                 }
             } catch (e) { /* ledger not readable yet */ }
-            // Not readable this instant (wallet not restored, ER down): still render
-            // the last-known value so pages never sit on static 0 / 'Loading…'.
-            // refreshLastAt is NOT touched so a later call retries promptly.
+            // Not readable this instant (wallet not restored, ER down, or the
+            // account doesn't exist yet). Keep rendering the last-known value
+            // so pages never sit on static 0 / 'Loading…'. A wallet present +
+            // reachable fetch counts as "checked" even for a zero result so we
+            // don't refetch it on every load; network-y errors leave the marker
+            // unset so the next page retries.
+            if (hasRealWallet()) markChecked(false);
+            if (firstCheck) notify(null, null); // pages flip their "loading" line to "no ledger yet"
             var fallback = cached || null;
             if (fallback) fillSlots(fallback);
             return fallback;
@@ -381,16 +425,22 @@
 
     // ---- public API -----------------------------------------------------
     window.globalLedger = {
-        // Latest known ledger snapshot (or null). ALWAYS triggers a background
-        // refresh (stability contract: a cold page returns the cached snapshot
-        // if any, and the fetch fills it in the moment the wallet is up).
+        // Latest known ledger snapshot (or null). PURE cache read — never
+        // fetches (single source of truth: the RPC is only consulted on the
+        // first check after login and after a credit/spend write). Returns the
+        // wallet-keyed snapshot from localStorage instantly.
         get: function () {
-            refreshLedger();
             return cached || null;
         },
+        // True once this wallet has been verified (even with nothing on-chain
+        // yet), so displays can show a real "no ledger yet" instead of an
+        // eternal loading line. False = still unknown.
+        checked: function () {
+            return hasChecked();
+        },
         // Blocking fetch of the global ledger (own account, gasless). Explicit
-        // fetch = fresh read (bypasses the throttled background refresh; still
-        // dedupes against one already in flight).
+        // fresh read — pages never need it, but tools/debugging do. Dedupes
+        // against a fetch already in flight.
         fetch: function () {
             return refreshLedger(true);
         },
@@ -463,11 +513,14 @@
         if (cached) fillSlots(cached);
     }
 
-    // Refresh once the module is usable AND the Dynamic session/wallet has been
-    // restored. On a plain page load the wallet arrives AFTER DOMContentLoaded
-    // (async session restore), and gfg:auth-changed only fires on interactive
-    // sign-in/out — so without this poll the display could stay stuck on the
-    // pre-sign-in value forever.
+    // Refresh ONCE when the module is usable AND the Dynamic session/wallet has
+    // been restored. On a plain page load the wallet arrives AFTER
+    // DOMContentLoaded (async session restore), and gfg:auth-changed only
+    // fires on interactive sign-in/out — so without this poll a silently
+    // restored session could leave the board stuck. It is the ONLY page-load
+    // fetch: limited to the first check for the wallet (and the rare zero-ledger
+    // re-verification after ZERO_RECHECK_MS). After that every page view reads
+    // the cached board and never consults the RPC until the next win/spend.
     function refreshWhenWalletReady(timeoutMs) {
         var deadline = Date.now() + (timeoutMs || 12000);
         (function poll() {
@@ -476,7 +529,9 @@
                 window.magicblockDice.available()) {
                 syncCacheToWallet();
                 renderCached();
-                refreshLedger(true);
+                if (hasRealWallet() && needsFirstCheck()) {
+                    refreshLedger(true);
+                }
                 return;
             }
             if (Date.now() < deadline) setTimeout(poll, 700);
@@ -494,14 +549,29 @@
         handleDomReady();
     }
 
-    // Re-fetch when auth changes (sign-in / sign-out on the same page): the
-    // ledger only becomes readable once the Dynamic wallet is available, and
-    // the wallet identity change must swap the cached slice too.
+    // On auth change (sign-in / sign-out on the same page) swap the cached
+    // slice to the new wallet. Fetch only the first time that wallet is seen
+    // in this browser; afterwards the board is the source of truth.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
             syncCacheToWallet();
             renderCached();
-            refreshLedger(true);
+            if (hasRealWallet() && needsFirstCheck()) {
+                refreshLedger(true);
+            }
+        });
+    }
+
+    // Cross-tab sync: when another tab credits/spends it writes the SAME
+    // localStorage board; a storage event repoints this tab's cache to the new
+    // numbers with no RPC call at all.
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('storage', function (e) {
+            if (e.key !== CACHE_KEY) return;
+            loadCache();
+            syncCacheToWallet();
+            renderCached();
+            notify(cached, lastCredit || null);
         });
     }
 

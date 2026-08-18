@@ -167,15 +167,19 @@
                 ? `<span class="tier-badge" title="Active ${tier.label} (${tier.mult}x on win points)">${tier.mult}x</span>`
                 : '';
 
-            // Read on-chain M4 spendable. Cached value is available immediately
-            // from localStorage (populated on module init). If null (first visit),
-            // show a subtle loading indicator that auto-updates when the fetch completes.
+            // Read on-chain M4 spendable. Cache-only: the module's board is the source
+            // of truth, and get() never fetches. Show the cached balance, or
+            // once the wallet has been verified (checked) a real 0, and only
+            // "Loading…" before the first check has landed.
             const gl = window.globalLedger && typeof window.globalLedger.get === 'function'
                 ? window.globalLedger.get() : null;
             const onChainAvailable = gl && gl.spendableBalance != null;
+            const globalChecked = !!(window.globalLedger &&
+                typeof window.globalLedger.checked === 'function' &&
+                window.globalLedger.checked());
             const pointsText = onChainAvailable
                 ? gl.spendableBalance.toLocaleString()
-                : 'Loading\u2026';
+                : (globalChecked ? '0' : 'Loading\u2026');
 
             pill.innerHTML = `
                 <button id="btn-signout" class="auth-btn-small">Sign out</button>
@@ -214,8 +218,14 @@
             if (window.globalLedger && typeof window.globalLedger.subscribe === 'function' && !_globalLedgerUnsub) {
                 _globalLedgerUnsub = window.globalLedger.subscribe(function (ledger) {
                     var el = document.getElementById('display-points');
-                    if (!el || !ledger || ledger.spendableBalance == null) return;
-                    el.textContent = ledger.spendableBalance.toLocaleString() + ' Pts';
+                    if (!el) return;
+                    if (ledger && ledger.spendableBalance != null) {
+                        el.textContent = ledger.spendableBalance.toLocaleString() + ' Pts';
+                    } else if (window.globalLedger &&
+                        typeof window.globalLedger.checked === 'function' &&
+                        window.globalLedger.checked()) {
+                        el.textContent = '0 Pts';
+                    }
                 });
             }
 

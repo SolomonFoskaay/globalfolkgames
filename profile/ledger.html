@@ -67,42 +67,40 @@
                     return;
                 }
                 statusEl.textContent = 'Signed in — welcome back!';
-                // Serve the M3 module's cached/snapshot ledger (throttled
-                // refresh) instead of a fresh direct fetch on every page load.
+                // Cache-only (single source of truth): the M3 module's board is
+                // the only display source — never a direct RPC fetch here.
                 const lp = window.localPoints;
                 if (lp && typeof lp.get === 'function') {
                     const cur = lp.get('ludo');
                     if (cur && cur.spendableBalance != null) {
                         window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', cur);
+                    } else if (typeof lp.checked === 'function' && lp.checked('ludo')) {
+                        ledgerEl.innerHTML = '<p class="empty">No rewards yet. Win a match and your tally appears here.</p>';
                     } else {
-                        ledgerEl.innerHTML = '<p class="empty">Check your ledger…</p>';
+                        ledgerEl.innerHTML = '<p class="empty">Checking your ledger…</p>';
                     }
                 } else {
-                    // Cold path: the module script hasn't landed yet, so a one-off
-                    // direct read still shows something now.
-                    window.ProfileCore.loadPointsLedger(ledgerEl);
+                    ledgerEl.innerHTML = '<p class="empty">Checking your ledger…</p>';
                 }
                 signinBtn.hidden = true;
             }
 
             // Auto-update the card when the M3 module pushes a refreshed ledger
-            // (page boot refresh, wallet restore, a new match award). Registered
-            // as soon as the module exists; then re-pulls the cached value once
-            // so a notify that landed before we subscribed isn't missed.
+            // (the first post-login check, wallet restore, a new match award).
+            // Registered as soon as the module exists; a null-ledger notify just
+            // re-renders the state through render(), and the cache re-pull
+            // catches any notify that landed before we subscribed.
             function wireLedger() {
                 if (!window.localPoints || typeof window.localPoints.subscribe !== 'function') {
                     if (wireLedger._tries++ < 10) setTimeout(wireLedger, 400);
                     return;
                 }
                 window.localPoints.subscribe(function (gameTag, ledger) {
-                    if (window.currentProfile && ledger && gameTag === 'ludo') {
-                        window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', ledger);
+                    if (window.currentProfile && gameTag === 'ludo') {
+                        render(!!window.currentUser);
                     }
                 });
-                const cur = window.localPoints.get('ludo');
-                if (cur && cur.spendableBalance != null) {
-                    window.ProfileCore.loadPointsLedger(ledgerEl, 'ludo', cur);
-                }
+                render(!!window.currentUser);
             }
             wireLedger._tries = 0;
             wireLedger();

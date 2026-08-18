@@ -149,32 +149,52 @@
                 renderLocalCard(selectedGame);
             });
 
-            // Render the local (M3) card. With a ledger snapshot: pure sync, no
-            // fetch. Without one, read the module's cached value (get() returns
-            // it immediately and background-refreshes via the module's throttled
-            // path — never a second, unbounded direct fetch). With no value yet,
-            // show a loading line until the subscribe (wired below) delivers.
+            // Render the local (M3) card. Cache-only (single source of truth): with a
+            // ledger snapshot render it sync, else read the module's cached
+            // value (get() never fetches). If the module has already verified
+            // this wallet for the game, show a real "no rewards yet" line; only
+            // before the first check does it say "loading" (the module's first
+            // check subscribe flips it).
             function renderLocalCard(gameTag, ledger) {
                 if (ledger && ledger.spendableBalance != null) {
                     window.ProfileCore.loadPointsLedger(localLedgerEl, gameTag, ledger);
                     return;
                 }
-                const cur = window.localPoints ? window.localPoints.get(gameTag) : null;
+                const lp = window.localPoints;
+                const cur = lp ? lp.get(gameTag) : null;
                 if (cur && cur.spendableBalance != null) {
                     window.ProfileCore.loadPointsLedger(localLedgerEl, gameTag, cur);
                     return;
                 }
-                localLedgerEl.innerHTML = '<p class="empty">Loading ' + (gameTag || selectedGame) + ' ledger...</p>';
+                if (lp && typeof lp.checked === 'function') {
+                    if (lp.checked(gameTag)) {
+                        localLedgerEl.innerHTML = '<p class="empty">No rewards for ' + (gameTag || selectedGame) + ' yet. Win a match and your points appear here.</p>';
+                        return;
+                    }
+                }
+                localLedgerEl.innerHTML = '<p class="empty">Checking ' + (gameTag || selectedGame) + ' ledger...</p>';
             }
 
             // Render the header totals + global (M4) card from a ledger snapshot.
-            // Never fetches here: get() already refreshed in the background and
-            // subscribe pushes fresh ledgers, so this path stays flicker-free.
+            // Cache-only: never fetches. Shows the cached balance, a neutral
+            // "no ledger yet" once the wallet has been verified, or loading
+            // before the first check lands.
             function renderGlobal(ledger) {
                 if (ledger && ledger.spendableBalance != null) {
                     totalEl.textContent = ledger.spendableBalance.toLocaleString();
                     lifetimeEl.textContent = 'Lifetime points: ' + (ledger.lifetime != null ? ledger.lifetime.toLocaleString() : '--');
                     window.ProfileCore.loadGlobalLedger(globalLedgerEl, ledger);
+                    return;
+                }
+                const gl = window.globalLedger;
+                if (gl && typeof gl.checked === 'function' && gl.checked()) {
+                    totalEl.textContent = '0';
+                    lifetimeEl.textContent = 'Lifetime points: 0';
+                    globalLedgerEl.innerHTML = '<p class="empty">No global ledger yet. Win a match and your cross-game record appears here.</p>';
+                } else {
+                    totalEl.textContent = '--';
+                    lifetimeEl.textContent = 'Lifetime points: --';
+                    globalLedgerEl.innerHTML = '<p class="empty">Loading global ledgers...</p>';
                 }
             }
 
@@ -203,7 +223,7 @@
                 }
                 if (typeof window.localPoints.subscribe === 'function') {
                     window.localPoints.subscribe(function (gameTag, ledger) {
-                        if (window.currentProfile && ledger && gameTag === selectedGame) {
+                        if (window.currentProfile && gameTag === selectedGame) {
                             render(!!window.currentUser);
                             renderLocalCard(gameTag, ledger);
                         }

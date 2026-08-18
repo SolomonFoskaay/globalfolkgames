@@ -65,15 +65,60 @@
     var lastSeenAward = null; // award computed for the most recent finish (shown as "banking..." before it lands)
     var lastError = null;   // last bank failure reason (ceremony shows it when the write hiccups)
 
-    // RPC economy: a page boot (module self-poll, header pill get(), profile
-    // cards) can call get() several times; without a guard each call fetches
-    // the PDA again, hammering the ER RPC on every page load. refreshLedger
-    // therefore coalesces: never two fetches in flight for the same game, and
-    // a throttled call within MIN_INTERVAL of a successful read just serves the
-    // cached snapshot (bank/spend/read-backs pass force=true for fresh data).
-    var REFRESH_MIN_INTERVAL_MS = 6000;
+    // SINGLE-SOURCE-OF-TRUTH RPC ECONOMY (owner design, 2026-08-18): the
+    // localStorage cache is the ONLY display source. Pages read it with
+    // get() (pure read, never fetches). The RPC is hit ONLY when:
+    //   1. the ledger is FIRST checked for this wallet after a login page boot
+    //      (so a silently restored session / new device never shows a wrong
+    //      zero), and
+    //   2. right after a bank/spend write (so the board posts the new balance).
+    // A player who doesn't win all day costs ~1-3 RPC hits for the whole
+    // browser, not one per page view. __meta.checkedTags records which games
+    // were already verified so we never re-fetch them per page load; a
+    // zero-result (no account yet) is legitimately "checked" too. A checked
+    // marker older than ZERO_RECHECK_MS on a ZERO ledger is re-verified (a
+    // transient outage can't freeze a fresh zero forever); populated ledgers
+    // stay cached until the next win/spend.
+    var ZERO_RECHECK_MS = 8 * 3600 * 1000;
     var refreshInFlight = {};  // gameTag -> in-flight refresh promise (dedup)
-    var refreshLastAt = {};    // gameTag -> ms of the last SUCCESSFUL fetch
+
+    // __meta lives INSIDE the wallet's cache slice so wallet isolation holds:
+    //   cacheStore[wk] = cached = { ludo: ledger, ..., __meta: { checkedTags: { ludo: {at, any} } } }
+    // It is written on the `cached` slice object itself so persistCache()
+    // (which persists `cached`) carries it to storage in the same write.
+    function metaFor() {
+        if (!cached || typeof cached !== 'object') cached = {};
+        if (!cached.__meta) cached.__meta = { checkedTags: {} };
+        return cached.__meta;
+    }
+    function markChecked(gameTag, any) {
+        var m = metaFor();
+        if (!m.checkedTags) m.checkedTags = {};
+        m.checkedTags[gameTag] = { at: Date.now(), any: !!any };
+        persistCache();
+    }
+    // A game needs an auto first-check when it was never verified for this
+    // wallet, OR its only checkpoint was a zero ledger older than the recheck
+    // window. A wallet with a real (populated) ledger never needs a page-load
+    // recheck.
+    function needsFirstCheck(gameTag) {
+        var m = metaFor();
+        var c = m.checkedTags && m.checkedTags[gameTag];
+        if (!c) return true;
+        if (c.any) return false;
+        return (Date.now() - c.at) > ZERO_RECHECK_MS;
+    }
+    // A ledger display may render a "no rewards yet" line once a game has been
+    // checked (even with nothing on-chain); before that it can only say "loading".
+    function hasChecked(gameTag) {
+        var c = metaFor().checkedTags && metaFor().checkedTags[gameTag];
+        return !!c;
+    }
+    // True when there is a real player wallet behind the current cache slice
+    // (dynamic wallet or profile wallet), false for the logged-out 'anon' state.
+    function hasRealWallet() {
+        return walletKey() !== 'anon';
+    }
 
     // Best-known caller identity for cache isolation: the Dynamic Solana wallet
     // address when available, else the profile wallet, else 'anon'.
@@ -196,29 +241,31 @@
 
     async function refreshLedger(gameTag, force) {
         gameTag = gameTag || DEFAULT_TAG;
-        if (!force && refreshLastAt[gameTag] &&
-            (Date.now() - refreshLastAt[gameTag]) < REFRESH_MIN_INTERVAL_MS) {
-            return cached[gameTag] || null; // throttled: serve the last-known ledger
-        }
         if (refreshInFlight[gameTag]) return refreshInFlight[gameTag]; // share the in-flight fetch
+        var firstCheck = !hasChecked(gameTag); // notify once when a zero check lands
         refreshInFlight[gameTag] = (async function () {
+            var ledger = null;
             try {
                 if (window.magicblockDice && typeof window.magicblockDice.fetchPointsPda === 'function') {
-                    var ledger = await window.magicblockDice.fetchPointsPda(gameTag);
+                    ledger = await window.magicblockDice.fetchPointsPda(gameTag);
                     if (ledger) {
                         cached[gameTag] = ledger;
+                        if (hasRealWallet()) markChecked(gameTag, true);
                         persistCache();
-                        refreshLastAt[gameTag] = Date.now();
                         fillSlots(gameTag, ledger);
                         notify(gameTag, ledger);
                         return ledger;
                     }
                 }
             } catch (e) { /* ledger not readable yet (not onboarded / wallet busy) */ }
-            // Not readable this instant (wallet not restored, ER down): still render
-            // the last-known value so the DOM never sits on static 0 / em-dash while
-            // the player waits for the fetch to become possible. refreshLastAt is
-            // NOT touched so a later call retries promptly.
+            // Not readable this instant (wallet not restored, ER down, or the
+            // account simply doesn't exist yet). Keep rendering the last-known
+            // value so the DOM never sits on static 0 / em-dash. A wallet
+            // present + reachable fetch counts as "checked" (even a no-account
+            // zero is a genuine answer) so we don't refetch it on every load;
+            // network-y errors leave the marker unset so the next page retries.
+            if (hasRealWallet()) markChecked(gameTag, false);
+            if (firstCheck) notify(gameTag, null, null); // pages flip their "loading" line to "no rewards yet"
             var fallback = cached[gameTag] || null;
             if (fallback) fillSlots(gameTag, fallback);
             return fallback;
@@ -361,17 +408,22 @@
 
     // ---- public API -----------------------------------------------------
     window.localPoints = {
-        // Latest known ledger for a game (or null). ALWAYS triggers a
-        // background refresh (stability contract: a cold page returns the cached
-        // snapshot if any, and the fetch fills it in the moment the wallet is up).
+        // Latest known ledger for a game (or null). PURE cache read — never
+        // fetches (single source of truth: the RPC is only consulted on the
+        // first check after login and after a bank/spend write). Returns the
+        // wallet-keyed snapshot from localStorage instantly.
         get: function (gameTag) {
-            var tag = gameTag || DEFAULT_TAG;
-            refreshLedger(tag);
-            return cached[tag] || null;
+            return cached[gameTag || DEFAULT_TAG] || null;
+        },
+        // True once this game has been verified for the current wallet (even
+        // with nothing on-chain yet), so displays can show a real "no rewards
+        // yet" instead of an eternal loading line. False = still unknown.
+        checked: function (gameTag) {
+            return hasChecked(gameTag || DEFAULT_TAG);
         },
         // Blocking fetch of the ledger for a game (own account, gasless).
-        // Explicit fetch = fresh read (bypasses the throttled background
-        // refresh; still dedupes against one already in flight).
+        // Explicit fresh read — pages never need it, but tools/debugging do.
+        // Dedupes against a fetch already in flight.
         fetch: function (gameTag) {
             return refreshLedger((gameTag || DEFAULT_TAG), true);
         },
@@ -436,22 +488,25 @@
         if (cached[tag]) fillSlots(tag, cached[tag]);
     }
 
-    // Refresh once the module is usable AND the Dynamic session/wallet has been
-    // restored. On a plain page load the wallet arrives AFTER DOMContentLoaded
-    // (async session restore), and gfg:auth-changed only fires on interactive
-    // sign-in/out — so without this poll the display could stay stuck on the
-    // pre-sign-in value/zero forever.
+    // Refresh ONCE when the module is usable AND the Dynamic session/wallet has
+    // been restored. On a plain page load the wallet arrives AFTER
+    // DOMContentLoaded (async session restore), and gfg:auth-changed only
+    // fires on interactive sign-in/out — so without this poll a silently
+    // restored session could leave the board stuck. It is the ONLY page-load
+    // fetch: limited to the first check for the wallet (and the rare zero-ledger
+    // re-verification after ZERO_RECHECK_MS). After that every page view reads
+    // the cached board and never consults the RPC until the next win/spend.
     function refreshWhenWalletReady(tag, timeoutMs) {
         var deadline = Date.now() + (timeoutMs || 12000);
         (function poll() {
             if (window.magicblockDice &&
                 typeof window.magicblockDice.available === 'function' &&
                 window.magicblockDice.available()) {
-                // The wallet just became known — re-anchor the cache to it so a
-                // silently restored session swaps in the right user's numbers.
                 syncCacheToWallet();
                 renderCached(tag);
-                refreshLedger(tag, true);
+                if (hasRealWallet() && needsFirstCheck(tag)) {
+                    refreshLedger(tag, true);
+                }
                 return;
             }
             if (Date.now() < deadline) setTimeout(poll, 700);
@@ -470,15 +525,31 @@
         handleDomReady();
     }
 
-    // Re-fetch when auth changes (sign-in / sign-out on the same page): the
-    // ledger only becomes readable once the Dynamic wallet is available, and
-    // the wallet identity change must swap the cached slice too.
+    // On auth change (sign-in / sign-out on the same page) swap the cached
+    // slice to the new wallet. Fetch only the first time that wallet is seen
+    // in this browser; afterwards the board is the source of truth.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
             syncCacheToWallet();
             var tag = pickGameTag();
             renderCached(tag);
-            refreshLedger(tag, true);
+            if (hasRealWallet() && needsFirstCheck(tag)) {
+                refreshLedger(tag, true);
+            }
+        });
+    }
+
+    // Cross-tab sync: when another tab banks/spends it writes the SAME
+    // localStorage board; a storage event repoints this tab's cache to the new
+    // numbers with no RPC call at all.
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('storage', function (e) {
+            if (e.key !== CACHE_KEY) return;
+            loadCache();
+            syncCacheToWallet();
+            var tag = pickGameTag();
+            renderCached(tag);
+            notify(tag, cached[tag] || null, lastAward || null);
         });
     }
 
