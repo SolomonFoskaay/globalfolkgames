@@ -159,12 +159,18 @@ export function assertSponsorReserve(balanceLamports, spendLamports, path = ledg
 //   category: string   what the spend was for ('onboarding' | 'house' | ...)
 //   steps:    number   how many base-layer tx steps produced this delta
 //   extra:    object   optional tags to store on the event (e.g. kind)
+//   capExempt:boolean  record analytics + globalSpent but DO NOT bump the
+//                      per-player cap map (a maintenance/ops cost like a
+//                      region re-pin should never consume a player's
+//                      onboarding budget). Default false.
 export function recordSpend(player, spendLamports, opts = {}, path = ledgerPath()) {
   if (spendLamports <= 0) return;
   const ledger = loadLedger(path);
-  const prior = ledger.players[player]?.spent || 0;
   const ts = new Date().toISOString();
-  ledger.players[player] = { spent: prior + spendLamports, lastSpentAt: ts };
+  if (!opts.capExempt) {
+    const prior = ledger.players[player]?.spent || 0;
+    ledger.players[player] = { spent: prior + spendLamports, lastSpentAt: ts };
+  }
   ledger.globalSpent = (ledger.globalSpent || 0) + spendLamports;
   ledger.events = ledger.events || [];
   ledger.events.push({

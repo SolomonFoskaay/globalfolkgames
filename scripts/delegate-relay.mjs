@@ -29,8 +29,13 @@ const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.m
 
 const PROGRAM_ID = new PublicKey(idl.address);
 const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
-// Devnet ER validator this player PDA is pinned to (US region).
-const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
+// Devnet ER validator this player PDA is pinned to. Was the US validator
+// (MUS3hc9...); flipped 2026-08-18 to the AS validator (MAS1Dt9...) because
+// devnet-us.magicblock.app answers "-32005 client temporarily banned" and new
+// accounts should land on the healthy AS region. Every gfg component that
+// pins a PDA (delegate-relay, comp-relay, lab probes) must agree on this so
+// the client's region resolution targets the same region the accounts live on.
+const ER_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57');
 // Base-layer devnet RPC (Router-first). The gfg-dice client, the sponsor relay
 // and the lab harnesses all read their devnet RPC here. See src/gfg-rpc.js for
 // the full chain: Magic Router (primary) -> GFG_DEVNET_RPC (Alchemy key) ->

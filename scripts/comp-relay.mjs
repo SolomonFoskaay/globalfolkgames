@@ -36,7 +36,7 @@ const PROGRAM_ID = new PublicKey(idl.address);
 const COMP_SEED = Buffer.from('gfgcomp');
 const BASE_URL = baseRpcUrl();
 const ER_URL = pickErRpcUrl();
-const ER_VALIDATOR = new PublicKey('MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd');
+const ER_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57'); // AS region (see delegate-relay.mjs)
 const DELEGATION_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 
 export function compPda(sponsorPubkey) {

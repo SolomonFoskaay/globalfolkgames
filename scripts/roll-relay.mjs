@@ -21,7 +21,7 @@ import { readFileSync } from 'fs';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import './load-env.mjs';
-import { createConnection, pickErRpcUrl, markErRpcSuccess, markErRpcFailure } from '../src/gfg-rpc.js';
+import { createConnection, pickErRpcUrl, markErRpcSuccess, markErRpcFailure, getDelegationStatus, baseRpcUrl, regionUrlForFqdn } from '../src/gfg-rpc.js';
 import { handleDelegate, loadSponsor } from './delegate-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
@@ -56,6 +56,28 @@ const DELEGATION_TTL_MS = 4 * 60 * 1000;
 let lastEnsuredAt = 0;
 let lastRollSucceeded = false;
 
+// Region that hosts the house dice PDA. THE fix for house roll timeouts: the
+// account lives on exactly ONE region (the validator the relay pinned it to),
+// so submit + poll must stay on that region. Rotation would confirm the tx yet
+// the VRF callback lands on the hosting region, unseen by a poll elsewhere.
+let cachedHostUrl = null;
+
+async function houseRegionUrl(pda) {
+  if (cachedHostUrl) return cachedHostUrl;
+  try {
+    const baseConn = new Connection(baseRpcUrl(), 'confirmed');
+    const st = await getDelegationStatus(baseConn, pda);
+    const url = st && st.isDelegated ? regionUrlForFqdn(st.fqdn) : null;
+    if (url) {
+      cachedHostUrl = url;
+      console.log(`[house roll] house dice PDA hosted on region ${url} - submitting + polling there`);
+    }
+  } catch (e) {
+    // Router unreachable: fall back to the coordinated rotation for this roll.
+  }
+  return cachedHostUrl || null;
+}
+
 // Single-flight queue: serializes all house rolls in this process.
 let rollQueue = Promise.resolve();
 
@@ -77,8 +99,13 @@ async function houseRollOnce() {
   const warm = Date.now() - lastEnsuredAt < DELEGATION_TTL_MS && lastRollSucceeded;
   if (!warm) await handleDelegate(housePubkey.toBase58());
 
-  // ER connection on the current best region; rotates when an endpoint errors.
-  const makeConn = () => createConnection(pickErRpcUrl(), 'confirmed', 30000, { backoffMs: [400, 800, 1200, 1800, 2500] });
+  // Resolve the region that hosts the house dice PDA and lock every connection
+  // to it (rotation only applies if the Router cannot report the account yet).
+  const hostUrl = await houseRegionUrl(pda);
+
+  // ER connection on the hosting region (or the current best region as a
+  // fallback); reconnects to the same region when an endpoint errors.
+  const makeConn = () => createConnection(hostUrl || pickErRpcUrl(), 'confirmed', 30000, { backoffMs: [400, 800, 1200, 1800, 2500] });
   let erConn = makeConn();
   let erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
 
@@ -96,7 +123,8 @@ async function houseRollOnce() {
         }
       } catch (e) {
         if (isErNetworkError(e)) {
-          // Region down: rotate to a fresh one and resume the pickup poll.
+          // Host region down: reconnect to it (makeConn is host-locked) and
+          // resume the pickup poll there.
           markErRpcFailure(erUrl);
           erConn = makeConn();
           erUrl = erConn.rpcEndpoint.replace(/\/+$/, '/');
@@ -109,7 +137,7 @@ async function houseRollOnce() {
   }
 
   // 3) Gasless rollDice on the ER, signed by the house key. Retry once on a
-  //    fresh region if the first region's RPC errors mid-send.
+  //    fresh connection to the SAME hosting region if its RPC errors mid-send.
   const walletAdapter = {
     publicKey: housePubkey,
     async signTransaction(t) { t.partialSign(sponsor); return t; },
@@ -143,8 +171,8 @@ async function houseRollOnce() {
     }
   }
 
-  // 4) Wait for the VRF oracle to callback into the program. Poll the current
-  //    region; if it dies mid-wait, rotate and keep polling on a fresh one.
+  // 4) Wait for the VRF oracle to callback into the program. Poll the hosting
+  //    region; if it dies mid-wait, reconnect there and keep polling.
   const callbackDeadline = Date.now() + CALLBACK_WAIT_MS;
   while (Date.now() < callbackDeadline) {
     await sleep(750);

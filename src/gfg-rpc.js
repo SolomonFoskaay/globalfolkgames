@@ -116,6 +116,28 @@ export function erRpcEndpoints() {
   return ER_ENDPOINTS.slice();
 }
 
+// Region URL a delegated account actually lives on. The Router's
+// getDelegationStatus returns an `fqdn` naming the ER region hosting the
+// account; every ER write AND its callback poll MUST target that same region
+// (a roll submitted to a region that does not host the account can never get
+// its callback back - proven by the E1 vs F2 probes). This map also covers
+// explicitly targeting an account pinned to US even though US is excluded
+// from fresh-connection rotation.
+export const ER_REGION_URLS = {
+  us: 'https://devnet-us.magicblock.app/',
+  as: 'https://devnet-as.magicblock.app/',
+  eu: 'https://devnet-eu.magicblock.app/',
+};
+
+export function regionUrlForFqdn(fqdn) {
+  if (!fqdn) return null;
+  const lower = String(fqdn).toLowerCase();
+  if (lower.includes('devnet-us') || /(^|[.\-_])us([.\-_]|$)/.test(lower)) return ER_REGION_URLS.us;
+  if (lower.includes('devnet-as') || /(^|[.\-_])as([.\-_]|$)/.test(lower)) return ER_REGION_URLS.as;
+  if (lower.includes('devnet-eu') || /(^|[.\-_])eu([.\-_]|$)/.test(lower)) return ER_REGION_URLS.eu;
+  return null;
+}
+
 export function pickErRpcUrl() {
   const now = Date.now();
   if (erPreferredUrl && ER_STATE.get(erPreferredUrl).cooldownUntil <= now) return erPreferredUrl;

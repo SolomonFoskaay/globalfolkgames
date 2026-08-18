@@ -43,7 +43,7 @@ const ER_REGIONS = erRpcEndpoints(); // AS / EU (US excluded 2026-08-18: "client
 const INVENTORY = {
   gfgDiceProgram: idl.address,
   delegationProgram: 'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh',
-  erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
+  erValidator: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
   erVrfQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc',
   baseVrfQueue: 'Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh',
   erRpc: 'https://devnet-as.magicblock.app/', // canonical display (rotation governed by the registry; see ops.erRotation)
@@ -294,7 +294,7 @@ export async function runProbe() {
   await probe('Delegation program deployed', 'accounts', 'infra', accountProbe('delegation', INVENTORY.delegationProgram));
   await probe('ER VRF queue (free)', 'accounts', 'infra', accountProbe('er-vrf', INVENTORY.erVrfQueue));
   await probe('Base VRF queue (paid)', 'accounts', 'infra', accountProbe('base-vrf', INVENTORY.baseVrfQueue));
-  await probe('ER validator (US)', 'accounts', 'infra', accountProbe('er-validator', INVENTORY.erValidator));
+  await probe('ER validator (AS - relay pins new accounts here)', 'accounts', 'infra', accountProbe('er-validator', INVENTORY.erValidator));
 
   // 3. ER RPC (infra) — probe EVERY public ER region with a real JSON-RPC call
   //    (an HTTP GET can answer 200 while the endpoint bans POST RPCs), plus

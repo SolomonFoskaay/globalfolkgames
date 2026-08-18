@@ -30,6 +30,7 @@ import {
   markErRpcSuccess,
   markErRpcFailure,
   rotateErRpc,
+  regionUrlForFqdn,
 } from './gfg-rpc.js';
 import bs58 from 'bs58';
 import { BN } from 'bn.js';
@@ -72,7 +73,7 @@ const config = {
   // non-banned default (AS) so nothing ever falls back to the region that has
   // been returning "-32005 client temporarily banned".
   erRpcUrl: 'https://devnet-as.magicblock.app/',
-  erValidator: 'MUS3hc9TCw4cGC12vHNoYcCGzJG1txjgQLZWVoeNHNd',
+  erValidator: 'MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57',
   // Devnet ER VRF queue (free VRF). Base-layer queue: Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh
   oracleQueue: '5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc',
   relayUrl: '/api/delegate',
@@ -126,19 +127,68 @@ function isErNetworkError(e) {
   return false;
 }
 
+// ---- Region-aware ER targeting (THE fix for "Timeout waiting for callback") ----
+//
+// A delegated PDA's ER state lives on ONE region (the validator the relay
+// pinned it to via remainingAccounts). Submitting a roll or points write to a
+// DIFFERENT region can confirm okay but the VRF callback lands on the hosting
+// region, so a poll elsewhere never sees it. Every operation that touches a
+// delegated account must therefore resolve WHICH region hosts it (Router
+// getDelegationStatus -> fqdn) and submit + poll THERE. Rotation is only a
+// fallback for accounts the Router has not reported on yet.
+const regionUrlCache = new Map(); // pda base58 -> region URL
+let regionBaseConn = null;
+
+async function resolvedRegionUrl(pda) {
+  const key = typeof pda === 'string' ? pda : pda.toBase58();
+  if (regionUrlCache.has(key)) return regionUrlCache.get(key);
+  try {
+    if (!regionBaseConn) regionBaseConn = new Connection(config.baseRpcUrl, 'confirmed');
+    const st = await getDelegationStatus(regionBaseConn, pda);
+    if (st && st.isDelegated) {
+      const url = regionUrlForFqdn(st.fqdn);
+      if (!url) {
+        // Delegated but fqdn not mapped yet: do not cache, so a later poll can
+        // re-resolve as the region metadata propagates.
+        console.warn(`[VRF] ${key.slice(0, 8)}... delegated with unmapped fqdn '${st.fqdn}' - will re-resolve`);
+        return null;
+      }
+      regionUrlCache.set(key, url);
+      console.log(`[VRF] ${key.slice(0, 8)}... pinned to region ${url}`);
+      return url;
+    }
+  } catch (e) {
+    // Router unreachable: caller falls back to rotation for this attempt.
+  }
+  return null;
+}
+
+// Best ER endpoint for `pda`: its hosting region when known, else the current
+// rotation pick (fresh/unknown accounts).
+async function regionUrlFor(pda) {
+  const host = await resolvedRegionUrl(pda);
+  return host || currentErUrl();
+}
+
 // Run `fn(ctx)` against the current best ER endpoint; on a network error,
 // rotate regions and retry once with a fresh provider. Program-level errors
 // bubble up immediately (they are not RPC outages). An optional label logs
 // WHICH operation is running and on WHICH region, so the console traces the
 // full path: wallet-sign (Dynamic email moment) -> send -> confirm.
-async function withErRetry(labelOrFn, maybeFn) {
+//
+// When `opts.regionUrl` is set (a delegated account is hosted on exactly that
+// region), the write targets ONLY that region and a network error RETRIES THE
+// SAME region: the account's state lives there, so rotating elsewhere can
+// neither confirm the tx nor ever return the VRF callback.
+async function withErRetry(labelOrFn, maybeFn, opts = {}) {
   const label = typeof labelOrFn === 'string' ? labelOrFn : (labelOrFn && labelOrFn.name) || 'op';
   const fn = typeof labelOrFn === 'function' ? labelOrFn : maybeFn;
+  const pinnedUrl = opts.regionUrl || null;
   let lastErr = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const ctx = getErProgram();
+    const url = pinnedUrl || currentErUrl();
+    const ctx = getErProgramFor(url);
     if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
-    const url = currentErUrl();
     console.log(`[VRF] ER write '${label}' attempt ${attempt + 1}/2 -> submitting on region ${url}`);
     try {
       const out = await fn(ctx);
@@ -150,6 +200,12 @@ async function withErRetry(labelOrFn, maybeFn) {
       if (!isErNetworkError(e)) {
         console.error(`[VRF] ER write '${label}' failed (NOT an RPC outage - surfaced to the caller):`, e.message);
         throw e;
+      }
+      if (pinnedUrl) {
+        // Account lives on this region: same-region retry only.
+        console.warn(`[VRF] ER write '${label}' network error on pinned region ${url} (${e.message}) - retrying SAME region.`);
+        erConns.delete(url);
+        continue;
       }
       console.warn(`[VRF] ER write '${label}' network error on region ${url} (${e.message}) - rotating regions.`);
       const next = rotateErRpc(url);
@@ -163,12 +219,12 @@ async function withErRetry(labelOrFn, maybeFn) {
 
 // Provider pointed at the Ephemeral Rollup. Transactions here are gasless, so
 // the player's wallet (session key) can be the fee payer with zero SOL.
-function getErProgram() {
+function getErProgramFor(url) {
   if (!config.programId || !config.idl) return null;
   const wallet = getSolanaWalletAccount();
   if (!wallet) return null;
 
-  const connection = erConnFor(currentErUrl());
+  const connection = erConnFor(url);
   const walletAdapter = {
     publicKey: wallet.publicKey,
     async signTransaction(transaction) {
@@ -200,6 +256,11 @@ function getErProgram() {
   };
 }
 
+// Rotation-picked provider (used when no specific account region applies).
+function getErProgram() {
+  return getErProgramFor(currentErUrl());
+}
+
 function playerPda(payerPubkey) {
   return PublicKey.findProgramAddressSync(
     [PLAYER_SEED, payerPubkey.toBytes()],
@@ -224,6 +285,10 @@ async function waitForErPickup(pda) {
   const deadline = Date.now() + config.erPickupWaitMs;
   let url = currentErUrl();
   while (Date.now() < deadline) {
+    // Fresh delegations take a beat to report their region fqdn; re-resolve on
+    // each pass so the poll converges onto the region that hosts the account.
+    const host = await resolvedRegionUrl(pda);
+    if (host) url = host;
     try {
       const info = await erConnFor(url).getAccountInfo(pda);
       if (info && info.owner.toBase58() === config.programId && info.data.length > 0) {
@@ -232,7 +297,8 @@ async function waitForErPickup(pda) {
       }
     } catch (e) {
       if (isErNetworkError(e)) {
-        // Endpoint down: rotate to a fresh region and retry the poll there.
+        // Endpoint down: drop it and try the rotation; the resolve loop above
+        // re-locks the poll onto the account's real region on the next pass.
         markErRpcFailure(url);
         erConns.delete(url);
         url = currentErUrl();
@@ -315,7 +381,12 @@ async function rollOnce() {
   // The ER validator may need a moment to include the freshly delegated PDA.
   await waitForErPickup(pda);
 
-  console.log(`[VRF] Dice PDA ready (${pda.toBase58()}). Requesting the VRF roll - signing + submitting on region ${currentErUrl()}. If Dynamic emails you, that is the signature step below working; the failure (if any) is next, in submission/confirmation.`);
+  // THE fix: submit the roll AND poll its callback on the region that actually
+  // hosts the dice PDA. Rolling on a rotated-but-wrong region confirms ok yet
+  // the VRF callback lands on the hosting region, so the poll never sees it.
+  const regionUrl = await regionUrlFor(pda);
+
+  console.log(`[VRF] Dice PDA ready (${pda.toBase58()}). Requesting the VRF roll - signing + submitting on region ${regionUrl}. If Dynamic emails you, that is the signature step below working; the failure (if any) is next, in submission/confirmation.`);
 
   // Unique entropy commitment for this roll (included in the VRF proof).
   // Generated fresh per attempt so a region-rotated retry never reuses a seed
@@ -333,15 +404,16 @@ async function rollOnce() {
         oracleQueue: new PublicKey(config.oracleQueue),
       })
       .rpc();
-  });
+  }, { regionUrl });
   lastProofRollSignature = (typeof proofResult === 'string' && proofResult)
     ? proofResult
     : (proofResult && (proofResult.signature || proofResult.txSig)) || null;
 
-  // Wait for the VRF oracle to fulfill and callback into our program.
+  // Wait for the VRF oracle to fulfill and callback into our program. Poll the
+  // SAME region the roll was submitted to (that is where the account lives).
   const deadline = Date.now() + config.requestTimeoutMs;
-  let pollCtx = getErProgram();
-  let pollUrl = currentErUrl();
+  let pollCtx = getErProgramFor(regionUrl);
+  let pollUrl = regionUrl;
   while (Date.now() < deadline) {
     await sleep(800);
     try {
@@ -352,11 +424,12 @@ async function rollOnce() {
       }
     } catch (e) {
       if (isErNetworkError(e)) {
-        // Endpoint died mid-wait: rotate and continue polling on a fresh region.
+        // Endpoint died mid-wait: retry the poll on the SAME region (the
+        // account's state lives there; another region can't answer it).
         markErRpcFailure(pollUrl);
         erConns.delete(pollUrl);
-        pollUrl = currentErUrl();
-        pollCtx = getErProgram();
+        pollUrl = regionUrl;
+        pollCtx = getErProgramFor(pollUrl);
       }
       // Account not settled yet; keep polling.
     }
@@ -393,6 +466,8 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
+  const regionUrl = await regionUrlFor(pointsPda);
+
   const sig = await withErRetry('record_points', async (ctx) => ctx.program.methods
     .recordPoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
@@ -400,7 +475,7 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc());
+    .rpc(), { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -419,6 +494,8 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
+  const regionUrl = await regionUrlFor(pointsPda);
+
   const sig = await withErRetry('spend_local', async (ctx) => ctx.program.methods
     .spendLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
@@ -426,7 +503,7 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc());
+    .rpc(), { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -459,6 +536,8 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
+  const regionUrl = await regionUrlFor(globalPda);
+
   const sig = await withErRetry('record_global_points', async (ctx) => ctx.program.methods
     .recordGlobalPoints(kind, sourceCode, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
@@ -466,7 +545,7 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc());
+    .rpc(), { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -484,6 +563,8 @@ export async function spendGlobal(amount, reason, spendRef) {
   await ensureDelegated(globalPda, wallet.publicKey);
   await waitForErPickup(globalPda);
 
+  const regionUrl = await regionUrlFor(globalPda);
+
   const sig = await withErRetry('spend_global', async (ctx) => ctx.program.methods
     .spendGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
@@ -491,7 +572,7 @@ export async function spendGlobal(amount, reason, spendRef) {
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
-    .rpc());
+    .rpc(), { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -517,6 +598,8 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
   await ensureDelegated(resultPda, wallet.publicKey);
   await waitForErPickup(resultPda);
 
+  const regionUrl = await regionUrlFor(resultPda);
+
   // Map colors to the canonical seat indexes (green=0, yellow=1, blue=2, red=3).
   const seatIndexes = finishOrder.map(color =>
     typeof color === 'number' ? color : SEAT_INDEX[color] ?? 0,
@@ -535,7 +618,7 @@ export async function recordResult(finishOrder, points, multiplier, matchRef) {
       playerAuthority: wallet.publicKey,
       result: resultPda,
     })
-    .rpc());
+    .rpc(), { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -570,6 +653,8 @@ export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
   await ensureDelegated(pointsPda, wallet.publicKey);
   await waitForErPickup(pointsPda);
 
+  const regionUrl = await regionUrlFor(pointsPda);
+
   const sig = await withErRetry('claim_comp (S2 winner claim)', async (ctx) => {
     // Read the sponsor out of the comp account so the PDA seed constraint passes.
     const compAccount = await ctx.program.account.competition.fetch(new PublicKey(compPda));
@@ -585,7 +670,7 @@ export async function claimComp(compPda, winnerIndex, gameTag = 'ludo') {
         comp: new PublicKey(compPda),
       })
       .rpc();
-  });
+  }, { regionUrl });
 
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
@@ -730,10 +815,11 @@ export function initMagicBlockDice() {
     async fetchPointsPda(gameTag = 'ludo') {
       const ctx = getErProgram();
       if (!ctx) return null;
-      const { program, wallet } = ctx;
+      const { wallet } = ctx;
       const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
       try {
-        const acct = await program.account.playerPoints.fetch(pointsPda);
+        const regionCtx = getErProgramFor(await regionUrlFor(pointsPda));
+        const acct = await regionCtx.program.account.playerPoints.fetch(pointsPda);
         return {
           pureLifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime ?? 0),
           spendableBalance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance ?? 0),
@@ -761,10 +847,11 @@ export function initMagicBlockDice() {
     async fetchGlobalPointsPda() {
       const ctx = getErProgram();
       if (!ctx) return null;
-      const { program, wallet } = ctx;
+      const { wallet } = ctx;
       const [globalPda] = globalPointsPdaFor(wallet.publicKey);
       try {
-        const acct = await program.account.globalPoints.fetch(globalPda);
+        const regionCtx = getErProgramFor(await regionUrlFor(globalPda));
+        const acct = await regionCtx.program.account.globalPoints.fetch(globalPda);
         return {
           pureLifetime: Number(acct.globalPureLifetime ?? acct.global_pure_lifetime ?? 0),
           lifetime: Number(acct.globalLifetime ?? acct.global_lifetime ?? 0),
