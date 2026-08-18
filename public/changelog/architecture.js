@@ -92,6 +92,7 @@
     const mods = ov.modules || [];
     const rules = ov.keyRules || [];
     const fd = ov.flowDiagram;
+    const infraNotes = ov.infraNotes || [];
 
     const flowCards = mods.map(m => {
       const badge = (() => {
@@ -118,6 +119,11 @@
 
     return `
       <p class="econ-updated" style="margin-bottom:18px;">${esc(ov.subtitle || '')}</p>
+      ${infraNotes.length ? `
+        <section class="arch-block">
+          <h3 class="arch-block-title">Infrastructure notes (MagicBlock ER)</h3>
+          <ul class="arch-contract-list">${infraNotes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+        </section>` : ''}
       ${fd ? `<div class="ov-flow-diagram"><h4 class="arch-block-title">Data flow</h4><p class="ov-flow-label">${esc(fd.label)}</p><p class="ov-flow-path">${esc(fd.path)}</p></div>` : ''}
       <section class="arch-block">
         <h3 class="arch-block-title">Modules at a glance</h3>
