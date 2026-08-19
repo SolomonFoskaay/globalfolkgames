@@ -370,6 +370,12 @@
             if (!window.localPoints && src.indexOf('local-points') >= 0) ensureScript(src);
             if (!window.globalLedger && src.indexOf('global-ledger') >= 0) ensureScript(src);
         });
+        // The central points store (single source of truth for "when does the
+        // RPC get consulted"): it binds solely to gfg:auth-changed and resets +
+        // refetches the M3/M4 ledgers on a fresh sign-in. On a plain page load
+        // it does nothing, so the header never causes page-load RPC. Ensure it
+        // everywhere too (idempotent).
+        if (!window.pointsStore) ensureScript('/universal/points/points-store.js');
         renderHeader(options || {});
         loadGameRegistry(); // keeps nav labels in sync with the games registry
     };

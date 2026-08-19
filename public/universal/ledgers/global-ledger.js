@@ -100,18 +100,6 @@
         metaStore[walletKey()] = { at: Date.now(), any: !!any };
         try { localStorage.setItem(META_KEY, JSON.stringify(metaStore)); } catch (e) { /* ignore */ }
     }
-    // A first auto-check is needed when this wallet was never verified, or its
-    // only checkpoint was a zero-ledger result. A zero checkpoint is rechecked
-    // at every wallet-ready boot (like M3) so a migration-era existing balance
-    // surfaces, and a one-off transient outage can NEVER freeze a fresh zero
-    // for hours (the old 8h window did exactly that). A real (populated)
-    // ledger never needs a page-load recheck.
-    function needsFirstCheck() {
-        var m = metaStore[walletKey()];
-        if (!m) return true;
-        if (m.any) return false;
-        return true; // a zero checkpoint triggers one recheck at the wallet-ready boot
-    }
     // True once this wallet has been verified at all (even with nothing
     // on-chain), so displays can show a real "no ledger yet" instead of
     // loading forever.
@@ -486,6 +474,21 @@
         fetch: function () {
             return refreshLedger(true);
         },
+        // Clear THIS wallet's stored snapshot + check marker so the next render
+        // shows "no snapshot yet" until a fresh fetch lands. Called by the
+        // central store (points-store.js) on a fresh sign-in — it wipes any
+        // stale cached number so the new on-chain read is what's shown, never
+        // the previous session's leftovers. Pure local op, no RPC.
+        reset: function () {
+            cached = null;
+            var wk = walletKey();
+            delete cacheStore[wk];
+            delete metaStore[wk];
+            try { localStorage.setItem(META_KEY, JSON.stringify(metaStore)); } catch (e) { /* ignore */ }
+            fillSlots({ pureLifetime: 0, lifetime: 0, spendableBalance: 0, lastPoints: 0 });
+            notify(null, null);
+            return true;
+        },
         // Programmatic credit (for M5 tier boost, M6 signup/referral/giveaway).
         // kind: 0 = game win, 1 = other. source: source-code enum (u8).
         // Points, reason, matchRef: same as the on-chain instruction.
@@ -555,15 +558,16 @@
         if (cached) fillSlots(cached);
     }
 
-    // READ STABILITY (2026-08-19): the gate is "SDK configured + a wallet
-    // ADDRESS is known" — NOT magicblockDice.available() (which additionally
-    // requires the Dynamic SIGNING session). A read only needs the address, so
-    // a slow mobile session-restore can never leave the board stuck. The
-    // address-diff guard keeps this the ONLY page-load fetch (first check per
-    // wallet), and focus/pageshow re-arm the poll so a session that finishes
-    // restoring after the initial deadline still gets read exactly once.
-    // After that every page view reads the cached board and never consults the
-    // RPC until the next win/spend.
+    // CENTRAL STORE DISPLAY CONTRACT (owner-approved 2026-08-19): a page load
+    // NEVER consults the RPC. This poll only swaps the in-memory cache to the
+    // restored wallet's snapshot and renders it (a silently restored session
+    // shows the last-known localStorage numbers instantly). The RPC is
+    // consulted ONLY by the central store on a fresh sign-in
+    // (public/universal/points/points-store.js -> globalLedger.fetch) and by
+    // the credit/spend path inside this module. The address-diff guard keeps
+    // this the ONLY page-load cache sync (per wallet), and focus/pageshow
+    // re-arm the poll so a session that finishes restoring after the initial
+    // deadline still gets its cached snapshot shown exactly once.
     var pollActive = false;
     var lastReadWallet = null;
     function refreshWhenWalletReady(timeoutMs) {
@@ -579,9 +583,9 @@
                     lastReadWallet = addr;
                     syncCacheToWallet();
                     renderCached();
-                    if (needsFirstCheck()) {
-                        refreshLedger(true);
-                    }
+                    // NOTE: no refreshLedger() here on purpose — a page load
+                    // never hits the RPC. Fresh reads come only from the
+                    // central store on auth and the credit/spend path.
                 }
                 pollActive = false;
                 return;
@@ -612,17 +616,15 @@
     }
 
     // On auth change (sign-in / sign-out on the same page) swap the cached
-    // slice to the new wallet. Fetch only the first time that wallet is seen
-    // in this browser; afterwards the board is the source of truth. Signed-out
-    // visitors map to the empty 'anon' slice, so a logged-out shared browser
-    // never renders another user's cached numbers.
+    // snapshot to the new wallet. The RPC is NOT touched here: a fresh
+    // sign-in is owned by the central store (public/universal/points/
+    // points-store.js), which resets the stored ledger then fetches fresh.
+    // Signed-out visitors map to the empty 'anon' state, so a logged-out
+    // shared browser never renders another user's cached numbers.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
             syncCacheToWallet();
             renderCached();
-            if (hasRealWallet() && needsFirstCheck()) {
-                refreshLedger(true);
-            }
         });
     }
 
