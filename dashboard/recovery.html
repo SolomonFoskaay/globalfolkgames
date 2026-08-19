@@ -136,22 +136,14 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/auth.js"></script>
-    <script src="/tamper-guard.js"></script>
+    <script src="/global_header.js"></script>
     <script src="/gfg-explorer.js"></script>
-    <script src="/profiles.js"></script>
-    <script src="/tiers.js"></script>
-    <script src="/header.js"></script>
     <script src="/changelog/render.js"></script>
     <script src="/dash-core.js"></script>
     <script src="/pager.js"></script>
     <script src="/dash-nav.js"></script>
-    <script type="module" src="/src/main.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.initGlobalHeader) window.initGlobalHeader();
-
             window.GFG_DASH_NAV.render({
                 brand: '🛡 Dashboard',
                 active: 'recovery',

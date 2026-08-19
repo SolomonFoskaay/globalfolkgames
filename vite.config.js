@@ -43,7 +43,24 @@ export default defineConfig({
         'points-check': './points-check/index.html',
         'points-check2': './points-check2/index.html',
         'points-check3': './points-check3/index.html',
-        verify: './verify/index.html'
+        verify: './verify/index.html',
+        // The header loader (public/global_header.js) injects the Dynamic
+        // bootstrap module at runtime as /src/main.js (and /src/main-lab.js for
+        // ludo-lab). Keep them as build inputs so they exist in dist under
+        // those stable paths (see entryFileNames below). Before this, pages
+        // referenced them with <script type="module"> tags, which is how Vite
+        // bundled them; with the loader every page is header-script-free, so
+        // the modules must be emitted explicitly.
+        'src/main.js': './src/main.js',
+        'src/main-lab.js': './src/main-lab.js'
+      },
+      output: {
+        // Emit the runtime-injected modules under their stable root paths.
+        entryFileNames: (chunk) => {
+          if (chunk.name === 'src/main.js') return 'src/main.js';
+          if (chunk.name === 'src/main-lab.js') return 'src/main-lab.js';
+          return 'assets/[name]-[hash].js';
+        }
       }
     }
   },

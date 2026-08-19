@@ -149,16 +149,15 @@
         </div>
     </div>
 
-    <!-- Global scripts (needed for points + auth) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/auth.js"></script>
-    <script src="/tamper-guard.js"></script>
+    <!-- Global scripts (needed for points + auth). Ludo-lab needs the ER VRF
+         SDK, so it points the shared loader at its own bootstrap module. No
+         header display options are passed: the global header is uniform. -->
+    <script>window.GFG_HEADER_MODULE = '/src/main-lab.js';</script>
+    <script src="/global_header.js"></script>
     <script src="/gfg-explorer.js"></script>
     <script src="/universal/result-seam/game-result.js"></script>
     <script src="/universal/points/local-points.js"></script>
     <script src="/universal/ledgers/global-ledger.js"></script>
-    <script src="/profiles.js"></script>
-    <script src="/header.js"></script>
 
     <!-- Ludo lab scripts (duplicate arena build) -->
     <script src="/games/ludo-lab/board.js"></script>
@@ -171,16 +170,5 @@
     <script src="/games/ludo-lab/mechanics/actions/movement.js"></script>
     <script src="/games/ludo-lab/mechanics/actions/capture.js"></script>
     <script src="/games/ludo-lab/mechanics/actions/ai.js"></script>
-    <script type="module" src="/src/main-lab.js"></script>
-
-    <script>
-        // Initialize the global header on the Ludo lab page. Local points are
-        // shown in the game's own local header, not the global header.
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.initGlobalHeader) {
-                window.initGlobalHeader({ gameName: 'Ludo Lab' });
-            }
-        });
-    </script>
 </body>
 </html>

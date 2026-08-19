@@ -33,19 +33,11 @@
     </main>
 
     <!-- Global scripts (needed for points + auth → wallet role) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="/auth.js"></script>
-    <script src="/tamper-guard.js"></script>
-    <script src="/profiles.js"></script>
-    <script src="/tiers.js"></script>
-    <script src="/header.js"></script>
+    <script src="/global_header.js"></script>
     <script src="/changelog/render.js"></script>
-    <script type="module" src="/src/main.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            if (window.initGlobalHeader) window.initGlobalHeader();
-
             // Staff (admin/moderator by Solana wallet) get a link to the raw view.
             if (window.getChangelogRole) {
                 const role = await window.getChangelogRole();
