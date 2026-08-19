@@ -576,9 +576,12 @@
                     lastReadWallet = addr;
                     syncCacheToWallet();
                     renderCached(tag);
-                    // NOTE: no refreshLedger() here on purpose — a page load
-                    // never hits the RPC. Fresh reads come only from the
-                    // central store on auth and the win/spend path.
+                    // The cached slice now points at the live wallet's snapshot
+                    // (or null for a new wallet). TELL subscribers so cache-driven
+                    // cards that rendered earlier re-render with the real ledger
+                    // instead of locking onto a pre-swap "no snapshot yet".
+                    // Cache-only, zero RPC — mirrors the storage handler below.
+                    notify(tag, cached[tag] || null, lastAward || null);
                 }
                 pollActive = false;
                 return;

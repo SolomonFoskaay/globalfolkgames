@@ -583,9 +583,13 @@
                     lastReadWallet = addr;
                     syncCacheToWallet();
                     renderCached();
-                    // NOTE: no refreshLedger() here on purpose — a page load
-                    // never hits the RPC. Fresh reads come only from the
-                    // central store on auth and the credit/spend path.
+                    // The cached slice now points at the live wallet's snapshot
+                    // (or null for a new wallet). TELL subscribers so cache-driven
+                    // cards that rendered earlier (e.g. the profile/points M4
+                    // card at wallet-ready) re-render with the real ledger
+                    // instead of locking onto a pre-swap "no ledger yet".
+                    // Cache-only, zero RPC — mirrors the storage handler below.
+                    notify(cached, null);
                 }
                 pollActive = false;
                 return;
