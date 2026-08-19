@@ -2,7 +2,7 @@
 // Shared data helpers for the profile pages (home + detail). Reads the signed-in
 // user's own Supabase records and their own on-chain points PDA only.
 // Used by /profile/ (home) and its detail pages (/profile/activity.html,
-// /profile/ledger.html).
+// /profile/points.html).
 
 (function () {
 

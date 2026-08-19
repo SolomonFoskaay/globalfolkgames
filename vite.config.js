@@ -30,7 +30,6 @@ export default defineConfig({
         forum: './forum/index.html',
         profile: './profile/index.html',
         'profile-points': './profile/points.html',
-        'profile-ledger': './profile/ledger.html',
         'profile-activity': './profile/activity.html',
         dashboard: './dashboard/index.html',
         'dashboard-ops': './dashboard/ops.html',
@@ -40,9 +39,6 @@ export default defineConfig({
         'dashboard-release': './dashboard/release.html',
         'dashboard-recovery': './dashboard/recovery.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
-        'points-check': './points-check/index.html',
-        'points-check2': './points-check2/index.html',
-        'points-check3': './points-check3/index.html',
         verify: './verify/index.html',
         // The header loader (public/global_header.js) injects the Dynamic
         // bootstrap module at runtime as /src/main.js (and /src/main-lab.js for
