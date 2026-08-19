@@ -42,6 +42,7 @@ export default defineConfig({
         'dashboard-content-guide': './dashboard/content-style-guide.html',
         'points-check': './points-check/index.html',
         'points-check2': './points-check2/index.html',
+        'points-check3': './points-check3/index.html',
         verify: './verify/index.html'
       }
     }
