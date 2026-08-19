@@ -41,6 +41,7 @@ export default defineConfig({
         'dashboard-recovery': './dashboard/recovery.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
         'points-check': './points-check/index.html',
+        'points-check2': './points-check2/index.html',
         verify: './verify/index.html'
       }
     }
