@@ -31,6 +31,8 @@ import {
   markErRpcFailure,
   rotateErRpc,
   regionUrlForFqdn,
+  erRpcEndpoints,
+  ER_REGION_URLS,
 } from './gfg-rpc.js';
 import bs58 from 'bs58';
 import { BN } from 'bn.js';
@@ -168,6 +170,25 @@ async function resolvedRegionUrl(pda) {
 async function regionUrlFor(pda) {
   const host = await resolvedRegionUrl(pda);
   return host || currentErUrl();
+}
+
+// Ordered list of ER region URLs to TRY for a read of `pda`: the account's
+// resolved hosting region first (when the Router reports it), then the rotation
+// registry regions (AS/EU), then legacy US (pre-flip accounts may still live
+// there). A delegated account's state lives on exactly ONE region, so a read
+// must try the host first; when the Router misses (fqdn not mapped / Router
+// down) the other regions are tried so a single-region hiccup can NEVER fake a
+// "no ledger" zero. Reads swallow "account not found" and move on; the first
+// region that answers with real bytes wins.
+async function regionCandidatesFor(pda) {
+  const list = [];
+  const seen = new Set();
+  const push = (url) => { if (url && !seen.has(url)) { seen.add(url); list.push(url); } };
+  const host = await resolvedRegionUrl(pda);
+  push(host);
+  erRpcEndpoints().forEach(e => push(e.url));
+  push(ER_REGION_URLS.us);
+  return list;
 }
 
 // Run `fn(ctx)` against the current best ER endpoint; on a network error,
@@ -817,25 +838,30 @@ export function initMagicBlockDice() {
       if (!ctx) return null;
       const { wallet } = ctx;
       const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
-      try {
-        const regionCtx = getErProgramFor(await regionUrlFor(pointsPda));
-        const acct = await regionCtx.program.account.playerPoints.fetch(pointsPda);
-        return {
-          pureLifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime ?? 0),
-          spendableBalance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance ?? 0),
-          lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
-          lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
-          lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
-          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
-          awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
-          lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
-          lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
-          lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
-          spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
-        };
-      } catch (e) {
-        return null;
+      const candidates = await regionCandidatesFor(pointsPda);
+      for (const url of candidates) {
+        try {
+          const regionCtx = getErProgramFor(url);
+          const acct = await regionCtx.program.account.playerPoints.fetch(pointsPda);
+          return {
+            pureLifetime: Number(acct.localPureLifetime ?? acct.local_pure_lifetime ?? 0),
+            spendableBalance: Number(acct.localSpendableBalance ?? acct.local_spendable_balance ?? 0),
+            lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
+            lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
+            lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
+            lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
+            awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
+            lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
+            lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
+            lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
+            spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+          };
+        } catch (e) {
+          // Account not on this region yet (or region down) — try the next one,
+          // so a Router miss can never fake a "no ledger" zero.
+        }
       }
+      return null;
     },
 
     // M4 — reads the player's on-chain GLOBAL points ledger from the ER
@@ -849,27 +875,31 @@ export function initMagicBlockDice() {
       if (!ctx) return null;
       const { wallet } = ctx;
       const [globalPda] = globalPointsPdaFor(wallet.publicKey);
-      try {
-        const regionCtx = getErProgramFor(await regionUrlFor(globalPda));
-        const acct = await regionCtx.program.account.globalPoints.fetch(globalPda);
-        return {
-          pureLifetime: Number(acct.globalPureLifetime ?? acct.global_pure_lifetime ?? 0),
-          lifetime: Number(acct.globalLifetime ?? acct.global_lifetime ?? 0),
-          spendableBalance: Number(acct.globalSpendableBalance ?? acct.global_spendable_balance ?? 0),
-          lastSource: Number(acct.lastSource ?? acct.last_source ?? 0),
-          lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
-          lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
-          lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
-          lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
-          awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
-          lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
-          lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
-          lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
-          spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
-        };
-      } catch (e) {
-        return null;
+      const candidates = await regionCandidatesFor(globalPda);
+      for (const url of candidates) {
+        try {
+          const regionCtx = getErProgramFor(url);
+          const acct = await regionCtx.program.account.globalPoints.fetch(globalPda);
+          return {
+            pureLifetime: Number(acct.globalPureLifetime ?? acct.global_pure_lifetime ?? 0),
+            lifetime: Number(acct.globalLifetime ?? acct.global_lifetime ?? 0),
+            spendableBalance: Number(acct.globalSpendableBalance ?? acct.global_spendable_balance ?? 0),
+            lastSource: Number(acct.lastSource ?? acct.last_source ?? 0),
+            lastPoints: Number(acct.lastPoints ?? acct.last_points ?? 0),
+            lastReason: Number(acct.lastReason ?? acct.last_reason ?? 0),
+            lastMatchRef: (acct.lastMatchRef ?? acct.last_match_ref)?.toString() ?? '0',
+            lastRecordedTs: Number(acct.lastRecordedTs ?? acct.last_recorded_ts ?? 0) * 1000,
+            awardCount: Number(acct.awardCount ?? acct.award_count ?? 0),
+            lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
+            lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
+            lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
+            spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+          };
+        } catch (e) {
+          // Account not on this region yet (or region down) — try the next one.
+        }
       }
+      return null;
     },
 
     // Cheap liveness probe for the on-chain outage monitor. Resolves true when
