@@ -340,47 +340,120 @@ function decodeGlobalPoints(acct) {
   };
 }
 
-// M3/M4 READ STABILITY FIX (2026-08-19, mirrors the recovery page):
-// fetch *BY WALLET ADDRESS* over the ER, without requiring the Dynamic signing
-// session. This is what makes the header pill / ludo-lab / profile show real
-// numbers even when the signing session restores late or not at all on mobile:
-// a ledger is PUBLIC data (the PDA derives from the wallet address), so a read
-// never needs to wait for the wallet to confirm identity. Signature + sign-in
-// remain required ONLY for writes (bank/spend/credit).
+// M3/M4 READ STABILITY FIX (2026-08-19, mirrors the recovery page EXACTLY):
+// fetch *BY WALLET ADDRESS* over the ER using the SAME raw `getAccountInfo` +
+// byte-offset decode the working recovery page (dashboard/recovery.html) uses
+// (recovery fetchM3/fetchM4). The Anchor typed `.fetch()` is NOT used for
+// reads here — the raw path is what provably returns 100/100 on every ER
+// region and the base RPC. A ledger is PUBLIC data (the PDA derives from the
+// wallet address), so a read never needs the Dynamic signing session.
+// Region order = recovery's: AS first, then EU, then US LAST (legacy fallback,
+// never US-first — devnet-us is the banned/throttled endpoint). If every ER
+// region returns nothing, the base RPC is tried last, exactly like recovery.
+async function readPdaByAddressRaw(pda, kindLabel) {
+  // Ordered exactly like recovery's ER_REGIONS + BASE_RPC fallback.
+  const candidates = ['https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/'];
+  candidates.push(ER_REGION_URLS.us); // US last — legacy fallback only
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const info = await erConnFor(url).getAccountInfo(pda, 'confirmed');
+      if (info && info.data && info.data.length >= 8) {
+        markErRpcSuccess(url);
+        return { data: info.data, url };
+      }
+    } catch (e) {
+      lastErr = e;
+      markErRpcFailure(url);
+    }
+  }
+  // Base RPC last (recovery's fallback when the ER has nothing).
+  try {
+    const baseConn = new Connection(config.baseRpcUrl, 'confirmed');
+    const info = await baseConn.getAccountInfo(pda, 'confirmed');
+    if (info && info.data && info.data.length >= 8) {
+      return { data: info.data, url: config.baseRpcUrl };
+    }
+  } catch (e) {
+    lastErr = e;
+  }
+  if (lastErr) console.warn(`[M3/M4] ${kindLabel} raw read failed on all regions (last: ${lastErr.message})`);
+  return null;
+}
+
+// Byte-offset decode of the PlayerPoints PDA — mirrors recovery fetchM3 EXACTLY.
+// Struct (no version field; 8-byte Anchor discriminator first, fields at 8+):
+//   8-15: local_pure_lifetime (u64)   16-23: local_spendable_balance (u64)
+//  24-31: last_points (u64)            32:   last_reason (u8)
+//  33-40: last_match_ref (u64)        41-48: last_recorded_ts (i64)
+//  49-56: award_count (u64)           57-64: last_spend_ts (i64)
+//  65-72: last_spend_ref (u64)         73:   last_spend_reason (u8)
+//  74-81: spend_count (u64)
+function decodePlayerPointsRaw(d) {
+  return {
+    pureLifetime: d.length >= 16 ? Number(d.readBigUInt64LE(8)) : 0,
+    spendableBalance: d.length >= 24 ? Number(d.readBigUInt64LE(16)) : 0,
+    lastPoints: d.length >= 32 ? Number(d.readBigUInt64LE(24)) : 0,
+    lastReason: d.length >= 33 ? d[32] : 0,
+    lastMatchRef: d.length >= 41 ? String(d.readBigUInt64LE(33)) : '0',
+    lastRecordedTs: d.length >= 49 ? Number(d.readBigInt64LE(41)) * 1000 : 0,
+    awardCount: d.length >= 57 ? Number(d.readBigUInt64LE(49)) : 0,
+    lastSpendTs: d.length >= 65 ? Number(d.readBigInt64LE(57)) * 1000 : 0,
+    lastSpendRef: d.length >= 73 ? String(d.readBigUInt64LE(65)) : '0',
+    lastSpendReason: d.length >= 74 ? d[73] : 0,
+    spendCount: d.length >= 82 ? Number(d.readBigUInt64LE(74)) : 0,
+  };
+}
+
+// Byte-offset decode of the GlobalPoints PDA — mirrors recovery fetchM4 EXACTLY.
+// Struct (no version field; 8-byte Anchor discriminator first, fields at 8+):
+//   8-15:  global_pure_lifetime (u64)  16-23: global_lifetime (u64)
+//  24-31:  global_spendable_balance    32:   last_source (u8)
+//  33-40:  last_points (u64)           41:   last_reason (u8)
+//  42-49:  last_match_ref (u64)        50-57: last_recorded_ts (i64)
+//  58-65:  award_count (u64)           66-73: last_spend_ts (i64)
+//  74-81:  last_spend_ref (u64)        82:   last_spend_reason (u8)
+//  83-90:  spend_count (u64)
+function decodeGlobalPointsRaw(d) {
+  return {
+    pureLifetime: d.length >= 16 ? Number(d.readBigUInt64LE(8)) : 0,
+    lifetime: d.length >= 24 ? Number(d.readBigUInt64LE(16)) : 0,
+    spendableBalance: d.length >= 32 ? Number(d.readBigUInt64LE(24)) : 0,
+    lastSource: d.length >= 33 ? d[32] : 0,
+    lastPoints: d.length >= 41 ? Number(d.readBigUInt64LE(33)) : 0,
+    lastReason: d.length >= 42 ? d[41] : 0,
+    lastMatchRef: d.length >= 50 ? String(d.readBigUInt64LE(42)) : '0',
+    lastRecordedTs: d.length >= 58 ? Number(d.readBigInt64LE(50)) * 1000 : 0,
+    awardCount: d.length >= 66 ? Number(d.readBigUInt64LE(58)) : 0,
+    lastSpendTs: d.length >= 74 ? Number(d.readBigInt64LE(66)) * 1000 : 0,
+    lastSpendRef: d.length >= 82 ? String(d.readBigUInt64LE(74)) : '0',
+    lastSpendReason: d.length >= 83 ? d[82] : 0,
+    spendCount: d.length >= 91 ? Number(d.readBigUInt64LE(83)) : 0,
+  };
+}
+
 async function readPlayerPointsByAddress(gameTag, walletAddress) {
   let pubkey;
   try { pubkey = new PublicKey(walletAddress); } catch (e) { return null; }
   const [pointsPda] = pointsPdaFor(gameTag, pubkey);
-  const candidates = await regionCandidatesFor(pointsPda);
-  for (const url of candidates) {
-    try {
-      const ctx = getReadErProgramFor(url, pubkey);
-      const acct = await ctx.program.account.playerPoints.fetch(pointsPda);
-      markErRpcSuccess(url);
-      return decodePlayerPoints(acct);
-    } catch (e) {
-      // Try the next region; a miss on one region must never fake a zero.
-    }
-  }
-  return null;
+  console.log(`[M3] reading Ludo local points PDA ${pointsPda.toBase58()} for wallet ${walletAddress}`);
+  const found = await readPdaByAddressRaw(pointsPda, 'M3');
+  if (!found) return null;
+  const ledger = decodePlayerPointsRaw(found.data);
+  console.log(`[M3] wallet ${walletAddress} -> pure ${ledger.pureLifetime} spendable ${ledger.spendableBalance} (from ${found.url})`);
+  return ledger;
 }
 
 async function readGlobalPointsByAddress(walletAddress) {
   let pubkey;
   try { pubkey = new PublicKey(walletAddress); } catch (e) { return null; }
   const [globalPda] = globalPointsPdaFor(pubkey);
-  const candidates = await regionCandidatesFor(globalPda);
-  for (const url of candidates) {
-    try {
-      const ctx = getReadErProgramFor(url, pubkey);
-      const acct = await ctx.program.account.globalPoints.fetch(globalPda);
-      markErRpcSuccess(url);
-      return decodeGlobalPoints(acct);
-    } catch (e) {
-      // Try the next region; a miss on one region must never fake a zero.
-    }
-  }
-  return null;
+  console.log(`[M4] reading Global points PDA ${globalPda.toBase58()} for wallet ${walletAddress}`);
+  const found = await readPdaByAddressRaw(globalPda, 'M4');
+  if (!found) return null;
+  const ledger = decodeGlobalPointsRaw(found.data);
+  console.log(`[M4] wallet ${walletAddress} -> pure ${ledger.pureLifetime} lifetime ${ledger.lifetime} spendable ${ledger.spendableBalance} (from ${found.url})`);
+  return ledger;
 }
 
 function playerPda(payerPubkey) {

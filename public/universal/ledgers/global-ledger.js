@@ -244,6 +244,7 @@
                 // fetch for SDK builds without the address-based reader.
                 var addr = readAddress();
                 var sdk = window.magicblockDice;
+                console.log('[global-ledger] refresh start: readAddress() =', addr, '| magicblockDice =', !!(sdk && sdk.isConfigured && sdk.isConfigured()));
                 if (addr && sdk && typeof sdk.fetchGlobalPointsPdaFor === 'function') {
                     ledger = await sdk.fetchGlobalPointsPdaFor(addr);
                 }
