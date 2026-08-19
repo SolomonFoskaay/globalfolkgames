@@ -116,10 +116,40 @@
         var c = metaFor().checkedTags && metaFor().checkedTags[gameTag];
         return !!c;
     }
-    // True when there is a real player wallet behind the current cache slice
-    // (dynamic wallet or profile wallet), false for the logged-out 'anon' state.
+    // True when there is a live player wallet behind the current cache slice
+    // (dynamic wallet or profile wallet), false for a logged-out 'anon' state.
     function hasRealWallet() {
-        return walletKey() !== 'anon';
+        return readAddress() !== null;
+    }
+
+    // READ STABILITY (owner-approved 2026-08-19, mirrors the recovery page):
+    // on-chain reads must NOT wait for the Dynamic SIGNING session to confirm
+    // identity. A ledger is PUBLIC data (the PDA derives from the wallet
+    // ADDRESS), so the module reads BY WALLET ADDRESS over the ER as soon as it
+    // knows the address, and only ever at the two agreed moments (first check
+    // after login + after a bank/spend). The address comes ONLY from the LIVE
+    // session (Dynamic wallet, else the loaded profile) — NEVER from a
+    // persisted "last wallet" hint. On a shared device a stale hint would leak
+    // the previous user's numbers to the next visitor after a silent session
+    // expiry; the wallet-ready poll (30s + focus/pageshow re-arm) still covers
+    // slow restores, so no hint is needed.
+    // Exact (case-sensitive) wallet address for PDA derivation + on-chain
+    // reads. Kept separate from walletKey() (lowercased cache-isolation key).
+    function readAddress() {
+        var addr = null;
+        try {
+            if (window.getDynamicSolanaWallet) {
+                var w = window.getDynamicSolanaWallet();
+                if (w && typeof w === 'string') addr = w;
+                else if (w && w.address) addr = String(w.address);
+            }
+        } catch (e) { /* ignore */ }
+        if (!addr) {
+            try {
+                if (window.currentProfile && window.currentProfile.solana_wallet) addr = String(window.currentProfile.solana_wallet);
+            } catch (e) { /* ignore */ }
+        }
+        return addr;
     }
 
     // Best-known caller identity for cache isolation: the Dynamic Solana wallet
@@ -248,16 +278,24 @@
         refreshInFlight[gameTag] = (async function () {
             var ledger = null;
             try {
-                if (window.magicblockDice && typeof window.magicblockDice.fetchPointsPda === 'function') {
-                    ledger = await window.magicblockDice.fetchPointsPda(gameTag);
-                    if (ledger) {
-                        cached[gameTag] = ledger;
-                        if (hasRealWallet()) markChecked(gameTag, true);
-                        persistCache();
-                        fillSlots(gameTag, ledger);
-                        notify(gameTag, ledger);
-                        return ledger;
-                    }
+                // READ BY WALLET ADDRESS first (no signing session required —
+                // mirrors the recovery page). Falls back to the sign-in-scoped
+                // fetch for SDK builds without the address-based reader.
+                var addr = readAddress();
+                var sdk = window.magicblockDice;
+                if (addr && sdk && typeof sdk.fetchPointsPdaFor === 'function') {
+                    ledger = await sdk.fetchPointsPdaFor(gameTag, addr);
+                }
+                if (!ledger && sdk && typeof sdk.fetchPointsPda === 'function') {
+                    ledger = await sdk.fetchPointsPda(gameTag);
+                }
+                if (ledger) {
+                    cached[gameTag] = ledger;
+                    if (hasRealWallet()) markChecked(gameTag, true);
+                    persistCache();
+                    fillSlots(gameTag, ledger);
+                    notify(gameTag, ledger);
+                    return ledger;
                 }
             } catch (e) { /* ledger not readable yet (not onboarded / wallet busy) */ }
             // Not readable this instant (wallet not restored, ER down, or the
@@ -498,20 +536,37 @@
     // fetch: limited to the first check for the wallet (and the zero-ledger
     // recheck at every wallet-ready boot). After that every page view reads
     // the cached board and never consults the RPC until the next win/spend.
+    // READ STABILITY (2026-08-19): the gate is "SDK configured + a wallet
+    // ADDRESS is known" — NOT magicblockDice.available() (which additionally
+    // requires the Dynamic SIGNING session). A read only needs the address, so
+    // a slow mobile session-restore can never leave the board stuck. The
+    // address-diff guard keeps this the ONLY page-load fetch (first check per
+    // wallet), and focus/pageshow re-arm the poll so a session that finishes
+    // restoring after the initial deadline still gets read exactly once.
+    var pollActive = false;
+    var lastReadWallet = null;
     function refreshWhenWalletReady(tag, timeoutMs) {
-        var deadline = Date.now() + (timeoutMs || 12000);
+        if (pollActive) return;
+        pollActive = true;
+        var deadline = Date.now() + (timeoutMs || 30000);
         (function poll() {
-            if (window.magicblockDice &&
-                typeof window.magicblockDice.available === 'function' &&
-                window.magicblockDice.available()) {
-                syncCacheToWallet();
-                renderCached(tag);
-                if (hasRealWallet() && needsFirstCheck(tag)) {
-                    refreshLedger(tag, true);
+            var sdk = window.magicblockDice;
+            var addr = readAddress();
+            if (addr && sdk &&
+                typeof sdk.isConfigured === 'function' && sdk.isConfigured()) {
+                if (addr !== lastReadWallet) {
+                    lastReadWallet = addr;
+                    syncCacheToWallet();
+                    renderCached(tag);
+                    if (needsFirstCheck(tag)) {
+                        refreshLedger(tag, true);
+                    }
                 }
+                pollActive = false;
                 return;
             }
             if (Date.now() < deadline) setTimeout(poll, 700);
+            else pollActive = false;
         })();
     }
 
@@ -527,9 +582,20 @@
         handleDomReady();
     }
 
+    // A mobile session that finishes restoring after the initial deadline (or
+    // a tab that sat in the background) re-arms the poll. The address-diff
+    // guard means this adds NO extra RPC when the wallet is already handled.
+    if (typeof window.addEventListener === 'function') {
+        ['pageshow', 'focus'].forEach(function (ev) {
+            window.addEventListener(ev, function () { handleDomReady(); });
+        });
+    }
+
     // On auth change (sign-in / sign-out on the same page) swap the cached
     // slice to the new wallet. Fetch only the first time that wallet is seen
-    // in this browser; afterwards the board is the source of truth.
+    // in this browser; afterwards the board is the source of truth. Signed-out
+    // visitors map to the empty 'anon' slice, so a logged-out shared browser
+    // never renders another user's cached numbers.
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('gfg:auth-changed', function () {
             syncCacheToWallet();

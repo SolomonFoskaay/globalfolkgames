@@ -1,4 +1,4 @@
-// src/magicblock-vrf.js
+// src/magicblock-er-vrf.js
 // Provably-fair, GASLESS dice for the Ludo game via MagicBlock VRF + Ephemeral
 // Rollup (Solana devnet).
 //
