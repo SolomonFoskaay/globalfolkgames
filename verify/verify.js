@@ -10,11 +10,14 @@
 (function () {
   'use strict';
 
-  // US excluded (2026-08-18): devnet-us answers "-32005 client temporarily
-  // banned", so only AS + EU are queried.
+  // Region order matches the client (regionCandidatesFor): healthy regions first,
+  // US LAST as a legacy-fallback. Pre-flip accounts (2026-08-18) still live on
+  // US, so excluding it entirely would make this page blind to them. US is last,
+  // not excluded, so a US-pinned receipt still resolves when AS/EU cannot see it.
   var ER_REGIONS = [
     'https://devnet-as.magicblock.app/',
-    'https://devnet-eu.magicblock.app/'
+    'https://devnet-eu.magicblock.app/',
+    'https://devnet-us.magicblock.app/'
   ];
   var BASE_RPC = 'https://api.devnet.solana.com';
   // Sticky cursor: reads prefer the region that last answered, so a down/slow

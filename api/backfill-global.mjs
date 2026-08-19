@@ -8,6 +8,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { pickErRpcUrl, createConnection } from '../src/gfg-rpc.js';
+import { sourceCodeFor } from '../scripts/point-sources.mjs';
 
 const ER_URL = pickErRpcUrl();
 const BASE_RPC = 'https://api.devnet.solana.com';
@@ -32,6 +33,12 @@ export default async function handler(req, res) {
     const { wallet, sourceTag, matchRef } = req.body;
     if (!wallet || !sourceTag || !matchRef) throw new Error('missing wallet/sourceTag/matchRef');
 
+    // Convert the tag -> on-chain source_code exactly like the live M4 path
+    // (source of truth is the M3 game tag; a client can never input a source
+    // code the live path would bank differently). Unknown tag -> refuse.
+    const sourceCode = sourceCodeFor(sourceTag);
+    if (sourceCode === 0) throw new Error('invalid sourceTag (no source_code for: ' + sourceTag + ')');
+
     const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
     const programId = new PublicKey(idl.address || idl.metadata?.address);
     const playerPub = new PublicKey(wallet);
@@ -54,7 +61,7 @@ export default async function handler(req, res) {
     )[0];
     let m4Info = await erConn.getAccountInfo(m4Pda).catch(() => null);
     if (!m4Info) m4Info = await baseConn.getAccountInfo(m4Pda);
-    const m4Pure = m4Info ? Number(m4Info.data.readBigUInt64LE(2)) : 0;
+    const m4Pure = m4Info ? Number(m4Info.data.readBigUInt64LE(8)) : 0;
 
     const gap = m3Pure - m4Pure;
     if (gap <= 0) return res.json({ ok: false, error: 'No orphaned points (M3=' + m3Pure + ', M4=' + m4Pure + ')' });
@@ -65,7 +72,7 @@ export default async function handler(req, res) {
     const program = new Program(idl, provider);
 
     const tx = await program.methods.recordGlobalPoints(
-      0, sourceTag, new BN(gap), 1, new BN(Date.now()),
+      0, sourceCode, new BN(gap), 1, new BN(Date.now()),
     ).accounts({
       payer: sponsor.publicKey, playerAuthority: playerPub, globalPoints: m4Pda,
     }).transaction();

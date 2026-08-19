@@ -91,14 +91,24 @@
     <main style="max-width:780px;margin:0 auto;padding:80px 16px 40px;">
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Points Recovery</h1>
         <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
-            Diagnose and recover orphaned M3 local points that never credited to M4 global ledgers.
+            Diagnose and recover orphaned local points (M3) that never reached the three global ledgers (M4).
         </p>
 
         <div class="recovery-note">
             <b>How it works:</b> Search a player by email or wallet address. The tool reads their
-            on-chain M3 local points (per game) and M4 global points, compares totals, and
-            shows any orphaned points that never reached the global ledger. One click to fix
-            (all gasless, no manual point entry).
+            on-chain M3 local points (per game) and the three M4 global ledgers, compares the verified
+            win total, and shows any orphaned points that never reached the global ledgers. One click
+            to sync them. It <b>never</b> lets you add an arbitrary amount or reduce points: the only
+            amount it can credit is the exact gap proven by the player's on-chain M3 ledger, bound to a
+            real win proof.
+        </div>
+
+        <div class="recovery-note" style="background:rgba(155,89,182,0.06);border-color:rgba(155,89,182,0.2);">
+            <b>The three global ledgers (M4):</b><br>
+            <b style="color:#f39c12;">Pure (unspendable)</b> - only verified local game wins, never diluted by bonuses or multipliers.<br>
+            <b style="color:#9b59b6;">Lifetime (unspendable)</b> - every point ever earned from any source (game wins, signup bonus, tier multiplier, referral, etc.).<br>
+            <b style="color:#2ecc71;">Spendable</b> - the site-wide balance shown in the header; goes up with earnings and down with spends.<br>
+            A verified win credits all three at once. This tool only syncs that verified win amount.
         </div>
 
         <div class="recovery-search">
@@ -120,7 +130,9 @@
                 <li><b>When</b> they played (approximate date/time)</li>
                 <li><b>What position</b> they finished (1st, 2nd, etc.)</li>
             </ul>
-            The tool will auto-detect orphaned points and offer a one-click fix.
+            The tool will auto-detect orphaned points and offer a one-click sync.
+            It only ever credits the verified amount on the player's on-chain M3 ledger;
+            there is no way to add a custom number or reduce points.
         </div>
     </main>
 
@@ -170,11 +182,15 @@
         import { BN } from 'bn.js';
 
         const IDL_URL = '/gfg-dice-idl.json';
-        // US excluded (2026-08-18): devnet-us answers "-32005 client
-        // temporarily banned", so only AS + EU are queried.
+        // Region order matches the client (regionCandidatesFor): healthy regions
+        // first, US LAST as a legacy-fallback. Pre-flip accounts (2026-08-18)
+        // still live on US, so excluding it entirely would make this page blind
+        // to them. US is last, not excluded, so a US-pinned ledger still reads
+        // when AS/EU cannot see it.
         const ER_REGIONS = [
             'https://devnet-as.magicblock.app/',
-            'https://devnet-eu.magicblock.app/'
+            'https://devnet-eu.magicblock.app/',
+            'https://devnet-us.magicblock.app/'
         ];
         // Sticky region cursor: each recovery action lands on the region that
         // last answered, so a down/throttled region is skipped on the next one.
@@ -226,12 +242,12 @@
             }
         }
 
-        function getErProgram() {
+        function getErProgram(url) {
             if (!programId || !idl) return null;
             const wallet = getSolanaWalletAccount();
             if (!wallet) return null;
 
-            const connection = new Connection(pickErUrl(), 'confirmed');
+            const connection = new Connection(url || pickErUrl(), 'confirmed');
             const walletAdapter = {
                 publicKey: wallet.publicKey,
                 async signTransaction(transaction) {
@@ -254,6 +270,46 @@
                 skipPreflight: true,
             });
             return new Program(idl, provider);
+        }
+
+        // Resolve the ACTUAL ER region a delegated account lives on (Router
+        // getDelegationStatus -> fqdn), so writes + reads target the hosting
+        // rollup and never the rotation pick. Mirrors the client's
+        // resolvedRegionUrl() in src/magicblock-vrf.js.
+        async function resolveRegionUrl(pda) {
+            try {
+                const baseConn = new Connection(BASE_RPC, 'confirmed');
+                const res = await fetch(baseConn.rpcEndpoint + '/getDelegationStatus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0', id: 1,
+                        method: 'getDelegationStatus',
+                        params: [pda.toBase58()],
+                    }),
+                });
+                const data = await res.json();
+                const st = data && data.result;
+                if (st && st.isDelegated && st.fqdn) {
+                    const fq = String(st.fqdn).toLowerCase();
+                    if (fq.includes('devnet-us')) return 'https://devnet-us.magicblock.app/';
+                    if (fq.includes('devnet-as')) return 'https://devnet-as.magicblock.app/';
+                    if (fq.includes('devnet-eu')) return 'https://devnet-eu.magicblock.app/';
+                }
+            } catch (e) { /* fall through to rotation pick */ }
+            return null;
+        }
+
+        // Best ER region for `pda`: its resolved hosting region first, else the
+        // rotation pick (covers accounts the Router has not reported on yet).
+        async function bestErUrlFor(pda) {
+            const host = await resolveRegionUrl(pda);
+            if (host) {
+                const idx = ER_REGIONS.indexOf(host);
+                if (idx >= 0) erCursor = idx; // land subsequent ops on the same region
+                return host;
+            }
+            return pickErUrl();
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -607,16 +663,16 @@
             // Gap banner
             if (gap > 0) {
                 html += `<div class="gap-banner gap-found">
-                    <span>Orphaned: M3 has <b>${fmtNum(m3TotalPure)}</b> pure but M4 has only <b>${fmtNum(m4Pure)}</b> (${gap} missing)</span>
+                    <span>Orphaned: M3 has <b>${fmtNum(m3TotalPure)}</b> pure but M4 pure has only <b>${fmtNum(m4Pure)}</b> (${gap} missing)</span>
                     <div>
-                        <button class="backfill-btn primary" id="backfill-btn" data-gap="${gap}">Add ${fmtNum(gap)} to Global</button>
+                        <button class="backfill-btn primary" id="backfill-btn" data-gap="${gap}">Sync ${fmtNum(gap)} to Global</button>
                         <div id="backfill-msg" class="backfill-msg"></div>
                     </div>
                 </div>`;
             } else if (m3TotalPure === 0 && m4Pure === 0) {
                 html += '<div class="gap-banner gap-ok"><span>No points on record yet.</span></div>';
             } else {
-                html += `<div class="gap-banner gap-ok"><span>M3 (<b>${fmtNum(m3TotalPure)}</b>) matches M4 (<b>${fmtNum(m4Pure)}</b>) — no orphaned points.</span></div>`;
+                html += `<div class="gap-banner gap-ok"><span>M3 (<b>${fmtNum(m3TotalPure)}</b>) matches M4 pure (<b>${fmtNum(m4Pure)}</b>) — no orphaned points.</span></div>`;
             }
 
             $results.innerHTML = html;
@@ -628,23 +684,72 @@
             }
         }
 
-        async function doBackfill(wallet, gap, m3Data) {
+        async function doBackfill(wallet, staleGap, staleM3Data) {
             const $btn = document.getElementById('backfill-btn');
             const $msg = document.getElementById('backfill-msg');
             if (!$btn || !$msg) return;
             $btn.disabled = true;
-            $btn.textContent = 'Adding...';
+            $btn.textContent = 'Syncing...';
             $msg.textContent = '';
 
             try {
                 await loadIdl();
+
+                // Re-read M3 + M4 FRESH at click time. The gap shown on the page
+                // may be stale (another credit could have landed since the search);
+                // this tool only ever credits the CURRENT verified gap, never a
+                // number captured earlier and never an arbitrary amount.
+                const playerPub0 = new PublicKey(wallet);
+                const [m4Pda0] = PublicKey.findProgramAddressSync(
+                    [POINTS_SEED, GLOBAL_SEED, playerPub0.toBytes()],
+                    programId,
+                );
+                const readUrl0 = (await bestErUrlFor(m4Pda0)) || pickErUrl();
+                const freshConn = new Connection(readUrl0, 'confirmed');
+                let m3Data = await fetchM3(freshConn, wallet);
+                let m4Data = await fetchM4(freshConn, wallet);
+                if (m3Data.length === 0 && !m4Data) {
+                    const baseConn = new Connection(BASE_RPC, 'confirmed');
+                    m3Data = await fetchM3(baseConn, wallet);
+                    m4Data = await fetchM4(baseConn, wallet);
+                }
+                const m3TotalPure = m3Data.reduce((s, g) => s + g.pure, 0);
+                const m4Pure = m4Data ? m4Data.pure : 0;
+                const gap = Math.max(0, m3TotalPure - m4Pure);
+                if (gap <= 0) {
+                    $btn.textContent = 'Already synced';
+                    $msg.className = 'backfill-msg ok';
+                    $msg.textContent = 'No orphaned points remain: M3 (' + fmtNum(m3TotalPure) + ') matches M4 pure (' + fmtNum(m4Pure) + ').';
+                    return;
+                }
 
                 // Build source code enum from the game with the most points.
                 // Must match the SOURCE_CODES in global-ledger.js.
                 const topGame = m3Data.sort((a, b) => b.pure - a.pure)[0];
                 const SOURCE_CODES = { ludo: 1, ayo_olopon: 2 };
                 const sourceCode = topGame ? (SOURCE_CODES[topGame.game] || 1) : 1;
-                const matchRef = new BN(Date.now());
+
+                // Idempotency: bind the global credit to a REAL, existing proof
+                // (the last local win's match_ref = first 8 bytes of its proof-roll
+                // signature). The program rejects a duplicate match_ref, so a retry
+                // after a timeout can NEVER double-credit. Never fall back to a
+                // wall-clock timestamp here (that is what made retries unsafe).
+                const proofRef = topGame && topGame.lastMatchRef ? topGame.lastMatchRef : 0;
+                let matchRef;
+                if (proofRef) {
+                    matchRef = new BN(proofRef);
+                } else {
+                    // No proof on record (pre-proof legacy win): derive a STABLE ref
+                    // from the ledger state itself, so a retry of the SAME state is
+                    // rejected, while a genuinely changed gap gets a fresh ref.
+                    const seedStr = wallet + '|' + (topGame ? topGame.game : '') + '|' + m3TotalPure + '|' + (topGame ? topGame.awardCount : 0);
+                    let h = 0x811c9dc5;
+                    for (let i = 0; i < seedStr.length; i++) {
+                        h ^= seedStr.charCodeAt(i);
+                        h = (h * 0x01000193) >>> 0;
+                    }
+                    matchRef = new BN(h);
+                }
 
                 // Step 1: Ensure the player's global PDA is initialized + delegated.
                 // The relay creates the base-layer account and delegates it to the ER
@@ -658,20 +763,26 @@
                 await waitForErPickup(globalAddr);
 
                 // Step 3: Write via .rpc() on the ER AnchorProvider (gasless).
-                // The admin's Dynamic session key signs as payer. The ER sees the
-                // delegated global PDA and executes the tx gaslessly. This follows
-                // the same path as the client's recordGlobalPoints() in
-                // magicblock-vrf.js — NOT the base-layer Solana .transaction() +
-                // sendTransaction() path which costs SOL every time.
-                const program = getErProgram();
-                if (!program) throw new Error('No wallet connected. Please sign in first.');
-
-                $msg.textContent = 'Writing to global ledger (gasless on ER)...';
+                // kind=0 (game win) credits ALL THREE global tracks: M4a pure +
+                // M4b lifetime + M4c spendable. The admin's Dynamic session key
+                // signs as payer; the ER executes it gaslessly (same path as the
+                // client's recordGlobalPoints()).
                 const playerPub = new PublicKey(wallet);
                 const [m4Pda] = PublicKey.findProgramAddressSync(
                     [POINTS_SEED, GLOBAL_SEED, playerPub.toBytes()],
                     programId,
                 );
+
+                // Target the region ACTUALLY hosting the account (the write must
+                // land on the rollup the delegated PDA lives on, not a rotation
+                // pick). After ensureGlobalDelegated, resolve it from the Router.
+                $msg.textContent = 'Resolving hosting region...';
+                await sleep(400);
+                const writeUrl = await bestErUrlFor(m4Pda) || pickErUrl();
+                const program = getErProgram(writeUrl);
+                if (!program) throw new Error('No wallet connected. Please sign in first.');
+
+                $msg.textContent = 'Crediting ' + fmtNum(gap) + ' to all 3 global ledgers (gasless on ' + writeUrl.split('.magicblock.app')[0].split('//')[1] + ')...';
 
                 const sig = await program.methods
                     .recordGlobalPoints(0, sourceCode, new BN(gap), 1, matchRef)
@@ -682,16 +793,31 @@
                     })
                     .rpc();
 
-                $btn.textContent = 'Added!';
-                $btn.classList.remove('primary');
-                $btn.classList.add('success');
-                $msg.className = 'backfill-msg ok';
-                $msg.textContent = 'Global ledger updated (gasless). ' + (sig ? 'Sig: ' + String(sig).slice(0, 16) + '...' : '');
+                // Step 4: Re-read M4 and VERIFY the gap closed (never-promise
+                // rule: show a neutral "pending" line until confirmed).
+                $msg.textContent = 'Write confirmed. Verifying on-chain...';
+                await sleep(1500);
+                const verifyConn = new Connection(writeUrl || pickErUrl(), 'confirmed');
+                const after = await fetchM4(verifyConn, wallet);
+                const afterPure = after ? after.pure : 0;
+                const afterSpendable = after ? after.spendable : 0;
+                if (afterPure >= m3TotalPure) {
+                    $btn.textContent = 'Synced!';
+                    $btn.classList.remove('primary');
+                    $btn.classList.add('success');
+                    $msg.className = 'backfill-msg ok';
+                    $msg.textContent = 'Global ledgers synced on-chain. Pure ' + fmtNum(afterPure) + ', spendable ' + fmtNum(afterSpendable) + '. ' + (sig ? 'Sig: ' + String(sig).slice(0, 16) + '...' : '');
+                } else {
+                    $btn.disabled = false;
+                    $btn.textContent = 'Retry (gap ' + fmtNum(Math.max(0, m3TotalPure - afterPure)) + ')';
+                    $msg.className = 'backfill-msg err';
+                    $msg.textContent = 'Write landed but the ledger read still shows a gap. Refresh or retry; the proof-bound match_ref makes a retry safe (no double-credit).';
+                }
                 console.log('[recovery] Backfill ER sig:', sig);
             } catch (e) {
                 console.error('[recovery] Backfill failed:', e);
                 $btn.disabled = false;
-                $btn.textContent = 'Add ' + fmtNum(gap) + ' to Global';
+                $btn.textContent = 'Sync ' + fmtNum(staleGap) + ' to Global';
                 $msg.className = 'backfill-msg err';
                 $msg.textContent = 'Error: ' + e.message;
             }

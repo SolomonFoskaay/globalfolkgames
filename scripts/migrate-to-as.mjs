@@ -46,8 +46,19 @@
 // Usage:
 //   node scripts/migrate-to-as.mjs                # house (sponsor) only
 //   node scripts/migrate-to-as.mjs --player <pk>  # one player (all 4 PDA types)
-//   node scripts/migrate-to-as.mjs --all          # every player in the spend
-//                                                 #   ledger + house
+//   node scripts/migrate-to-as.mjs --all          # EVERY wallet the program has
+//                                                 #   ever touched: spend-ledger
+//                                                 #   players + Supabase profile
+//                                                 #   wallets + house (union).
+//
+// --all (2026-08-19, COMPLETE SWEEP): the spend ledger alone is NOT complete -
+// wallets that onboarded before the ledger existed (or outside the relay) have
+// NO ledger entry, so a ledger-only sweep silently leaves their PDAs pinned to
+// a flaky region (the owner's own 42Xs2... was on US while --all reported all
+// green). The authoritative "every wallet ever initiated by the program" set is
+// the UNION of the spend ledger, Supabase profiles.solana_wallet (every
+// signed-in user) and the house key. Account existence is checked on-chain per
+// PDA (missing = skipped), so the wider list costs nothing extra.
 //
 // Env: sponsor key via GFG_Gasless_Sponsor_Keypair (Vercel) or
 // ~/.config/solana/id.json (local), exactly like the delegate relay.
@@ -324,15 +335,39 @@ function spendLedgerPlayers() {
   }
 }
 
+// Every signed-in wallet (Supabase profiles.solana_wallet). The spend ledger
+// misses wallets that onboarded before the ledger existed; Supabase profiles
+// are created for every email-OTP sign-in, so this is the authoritative "all
+// users" list. Read via the REST API with the publishable key (matches
+// scripts/restore-points.mjs).
+const SUPABASE_URL = 'https://ywrgxynjjgdicdzizpue.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_qbrLQtG1fx51sBIiDm_zGQ_dR6BcqEb';
+
+async function supabasePlayers() {
+  try {
+    const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=solana_wallet`, { headers: h });
+    if (!res.ok) throw new Error(`supabase ${res.status}`);
+    const rows = await res.json();
+    const set = new Set();
+    for (const p of rows) if (p && p.solana_wallet) set.add(p.solana_wallet);
+    return [...set];
+  } catch (e) {
+    console.warn(`[migrate] WARN supabase profiles lookup failed (${e.message}) - using spend ledger only`);
+    return [];
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const sponsor = loadSponsor();
-  const targets = [sponsor.publicKey.toBase58()]; // house always
+  const targets = new Set([sponsor.publicKey.toBase58()]); // house always
 
   const pIdx = args.indexOf('--player');
-  if (pIdx !== -1) targets.push(args[pIdx + 1]);
+  if (pIdx !== -1) targets.add(args[pIdx + 1]);
   if (args.includes('--all')) {
-    for (const pk of spendLedgerPlayers()) if (!targets.includes(pk)) targets.push(pk);
+    for (const pk of spendLedgerPlayers()) targets.add(pk);
+    for (const pk of await supabasePlayers()) targets.add(pk);
   }
 
   const baseConn = createConnection(BASE_URL, 'confirmed');

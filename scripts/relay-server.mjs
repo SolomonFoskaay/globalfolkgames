@@ -17,6 +17,7 @@ import { runProbe } from './endpoints-probe.mjs';
 import { handleHouseRoll } from './roll-relay.mjs';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState } from './comp-relay.mjs';
 import { pickErRpcUrl } from '../src/gfg-rpc.js';
+import { sourceCodeFor } from './point-sources.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -81,6 +82,12 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
 
   if (!wallet || !sourceTag || !matchRef) throw new Error('missing wallet/sourceTag/matchRef');
 
+  // Convert the tag -> on-chain source_code exactly like the live M4 path
+  // (source of truth is the M3 game tag; never let a caller input a source
+  // code the live path would bank differently). Unknown tag -> refuse.
+  const sourceCode = sourceCodeFor(sourceTag);
+  if (sourceCode === 0) throw new Error('invalid sourceTag (no source_code for: ' + sourceTag + ')');
+
   const idl2 = JSON.parse(rfs(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
   const programId2 = new PubKey3(idl2.address || idl2.metadata?.address);
   const playerPub2 = new PubKey3(wallet);
@@ -109,7 +116,7 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
     const baseConn2b = new Conn3('https://api.devnet.solana.com', 'confirmed');
     m4Info2 = await baseConn2b.getAccountInfo(m4Pda2);
   }
-  const m4Pure2 = m4Info2 ? Number(m4Info2.data.readBigUInt64LE(2)) : 0;
+  const m4Pure2 = m4Info2 ? Number(m4Info2.data.readBigUInt64LE(8)) : 0;
   const gap2 = m3Pure2 - m4Pure2;
   if (gap2 <= 0) return { ok: false, error: 'No orphaned points (M3=' + m3Pure2 + ', M4=' + m4Pure2 + ')' };
 
@@ -118,7 +125,7 @@ async function handleBackfillGlobal({ wallet, sourceTag, matchRef }) {
   const provider2 = new AP3(erConn2, mkW(sponsor2), { commitment: 'confirmed', skipPreflight: true });
   const program2 = new Prog3(idl2, provider2);
   const tx2 = await program2.methods.recordGlobalPoints(
-    0, sourceTag, new BN3(gap2), 1, new BN3(Date.now()),
+    0, sourceCode, new BN3(gap2), 1, new BN3(Date.now()),
   ).accounts({
     payer: sponsor2.publicKey, playerAuthority: playerPub2, globalPoints: m4Pda2,
   }).transaction();
