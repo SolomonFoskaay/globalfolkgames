@@ -528,29 +528,34 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
   // If the premium PDA is currently delegated, undelegate it (sponsor signs,
   // pinned region hosts it; commit+undelegate runs on the ER) so the
   // base-layer credit can write its state, then re-delegate afterwards.
+  // The re-delegate MUST run even when the credit is rejected (e.g. a reused
+  // credit_ref) — otherwise a double-click/retry would strand the PDA on base
+  // and break the player's ER spends until the next onboarding.
   const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
   const undelegated = !!(status && status.isDelegated);
   if (undelegated) {
     await undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda);
   }
 
-  const sig = await sendAndConfirmBase(conn, sponsor,
-    await program.methods.creditPremiumPoints(new BN(points), new BN(creditRef))
-      .accounts({
-        admin: sponsor.publicKey,
-        playerAuthority: player,
-        premiumPoints: premiumPointsPda,
-      })
-      .transaction()
-  );
-
-  let redelegated = false;
-  if (undelegated) {
-    const dsig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
-    redelegated = !!dsig;
+  let sig = null;
+  try {
+    sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.creditPremiumPoints(new BN(points), new BN(creditRef))
+        .accounts({
+          admin: sponsor.publicKey,
+          playerAuthority: player,
+          premiumPoints: premiumPointsPda,
+        })
+        .transaction()
+    );
+  } finally {
+    if (undelegated) {
+      const dsig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
+      if (dsig) console.log(`  re-delegated premium PDA ${premiumPointsPda.toBase58()} (${dsig})`);
+    }
   }
-  console.log(`[relay] credited ${player.toBase58()} +${points} premium points (creditRef ${creditRef}, sig ${sig}, undelegated ${undelegated}, redelegated ${redelegated})`);
-  return { player: player.toBase58(), points, creditRef, sig, undelegated, redelegated };
+  console.log(`[relay] credited ${player.toBase58()} +${points} premium points (creditRef ${creditRef}, sig ${sig}, undelegated ${undelegated}, redelegated ${undelegated})`);
+  return { player: player.toBase58(), points, creditRef, sig, undelegated, redelegated: undelegated };
 }
 
 // Undelegate the premium PDA back to base (runs commit+undelegate on its
