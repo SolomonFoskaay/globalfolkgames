@@ -307,17 +307,9 @@
                     btn.style.marginTop = '0';
                     btn.style.flex = '1';
                     btn.style.minWidth = '110px';
-                    btn.textContent = 'Buy Level 2 (2x) · $10 / N3,000';
+                    btn.textContent = 'Pay N3,000 · Level 2 (2x)';
                     btn.onclick = function () {
-                        if (window.openPremiumCheckout) {
-                            window.openPremiumCheckout();
-                        } else {
-                            const p = window.currentProfile;
-                            const addr = p && p.solana_wallet ? p.solana_wallet : '';
-                            if (window.showAuthBanner) {
-                                window.showAuthBanner('Paystack checkout is being wired up. For now: make the N3,000 bank transfer (temporary Paystack account), then email your receipt to the owner with your wallet address ( ' + addr + ' ) to get 5,000 premium points.', true);
-                            }
-                        }
+                        window.open('https://paystack.shop/pay/globalfolkgames2xplan', '_blank');
                     };
                     buyRow.appendChild(btn);
                 }

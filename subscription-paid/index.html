@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Payment received | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .steps { text-align: left; margin-top: 4px; }
+        .steps li { margin-bottom: 8px; line-height: 1.5; }
+        .receipt-form { text-align: left; }
+        .receipt-form label { display:block; font-size:0.82rem; color:#aaa; margin:10px 0 4px; }
+        .receipt-form input, .receipt-form select {
+            width:100%; padding:11px 14px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+            color:#fff; font-size:0.92rem; box-sizing:border-box;
+        }
+        .receipt-form input::placeholder { color:#888; }
+        .receipt-form input[readonly] { color:#bbb; background:rgba(155,89,182,0.06); }
+        .receipt-hint { font-size:0.8rem; color:#888; margin-top:4px; line-height:1.4; }
+        .form-actions { display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; }
+        .form-actions button { flex:1; min-width:130px; }
+        .auto-row { display:flex; gap:10px; flex-wrap:wrap; }
+        .auto-row > div { flex:1; min-width:150px; }
+        .signedout-note {
+            background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.25);
+            border-radius:10px; padding:14px 16px; margin-bottom:14px;
+            font-size:0.85rem; color:#ddd; line-height:1.5;
+        }
+        .signedout-note b { color:#f39c12; }
+        .ok-badge { color:#2ecc71; font-weight:700; }
+        .pending-badge { color:#f39c12; font-weight:700; }
+        .copy-btn {
+            background:transparent; color:#f39c12; border:1px solid rgba(243,156,18,0.35);
+            border-radius:8px; padding:12px 16px; font-weight:600; font-size:0.9rem; cursor:pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2>Payment received, thank you!</h2>
+            <p>Your Level 2 (2x) payment of N3,000 has gone through. One last step unlocks your boost.</p>
+        </section>
+
+        <section class="game-card">
+            <h3>What happens next</h3>
+            <ul class="steps">
+                <li>Fill the short form below. It tells us the bank account your transfer came from, so we can match it to your GlobalFolkGames account.</li>
+                <li>Your account email and wallet are filled in for you when you are signed in. If they look empty, sign in with the buttons at the top, then refresh this page.</li>
+                <li>We verify the payment and credit your account, usually within 24 hours. You get 5,000 premium points and a 2x boost on your win points for 30 days.</li>
+                <li>You will see your boost appear on your profile points page, no auto-renew, so nothing charges again afterwards.</li>
+            </ul>
+        </section>
+
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <h3>Confirm your payment</h3>
+
+            <div id="signedout-box" class="signedout-note" hidden>
+                You are not signed in, so your email and wallet cannot be filled automatically.
+                <b>Tap Sign in</b> (top right) and enter the same email you used to create your GlobalFolkGames account, then refresh this page. Your details will appear below.
+                <div style="margin-top:10px;">
+                    <button id="signin-now-btn" class="auth-btn primary" style="display:inline-block; border:none; cursor:pointer;">Sign in now</button>
+                </div>
+            </div>
+
+            <form class="receipt-form" id="premium-receipt-form" novalidate>
+                <div class="auto-row">
+                    <div>
+                        <label for="pay-email">Account email</label>
+                        <input type="email" id="pay-email" placeholder="auto-filled when signed in" autocomplete="off">
+                    </div>
+                    <div>
+                        <label for="pay-wallet">Embedded wallet</label>
+                        <input type="text" id="pay-wallet" placeholder="auto-filled when signed in" autocomplete="off">
+                    </div>
+                </div>
+
+                <label for="pay-bank">Bank name (where the transfer came from)</label>
+                <input type="text" id="pay-bank" placeholder="e.g. Access Bank" autocomplete="off">
+
+                <label for="pay-acct-name">Bank account name</label>
+                <input type="text" id="pay-acct-name" placeholder="Name on the bank account" autocomplete="off">
+
+                <label for="pay-acct-num">Bank account number</label>
+                <input type="text" id="pay-acct-num" placeholder="10 digit account number" inputmode="numeric" maxlength="16" autocomplete="off">
+
+                <label for="pay-plan">Plan paid for</label>
+                <select id="pay-plan">
+                    <option value="2x" selected>Level 2 (2x)</option>
+                </select>
+                <div class="receipt-hint">More plans will be added here later.</div>
+
+                <label for="pay-amount">Amount paid (Naira)</label>
+                <input type="number" id="pay-amount" value="3000" min="1" step="1" autocomplete="off">
+                <div class="receipt-hint">Set to N3,000 for the Level 2 plan. Editable in case the price changes.</div>
+
+                <div class="form-actions">
+                    <button type="submit" id="submit-receipt" class="launch-btn onchain">Submit to owner</button>
+                    <button type="button" id="copy-receipt" class="copy-btn">Copy details</button>
+                </div>
+
+                <p id="form-status" style="margin-top:12px; font-size:0.85rem; color:var(--muted);"></p>
+            </form>
+        </section>
+
+        <section class="game-card">
+            <h3>Questions?</h3>
+            <p style="margin-bottom:10px;">Contact the owner directly, we reply within 1 to 2 business days.</p>
+            <p><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20plan%20support" class="auth-btn primary" style="display:inline-block; text-decoration:none;">Email GlobalFolkGames@gmail.com</a></p>
+        </section>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('premium-receipt-form');
+            var emailEl = document.getElementById('pay-email');
+            var walletEl = document.getElementById('pay-wallet');
+            var bankEl = document.getElementById('pay-bank');
+            var acctEl = document.getElementById('pay-acct-name');
+            var acctNumEl = document.getElementById('pay-acct-num');
+            var planEl = document.getElementById('pay-plan');
+            var amountEl = document.getElementById('pay-amount');
+            var statusEl = document.getElementById('form-status');
+            var signedOutBox = document.getElementById('signedout-box');
+            var storedKey = 'gfg_premium_payment_draft_v1';
+
+            var PLAN_AMOUNTS = { '2x': 3000 };
+            planEl.addEventListener('change', function () {
+                if (PLAN_AMOUNTS[planEl.value]) {
+                    amountEl.value = PLAN_AMOUNTS[planEl.value];
+                }
+            });
+
+            function getAuthDetails() {
+                var email = (window.currentUser && window.currentUser.email) || '';
+                var wallet = '';
+                try {
+                    if (window.getDynamicSolanaWallet) {
+                        var w = window.getDynamicSolanaWallet();
+                        if (w && typeof w === 'string') wallet = w;
+                        else if (w && w.address) wallet = String(w.address);
+                    }
+                } catch (e) { /* ignore */ }
+                if (!wallet && window.currentProfile && window.currentProfile.solana_wallet) {
+                    wallet = String(window.currentProfile.solana_wallet);
+                }
+                var signedIn = !!(email || wallet);
+                return { email: email, wallet: wallet, signedIn: signedIn };
+            }
+
+            function fillAuth() {
+                var d = getAuthDetails();
+                emailEl.value = d.email;
+                walletEl.value = d.wallet;
+                signedOutBox.hidden = d.signedIn;
+                if (d.signedIn) persisted.email = d.email;
+                if (d.signedIn) persisted.wallet = d.wallet;
+                return d;
+            }
+
+            // Draft persistence so a hasty refresh never loses the filled form.
+            var persisted = {};
+            try { persisted = JSON.parse(localStorage.getItem(storedKey) || '{}') || {}; } catch (e) { persisted = {}; }
+            if (persisted.bank) bankEl.value = persisted.bank;
+            if (persisted.acctName) acctEl.value = persisted.acctName;
+            if (persisted.acctNum) acctNumEl.value = persisted.acctNum;
+            if (persisted.plan && PLAN_AMOUNTS[persisted.plan]) { planEl.value = persisted.plan; amountEl.value = PLAN_AMOUNTS[persisted.plan]; }
+            else if (persisted.amount) amountEl.value = persisted.amount;
+
+            function persistDraft() {
+                persisted = {
+                    email: emailEl.value.trim(),
+                    wallet: walletEl.value.trim(),
+                    bank: bankEl.value.trim(),
+                    acctName: acctEl.value.trim(),
+                    acctNum: acctNumEl.value.trim(),
+                    plan: planEl.value,
+                    amount: amountEl.value.trim(),
+                };
+                try { localStorage.setItem(storedKey, JSON.stringify(persisted)); } catch (e) { /* ignore */ }
+            }
+            ['bank', 'acctName', 'acctNum', 'amount'].forEach(function (key) {
+                var el = key === 'bank' ? bankEl : key === 'acctName' ? acctEl : key === 'acctNum' ? acctNumEl : amountEl;
+                el.addEventListener('input', persistDraft);
+            });
+            emailEl.addEventListener('input', persistDraft);
+            walletEl.addEventListener('input', persistDraft);
+
+            fillAuth();
+
+            // The Dynamic session can restore AFTER this DOMContentLoaded runs.
+            var authPoll = 0;
+            function pollAuth() {
+                var d = getAuthDetails();
+                if (d.signedIn || authPoll++ > 30) { fillAuth(); return; }
+                setTimeout(pollAuth, 600);
+            }
+            pollAuth();
+            window.addEventListener('gfg:auth-changed', fillAuth);
+
+            function buildEmailLines() {
+                var d = getAuthDetails();
+                return [
+                    'PAYMENT CONFIRMATION',
+                    '---------------------',
+                    'Email: ' + (emailEl.value.trim() || '(empty)'),
+                    'Wallet: ' + (walletEl.value.trim() || '(empty)'),
+                    'Plan: ' + (planEl.selectedOptions[0] ? planEl.selectedOptions[0].text : planEl.value),
+                    'Amount paid: N' + (amountEl.value.trim() || '0'),
+                    'Bank: ' + (bankEl.value.trim() || '(empty)'),
+                    'Account name: ' + (acctEl.value.trim() || '(empty)'),
+                    'Account number: ' + (acctNumEl.value.trim() || '(empty)'),
+                    '',
+                    'Signed in at submit time: ' + (d.signedIn ? 'yes' : 'no'),
+                ].join('\n');
+            }
+
+            function valid() {
+                if (!bankEl.value.trim()) { statusEl.textContent = 'Please enter the bank name.'; statusEl.style.color = '#e74c3c'; bankEl.focus(); return false; }
+                if (!acctEl.value.trim()) { statusEl.textContent = 'Please enter the bank account name.'; statusEl.style.color = '#e74c3c'; acctEl.focus(); return false; }
+                if (!acctNumEl.value.trim()) { statusEl.textContent = 'Please enter the bank account number.'; statusEl.style.color = '#e74c3c'; acctNumEl.focus(); return false; }
+                var n = Number(amountEl.value);
+                if (!n || n <= 0) { statusEl.textContent = 'Please enter a valid amount.'; statusEl.style.color = '#e74c3c'; amountEl.focus(); return false; }
+                return true;
+            }
+
+            function summarize(body) {
+                return 'Premium plan payment: ' + (planEl.selectedOptions[0] ? planEl.selectedOptions[0].text : planEl.value) + ' for account ' + (acctNumEl.value.trim() || '?');
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!valid()) return;
+                persistDraft();
+                var body = encodeURIComponent(buildEmailLines());
+                var subject = encodeURIComponent(summarize(body));
+                window.location.href = 'mailto:GlobalFolkGames@gmail.com?subject=' + subject + '&body=' + body;
+                statusEl.textContent = 'Your email app should now open with the details filled in. If it did not open, tap "Copy details" and paste them into an email to GlobalFolkGames@gmail.com.';
+                statusEl.style.color = '#2ecc71';
+            });
+
+            document.getElementById('copy-receipt').addEventListener('click', function () {
+                persistDraft();
+                var text = buildEmailLines();
+                function done(ok) {
+                    statusEl.textContent = ok
+                        ? 'Details copied. Paste them into an email to GlobalFolkGames@gmail.com, thank you!'
+                        : 'Could not copy automatically. Select and copy the email title below.';
+                    statusEl.style.color = '#2ecc71';
+                    if (!ok) {
+                        var pre = document.createElement('pre');
+                        pre.textContent = text;
+                        pre.style.whiteSpace = 'pre-wrap';
+                        pre.style.fontSize = '0.8rem';
+                        pre.style.color = '#bbb';
+                        pre.style.textAlign = 'left';
+                        pre.style.background = 'rgba(255,255,255,0.04)';
+                        pre.style.borderRadius = '8px';
+                        pre.style.padding = '10px';
+                        pre.style.marginTop = '10px';
+                        var old = document.getElementById('copy-fallback');
+                        if (old) old.remove();
+                        pre.id = 'copy-fallback';
+                        statusEl.insertAdjacentElement('afterend', pre);
+                    }
+                }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+                } else {
+                    done(false);
+                }
+            });
+
+            document.getElementById('signin-now-btn').addEventListener('click', function () {
+                if (window.openDynamicLogin) window.openDynamicLogin();
+                else statusEl.textContent = 'Tap Sign in at the top of the page.';
+            });
+
+            // Auto-fill amount whenever a plan is chosen (also on first load).
+            if (PLAN_AMOUNTS[planEl.value]) amountEl.value = PLAN_AMOUNTS[planEl.value];
+        });
+    </script>
+</body>
+</html>

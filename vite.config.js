@@ -31,6 +31,7 @@ export default defineConfig({
         profile: './profile/index.html',
         'profile-points': './profile/points.html',
         'profile-activity': './profile/activity.html',
+        'subscription-paid': './subscription-paid/index.html',
         dashboard: './dashboard/index.html',
         'dashboard-ops': './dashboard/ops.html',
         'dashboard-endpoints': './dashboard/endpoints.html',
