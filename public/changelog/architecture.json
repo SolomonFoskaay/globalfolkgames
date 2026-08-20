@@ -212,7 +212,7 @@
     {
       "id": "M4",
       "title": "Global points (3 ledgers) + on-chain inventory wallet (site-wide, decoupled from gameplay)",
-      "status": "planned",
+      "status": "in-progress",
       "summary": "M4a Global Pure (sum of M3 local wins across all games, no multiplier, honest cross-game skill total). M4b Global Lifetime (unspendable) - every point ever earned from any source. M4c Global Spendable - the spendable split of lifetime. The 2x/3x/4x multiplier applies ONLY at M4 flow-up, never on M3 or M4a. M4 ALSO owns the player's on-chain inventory/asset wallet ([gfgassets, player]): skins/items/sounds living IN the account (media bytes on-chain), the embedded wallet owns, the platform frontend views the chain bytes directly - 'the wallet is a viewer'.",
       "expectedInput": {
         "summary": "What M4 RECEIVES from upstream modules. M4 consumes the M2 seam (game wins) and receives programmatic credits from M5 (tier boosts) and M6 (signup/referral/giveaway). M4 does NOT recompute scoring or invent source identities.",
@@ -258,98 +258,105 @@
     },
     {
       "id": "M5",
-      "title": "Monthly subscription (powers the multiplier)",
+      "title": "Subscription + Premium points (the money + launch engine)",
       "status": "in-progress",
-      "summary": "The consistent-money module: a monthly subscription (Active Tier) bought from spendable points that powers the 2x/3x/4x win multiplier applied at M4 flow-up. The core recurring revenue stream.",
+      "summary": "The consistent-money module: a monthly subscription (Active Tier, single Level-2 2x plan at launch, $10/30 days, NG cash-discount N3,000) bought with PREMIUM points, not global spendable. Premium points are their own on-chain ledger ([gfgprem, player]) acquired ONLY by direct purchase: premium_lifetime (credential, never spent) + premium_spendable (the subscription/special-purchase currency). The subscription powers the 2x win multiplier at M4 flow-up, the boosted daily reward and the bigger lives pool (both in M10). Non-cancellable, non-refundable. This is the LAUNCH GUIDE: every launch-critical piece (payment pipe, admin credit, receipts, 1-year affiliate, daily earn campaign) is specced here.",
       "expectedInput": {
-        "status": "pending discussion — finalize before M5 build",
-        "summary": "What M5 will RECEIVE. To be discussed and locked when M5 build starts.",
+        "summary": "What M5 RECEIVES. Locked 2026-08-20 for the launch build.",
         "items": [
-          "FROM M4: window.globalLedger.get() to read the player's current spendable balance (to verify they can afford the tier).",
-          "FROM M4: window.globalLedger.spend() to deduct the tier cost from M4c spendable.",
-          "FROM USER: tier selection (Tier 2/3/4) and confirmation.",
-          "FROM M2 SEAM: the current game win's base points (to compute the multiplier boost). M5 reads the envelope and calculates (multiplier-1)*base, then credits M4 via window.globalLedger.credit({kind:1, source:'tier_boost', points: boost, reason:5, matchRef})."
+          "FROM ADMIN (the ONLY way premium points enter the economy): after the owner verifies a manual Paystack bank-transfer payment, an admin-only page credits the player's premium ledger on-chain via a sponsor/ecror-authorized credit_premium_points instruction (writes premium_lifetime + premium_spendable together). $10 paid = 5,000 premium points credited (full on-chain worth), regardless of the N3,000 cash discount: the plan's on-chain cost is fixed at 5,000P and the discount is a payment-side cash deal only.",
+          "FROM PLAYER: buy intent (single 2x plan) submitted through the Paystack embed (owner supplies the embed code at build), Paystack set to MANUAL BANK TRANSFER ONLY (card payments disabled), the player emails the payment receipt to the owner for verification (activation typically within 24h).",
+          "FROM M4: window.globalLedger.get()/fetch() for balance display and reading base points at boost time. M4 is the bank, M5 only applies the multiplier there.",
+          "FROM M2 SEAM: the current verified game win's base points, to compute (multiplier-1)*base and then credit M4 with a kind=1, source_code 13 (tier_boost) credit. The multiplier is kind=1 only (M4b+M4c).",
+          "FROM M10: daily-reward and lives interactions read M5's subscription state (active level + days left) to enable the boosted values."
         ]
       },
       "expectedOutput": {
-        "status": "pending discussion — finalize before M5 build",
-        "summary": "What M5 MUST expose. To be discussed and locked when M5 build starts.",
+        "summary": "What M5 MUST expose. Locked 2026-08-20 for the launch build.",
         "items": [
-          "WINDOW API: window.activeTier.get() → current tier + expiry. window.activeTier.subscribe(cb).",
-          "CREDIT INTO M4: on each verified game win, M5 computes (multiplier-1)*base and calls window.globalLedger.credit({kind:1, source:'tier_boost', ...}) — this is M5's ONLY output to M4.",
-          "M4a PURE GUARANTEE: M5 never touches M3 or M4a pure. Multiplier is kind=1 only (M4b+M4c)."
+          "PREMIUM LEDGER (on-chain, gasless ER, same program id, NO new program): PDA [gfgprem, player_authority], immutable NEW seed prefix gfgprem (upgrade-safety R1), versioned layout (version u8 FIRST, R2). Fields: premium_lifetime u64 (never spendable), premium_spendable u64 (spendable), subscription_level u8 (0=free, 2=Level 2), subscription_active_until i64 (unix ts, hard 30-day window, NO auto-renew), last_credit_ts i64, last_credit_points u64, last_credit_ref u64, last_spend_ts i64, last_spend_ref u64, last_spend_reason u8, spend_count u64.",
+          "INSTRUCTIONS (same program id): initialize_premium_points, delegate_premium_points (sponsor pays via relay), credit_premium_points(points, ref) (AUTHORITY-GATED signer = sponsor/ecror; writes both lifetime + spendable; idempotent ref), spend_premium_points(amount, reason, ref) (player session-key signed; InsufficientBalance guard; idempotent spend_ref), activate_subscription() (deducts 5,000 premium spendable, sets subscription_level=2 + active_until=now+30d), undelegate_premium_points (RPC/region-agnostic rule: ships in the same build).",
+          "WINDOW API: window.premiumPoints = { get() -> {premiumLifetime, premiumSpendable, subscriptionLevel, activeUntil, daysLeft}, fetch(), spend(amount, reason, ref), subscribe(cb) }, window.activeTier = { get() -> {level, expiry, daysLeft}, subscribe(cb) }.",
+          "MULTIPLIER AT M4 FLOW-UP ONLY: on each verified seam event while the sub is active, M5 applies window.globalLedger.credit({kind:1, source:'tier_boost', points:(multiplier-1)*base, reason:5, matchRef}). M5 never touches M3 or M4a pure (they stay honest).",
+          "RECEIPT/LOG CONTRACT (hard): every activation records WHEN the token credit happened, the AMOUNT (5,000P), and the active-sub window (start + 30-day expiry) in a durable log (on-chain last_credit_* in the PDA + a Supabase audit row keyed by credit_ref). The profile page shows the active sub, days left, and the credit/activation history.",
+          "NO-AUTO-RENEW GUARANTEE: subscription_active_until is a fixed 30-day window; nothing renews silently. Expiry is passive (level stays 2 but the window lapses and is treated as free until the next manual purchase/credit)."
         ]
       },
       "details": [
-        "Standalone module because it is the consistent money engine: 1,000 / 2,500 / 5,000 spendable per month for 2x / 3x / 4x (econ-003 settled ladder).",
-        "Multiplier applies ONLY at M4 flow-up (lifetime + spendable), never on M3 local or M4a pure. A player's pure local wins stay honest.",
-        "Build timing: EARLY, immediately after the game (M1-M4) - the platform can't launch without the monthly subscription because players expect to upgrade and get a multiplier instead of base rewards.",
-        "Future: real-money subscription once payment rails mature (econ-006 stream 3).",
-        "Gates M7 competition entry in the settled design."
+        "LOCKED LAUNCH PLAN (owner-approved 2026-08-20): single Level-2 (2x) monthly plan. Real price $10 / 30 days. Nigeria cash-discount price N3,000 via Paystack manual bank transfer. Digital membership, NON-cancellable and NON-refundable. The NG user clicks Paystack to see a temporary Paystack account number, pays N3,000, emails the receipt to the owner; the owner verifies then credits the FULL 5,000 premium points on-chain (the cash discount never reduces what the chain recognizes, because the on-chain cost of the 2x plan is 5,000P).",
+        "PREMIUM POINTS (owner 'payment onchain' decision): two tracks with NO free entry. premium_lifetime = a credential you keep forever (never spent, not a gameplay number). premium_spendable = what actually buys things. Acquired ONLY by direct purchase (admin credit). DUAL POWER: premium spendable is accepted anywhere global spendable is accepted AND in places global spendable can NEVER go: subscription activation and unlimited-life upgrades. Premium points never merge into global lifetime/spendable (M4) and never touch local (M3) or M4a pure.",
+        "SUBSCRIPTION STATE ON-CHAIN (not Supabase as truth): subscription_level + active_until live in the premium PDA, so any page reads the truth from the chain gaslessly. Supabase keeps only the payment/affiliate relationship + audit rows.",
+        "MULTIPLIER LADDER: launch ships Level 2 (2x). Future ladder (when tiers reopen): 2x/3x/4x/5x, i.e. a 100P base win banks 200/300/400/500. Applied ONLY at M4 flow-up as kind=1 tier_boost. Base unmultiplied wins already bank in M4 via the seam.",
+        "DAILY REWARD (M10, subscription-boosted, owner numbers 2026-08-20): free tier claims 25P once per day (must be signed in; 24h reset enforced, also via Dynamic sign-out). Level-2 subscriber claims 200P/day. Owner marketing note: frame the Level-2 daily jump as a strong upsell hook - it feeds the earn-competition feel and encourages the upgrade.",
+        "LIVES (M10, subscription-boosted, owner numbers 2026-08-20): free = 5 lives/day, Level 2 = 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC). A life is consumed ONLY when a match COMPLETES (a finished game); abandon, reset, and mid-game network disconnect NEVER cost a life. Universal: applies to Ludo 2P/4P and every future M1 game.",
+        "AFFILIATE (M6, launch marketing - 1 YEAR, owner 2026-08-20): each user gets a unique referral code (pasted into profile once, auto link everywhere). When a referred player makes their FIRST premium purchase, the referrer earns 25% (e.g. 25% of 5,000P = 1,250P) + 200P. 0P if the referral never upgrades. The 25% RECURS for 365 days on every subscription the referral buys. HARD GATE: the referrer must hold an ACTIVE subscription at the moment of the referral's upgrade, otherwise that 25% share is forfeited PERMANENTLY. Payout is manual (owner pays in Naira offline) within 3-7 days after the referred user's payment; automated later. Profile shows a withdraw control later.",
+        "EARN COMPETITION (M7, simplest launch version - the no-ads-budget growth engine): a 30-day daily campaign at launch, 5 winners x ~N100 airtime = N500/day total. SELECT GAME: Ludo only at launch (a select-more-games dropdown comes later). ENTRY: a spendable requirement (e.g. 1,000P) that IS DEDUCTED, payable from global spendable, local spendable, OR premium spendable (any spendable works). OPTIONAL NON-SPENDABLE GATE: e.g. 500 pure Ludo points as 'Ludo expert' proof - a filter only, NEVER deducted. SIGNUP BONUS 500P (M6) exists so a brand-new user can fund the daily entry. Daily 24h window; a PUBLIC leaderboard shows the winner; the top 5 of the window get airtime sent to their phone. PROFILE: the user fills their bank account + phone ONCE (like the referral code), cannot change it afterward; no same phone across two accounts; payouts are sent manually.",
+        "CANNOT-FORGO AT LAUNCH (owner list 2026-08-20): the game itself, local points, global points, premium points, subscription (with all it needs to deliver: affiliate 1-year, pay within 3-7 days, Paystack manual-transfer-only, receipts/logs of token credit + amount + active sub), and the simplest earn competition.",
+        "PAYMENT PIPE (lock at build): Paystack embed -> manual bank transfer ONLY (cards disabled at Paystack setup) -> player sees a temporary Paystack account -> pays -> emails receipt -> owner verifies -> admin-only credit page banks premium points + activates subscription on-chain -> receipt log + Supabase audit row. The owner supplies the Paystack embed code at build time.",
+        "IMPLEMENTATION PATH: (1) extend the gfg program: premium PDA + credit/spend/activate/undelegate_premium_points (+ additive source_code 14 = daily_reward if a program-level guard is wanted) -> deploy + IDL sync; (2) relay: premium init+delegate + admin credit endpoint; (3) admin credit page (staff); (4) client premiumPoints SDK + activate/sub UI on profile (choose plan, Paystack pay button, status card with days left); (5) multiplier wiring into M4 kind=1 tier_boost on each seam award; (6) M10 lives + daily (free 25 / Level-2 200); (7) M6 affiliate + M7 daily earn campaign page. AGENTS program deploy order rule (R5) applies: program -> IDL -> server -> client.",
+        "TEST (benchmark = this spec): credit-then-activate harness (admin credit 5,000P -> activate_subscription deducts -> level/serial fields set), idempotency (re-credit same ref = no-op, re-activate = InsufficientBalance), spend guard (cannot spend premium below balance; premium never feeds global), 30-day expiry pass-through, multiplier kind=1 never touching M4a pure, daily claim once-per-day, life consumed only on completion (abandon/reset/disconnect free), affiliate gate (referrer active-sub required at referral upgrade), competition mixed-spendable deduction + non-spendable filter, receipt log rows present.",
+        "BUILD ORDER NOTE: premium points must exist before activation; admin credit flow first (so balances + receipts are real), then activation/spend, then multiplier wiring, then M10 lives/daily, then the launch campaign (M6 affiliate + M7 simple comp)."
       ]
     },
     {
       "id": "M6",
-      "title": "Point-source modules (referral, giveaway, signup, social earn)",
-      "status": "planned",
-      "summary": "The other point sources that feed M4 (lifetime + spendable) but NEVER M3 local. Signup bonus from day 1; referral, giveaway and social-share earn paths built early.",
+      "title": "Point-source modules (signup bonus + 1-year affiliate launch marketing; giveaway/social deferred)",
+      "status": "in-progress",
+      "summary": "The other point sources that feed M4 (lifetime + spendable) but NEVER M3 local. Launch: signup bonus of 500P (so a new user can fund the daily earn-competition entry) and the AFFILIATE program (25% + 200P, recurring 365 days, referrer must hold an active subscription to qualify, manual Naira payout 3-7 days). Giveaway and social-share earn are deferred past launch. All credits are kind=1: M4b + M4c only.",
       "expectedInput": {
-        "status": "pending discussion — finalize before M6 build",
-        "summary": "What M6 will RECEIVE. To be discussed and locked when M6 build starts.",
+        "summary": "What M6 RECEIVES. Locked 2026-08-20 for the launch build.",
         "items": [
-          "FROM USER: referral code, social share action, or signup event.",
-          "FROM M4: window.globalLedger.credit() to write points into M4b+M4c.",
-          "FROM SUPABASE/PLATFORM: referral tracking (who invited whom), signup verification."
+          "FROM SUPABASE/PROFILES: referral relationships (unique code, who invited whom, upgrade events), signup events, payout bank/phone details (filled once, immutable).",
+          "FROM ADMIN: manual payout approvals (the 25% affiliate shares + airtime-winner payments flow through owner-managed payments).",
+          "FROM M5: the referred player's first premium-purchase event (triggers the referrer's 25% + 200P, gated on the referrer's ACTIVE subscription).",
+          "FROM M4: window.globalLedger.credit() to write kind=1 credits into M4b + M4c."
         ]
       },
       "expectedOutput": {
-        "status": "pending discussion — finalize before M6 build",
-        "summary": "What M6 MUST expose. To be discussed and locked when M6 build starts.",
+        "summary": "What M6 MUST expose. Locked 2026-08-20 for the launch build.",
         "items": [
-          "CREDIT INTO M4: M6 calls window.globalLedger.credit({kind:1, source:'signup_bonus'|'referral'|'giveaway', points, reason, matchRef}) — this is M6's ONLY output to M4.",
-          "M4a PURE GUARANTEE: M6 never touches M3 or M4a pure. All credits are kind=1 (M4b+M4c only)."
+          "SIGNUP BONUS: 500P credited to every new user via window.globalLedger.credit({kind:1, source:'signup_bonus', points:500, reason:2, matchRef}) - M4b+M4c only, never M3/M4a.",
+          "REFERRAL CODE: unique per-user referral code exposed through window.gfgReferral.getCode() and pasted into profile; a shareable auto link.",
+          "AFFILIATE CREDIT: on a referred player's first premium purchase, credit the referrer 25% (1,250P for a 5,000P purchase) + 200P via window.globalLedger.credit({kind:1, source:'referral', ...}) ONLY IF the referrer's subscription is ACTIVE at that moment (else permanently forfeited). Recurs for 365 days on each subscription the referral buys.",
+          "PAYOUT STATE: profile holds bank account + phone (filled once, unchangeable), no same phone across two accounts; the affiliate/payout list shows what the owner owes and is paid manually in Naira within 3-7 days."
         ]
       },
       "details": [
-        "SIGNUP BONUS: from day 1 a user joins the platform. Goes to M4c spendable (and M4b lifetime), NEVER M3 local, so bragging rights stay pure.",
-        "REFERRAL: invites earn the referrer M4 points when the friend joins/plays. Early build - core acquisition.",
-        "GIVEAWAY: promotional/lootbox-style surprises (econ-001), feed M4 only.",
-        "SOCIAL EARN: share-linked small earn paths to soften the buy-to-join moment (econ-005).",
-        "Rule: ALL of these feed M4 (lifetime + spendable), never M3 local and never M4a pure. M3 stays strictly verified gameplay."
+        "SIGNUP BONUS 500P (locked 2026-08-20): replaces the previous 0. Enough to fund the daily earn-competition entry (which accepts global/local/premium spendable), so a brand-new user can compete from day one. Never touches local (M3) or M4a pure.",
+        "AFFILIATE (owner numbers, launch marketing - 1 YEAR): referral earns 25% + 200P after the referred user's FIRST premium upgrade; 0P if the referral never upgrades; 25% recurs for 365 days on every subscription the referral buys; the referrer MUST hold an active subscription at the moment of the referral's upgrade or that 25% share is forfeited permanently. Payout manual (Naira offline) within 3-7 days after the referred user's payment; automated later.",
+        "WHY: there is no ad budget. The 1-year affiliate + the 30-day daily earn campaign are the launch growth engine (owner 2026-08-20).",
+        "Rule (unchanged): ALL M6 credits are kind=1 -> M4b + M4c only, never M3 local and never M4a pure. M3 stays strictly verified gameplay.",
+        "DEFERRED PAST LAUNCH: giveaway (lootbox-style, econ-001) and social-share earn (econ-005) - planned, not in the launch critical path."
       ]
     },
     {
       "id": "M7",
-      "title": "Competitions (standalone, game-agnostic)",
-      "status": "planned",
-      "summary": "Entry config = points requirement + optional custom fields (e.g. phone number for airtime). Plugs into one / multiple / all games. Pluggable payout: airtime, escrow, manual. Runs fine with NO sponsor.",
+      "title": "Competitions (simplest daily earn campaign ships with M5; full game-agnostic platform deferred)",
+      "status": "in-progress",
+      "summary": "Launch: the simplest earn competition - a 30-day daily campaign, select game (Ludo only), entry = a spendable fee deducted from ANY spendable (global/local/premium) plus an optional non-spendable 'expert' filter (e.g. 500 pure Ludo points, never deducted), 5 winners x ~N100 airtime = N500/day, PUBLIC leaderboard, phone captured once on profile (no shared phones), manual airtime payout. Full game-agnostic competition platform (multi-game select, pluggable payouts, M8 escrow) stays deferred until M1-M6 are stable.",
       "expectedInput": {
-        "status": "pending discussion — finalize before M7 build",
-        "summary": "What M7 will RECEIVE. To be discussed and locked when M7 build starts.",
+        "summary": "What M7 RECEIVES. Launch version locked 2026-08-20.",
         "items": [
-          "FROM M2 SEAM: window.onGameResult — the normalized envelope for verified finishes. M7 reads gameId, player identity, position to determine leaderboard placement.",
-          "FROM M4: window.globalLedger.get() to read player's global points (for entry requirements and leaderboard ranking).",
-          "FROM M4: window.globalLedger.spend() to deduct entry fee from M4c spendable (if competition has an entry cost).",
-          "FROM M8 (OPTIONAL): sponsor escrow attached to a competition for brand-funded prizes.",
-          "FROM USER: competition entry form data (phone number for airtime, etc.)."
+          "FROM M2 SEAM: window.onGameResult - the normalized envelope for verified finishes. M7 reads gameId (ludo at launch), player identity, position for leaderboard placement.",
+          "FROM M3/M4/M5 (mixed spendable entry): window.localPoints.spend(), window.globalLedger.spend(), window.premiumPoints.spend() - the entry fee is deducted from whichever spendable the player has.",
+          "FROM PROFILE (immutable fields): the player's phone (for airtime) and bank account, filled once, no change, no same phone across two accounts.",
+          "FROM ADMIN: manual airtime/Naira payouts (no sponsor, no escrow at launch)."
         ]
       },
       "expectedOutput": {
-        "status": "pending discussion — finalize before M7 build",
-        "summary": "What M7 MUST expose. To be discussed and locked when M7 build starts.",
+        "summary": "What M7 MUST expose. Launch version locked 2026-08-20.",
         "items": [
-          "LEADERBOARD: per-competition rankings based on game finishes (consumes M2 envelope).",
-          "PAYOUT: pluggable (airtime via phone, escrow via M8, manual). M7 triggers the payout, never M4.",
-          "ENTRY GATE: M7 reads M4 to verify entry requirements, deducts entry cost via M4 spend."
+          "ENTRY GATE: select game (Ludo), verify the spendable requirement (e.g. 1,000P deducted from global/local/premium spendable) + optional non-spendable filter (e.g. 500 pure Ludo points = expert proof, NOT deducted).",
+          "LEADERBOARD: public daily ranking of 24h-window finishes; top 5 of the window are the airtime winners.",
+          "PAYOUT: manual airtime to the winner's phone (~N100 each, N500/day, 30-day launch campaign); later pluggable (M8 escrow, automated)."
         ]
       },
       "details": [
-        "Game-agnostic: a competition selects which games' points count (one, several, or all), never tailored to a single game.",
-        "Entry requirements: general (points threshold) + competition-specific custom fields (e.g. phone number for airtime rewards).",
-        "Payout is pluggable: airtime (via phone field), on-chain escrow (M8), or manual. Standalone even with no sponsor.",
-        "Product build is deferred until M1-M4 ship and test; the escrow program proof (M8) already exists on devnet.",
-        "NG test-launch plan: 1-2 week launch, daily airtime to winners via the phone number collected at entry.",
-        "Consumes the result seam (M2): subscribes to window.onGameResult for verified finishes."
+        "LAUNCH SIMPLEST VERSION (owner-locked 2026-08-20, ships with M5): 30-day daily campaign, 5 winners x ~N100 airtime = N500/day total, public leaderboard shows the winner, top 5 of each 24h window get airtime to their phone. Select game = Ludo only (dropdown adds more games later).",
+        "ENTRY MECHANICS: a spendable requirement (e.g. 1,000P) IS deducted - accepted from global spendable, local spendable, OR premium spendable (any spendable works); an optional non-spendable gate (e.g. 500 pure Ludo points as 'Ludo expert' proof) is a filter only, never deducted. The 500P signup bonus (M6) funds a new user's first entry.",
+        "WHY AT LAUNCH: no ads budget; the daily earn campaign + the 1-year affiliate ARE the marketing (owner 2026-08-20).",
+        "PROFILE: phone + bank captured ONCE (immutable, like the referral code), no same phone across two accounts, payouts sent manually by the owner.",
+        "FULL PLATFORM (deferred past launch): multi-game select (one/several/all), pluggable payout (airtime / manual / M8 on-chain escrow for brand-funded prizes), standalone with no sponsor. Product build stays behind M1-M6 stability."
       ]
     },
     {
@@ -412,6 +419,36 @@
         "Gasless grant/equip/revoke via session key. Sliced reads (dataSlice) for efficient media loading.",
         "M1 games define their own item catalogs; M9 owns the wallet infrastructure."
       ]
+    },
+    {
+      "id": "M10",
+      "title": "Lives + daily rewards (subscription-boosted, ships with M5)",
+      "status": "in-progress",
+      "summary": "The free-play meter and the recurring daily earn, both boosted by an active subscription. LIVES: free = 5/day, Level-2 subscriber = 10/day, reset at GMT+00, consumed ONLY when a match COMPLETES (abandon/reset/network-disconnect never cost one), universal across every M1 game. DAILY REWARD: free users claim 25P once per day (signed-in, 24h reset via Dynamic sign-out), Level-2 subscribers claim 200P/day. Both feed the 30-day launch earn campaign and give the subscription real recurring value.",
+      "expectedInput": {
+        "summary": "What M10 RECEIVES. Locked 2026-08-20 with the launch build.",
+        "items": [
+          "FROM M2 SEAM: match completion signals (to consume a life ONLY on a finished game, never on abandon/reset/disconnect).",
+          "FROM M5: window.activeTier.get() to apply the boosted values (free 5L/25P vs Level-2 10L/200P).",
+          "FROM M4: window.globalLedger.credit() to bank the daily reward as a kind=1 credit (M4b+M4c only, never M3 or M4a pure).",
+          "FROM USER: daily reward claim action; game-start requests checked against the lives pool."
+        ]
+      },
+      "expectedOutput": {
+        "summary": "What M10 MUST expose. Locked 2026-08-20 with the launch build.",
+        "items": [
+          "WINDOW API: window.gfgLives = { get() -> {livesLeft, totalForLevel, resetsInMs}, consume(), subscribe(cb) }, window.gfgDaily = { get() -> {claimedToday, amount, tierLevel}, claim() -> banks kind=1 daily_reward into M4, subscribe(cb) }.",
+          "LIVES GATE: a game request when livesLeft=0 is blocked until the GMT+00 reset (or an active Level-2 sub restores 10). Lives consumed ONLY on match completion.",
+          "DAILY REWARD: one claim per 24h, signed-in required; free = 25P, Level-2 = 200P.",
+          "MAPS BY SOURCE: daily_reward is a NEW additive source_code (14) on the gfg program so the M4 ledger records it honestly next to signup/referral/tier_boost.",
+          "HOME (universal/): public/universal/lives/ holds the module; slots [data-lives-left], [data-lives-total], [data-daily-amount], [data-daily-claimed] for any page."
+        ]
+      },
+      "details": [
+        "LIVES (owner numbers 2026-08-20): free = 5 lives/day; Level-2 subscriber = 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC). HARD RULE: a life is consumed ONLY when a match COMPLETES; abandon, reset, and mid-game network disconnect NEVER lose a life.",
+        "DAILY REWARD (owner numbers 2026-08-20): free = 25P once per day; Level-2 = 200P once per day. Must be signed in; 24h reset enforced (also via Dynamic sign-out). Framed as an upsell hook for the Level-2 subscription.",
+        "WHY: lives meter free play so the recurring subscription has a reason to exist; the daily reward gives every signed-in user a reason to return each day. Both are launch-critical (shipped inside the M5 build window)."
+      ]
     }
   ],
   "rules": [
@@ -424,13 +461,17 @@
     "Modular + pluggable: each module is interchangeable and game-agnostic; no module is tailored to a single game.",
     "Extensible: M1-M9 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M10+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
     "LOCKED PER-GAME SPECS ARE THE BENCHMARK (M1A rule): each game under M1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the M1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes M1 for that game when the build matches A-Z.",
-    "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability in ANY module MUST be RPC/region agnostic by construction. New per-player PDA types ship their own undelegate instruction in the same program build (so any account can leave a flaky/banned ER region and be re-pinned); client/relay/probe never hardcode one ER endpoint/region (resolve each account's hosting region from the Magic Router and target it; 3-region registry + failover is the base transport); delegate account maps use the relay's camelCase key form for #[delegate] helper accounts. Survived the 2026-08-18 US-route ban by re-pinning the fleet to AS. A banned region is a re-pin job, never a feature outage."
+    "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability in ANY module MUST be RPC/region agnostic by construction. New per-player PDA types ship their own undelegate instruction in the same program build (so any account can leave a flaky/banned ER region and be re-pinned); client/relay/probe never hardcode one ER endpoint/region (resolve each account's hosting region from the Magic Router and target it; 3-region registry + failover is the base transport); delegate account maps use the relay's camelCase key form for #[delegate] helper accounts. Survived the 2026-08-18 US-route ban by re-pinning the fleet to AS. A banned region is a re-pin job, never a feature outage.",
+    "PREMIUM POINTS (M5) ARE THEIR OWN ECONOMY (locked 2026-08-20): premium_lifetime + premium_spendable live in the [gfgprem, player] PDA, acquired ONLY by direct purchase (admin/sponsor credit), never from gameplay, signup, referral, or giveaway. Premium spendable works wherever global spendable works PLUS places global NEVER can (subscription, lives). Premium never merges into global (M4) or local (M3) and never dilutes M4a pure.",
+    "SUBSCRIPTION STATE IS ON-CHAIN (locked 2026-08-20): subscription_level + active_until live in the premium PDA, never Supabase as truth. No auto-renew: a 30-day window lapses passively. Multiplier stays kind=1 at M4 flow-up only."
   ],
   "implementationOrder": [
     "1. M1 + M2 + M3 + M4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at M4 flow-up, 3 global ledgers. Test it.",
-    "2. M5 monthly subscription (after M1-M4): the money engine - Active Tier multiplier at flow-up, spendable drain.",
-    "3. M6 point sources: signup bonus (day 1), referral, giveaway, social earn.",
-    "4. M7 competitions game-agnostic (after M1-M4 stable), with pluggable payout (airtime / manual / escrow).",
-    "5. M8 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize."
+    "2. M5 + M10 launch engine (launch gate - all build ahead of launch): premium points ledger [gfgprem, player] + admin credit + single Level-2 $10/N3,000 plan + 30-day active sub (on-chain, no auto-renew) + multiplier at M4 flow-up + lives (5/10 per day, GMT+00 reset) + daily reward (25P/200P).",
+    "3. M6 launch sources (launch gate): 500P signup bonus + 1-year affiliate (25% + 200P, active-sub gate, manual Naira 3-7 days).",
+    "4. M7 LAUNCH SIMPLEST (launch gate): 30-day daily earn competition, Ludo only, spendable entry (global/local/premium) + non-spendable expert filter, 5 x N100 airtime = N500/day, public leaderboard, manual payout.",
+    "5. M7 full game-agnostic competition platform (after launch stable): multi-game select, pluggable payout (airtime / manual / escrow).",
+    "6. M8 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize.",
+    "7. M9 player inventory (after launch stable): on-chain assets wallet, per-game catalogs."
   ]
 }

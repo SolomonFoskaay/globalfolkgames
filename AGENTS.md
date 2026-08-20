@@ -51,15 +51,31 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 - **M4 — Global ledgers:** platform-wide ledgers (lifetime points, spendable
   points) that aggregate game results. Points flow game -> seam -> local ->
   global. Consumes the seam (M2).
-- **M5 — Active Tier subscription:** the money module. Monthly tier bought from
-  spendable points (Tier 2/3/4 = 1,000/2,500/5,000 spendable/mo -> 2x/3x/4x on
-  base match win points, per-day +1,000 cap). S1 = in-progress.
-- **M6 — Point sources:** referral program, giveaways, sub buy-in. All feed the
-  spendable balance (M4). Planned.
-- **M7 — Competitions:** earn events (daily/weekly/monthly), leaderboards.
-  DEFERRED until M1-M4 are stable for Ludo. Consumes the seam (M2).
+- **M5 — Active Tier subscription + Premium points:** the money + launch engine.
+  Premium points live on their own on-chain ledger ([gfgprem, player], buy-only,
+  premium_lifetime + premium_spendable); a single Level-2 2x plan at launch
+  ($10/30 days, NG cash-discount N3,000 via Paystack manual bank transfer,
+  non-cancellable/non-refundable) activates a 30-day on-chain sub (no auto-renew)
+  and powers the 2x win multiplier at M4 flow-up. Owner-approved 2026-08-20; the
+  M5 spec in architecture.json is the LAUNCH GUIDE (payment pipe, admin credit,
+  receipts/logs, daily reward + lives boosted values, 1-year affiliate, daily earn
+  campaign).
+- **M6 — Point sources:** launch = 500P signup bonus + 1-year affiliate (25% of a
+  referred player's first premium purchase + 200P, recurs 365 days, referrer must
+  hold an active sub at the referral's upgrade or the share is forfeited
+  permanently, manual Naira payout 3-7 days). Giveaway/social deferred. All feed
+  M4b+M4c via kind=1 credits, never M3/M4a. In-progress.
+- **M7 — Competitions:** LAUNCH SIMPLEST VERSION ships with M5: 30-day daily earn
+  campaign, Ludo only, spendable entry (global/local/premium) + optional
+  non-spendable expert filter, 5 winners x ~N100 airtime = N500/day, public
+  leaderboard, manual payout. Full game-agnostic competition platform stays
+  DEFERRED until M1-M6 are stable. Consumes the seam (M2). In-progress.
 - **M8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
   The escrow proof-of-life; product build waits behind M1-M4.
+- **M10 — Lives + daily rewards:** the free-play gate (free 5 lives/day, Level-2
+  10/day, GMT+00 reset, consumed ONLY on match completion, never on abandon/reset/
+  disconnect) + daily earn (free 25P/day, Level-2 200P/day, kind=1 credit into M4,
+  new source_code 14). Ships inside the M5 build window. In-progress.
 
 **HARD RULES (do not regress):**
 0. **Surgical edits only, never rewrite.** When updating any code (adding a
@@ -94,11 +110,14 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    read `architecture.json` first, state the module, slot check, renumber by
    build order when inserting a module. Never skip it; the owner will not repeat
    this.
-2. **M7/M8 are deferred.** Competitions and sponsor escrow product work does NOT
-   start until M1 + M2 + M3 + M4 are stable and verified for Ludo. The on-chain
-   S2 escrow + Scope C finish-order code that ALREADY exists stays (program id
-   unchanged, idempotent, verified live on devnet) but the PRODUCT/UI build for
-   competitions waits.
+2. **M7/M8 scope gate.** The FULL game-agnostic competition platform (M7) and the
+   sponsor escrow product (M8) do NOT start until M1-M6 are stable and verified
+   for Ludo. The launch SIMPLEST daily-earn competition is an exception (locked
+   2026-08-20): it ships with M5 because there is no ad budget and the daily
+   campaign + 1-year affiliate ARE the launch marketing. The on-chain S2 escrow +
+   Scope C finish-order code that ALREADY exists stays (program id unchanged,
+   idempotent, verified live on devnet) but the full PRODUCT/UI competition build
+   waits.
 3. **Modules integrate cleanly.** Each module is a seam: games (M1) emit into
    the result bus (M2); local points (M3) and global ledgers (M4) consume it;
    spendable (M4) buys tiers (M5) or enters events (M7). Never hard-wire one
@@ -236,12 +255,22 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   on-chain. Each game defines its own catalog (like M1's game dropdown); M9
   owns the wallet infrastructure. Gasless grant/equip/revoke via session key,
   sliced reads (dataSlice). Module at public/universal/inventory/.
-- M5: in-progress — S1 Active Tier + spendable sink.
-- M6: planned — referral / giveaways / sub buy-in.
-- M7: planned (deferred) — competitions.
+- M5: in-progress — Active Tier (Level-2 2x) + Premium points launch engine
+  (single $10/N3,000 plan, on-chain [gfgprem, player] buy-only ledger, 30-day
+  sub no auto-renew, admin credit flow, 1-year affiliate + daily earn campaign in
+  the same launch bundle). Launch-guide spec lives in M5.
+- M6: in-progress — 500P signup bonus + 1-year affiliate (25% + 200P, active-sub
+  gate, manual Naira 3-7 days). Giveaway/social deferred.
+- M7: in-progress — LAUNCH SIMPLEST daily earn campaign ships with M5 (30-day,
+  5 x N100 airtime/day, Ludo only, spendable entry + non-spendable filter).
+  Full competition platform deferred.
 - M8: planned (deferred) — sponsor escrow.
+- M10: in-progress — lives + daily rewards gate (ships with M5).
 
-**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> M5 (money) -> M6 -> M9 (inventory) -> M7/M8
+**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
+(premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
+simplest daily-earn competition (all launch gates, in that order) -> M9
+(inventory) -> M7 full platform / M8 escrow
 -> S3 rails (on-ramp, cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never
 build ahead of its module status.
 
