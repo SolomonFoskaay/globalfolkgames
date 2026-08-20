@@ -149,6 +149,11 @@
         return created;
     }
 
+    // Expose the session resolver so every page (profile, competitions,
+    // subscription-paid) checks the SAME sign-in signal the header pill uses,
+    // never a stale page-level copy. This is the single sign-in/out source.
+    window.getDynamicUser = getDynamicUser;
+
     // Update the header UI. Points are ALWAYS on-chain (M4 global ledger).
     // Shows cached points immediately (from localStorage), then auto-updates
     // when the async on-chain fetch completes. No "unavailable" flash.

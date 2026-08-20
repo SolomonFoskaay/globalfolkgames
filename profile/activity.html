@@ -19,10 +19,6 @@
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5;">Every Ludo roll and win reward is a verifiable transaction on the Solana devnet. Click a signature to verify it on-chain (SolanaFM, alt = official explorer).</p>
             <div id="profile-ontx-list"><p class="empty">Loading…</p></div>
         </section>
-
-        <section class="game-card" style="text-align:center;">
-            <button id="activity-signin-btn" class="auth-btn primary" hidden>Sign in</button>
-        </section>
     </main>
 
     <script src="/global_header.js"></script>
@@ -49,24 +45,39 @@
 
             const statusEl = document.getElementById('activity-status');
             const ontxList = document.getElementById('profile-ontx-list');
-            const signinBtn = document.getElementById('activity-signin-btn');
+
+            function walletConnected() {
+                try {
+                    if (window.getDynamicSolanaWallet) {
+                        const w = window.getDynamicSolanaWallet();
+                        if (w) return true;
+                    }
+                    if (window.currentProfile && window.currentProfile.solana_wallet) return true;
+                } catch (e) { /* ignore */ }
+                return false;
+            }
 
             function render(signedIn) {
                 if (!signedIn) {
-                    statusEl.textContent = 'Sign in to see your on-chain activity.';
-                    signinBtn.hidden = false;
+                    if (!walletConnected()) {
+                        statusEl.textContent = 'Sign in from the menu at the top to see your on-chain activity.';
+                        return;
+                    }
+                    statusEl.textContent = 'Signed in, loading your activity...';
                     return;
                 }
                 statusEl.textContent = 'Signed in — welcome back!';
                 window.ProfileCore.loadOnchainActivity(ontxList, { full: true });
-                signinBtn.hidden = true;
             }
-
-            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
             render(!!window.currentUser);
             if (window.refreshAuthHeader) {
                 window.refreshAuthHeader().then(() => render(!!window.currentUser)).catch(() => render(false));
+            }
+            // Re-render when the user signs in / out on the same page (the
+            // global header is the single sign-in/out source).
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('gfg:auth-changed', () => render(!!window.currentUser));
             }
         });
     </script>

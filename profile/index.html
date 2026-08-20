@@ -38,10 +38,6 @@
             <p id="wallet-copy-msg" style="color:var(--muted); font-size:0.75rem; margin-top:6px;"></p>
         </section>
 
-        <section class="game-card" style="text-align:center;">
-            <button id="profile-signin-btn" class="auth-btn primary" hidden>Sign in</button>
-        </section>
-
         </div>
     </main>
 
@@ -64,7 +60,6 @@
             });
 
             const statusEl = document.getElementById('profile-status');
-            const signinBtn = document.getElementById('profile-signin-btn');
 
             const walletChip = document.getElementById('wallet-chip');
             const walletAddrEl = document.getElementById('wallet-address');
@@ -131,41 +126,43 @@
                 copyWallet();
             });
 
-            function render(signedIn) {
-                if (!signedIn || !window.currentProfile) {
-                    statusEl.textContent = 'Sign in to see your profile.';
-                    signinBtn.hidden = false;
+            function render() {
+                if (!currentWallet()) {
+                    statusEl.textContent = 'Sign in from the menu at the top to see your profile.';
                     walletAddrEl.textContent = 'Sign in to see your wallet.';
                     walletCopyMsg.textContent = '';
+                    return;
+                }
+                renderWallet();
+                if (!window.currentProfile) {
+                    statusEl.textContent = 'Signed in, loading your profile...';
                     return;
                 }
                 const p = window.currentProfile;
                 const name = p.display_name || p.username || 'Player';
                 statusEl.textContent = 'Welcome, ' + name + '!';
-                signinBtn.hidden = true;
-                renderWallet();
             }
-
-            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
             // Re-render the wallet when auth changes (sign-in / sign-out on the
             // same page) or the header refreshes the session.
-            render(!!window.currentUser);
+            render();
             if (window.refreshAuthHeader) {
                 window.refreshAuthHeader().then(() => {
-                    render(!!window.currentUser);
+                    render();
                     renderWallet();
-                }).catch(() => render(false));
+                }).catch(() => render());
             }
             if (typeof window.addEventListener === 'function') {
-                window.addEventListener('gfg:auth-changed', () => render(!!window.currentUser));
+                window.addEventListener('gfg:auth-changed', () => render());
             }
 
             // Dynamic restores a silent session AFTER DOMContentLoaded; a bounded
-            // poll keeps the wallet chip honest (no RPC involved, just the client).
+            // poll keeps the wallet chip + status honest (no RPC involved, just
+            // the client), so the body never stays stuck "signed out" while the
+            // header already shows the user as signed in.
             let walletPoll = 0;
             (function pollWallet() {
-                if (currentWallet()) { renderWallet(); return; }
+                if (currentWallet()) { render(); renderWallet(); return; }
                 if (walletPoll++ < 24) setTimeout(pollWallet, 600); // ~15s budget
             })();
         });

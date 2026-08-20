@@ -53,10 +53,6 @@
             <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">--</p>
         </section>
 
-        <section class="game-card" style="text-align:center;">
-            <button id="points-signin-btn" class="auth-btn primary" hidden>Sign in</button>
-        </section>
-
         </div>
     </main>
 
@@ -89,9 +85,22 @@
             const globalLedgerEl = document.getElementById('points-global-ledger');
             const gameSelect = document.getElementById('points-game-select');
             const gameSearch = document.getElementById('points-game-search');
-            const signinBtn = document.getElementById('points-signin-btn');
             let selectedGame = 'ludo';
             let gameList = [];          // full registry list (for search filtering)
+
+            // Resolve the connected wallet the same way the global header does.
+            function currentWalletRef() {
+                try {
+                    if (window.getDynamicSolanaWallet) {
+                        const w = window.getDynamicSolanaWallet();
+                        if (w) return w;
+                    }
+                    if (window.currentProfile && window.currentProfile.solana_wallet) {
+                        return window.currentProfile.solana_wallet;
+                    }
+                } catch (e) { /* ignore */ }
+                return null;
+            }
 
             // Populate the game dropdown from the games registry (auto-loads the
             // available games), filtered live by the search box. Falls back to
@@ -232,6 +241,7 @@
                 wireSubscriptions();
                 const magic = window.magicblockDice;
                 if (magic && typeof magic.available === 'function' && magic.available()) {
+                    render(!!window.currentUser);
                     renderGlobal(window.globalLedger ? window.globalLedger.get() : null);
                     renderLocalCard(selectedGame);
                     if (window.currentProfile) renderTierCard();
@@ -242,15 +252,19 @@
 
             function render(signedIn) {
                 if (!signedIn || !window.currentProfile) {
-                    statusEl.textContent = 'Sign in to see your points and level.';
-                    signinBtn.hidden = false;
+                    if (!currentWalletRef()) {
+                        statusEl.textContent = 'Sign in from the menu at the top to see your points and level.';
+                        return;
+                    }
+                    // Wallet restored but the profile round-trip is still in
+                    // flight; keep the status honest rather than "sign in".
+                    statusEl.textContent = 'Signed in, loading your points...';
                     return;
                 }
                 const p = window.currentProfile;
                 statusEl.textContent = 'Signed in, welcome back!';
                 levelEl.textContent = 'Level ' + (p.level || 0);
                 renderTierCard();
-                signinBtn.hidden = true;
             }
 
             function renderTierCard() {
@@ -318,8 +332,6 @@
             window.__renderTierUI = function () {
                 if (window.currentProfile) renderTierCard();
             };
-
-            signinBtn.addEventListener('click', () => { if (window.openDynamicLogin) window.openDynamicLogin(); });
 
             render(!!window.currentUser);
 

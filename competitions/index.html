@@ -172,6 +172,21 @@
             refresh();
             // Keep the leaderboard fresh while the page is open.
             setInterval(refresh, 45000);
+            // Re-check when the user signs in / out on the same page (the
+            // global header is the single sign-in/out source).
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('gfg:auth-changed', refresh);
+            }
+            // Dynamic restores a silent session AFTER DOMContentLoaded; a
+            // bounded poll flips the sign-in hint without waiting for the next
+            // 45s interval.
+            let authPoll = 0;
+            (function pollAuthSession() {
+                let found = false;
+                try { found = !!(window.getDynamicUser && window.getDynamicUser()); } catch (e) { /* ignore */ }
+                if (found) { refresh(); return; }
+                if (authPoll++ < 24) setTimeout(pollAuthSession, 600); // ~15s budget
+            })();
         });
     </script>
 </body>

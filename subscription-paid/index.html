@@ -108,7 +108,7 @@
         <section class="game-card">
             <h3>Questions?</h3>
             <p style="margin-bottom:10px;">Contact the owner directly, we reply within 1 to 2 business days.</p>
-            <p><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20plan%20support" class="auth-btn primary" style="display:inline-block; text-decoration:none;">Email GlobalFolkGames@gmail.com</a></p>
+            <p><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20plan%20support" class="auth-btn primary" style="display:inline-block; text-decoration:none;">Email the owner</a></p>
         </section>
     </main>
 
@@ -136,6 +136,15 @@
 
             function getAuthDetails() {
                 var email = (window.currentUser && window.currentUser.email) || '';
+                if (!email) {
+                    // The Dynamic session knows the account email immediately;
+                    // window.currentUser only gets it after the Supabase profile
+                    // round-trip, which can lag the wallet by seconds.
+                    try {
+                        var du = (window.getDynamicUser && window.getDynamicUser()) || null;
+                        if (du && du.email) email = du.email;
+                    } catch (e) { /* ignore */ }
+                }
                 var wallet = '';
                 try {
                     if (window.getDynamicSolanaWallet) {
@@ -194,8 +203,11 @@
             // The Dynamic session can restore AFTER this DOMContentLoaded runs.
             var authPoll = 0;
             function pollAuth() {
-                var d = getAuthDetails();
-                if (d.signedIn || authPoll++ > 30) { fillAuth(); return; }
+                var d = fillAuth();
+                // Wait for BOTH the account email and the wallet so the form is
+                // never left half-filled (wallet can appear before email if the
+                // profile round-trip lags the client session).
+                if ((d.email && d.wallet) || authPoll++ > 34) return; // ~20s budget
                 setTimeout(pollAuth, 600);
             }
             pollAuth();
@@ -238,7 +250,7 @@
                 var body = encodeURIComponent(buildEmailLines());
                 var subject = encodeURIComponent(summarize(body));
                 window.location.href = 'mailto:GlobalFolkGames@gmail.com?subject=' + subject + '&body=' + body;
-                statusEl.textContent = 'Your email app should now open with the details filled in. If it did not open, tap "Copy details" and paste them into an email to GlobalFolkGames@gmail.com.';
+                statusEl.textContent = 'Your email app should now open with the details filled in. If it did not open, tap "Copy details" and paste them into an email to the owner, thank you!';
                 statusEl.style.color = '#2ecc71';
             });
 
@@ -247,7 +259,7 @@
                 var text = buildEmailLines();
                 function done(ok) {
                     statusEl.textContent = ok
-                        ? 'Details copied. Paste them into an email to GlobalFolkGames@gmail.com, thank you!'
+                        ? 'Details copied. Paste them into an email to the owner, thank you!'
                         : 'Could not copy automatically. Select and copy the email title below.';
                     statusEl.style.color = '#2ecc71';
                     if (!ok) {
