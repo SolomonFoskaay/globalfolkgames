@@ -221,6 +221,28 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === 'POST' && req.url === '/api/credit-premium') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { player, points, creditRef, token } = JSON.parse(body || '{}');
+      // Operator gate: only the owner (holding GFG_OPERATOR_TOKEN) may credit
+      // premium points. This is the ONLY entry point for money-like value.
+      const expected = process.env.GFG_OPERATOR_TOKEN;
+      if (!expected || token !== expected) {
+        throw new Error('unauthorized operator token');
+      }
+      if (!player) throw new Error('missing "player" pubkey');
+      const result = await handleCreditPremium(player, points, creditRef);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('credit-premium error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/comp') {
     let body = '';
     for await (const chunk of req) body += chunk;

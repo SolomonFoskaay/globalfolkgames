@@ -42,6 +42,8 @@ const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
 const GLOBAL_TAG = Buffer.from('global');
+const PREMIUM_SEED = Buffer.from('gfgprem');
+const PREMIUM_PLAN_COST = 5000; // premium spendable required to activate Level 2
 
 // Reasons recorded against a points award (mirrors the program's u8 codes).
 export const POINT_REASONS = Object.freeze({
@@ -432,6 +434,54 @@ function decodeGlobalPointsRaw(d) {
   };
 }
 
+// Byte-offset decode of the PremiumPoints PDA ([gfgprem, player], M5 buy-only
+// premium ledger). Mirrors decodeGlobalPointsRaw: 8-byte Anchor discriminator
+// first, then the versioned struct fields at 8+:
+//   8:    version (u8)                9-40:  admin_authority (pubkey)
+//  41-48: premium_lifetime (u64)     49-56: premium_spendable (u64)
+//  57:    subscription_level (u8)     58-65: subscription_active_until (i64)
+//  66-73: last_credit_ts (i64)       74-81: last_credit_points (u64)
+//  82-89: last_credit_ref (u64)      90-97: last_spend_ts (i64)
+//  98-105: last_spend_ref (u64)     106:    last_spend_reason (u8)
+// 107-114: spend_count (u64)
+function decodePremiumPointsRaw(d) {
+  const adminOffset = 9;
+  return {
+    version: d.length >= 9 ? d[8] : 0,
+    adminAuthority: d.length >= 41 ? bs58.encode(d.subarray(adminOffset, adminOffset + 32)) : '',
+    premiumLifetime: d.length >= 49 ? Number(d.readBigUInt64LE(41)) : 0,
+    premiumSpendable: d.length >= 57 ? Number(d.readBigUInt64LE(49)) : 0,
+    subscriptionLevel: d.length >= 58 ? d[57] : 0,
+    subscriptionActiveUntil: d.length >= 66 ? Number(d.readBigInt64LE(58)) * 1000 : 0,
+    lastCreditTs: d.length >= 74 ? Number(d.readBigInt64LE(66)) * 1000 : 0,
+    lastCreditPoints: d.length >= 82 ? Number(d.readBigUInt64LE(74)) : 0,
+    lastCreditRef: d.length >= 90 ? String(d.readBigUInt64LE(82)) : '0',
+    lastSpendTs: d.length >= 98 ? Number(d.readBigInt64LE(90)) * 1000 : 0,
+    lastSpendRef: d.length >= 106 ? String(d.readBigUInt64LE(98)) : '0',
+    lastSpendReason: d.length >= 107 ? d[106] : 0,
+    spendCount: d.length >= 115 ? Number(d.readBigUInt64LE(107)) : 0,
+  };
+}
+
+// Typed Anchor decode (used by the sign-in-scoped fetch path).
+function decodePremiumPoints(acct) {
+  return {
+    version: Number(acct.version ?? 0),
+    adminAuthority: (acct.adminAuthority ?? acct.admin_authority)?.toBase58?.() ?? '',
+    premiumLifetime: Number(acct.premiumLifetime ?? acct.premium_lifetime ?? 0),
+    premiumSpendable: Number(acct.premiumSpendable ?? acct.premium_spendable ?? 0),
+    subscriptionLevel: Number(acct.subscriptionLevel ?? acct.subscription_level ?? 0),
+    subscriptionActiveUntil: Number(acct.subscriptionActiveUntil ?? acct.subscription_active_until ?? 0) * 1000,
+    lastCreditTs: Number(acct.lastCreditTs ?? acct.last_credit_ts ?? 0) * 1000,
+    lastCreditPoints: Number(acct.lastCreditPoints ?? acct.last_credit_points ?? 0),
+    lastCreditRef: (acct.lastCreditRef ?? acct.last_credit_ref)?.toString() ?? '0',
+    lastSpendTs: Number(acct.lastSpendTs ?? acct.last_spend_ts ?? 0) * 1000,
+    lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
+    lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
+    spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+  };
+}
+
 async function readPlayerPointsByAddress(gameTag, walletAddress) {
   let pubkey;
   try { pubkey = new PublicKey(walletAddress); } catch (e) { return null; }
@@ -453,6 +503,21 @@ async function readGlobalPointsByAddress(walletAddress) {
   if (!found) return null;
   const ledger = decodeGlobalPointsRaw(found.data);
   console.log(`[M4] wallet ${walletAddress} -> pure ${ledger.pureLifetime} lifetime ${ledger.lifetime} spendable ${ledger.spendableBalance} (from ${found.url})`);
+  return ledger;
+}
+
+// M5 — read the PREMIUM points PDA ([gfgprem, player]) BY WALLET ADDRESS, no
+// Dynamic signing session needed. Mirrors readGlobalPointsByAddress + the
+// recovery page's raw byte-offset decode path.
+async function readPremiumPointsByAddress(walletAddress) {
+  let pubkey;
+  try { pubkey = new PublicKey(walletAddress); } catch (e) { return null; }
+  const [premiumPda] = premiumPointsPdaFor(pubkey);
+  console.log(`[M5] reading Premium points PDA ${premiumPda.toBase58()} for wallet ${walletAddress}`);
+  const found = await readPdaByAddressRaw(premiumPda, 'M5');
+  if (!found) return null;
+  const ledger = decodePremiumPointsRaw(found.data);
+  console.log(`[M5] wallet ${walletAddress} -> lifetime ${ledger.premiumLifetime} spendable ${ledger.premiumSpendable} level ${ledger.subscriptionLevel} (from ${found.url})`);
   return ledger;
 }
 
@@ -717,6 +782,14 @@ function globalPointsPdaFor(payerPubkey) {
   );
 }
 
+// M5 — the player's PREMIUM points PDA ([gfgprem, player], buy-only ledger).
+function premiumPointsPdaFor(payerPubkey) {
+  return PublicKey.findProgramAddressSync(
+    [PREMIUM_SEED, payerPubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
+}
+
 // M4 — global points credit: credits the player's GLOBAL POINTS PDA (M4a
 // pure + M4b lifetime + M4c spendable for kind=0 game wins; M4b+M4c only
 // for kind=1 other credits). Gasless on the ER; `matchRef` guards idempotency.
@@ -772,7 +845,79 @@ export async function spendGlobal(amount, reason, spendRef) {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
-// Scope C: commits the FULL 1st..4th finish order on-chain. Gasless on the ER
+// M5 — premium spendable draw-down on the player's PREMIUM points PDA
+// ([gfgprem, player]). Gasless on the ER; `spendRef` guards replayability.
+// premium_lifetime is never touched.
+export async function spendPremiumPoints(amount, reason, spendRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { wallet } = ctx;
+  const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(premiumPda, wallet.publicKey);
+  await waitForErPickup(premiumPda);
+
+  const regionUrl = await regionUrlFor(premiumPda);
+
+  const sig = await withErRetry('spend_premium_points', async (ctx) => ctx.program.methods
+    .spendPremiumPoints(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+    .accounts({
+      premiumPoints: premiumPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc(), { regionUrl });
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+// M5 — activates the Level-2 Active Tier on-chain: deducts PREMIUM_PLAN_COST
+// (5,000) premium spendable and sets subscription_level=2 with a 30-day active
+// window (NO auto-renew). Gasless on the ER; the player's session key signs.
+export async function activateSubscription() {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { wallet } = ctx;
+  const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(premiumPda, wallet.publicKey);
+  await waitForErPickup(premiumPda);
+
+  const regionUrl = await regionUrlFor(premiumPda);
+
+  const sig = await withErRetry('activate_subscription', async (ctx) => ctx.program.methods
+    .activateSubscription()
+    .accounts({
+      premiumPoints: premiumPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc(), { regionUrl });
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
+// M5 — operator-gated PREMIUM credit via the sponsor relay (the sponsor key
+// signs base-layer, never the client). The relay is idempotent by credit_ref.
+// Posts to /api/credit-premium and resolves the on-chain ledger after.
+// Tracer: used by the staff credit UI; never called from game code.
+export async function creditPremiumPoints(player, points, creditRef, operatorToken) {
+  const res = await fetch('/api/credit-premium', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player, points, creditRef, token: operatorToken }),
+  });
+  if (!res.ok) {
+    let msg = `credit relay error ${res.status}`;
+    try { msg += ': ' + (await res.text()); } catch (e) { /* ignore */ }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || 'credit relay failed');
+  return readPremiumPointsByAddress(player);
+}
 // (session key signs, 0 SOL), mirroring recordPoints. The relay's handleDelegate
 // (idempotent) also creates + delegates the result PDA (seed 'gfgresult'), so
 // this write is a pure ER send once onboarded.
@@ -1065,6 +1210,65 @@ export function initMagicBlockDice() {
     async fetchGlobalPointsPdaFor(walletAddress) {
       if (!walletAddress) return this.fetchGlobalPointsPda();
       return readGlobalPointsByAddress(walletAddress);
+    },
+
+    // M5 — the player's on-chain PREMIUM points PDA address ([gfgprem, player],
+    // buy-only ledger).
+    premiumPointsPda() {
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return premiumPointsPdaFor(wallet.publicKey)[0].toBase58();
+    },
+
+    // M5 — reads the player's PREMIUM points ledger from the ER (gasless, no
+    // sign). Returns
+    // { version, adminAuthority, premiumLifetime, premiumSpendable,
+    //   subscriptionLevel, subscriptionActiveUntil, lastCreditTs,
+    //   lastCreditPoints, lastCreditRef, lastSpendTs, lastSpendRef,
+    //   lastSpendReason, spendCount }
+    // or null if the PDA isn't visible yet.
+    async fetchPremiumPointsPda() {
+      const ctx = getErProgram();
+      if (!ctx) return null;
+      const { wallet } = ctx;
+      const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+      const candidates = await regionCandidatesFor(premiumPda);
+      for (const url of candidates) {
+        try {
+          const regionCtx = getErProgramFor(url);
+          const acct = await regionCtx.program.account.premiumPoints.fetch(premiumPda);
+          return decodePremiumPoints(acct);
+        } catch (e) {
+          // Account not on this region yet (or region down) — try the next one.
+        }
+      }
+      return null;
+    },
+
+    // M5 — read the PREMIUM ledger BY WALLET ADDRESS, no Dynamic signing
+    // session needed. Mirrors fetchGlobalPointsPdaFor. Falls back to the
+    // sign-in-scoped fetch when no address is given.
+    async fetchPremiumPointsPdaFor(walletAddress) {
+      if (!walletAddress) return this.fetchPremiumPointsPda();
+      return readPremiumPointsByAddress(walletAddress);
+    },
+
+    // M5 — premium spendable draw-down on the player's PREMIUM points PDA
+    // (gasless ER write, session key signs). Returns the spend receipt sig.
+    spendPremiumPoints(amount, reason, spendRef) {
+      return spendPremiumPoints(amount, reason, spendRef);
+    },
+
+    // M5 — activates the Level-2 Active Tier on-chain (deducts 5,000 premium
+    // spendable, sets a 30-day sub, NO auto-renew). Gasless ER write.
+    activateSubscription() {
+      return activateSubscription();
+    },
+
+    // M5 — operator-gated PREMIUM credit (staff UI only). The relay calls back
+    // with the on-chain ledger after crediting.
+    creditPremiumPoints(player, points, creditRef, operatorToken) {
+      return creditPremiumPoints(player, points, creditRef, operatorToken);
     },
 
     // Cheap liveness probe for the on-chain outage monitor. Resolves true when

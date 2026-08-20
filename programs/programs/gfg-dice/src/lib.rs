@@ -53,20 +53,31 @@
 //   On devnet the pool is mirror points (free money) — real-value escrow +
 //   legal framing is a mainnet item.
 //
-// Active Tier (S1, FUTURE/mainnet design, NOT implemented in this build):
-//   - `initialize_tier`   : creates the player's TIER PDA (base layer, app
-//                           pays rent). Seed `gfgtier`, same player_authority.
-//   - `delegate_tier`     : moves the tier PDA into the ER session (base
-//                           layer, app pays) so purchases run gasless.
-//   - `purchase_tier`     : buys a monthly Active Tier on the ER. The cost is
-//                           the player's SPENDABLE balance, derived on-chain
-//                           as points.total_points - tier.total_spent (so a
-//                           spend can never exceed what was earned on-chain).
-//                           FREE for the player (session key signs, no SOL).
-// S1 ships WITHOUT these: the multiplier/cap run client + Supabase and the
-// existing `record_points` PDA mirrors the boosted award on-chain. Full
-// on-chain tier enforcement is deferred to mainnet (see roadmap "Active Tier
-// subscriptions + spendable sink").
+// M5 — Premium points + Active Tier (launch engine, IMPLEMENTED):
+//   - `initialize_premium_points`: creates the player's PREMIUM points PDA
+//                                  (base layer, app pays rent). Seed `gfgprem`,
+//                                  same player_authority. Stores the admin
+//                                  authority (the sponsor/ecror who initializes
+//                                  it), matching the Competition sponsor pattern.
+//   - `delegate_premium_points`  : moves the premium PDA into the ER session
+//                                  (base layer, app pays) so spends run gasless.
+//   - `credit_premium_points`    : the admin (stored authority) credits
+//                                  premium_lifetime + premium_spendable together
+//                                  after a VERIFIED manual payment. AUTHORITY-
+//                                  GATED (only the account's admin_authority
+//                                  signer). Idempotent by credit ref.
+//   - `spend_premium_points`     : the player spends premium spendable on the ER
+//                                  (session key signs, gasless). Insufficient
+//                                  guard + idempotent spend_ref.
+//   - `activate_subscription`    : deducts 5,000 premium spendable and sets
+//                                  subscription_level=2 + active_until=now+30d
+//                                  (no auto-renew; expiry is passive). Gasless on
+//                                  the ER (session key signs).
+//   - `undelegate_premium_points`: returns the premium PDA to this program so it
+//                                  can be re-pinned off a flaky ER region
+//                                  (RPC/region-agnostic rule, same build).
+// Premium points are a buy-only economy: they NEVER merge into global (M4) or
+// local (M3) ledgers and never dilute M4a pure.
 //
 // The PDA seed uses a dedicated `player_authority` key (the player's wallet),
 // NOT the payer, so any wallet can sponsor rent/fees without changing the
@@ -94,9 +105,15 @@ pub const POINTS: &[u8] = b"gfgpoints";
 pub const RESULT: &[u8] = b"gfgresult";
 pub const COMP: &[u8] = b"gfgcomp";
 pub const GLOBAL_TAG: &[u8] = b"global"; // reserved M4 global points tag, no game may use this
+pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (buy-only)
 
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
+
+// M5 — Active Tier Level-2 2x launch plan (owner-locked 2026-08-20).
+pub const PREMIUM_PLAN_COST: u64 = 5_000; // premium spendable required to activate Level 2
+pub const SUBSCRIPTION_DAYS: i64 = 30; // active-sub window (no auto-renew)
+pub const DAY_SECS: i64 = 24 * 60 * 60;
 
 /// Registered M1A game tags for per-game point ledgers. Add a game here when
 /// its M1 spec locks. The tag is the seed basis that isolates each game's
@@ -674,6 +691,148 @@ pub mod gfg_dice {
         dest.spend_count = dest.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
         Ok(())
     }
+
+    // ── M5: Premium Points + Active Tier (launch engine) ───────────────────
+
+    /// Idempotent: creates the player's PREMIUM points PDA if it does not
+    /// exist yet. Seed [gfgprem, player_authority]. Payer (sponsor/ecror) pays
+    /// rent; the payer becomes the stored ADMIN AUTHORITY who alone can credit
+    /// the account (mirrors the Competition sponsor pattern).
+    pub fn initialize_premium_points(ctx: Context<InitializePremiumPoints>) -> Result<()> {
+        let prem = &mut ctx.accounts.premium_points;
+        prem.version = 1u8;
+        prem.admin_authority = ctx.accounts.payer.key();
+        prem.premium_lifetime = 0;
+        prem.premium_spendable = 0;
+        prem.subscription_level = 0;
+        prem.subscription_active_until = 0;
+        prem.last_credit_ts = 0;
+        prem.last_credit_points = 0;
+        prem.last_credit_ref = 0;
+        prem.last_spend_ts = 0;
+        prem.last_spend_ref = 0;
+        prem.last_spend_reason = 0;
+        prem.spend_count = 0;
+        Ok(())
+    }
+
+    /// Delegates the player's PREMIUM points PDA into an ER session (base
+    /// layer, sponsor pays) so spend_premium_points / activate_subscription run
+    /// gasless on the rollup.
+    pub fn delegate_premium_points(ctx: Context<DelegatePremiumPointsInput>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_premium_points(
+            &ctx.accounts.payer,
+            &[PREMIUM_SEED, authority.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// The admin (stored admin_authority, e.g. the sponsor/ecror) credits the
+    /// player's PREMIUM points ledger after a VERIFIED manual payment. Writes
+    /// premium_lifetime AND premium_spendable together. idempotent by
+    /// `credit_ref`, so admin double-clicks can never double-credit.
+    /// Runs base-layer or ER signed by the admin key (never by the player).
+    pub fn credit_premium_points(
+        ctx: Context<CreditPremiumPointsCtx>,
+        points: u64,
+        credit_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        let prem = &mut ctx.accounts.premium_points;
+        require!(
+            prem.admin_authority == ctx.accounts.admin.key(),
+            PointsError::NotAdmin
+        );
+        require!(
+            prem.last_credit_ref != credit_ref,
+            PointsError::DuplicateCreditRef
+        );
+        prem.premium_lifetime = prem
+            .premium_lifetime
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        prem.premium_spendable = prem
+            .premium_spendable
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        prem.last_credit_points = points;
+        prem.last_credit_ref = credit_ref;
+        prem.last_credit_ts = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
+    /// (M5) Draws down the SPENDABLE track of the player's PREMIUM points PDA.
+    /// Runs GASLESS on the ER (session key signs, 0 SOL, player-consented);
+    /// `spend_ref` is the purchase reference for replayability. premium_lifetime
+    /// is never touched. (The operator/admin can also spend on the player's
+    /// behalf with their authority, e.g. subscription activation.)
+    pub fn spend_premium_points(
+        ctx: Context<SpendPremiumPointsCtx>,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        let prem = &mut ctx.accounts.premium_points;
+        require!(
+            prem.premium_spendable >= amount,
+            PointsError::InsufficientPremiumBalance
+        );
+        prem.premium_spendable = prem
+            .premium_spendable
+            .checked_sub(amount)
+            .ok_or(PointsError::InsufficientPremiumBalance)?;
+        prem.last_spend_reason = reason;
+        prem.last_spend_ref = spend_ref;
+        prem.last_spend_ts = Clock::get()?.unix_timestamp;
+        prem.spend_count = prem.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// (M5) Activates the Level-2 (2x) subscription from PREMIUM spendable.
+    /// Deducts PREMIUM_PLAN_COST (5,000), sets subscription_level = 2 and
+    /// subscription_active_until = now + 30 days. NO auto-renew: the window is
+    /// fixed; expiry is passive until the next manual purchase/credit. Runs
+    /// GASLESS on the ER (session key signs).
+    pub fn activate_subscription(ctx: Context<ActivateSubscriptionCtx>) -> Result<()> {
+        let prem = &mut ctx.accounts.premium_points;
+        require!(
+            prem.premium_spendable >= PREMIUM_PLAN_COST,
+            PointsError::InsufficientPremiumBalance
+        );
+        prem.premium_spendable = prem
+            .premium_spendable
+            .checked_sub(PREMIUM_PLAN_COST)
+            .ok_or(PointsError::InsufficientPremiumBalance)?;
+        prem.subscription_level = 2u8;
+        prem.subscription_active_until =
+            Clock::get()?.unix_timestamp.checked_add(SUBSCRIPTION_DAYS * DAY_SECS)
+                .ok_or(PointsError::Overflow)?;
+        prem.last_spend_reason = 20; // SUB_ACTIVATE
+        prem.last_spend_ref = prem.subscription_active_until as u64;
+        prem.last_spend_ts = Clock::get()?.unix_timestamp;
+        prem.spend_count = prem.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Commits the latest state and returns the PREMIUM points PDA to this
+    /// program (runs on ER). Mirrors `undelegate_global_points` so a premium
+    /// PDA can leave a flaky region and be re-pinned. Additive, 2026-08-20.
+    pub fn undelegate_premium_points(ctx: Context<CommitAndUndelegatePremiumPointsInput>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.premium_points.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -940,6 +1099,89 @@ pub struct SpendGlobalCtx<'info> {
     pub global_points: Account<'info, GlobalPoints>,
 }
 
+// ── M5: Premium Points contexts ────────────────────────────────────────────
+
+/// Context for `initialize_premium_points`. Base layer: the payer
+/// (sponsor/ecror) pays rent and becomes the stored admin authority.
+#[derive(Accounts)]
+pub struct InitializePremiumPoints<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + PremiumPoints::INIT_SPACE,
+        seeds = [PREMIUM_SEED, player_authority.key().as_ref()],
+        bump
+    )]
+    pub premium_points: Account<'info, PremiumPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `delegate_premium_points`. Base layer, sponsor pays.
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegatePremiumPointsInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The premium points PDA to delegate.
+    #[account(mut, del)]
+    pub premium_points: UncheckedAccount<'info>,
+}
+
+/// Context for `credit_premium_points`. The admin authority (sponsor/ecror,
+/// stored at init) signs. Runs base-layer or ER signed by the admin; the
+/// player does NOT sign.
+#[derive(Accounts)]
+pub struct CreditPremiumPointsCtx<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
+/// Context for `spend_premium_points`. Runs on the ER (gasless): the player's
+/// session key is the payer, and the premium PDA must exist + be delegated.
+#[derive(Accounts)]
+pub struct SpendPremiumPointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
+/// Context for `activate_subscription`. Runs on the ER (gasless): the player's
+/// session key signs; the premium PDA must exist + be delegated.
+#[derive(Accounts)]
+pub struct ActivateSubscriptionCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
+/// Context for `undelegate_premium_points`: returns the PREMIUM PDA to this
+/// program (runs on the ER). Mirrors CommitAndUndelegateGlobalPointsInput.
+#[commit]
+#[derive(Accounts)]
+pub struct CommitAndUndelegatePremiumPointsInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
 /// Context for `spend_local`. Runs on the ER (gasless): the player's session
 /// key is the payer, and the points PDA must already exist + be delegated.
 #[derive(Accounts)]
@@ -1136,12 +1378,50 @@ pub struct GlobalPoints {
     pub global_pure_lifetime: u64,   // M4a: sum of verified game wins only
     pub global_lifetime: u64,        // M4b: everything earned, unspendable
     pub global_spendable_balance: u64, // M4c: spendable track
-    pub last_source: u8,             // source_code enum: 1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost
+    pub last_source: u8,             // source_code enum: 1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost, 14=daily_reward
     pub last_points: u64,
     pub last_reason: u8,
     pub last_match_ref: u64,
     pub last_recorded_ts: i64,
     pub award_count: u64,
+    pub last_spend_ts: i64,
+    pub last_spend_ref: u64,
+    pub last_spend_reason: u8,
+    pub spend_count: u64,
+}
+
+/// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
+/// points, the launch engine). One account per player, seed [gfgprem, player].
+/// Runs gasless on the ER.
+///
+/// Two tracks, buy-only (never earned from gameplay):
+///   - premium_lifetime    : the player's permanent premium-point credential
+///                           (never spendable).
+///   - premium_spendable   : the spendable premium balance (buys the Active
+///                           Tier subscription, lives, and anything else premium
+///                           spendable is accepted for - places global spendable
+///                           can NEVER go). Acquired ONLY via admin
+///                           `credit_premium_points` after a verified purchase.
+///
+/// Subscription state lives here (never Supabase):
+///   - subscription_level     : 0 = free, 2 = Level-2 (2x) at launch.
+///   - subscription_active_until : unix ts; a fixed 30-day window, NO auto-renew
+///                           (expiry is passive until the next manual purchase).
+///
+/// `version: u8` is FIRST per upgrade-safety R2 (live layouts are versioned).
+/// The MEDIA never merges into global (M4) or local (M3) ledgers.
+#[account]
+#[derive(InitSpace)]
+pub struct PremiumPoints {
+    pub version: u8,               // layout version (1)
+    pub admin_authority: Pubkey,   // the sponsor/ecror who may credit the ledger
+    pub premium_lifetime: u64,     // permanent, never spendable
+    pub premium_spendable: u64,    // spendable premium balance (buys the sub)
+    pub subscription_level: u8,    // 0=free, 2=Level 2
+    pub subscription_active_until: i64, // unix ts expiry; never auto-renewed
+    pub last_credit_ts: i64,
+    pub last_credit_points: u64,
+    pub last_credit_ref: u64,
     pub last_spend_ts: i64,
     pub last_spend_ref: u64,
     pub last_spend_reason: u8,
@@ -1249,4 +1529,10 @@ pub enum PointsError {
     NotYourAllocation,
     #[msg("allocation already claimed")]
     AlreadyClaimed,
+    #[msg("premium points credit requires the admin authority signer")]
+    NotAdmin,
+    #[msg("premium points credit_ref already used (duplicate credit guard)")]
+    DuplicateCreditRef,
+    #[msg("insufficient premium spendable balance")]
+    InsufficientPremiumBalance,
 }

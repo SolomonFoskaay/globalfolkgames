@@ -21,6 +21,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
+import { BN } from 'bn.js';
 import './load-env.mjs'; // load .env (Alchemy key) before resolving the RPC chain
 import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus } from '../src/gfg-rpc.js';
 import { authorizeSpend, assertSponsorReserve, recordSpend } from './spend-ledger.mjs';
@@ -45,6 +46,7 @@ const PLAYER_SEED = Buffer.from('gfgplayerd');
 const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
 const GLOBAL_TAG = Buffer.from('global');
+const PREMIUM_SEED = Buffer.from('gfgprem'); // M5 premium points ledger (buy-only)
 
 // Registered M1A game tags (mirrors is_valid_game_tag in the program). Each
 // game owns its per-game points ledger seed [gfgpoints, game_tag, player].
@@ -111,6 +113,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const [pointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, Buffer.from(gameTag, 'utf8'), player.toBytes()], PROGRAM_ID);
   const [resultPda] = PublicKey.findProgramAddressSync([RESULT_SEED, player.toBytes()], PROGRAM_ID);
   const [globalPointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, GLOBAL_TAG, player.toBytes()], PROGRAM_ID);
+  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
   // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
@@ -128,8 +131,9 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const pointsStatus = await retry(() => getDelegationStatus(conn, pointsPda));
   const resultStatus = await retry(() => getDelegationStatus(conn, resultPda));
   const globalStatus = await retry(() => getDelegationStatus(conn, globalPointsPda));
-  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated) {
-    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), gameTag, delegated: true, steps: [] };
+  const premiumStatus = await retry(() => getDelegationStatus(conn, premiumPointsPda));
+  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated && premiumStatus && premiumStatus.isDelegated) {
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), premiumPointsPda: premiumPointsPda.toString(), gameTag, delegated: true, steps: [] };
   }
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
@@ -137,11 +141,13 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   // sponsor wallet keeps its reserve after this spend. Throws SpendCapExceeded
   // before any SOL leaves the wallet.
   // Steps per PDA: fresh = initialize + delegate (2); existing = delegate only (1).
+  // Scope B adds points, Scope C adds result, M4 adds global, M5 adds premium.
   const plannedSteps =
     (status && status.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pda)) ? 1 : 2)) +
     (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2)) +
     (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2)) +
-    (globalStatus && globalStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(globalPointsPda)) ? 1 : 2));
+    (globalStatus && globalStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(globalPointsPda)) ? 1 : 2)) +
+    (premiumStatus && premiumStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(premiumPointsPda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
   const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
@@ -210,6 +216,21 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     if (sig) steps.push({ step: 'delegate_global_points', sig });
   }
 
+  // Premium Points PDA: create if missing, then delegate if not delegated (M5).
+  if (!(premiumStatus && premiumStatus.isDelegated)) {
+    const pinfo = await retry(() => conn.getAccountInfo(premiumPointsPda));
+    if (!pinfo) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initializePremiumPoints()
+          .accounts({ premiumPoints: premiumPointsPda, payer: sponsor.publicKey, playerAuthority: player })
+          .transaction()
+      );
+      steps.push({ step: 'initialize_premium_points', sig });
+    }
+    const sig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
+    if (sig) steps.push({ step: 'delegate_premium_points', sig });
+  }
+
   // Record the REAL cost (balance delta), not the estimate, so the ledger
   // reflects actual sponsor spend. Caps were already enforced on the estimate.
   if (steps.length) {
@@ -228,7 +249,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     }
   }
 
-  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), gameTag, delegated: true, steps };
+  return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), premiumPointsPda: premiumPointsPda.toString(), gameTag, delegated: true, steps };
 }
 
 // M3 data-preservation migration (see .opencode/rules/solana-upgrade-safety.md).
@@ -424,6 +445,132 @@ async function delegateGlobalPointsPda(program, conn, sponsor, player, globalPoi
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
       throw new Error(`delegate_global_points failed: ${detail}`);
     });
+  return sig;
+}
+
+// Delegate the premium points PDA into the ER session (M5). Mirrors the other
+// delegate helpers but uses the premium seed + delegate_premium_points.
+async function delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda) {
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), premiumPointsPda.toBytes()], PROGRAM_ID);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), premiumPointsPda.toBytes()], DELEGATION_PROGRAM);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), premiumPointsPda.toBytes()], DELEGATION_PROGRAM);
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.delegatePremiumPoints()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          premiumPoints: premiumPointsPda,
+          bufferPremiumPoints: buffer,
+          delegationRecordPremiumPoints: record,
+          delegationMetadataPremiumPoints: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
+    .catch(async (err) => {
+      await new Promise(r => setTimeout(r, 600));
+      const after = await getDelegationStatus(conn, premiumPointsPda);
+      if (after && after.isDelegated) {
+        return null;
+      }
+      const detail = err.transactionMessage || err.transactionError?.message || err.message;
+      throw new Error(`delegate_premium_points failed: ${detail}`);
+    });
+  return sig;
+}
+
+// M5 admin credit: the owner (sponsor key = the stored adminAuthority) credits
+// a player's PREMIUM points ledger with `points` after a VERIFIED manual
+// Paystack payment. Idempotent by `creditRef` (the program rejects a reused
+// ref). Ensures the premium PDA exists first (sponsor pays rent).
+//
+// DELEGATION-AWARE: `credit_premium_points` is authority-gated and writes
+// whatever the current LCM state is, but a base-layer write only works on a
+// NON-delegated account (a delegated account lives on the ER). handleDelegate
+// may have already delegated the premium PDA (onboarding), so the correct
+// launch flow is: if delegated -> undelegate_premium_points (sponsor signs) ->
+// credit base-layer -> re-delegate to AS so the player's ER spends keep
+// working. This mirrors the migrate-to-as pattern.
+// Returns { player, points, creditRef, sig, undelegated, redelegated }.
+export async function handleCreditPremium(playerPubkey, points, creditRef) {
+  if (!Number.isInteger(points) || points <= 0) throw new Error(`invalid points: ${points}`);
+  if (!Number.isInteger(creditRef) || creditRef <= 0) throw new Error(`invalid creditRef: ${creditRef}`);
+  const player = new PublicKey(playerPubkey);
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
+  const program = new Program(idl, provider);
+
+  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
+
+  const retry = async (fn, n = 4, delay = 400) => {
+    for (let i = 0; i < n; i++) {
+      try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); }
+    }
+    return null;
+  };
+
+  // Ensure the premium PDA exists (init if missing). The sponsor is the payer,
+  // so the account's stored adminAuthority = sponsor key = our credit signer.
+  const info = await retry(() => conn.getAccountInfo(premiumPointsPda));
+  if (!info) {
+    await sendAndConfirmBase(conn, sponsor,
+      await program.methods.initializePremiumPoints()
+        .accounts({ premiumPoints: premiumPointsPda, payer: sponsor.publicKey, playerAuthority: player })
+        .transaction()
+    );
+  }
+
+  // If the premium PDA is currently delegated, undelegate it (sponsor signs,
+  // pinned region hosts it; commit+undelegate runs on the ER) so the
+  // base-layer credit can write its state, then re-delegate afterwards.
+  const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
+  const undelegated = !!(status && status.isDelegated);
+  if (undelegated) {
+    await undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda);
+  }
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+    await program.methods.creditPremiumPoints(new BN(points), new BN(creditRef))
+      .accounts({
+        admin: sponsor.publicKey,
+        playerAuthority: player,
+        premiumPoints: premiumPointsPda,
+      })
+      .transaction()
+  );
+
+  let redelegated = false;
+  if (undelegated) {
+    const dsig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
+    redelegated = !!dsig;
+  }
+  console.log(`[relay] credited ${player.toBase58()} +${points} premium points (creditRef ${creditRef}, sig ${sig}, undelegated ${undelegated}, redelegated ${redelegated})`);
+  return { player: player.toBase58(), points, creditRef, sig, undelegated, redelegated };
+}
+
+// Undelegate the premium PDA back to base (runs commit+undelegate on its
+// hosting ER region, sponsor signs). Mirrors migrate-to-as's undelegate step.
+async function undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda) {
+  const magProg = new PublicKey('Magic11111111111111111111111111111111111111');
+  const magContext = new PublicKey('MagicContext1111111111111111111111111111111');
+  const tx = await program.methods.undelegatePremiumPoints()
+    .accounts({
+      payer: sponsor.publicKey,
+      playerAuthority: player,
+      premiumPoints: premiumPointsPda,
+      magicProgram: magProg,
+      magicContext: magContext,
+    })
+    .transaction();
+  tx.feePayer = sponsor.publicKey;
+  const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
+  await conn.confirmTransaction({ signature: sig }, 'processed');
+  console.log(`  undelegate_premium_points ${sig} -> isDelegated=false`);
   return sig;
 }
 

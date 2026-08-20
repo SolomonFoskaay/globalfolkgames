@@ -366,9 +366,10 @@
         // globalLedger, so pages that don't explicitly load them would otherwise
         // sit on a permanent loading state / zero. Loading the module scripts
         // here when absent makes the pill always reflect the real balances.
-        ['/universal/points/local-points.js', '/universal/ledgers/global-ledger.js'].forEach(function (src) {
+        ['/universal/points/local-points.js', '/universal/ledgers/global-ledger.js', '/universal/subscription/premium-ledger.js'].forEach(function (src) {
             if (!window.localPoints && src.indexOf('local-points') >= 0) ensureScript(src);
             if (!window.globalLedger && src.indexOf('global-ledger') >= 0) ensureScript(src);
+            if (!window.premiumPoints && src.indexOf('premium-ledger') >= 0) ensureScript(src);
         });
         // The central points store (single source of truth for "when does the
         // RPC get consulted"): it binds solely to gfg:auth-changed and resets +

@@ -46,8 +46,8 @@
         </section>
 
         <section class="game-card" id="tier-card-section" style="border:1px solid var(--accent, #f39c12);">
-            <h3>Active Tier</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Boost your win points with a monthly Active Tier. Multiplies base match wins only (2x/3x/4x), capped at +1,000 boosted points per day.</p>
+            <h3>Active Tier (Premium plan)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">A monthly boost bought with premium points (a one-off $10 / N3,000 purchase, verified manually by the owner). Level 2 doubles base win points on the global ledger for 30 days. No auto-renew: when the window lapses you drop back to the free 1x plan.</p>
             <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin-bottom:10px;">--</p>
             <div id="tier-buy-row" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
             <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">--</p>
@@ -220,6 +220,13 @@
                         }
                     });
                 }
+                // M5: re-render the Active Tier card when the premium ledger
+                // refreshes (credit verified, sub activated, expiry reaches).
+                if (window.premiumPoints && typeof window.premiumPoints.subscribe === 'function') {
+                    window.premiumPoints.subscribe(function () {
+                        if (window.currentProfile) renderTierCard();
+                    });
+                }
             }
             function bootOnWalletReady() {
                 wireSubscriptions();
@@ -227,6 +234,7 @@
                 if (magic && typeof magic.available === 'function' && magic.available()) {
                     renderGlobal(window.globalLedger ? window.globalLedger.get() : null);
                     renderLocalCard(selectedGame);
+                    if (window.currentProfile) renderTierCard();
                     return;
                 }
                 if (walletPoll++ < 24) setTimeout(bootOnWalletReady, 600); // ~15s budget
@@ -246,46 +254,73 @@
             }
 
             function renderTierCard() {
-                if (typeof window.getActiveTier !== 'function') return;
-                const tier = window.getActiveTier();
-                const spendable = window.getSpendablePoints();
                 const statusEl = document.getElementById('tier-status');
                 const buyRow = document.getElementById('tier-buy-row');
+                const spendableEl = document.getElementById('tier-spendable');
+                // M5 (on-chain): the subscription truth lives in the premium PDA.
+                // Fall back to the legacy Supabase tier only if the module isn't
+                // loaded yet (it bootstraps via the header).
+                const prem = window.premiumPoints ? window.premiumPoints.get() : null;
+                const tier = window.activeTier ? window.activeTier.get() : null;
+                const legacy = (typeof window.getActiveTier === 'function') ? window.getActiveTier() : { tier: 1, mult: 1 };
 
-                if (tier.tier > 1) {
-                    const upgradeTarget = tier.tier < 4 ? (window.ACTIVE_TIERS || {})[tier.tier + 1] : null;
-                    const upgradeHint = upgradeTarget
-                        ? '<div style="margin-top:6px; font-size:0.8rem; color:var(--muted);">Upgrade: <b style="color:#f39c12;">' + upgradeTarget.name + ' (' + upgradeTarget.mult + 'x)</b> costs ' + upgradeTarget.cost.toLocaleString() + ' spendable points for another month.</div>'
-                        : '';
-                    statusEl.innerHTML = 'You have <b style="color:#f39c12;">' + tier.label + ' (' + tier.mult + 'x)</b> on wins, active until <b>' + new Date(tier.expiresAt).toLocaleDateString() + '</b>. Boosted points today: <span id="tier-used-today">' + ((window.TIER_DAILY_BOOST_CAP || 0) - (tier.remainingToday ?? 0)) + '</span> / ' + (window.TIER_DAILY_BOOST_CAP || 0).toLocaleString() + '.' + upgradeHint;
+                const level = tier && tier.level > 0 ? tier.level : (legacy && legacy.tier > 1 ? legacy.tier : 0);
+                const mult = level > 1 ? (level === 2 ? 2 : level) : 1;
+                const daysLeft = tier && tier.level > 0 ? tier.daysLeft : (legacy && legacy.expiresAt ? Math.max(0, Math.ceil((legacy.expiresAt - Date.now()) / 86400000)) : 0);
+                const active = level > 0 && daysLeft > 0;
+                const premiumSpendable = prem ? (prem.premiumSpendable || 0) : 0;
+
+                if (active) {
+                    statusEl.innerHTML = 'You have <b style="color:#f39c12;">Level ' + level + ' (' + mult + 'x)</b> on win points, active until <b>' + new Date((tier ? tier.expiry : legacy.expiresAt)).toLocaleDateString() + '</b> (' + daysLeft + ' days left). No auto-renew: when it lapses you return to the free plan until your next purchase is verified.</span>';
                 } else {
-                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. Buy a tier below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: every tier lasts one month, multiplies base win points only (100 becomes 200/300/400 at 2x/3x/4x), and is capped at +1,000 boosted points per day. Earn or top up spendable points, then tap a tier to activate it.</span>';
+                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. Buy the Level-2 plan below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: the Level-2 plan costs 5,000 premium points (a one-off purchase worth $10 / N3,000 in Nigeria), lasts 30 days, multiplies base win points by 2x on the global ledger, and NEVER auto-renews. Pay with the button below, email your receipt to the owner, and your premium points are credited on-chain after verification.</span>';
+                }
+
+                if (spendableEl) {
+                    spendableEl.innerHTML = prem
+                        ? 'Premium balance: <b style="color:#9b59b6;">' + (prem.premiumLifetime || 0).toLocaleString() + '</b> lifetime credential · <b style="color:#f39c12;">' + premiumSpendable.toLocaleString() + '</b> spendable' + (prem.lastCreditRef ? ' · last credit ref: <span class="mono">' + prem.lastCreditRef + '</span>' : '')
+                        : '--';
                 }
 
                 buyRow.innerHTML = '';
-                const ladder = window.ACTIVE_TIERS || {};
-                [2, 3, 4].forEach(level => {
-                    const t = ladder[level];
-                    if (!t) return;
+                if (!active && premiumSpendable >= 5000) {
                     const btn = document.createElement('button');
                     btn.className = 'launch-btn onchain';
                     btn.style.marginTop = '0';
                     btn.style.flex = '1';
                     btn.style.minWidth = '110px';
-                    btn.textContent = t.name + ' · ' + t.mult + 'x · ' + t.cost.toLocaleString();
-                    btn.disabled = spendable < t.cost;
-                    btn.title = spendable < t.cost ? 'Not enough spendable points' : 'Buy for one month';
+                    btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
                     btn.onclick = async function () {
-                        if (typeof window.buyActiveTier === 'function') {
-                            await window.buyActiveTier(level);
-                            if (window.refreshAuthHeader) {
-                                window.refreshAuthHeader().then(() => render(!!window.currentUser));
-                            }
+                        if (window.premiumPoints && typeof window.premiumPoints.activate === 'function') {
+                            btn.disabled = true;
+                            btn.textContent = 'Activating on-chain...';
+                            const sig = await window.premiumPoints.activate();
+                            if (window.refreshAuthHeader) window.refreshAuthHeader().then(() => render(!!window.currentUser));
                             renderTierCard();
+                            if (window.showAuthBanner) window.showAuthBanner(sig ? 'Level 2 active for 30 days. Welcome to the 2x club!' : 'Activation failed on-chain. Try again.', !sig);
                         }
                     };
                     buyRow.appendChild(btn);
-                });
+                } else if (!active) {
+                    const btn = document.createElement('button');
+                    btn.className = 'launch-btn onchain';
+                    btn.style.marginTop = '0';
+                    btn.style.flex = '1';
+                    btn.style.minWidth = '110px';
+                    btn.textContent = 'Buy Level 2 (2x) · $10 / N3,000';
+                    btn.onclick = function () {
+                        if (window.openPremiumCheckout) {
+                            window.openPremiumCheckout();
+                        } else {
+                            const p = window.currentProfile;
+                            const addr = p && p.solana_wallet ? p.solana_wallet : '';
+                            if (window.showAuthBanner) {
+                                window.showAuthBanner('Paystack checkout is being wired up. For now: make the N3,000 bank transfer (temporary Paystack account), then email your receipt to the owner with your wallet address ( ' + addr + ' ) to get 5,000 premium points.', true);
+                            }
+                        }
+                    };
+                    buyRow.appendChild(btn);
+                }
             }
 
             window.__renderTierUI = function () {

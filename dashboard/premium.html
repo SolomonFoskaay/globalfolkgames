@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Credit - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .prem-form { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
+        .prem-form label { font-size:0.82rem; color:#aaa; }
+        .prem-form input {
+            width:100%; padding:10px 14px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+            color:#fff; font-size:0.9rem; box-sizing:border-box;
+        }
+        .prem-form input::placeholder { color:#888; }
+        .prem-form input[type=number] { font-family:monospace; }
+        .prem-form button {
+            padding:12px 20px; border-radius:8px; border:none; cursor:pointer;
+            font-weight:600; font-size:0.9rem; background:#f39c12; color:#000;
+        }
+        .prem-form button:hover { background:#e67e22; }
+        .prem-form button:disabled { opacity:0.4; cursor:not-allowed; }
+        .prem-note {
+            background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2);
+            border-radius:8px; padding:12px 16px; margin-bottom:16px;
+            font-size:0.82rem; color:#ccc; line-height:1.6;
+        }
+        .prem-note b { color:#f39c12; }
+        .prem-card {
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+            border-radius:10px; padding:16px; margin-bottom:12px;
+        }
+        .prem-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .prem-card .label { color:var(--muted,#888); font-size:0.8rem; }
+        .prem-card .value { color:#fff; font-weight:600; }
+        .prem-card .mono { font-family:monospace; font-size:0.8rem; color:#9b59b6; word-break:break-all; }
+        .prem-row {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);
+            flex-wrap:wrap; gap:4px;
+        }
+        .prem-row:last-child { border-bottom:none; }
+        .prem-badge {
+            display:inline-block; padding:2px 8px; border-radius:4px;
+            font-size:0.75rem; font-weight:600;
+        }
+        .badge-ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
+        .badge-info { background:rgba(155,89,182,0.15); color:#9b59b6; }
+        .empty-state { color:#888; font-size:0.85rem; text-align:center; padding:24px; }
+        .ledger-grid {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px;
+        }
+        .ledger-cell {
+            background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+            border-radius:8px; padding:12px;
+        }
+        .ledger-cell .l { color:#888; font-size:0.75rem; }
+        .ledger-cell .v { color:#fff; font-size:1.05rem; font-weight:700; }
+        .ledger-cell .v.orange { color:#f39c12; }
+        .ledger-cell .v.purple { color:#9b59b6; }
+        .prev-credits {
+            margin-top:8px; font-size:0.8rem; color:#bbb;
+        }
+        .prev-credits li { margin-bottom:4px; word-break:break-all; }
+    </style>
+</head>
+<body>
+    <header id="global-header"></header>
+    <main style="max-width:780px;margin:0 auto;padding:80px 16px 40px;">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Points Credit (M5)</h1>
+        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
+            Credit the on-chain PREMIUM points ledger (<b style="color:#f39c12;">[gfgprem, player]</b>, buy-only)
+            after a VERIFIED manual payment. Runs base-layer signed by the sponsor key.
+        </p>
+
+        <div class="prem-note">
+            <b>How it works:</b> enter the cash-payer's Solana wallet address and the premium points amount
+            they bought (1,000 Naira = ~1,666.67p at N3,000 for $10). Fill or accept the auto-generated credit
+            reference, paste the operator token, and click Credit. The relay writes <b>premium_lifetime</b> and
+            <b>premium_spendable</b> together (idempotent by credit ref, so a retry can never double-credit).
+            It never touches the M3 local or M4 global game-points ledgers.
+        </div>
+
+        <div class="prem-form">
+            <label for="prem-player">Player Solana wallet address</label>
+            <input type="text" id="prem-player" placeholder="e.g. 7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB" autocomplete="off">
+            <label for="prem-points">Premium points to credit</label>
+            <input type="number" id="prem-points" placeholder="e.g. 5000" min="1" autocomplete="off">
+            <label for="prem-ref">Credit reference (integer, unique per payment)</label>
+            <input type="number" id="prem-ref" placeholder="e.g. 1938472" min="1" autocomplete="off">
+            <label for="prem-token">Operator token (GFG_OPERATOR_TOKEN)</label>
+            <input type="password" id="prem-token" placeholder="operator token" autocomplete="off">
+            <button id="prem-credit-btn">Credit Premium Points</button>
+        </div>
+
+        <div id="prem-results">
+            <div class="empty-state">Fill the form above and click Credit to see the relay receipt and the on-chain ledger.</div>
+        </div>
+
+        <div class="prem-card">
+            <h3>Recent credits from this browser</h3>
+            <ul id="prem-history" class="prev-credits">
+                <li class="empty-state">No credits yet this session.</li>
+            </ul>
+        </div>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/pager.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'premium',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                    { heading: 'Staff', items: [
+                        { key: 'content-guide', label: '✏ Content style guide', href: '/dashboard/content-style-guide.html' },
+                    ]},
+                ]
+            });
+        });
+    </script>
+    <script type="module">
+        import { Connection, PublicKey } from '@solana/web3.js';
+        import bs58 from 'bs58';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            const $player = document.getElementById('prem-player');
+            const $points = document.getElementById('prem-points');
+            const $ref = document.getElementById('prem-ref');
+            const $token = document.getElementById('prem-token');
+            const $btn = document.getElementById('prem-credit-btn');
+            const $results = document.getElementById('prem-results');
+            const $history = document.getElementById('prem-history');
+
+            const HISTORY_KEY = 'gfg_premium_credit_history';
+            const fmtNum = n => Number(n || 0).toLocaleString();
+            const esc = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            function renderHistory() {
+                const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+                if (!rows.length) {
+                    $history.innerHTML = '<li class="empty-state">No credits yet this session.</li>';
+                    return;
+                }
+                $history.innerHTML = rows.slice(0, 10).map(r =>
+                    `<li><b style="color:#f39c12;">${fmtNum(r.points)}</b> premium → ${esc(r.player.slice(0, 8))}…${esc(r.player.slice(-8))} · ref ${esc(r.creditRef)} · ${esc(r.sig ? r.sig.slice(0, 16) + '…' : 'no sig')} · ${esc(new Date(r.ts || Date.now()).toLocaleString())}</li>`
+                ).join('');
+            }
+
+            function pushHistory(p) {
+                try {
+                    const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+                    rows.unshift({ player: p.player, points: p.points, creditRef: p.creditRef, sig: p.sig, ts: Date.now() });
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(rows.slice(0, 20)));
+                    renderHistory();
+                } catch (e) { /* ignore */ }
+            }
+
+            function renderLedger(ledger, sig) {
+                const level = ledger.subscriptionLevel || 0;
+                const until = ledger.subscriptionActiveUntil || 0;
+                const daysLeft = until > Date.now() ? Math.ceil((until - Date.now()) / 86400000) : 0;
+                const status = level > 0 && daysLeft > 0
+                    ? `<span class="prem-badge badge-ok">Active Level ${level} (${daysLeft}d left)</span>`
+                    : (level > 0 ? `<span class="prem-badge badge-info">Sub expired / renew soon</span>` : `<span class="prem-badge badge-info">No active sub</span>`);
+                return `
+                    <div class="ledger-grid">
+                        <div class="ledger-cell">
+                            <div class="l">Premium lifetime (never spendable)</div>
+                            <div class="v orange">${fmtNum(ledger.premiumLifetime)}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Premium spendable</div>
+                            <div class="v purple">${fmtNum(ledger.premiumSpendable)}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Subscription status</div>
+                            <div class="v" style="font-size:0.85rem;">${status}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Last credit (points / ref / time)</div>
+                            <div class="v" style="font-size:0.85rem;font-weight:600;">${fmtNum(ledger.lastCreditPoints)} / ${esc(ledger.lastCreditRef)} / ${ledger.lastCreditTs ? esc(new Date(ledger.lastCreditTs).toLocaleString()) : '-'}</div>
+                        </div>
+                    </div>
+                    ${sig ? `<div class="prem-row" style="margin-top:10px;"><span class="label">Base-layer tx (devnet explorer)</span><span class="mono"><a href="https://explorer.solana.com/tx/${esc(sig)}?cluster=devnet" target="_blank" rel="noreferrer">${esc(sig)}</a></span></div>` : ''}
+                `;
+            }
+
+            $btn.addEventListener('click', async () => {
+                const player = $player.value.trim().toLowerCase();
+                const points = parseInt($points.value, 10);
+                const creditRef = parseInt($ref.value.trim(), 10);
+                const token = $token.value.trim();
+                if (!player) return alert('Enter a player wallet address.');
+                try { new PublicKey(player); } catch (e) { return alert('Invalid Solana wallet address.'); }
+                if (!points || points <= 0) return alert('Enter premium points greater than 0.');
+                if (!creditRef) return alert('Enter a credit reference (the verified payment id).');
+                if (!Number.isInteger(creditRef) || creditRef <= 0) return alert('Credit reference must be a positive integer (the on-chain ref is a number).');
+                if (!token || token.length < 8) return alert('Enter the operator token.');
+
+                $btn.disabled = true;
+                $btn.textContent = 'Crediting on-chain...';
+                $results.innerHTML = '<div class="empty-state">Relay is signing the credit write on the base layer...</div>';
+                try {
+                    const res = await fetch('/api/credit-premium', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ player, points, creditRef, token }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                    // Read back the on-chain ledger (any region, no sign).
+                    const ledger = await window.magicblockDice
+                        ? window.magicblockDice.fetchPremiumPointsPdaFor(player)
+                        : null;
+                    pushHistory({ player, points, creditRef, sig: data.sig });
+                    $results.innerHTML = `
+                        <div class="prem-card">
+                            <h3>Relay receipt</h3>
+                            <div class="prem-row"><span class="label">Player</span><span class="mono">${esc(data.player || player)}</span></div>
+                            <div class="prem-row"><span class="label">Points credited</span><span class="value">${fmtNum(points)}</span></div>
+                            <div class="prem-row"><span class="label">Credit ref</span><span class="mono">${esc(data.creditRef)}</span></div>
+                            <div class="prem-row"><span class="label">Undelegated for base-layer credit</span><span class="value">${data.undelegated ? 'yes' : 'no'}</span></div>
+                            <div class="prem-row"><span class="label">Re-delegated to ER</span><span class="value">${data.redelegated ? 'yes' : 'no'}</span></div>
+                            <div class="prem-row"><span class="label">Base-layer signature</span><span class="mono">${esc(data.sig)}</span></div>
+                            <div style="margin-top:8px;">
+                                <a href="https://explorer.solana.com/tx/${esc(data.sig)}?cluster=devnet" target="_blank" rel="noreferrer" style="color:#f39c12;font-size:0.85rem;">View on Solana explorer</a>
+                            </div>
+                        </div>
+                        <div class="prem-card">
+                            <h3>On-chain ledger readback</h3>
+                            ${ledger ? renderLedger(ledger, data.sig) : '<div class="empty-state">Ledger readback pending (the re-delegated PDA may take a moment to appear on the ER). Refresh after a few seconds.</div>'}
+                        </div>
+                    `;
+                } catch (e) {
+                    $results.innerHTML = `<div class="prem-card"><h3 style="color:#e74c3c;">Credit failed</h3><div class="prem-row"><span class="label">Error</span><span class="value">${esc(e.message)}</span></div></div>`;
+                } finally {
+                    $btn.disabled = false;
+                    $btn.textContent = 'Credit Premium Points';
+                }
+            });
+
+            renderHistory();
+        });
+    </script>
+</body>
+</html>

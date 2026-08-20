@@ -8,6 +8,61 @@
   },
   "instructions": [
     {
+      "name": "activate_subscription",
+      "docs": [
+        "(M5) Activates the Level-2 (2x) subscription from PREMIUM spendable.",
+        "Deducts PREMIUM_PLAN_COST (5,000), sets subscription_level = 2 and",
+        "subscription_active_until = now + 30 days. NO auto-renew: the window is",
+        "fixed; expiry is passive until the next manual purchase/credit. Runs",
+        "GASLESS on the ER (session key signs)."
+      ],
+      "discriminator": [
+        101,
+        41,
+        57,
+        61,
+        203,
+        67,
+        214,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "callback_roll_dice",
       "docs": [
         "Called by the VRF program (oracle-verified) with the randomness."
@@ -269,6 +324,70 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "credit_premium_points",
+      "docs": [
+        "The admin (stored admin_authority, e.g. the sponsor/ecror) credits the",
+        "player's PREMIUM points ledger after a VERIFIED manual payment. Writes",
+        "premium_lifetime AND premium_spendable together. idempotent by",
+        "`credit_ref`, so admin double-clicks can never double-credit.",
+        "Runs base-layer or ER signed by the admin key (never by the player)."
+      ],
+      "discriminator": [
+        215,
+        69,
+        210,
+        120,
+        241,
+        72,
+        37,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "credit_ref",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "delegate",
@@ -970,6 +1089,181 @@
       ]
     },
     {
+      "name": "delegate_premium_points",
+      "docs": [
+        "Delegates the player's PREMIUM points PDA into an ER session (base",
+        "layer, sponsor pays) so spend_premium_points / activate_subscription run",
+        "gasless on the rollup."
+      ],
+      "discriminator": [
+        205,
+        124,
+        46,
+        193,
+        135,
+        27,
+        106,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "premium_points"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "premium_points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "premium_points"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "premium_points",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "delegate_result",
       "docs": [
         "Delegates the player's RESULT PDA into an ER session (base layer,",
@@ -1475,6 +1769,64 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "initialize_premium_points",
+      "docs": [
+        "Idempotent: creates the player's PREMIUM points PDA if it does not",
+        "exist yet. Seed [gfgprem, player_authority]. Payer (sponsor/ecror) pays",
+        "rent; the payer becomes the stored ADMIN AUTHORITY who alone can credit",
+        "the account (mirrors the Competition sponsor pattern)."
+      ],
+      "discriminator": [
+        98,
+        95,
+        38,
+        177,
+        198,
+        224,
+        74,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "initialize_result",
@@ -2328,6 +2680,74 @@
       ]
     },
     {
+      "name": "spend_premium_points",
+      "docs": [
+        "(M5) Draws down the SPENDABLE track of the player's PREMIUM points PDA.",
+        "Runs GASLESS on the ER (session key signs, 0 SOL, player-consented);",
+        "`spend_ref` is the purchase reference for replayability. premium_lifetime",
+        "is never touched. (The operator/admin can also spend on the player's",
+        "behalf with their authority, e.g. subscription activation.)"
+      ],
+      "discriminator": [
+        162,
+        189,
+        34,
+        58,
+        164,
+        155,
+        103,
+        131
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "undelegate",
       "docs": [
         "Commits the latest state and returns the PDA to this program (runs on ER)."
@@ -2540,6 +2960,68 @@
       ]
     },
     {
+      "name": "undelegate_premium_points",
+      "docs": [
+        "Commits the latest state and returns the PREMIUM points PDA to this",
+        "program (runs on ER). Mirrors `undelegate_global_points` so a premium",
+        "PDA can leave a flaky region and be re-pinned. Additive, 2026-08-20."
+      ],
+      "discriminator": [
+        190,
+        204,
+        186,
+        37,
+        78,
+        84,
+        156,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "undelegate_result",
       "docs": [
         "Commits the latest state and returns the RESULT PDA to this program",
@@ -2669,6 +3151,19 @@
         199,
         48
       ]
+    },
+    {
+      "name": "PremiumPoints",
+      "discriminator": [
+        128,
+        231,
+        201,
+        193,
+        30,
+        238,
+        115,
+        64
+      ]
     }
   ],
   "errors": [
@@ -2746,6 +3241,21 @@
       "code": 6014,
       "name": "AlreadyClaimed",
       "msg": "allocation already claimed"
+    },
+    {
+      "code": 6015,
+      "name": "NotAdmin",
+      "msg": "premium points credit requires the admin authority signer"
+    },
+    {
+      "code": 6016,
+      "name": "DuplicateCreditRef",
+      "msg": "premium points credit_ref already used (duplicate credit guard)"
+    },
+    {
+      "code": 6017,
+      "name": "InsufficientPremiumBalance",
+      "msg": "insufficient premium spendable balance"
     }
   ],
   "types": [
@@ -3035,6 +3545,88 @@
           },
           {
             "name": "result_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PremiumPoints",
+      "docs": [
+        "On-chain PREMIUM points ledger for one player (M5 — subscription + premium",
+        "points, the launch engine). One account per player, seed [gfgprem, player].",
+        "Runs gasless on the ER.",
+        "",
+        "Two tracks, buy-only (never earned from gameplay):",
+        "- premium_lifetime    : the player's permanent premium-point credential",
+        "(never spendable).",
+        "- premium_spendable   : the spendable premium balance (buys the Active",
+        "Tier subscription, lives, and anything else premium",
+        "spendable is accepted for - places global spendable",
+        "can NEVER go). Acquired ONLY via admin",
+        "`credit_premium_points` after a verified purchase.",
+        "",
+        "Subscription state lives here (never Supabase):",
+        "- subscription_level     : 0 = free, 2 = Level-2 (2x) at launch.",
+        "- subscription_active_until : unix ts; a fixed 30-day window, NO auto-renew",
+        "(expiry is passive until the next manual purchase).",
+        "",
+        "`version: u8` is FIRST per upgrade-safety R2 (live layouts are versioned).",
+        "The MEDIA never merges into global (M4) or local (M3) ledgers."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "admin_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "premium_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "premium_spendable",
+            "type": "u64"
+          },
+          {
+            "name": "subscription_level",
+            "type": "u8"
+          },
+          {
+            "name": "subscription_active_until",
+            "type": "i64"
+          },
+          {
+            "name": "last_credit_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_credit_points",
+            "type": "u64"
+          },
+          {
+            "name": "last_credit_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_spend_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_spend_reason",
+            "type": "u8"
+          },
+          {
+            "name": "spend_count",
             "type": "u64"
           }
         ]
