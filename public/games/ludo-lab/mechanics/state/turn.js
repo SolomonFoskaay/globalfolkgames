@@ -270,6 +270,22 @@ function initiateArenaMatch() {
         return;
     }
 
+    // M10 LIVES GATE: block the match start when today's free-play lives are
+    // exhausted (refill at GMT+00). The gate reads window.gfgLives (loaded on
+    // every page via the header); when the module is absent (dev page without
+    // the header) play is NOT blocked.
+    if (typeof window.gfgLives === 'object' && window.gfgLives && typeof window.gfgLives.get === 'function') {
+        const lives = window.gfgLives.get();
+        if (lives && lives.livesLeft <= 0) {
+            const mins = Math.ceil((lives.resetsInMs || 0) / 60000);
+            displayEducationalLog(`ERROR: No lives left for today. Lives refill at midnight (GMT+00)${mins > 0 ? `, about ${mins} min away` : ''}.`);
+            if (typeof window.showAuthBanner === 'function') {
+                window.showAuthBanner(`No lives left today. Your meter refills at midnight (GMT), roughly ${mins > 0 ? mins + ' minutes' : 'soon'}.\n\nBecome a Level-2 subscriber for 10 lives a day instead of 5.`, true);
+            }
+            return;
+        }
+    }
+
     // Fresh-match start seat: classic Ludo turn order is GREEN → YELLOW → BLUE
     // → RED regardless of 2P or 4P, so the match opens on the FIRST ACTIVE seat
     // in that canonical order (4P = GREEN; 2P = whichever of the chosen colours

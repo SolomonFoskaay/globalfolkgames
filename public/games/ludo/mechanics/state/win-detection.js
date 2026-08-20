@@ -4,6 +4,7 @@
 (function () {
 
     let pointsAwardedThisMatch = false;
+    let lifeConsumedThisMatch = false; // M10: one life per completed match
     let finishOrder = [];   // e.g. ['green', 'red', 'yellow', 'blue']
     // Scope C: the on-chain result commit (full 1st..4th finish order) mirrors
     // the award that was banked, tying the committed order to the winning roll.
@@ -26,6 +27,15 @@
         // Record finishing position
         finishOrder.push(color);
         const position = finishOrder.length; // 1, 2, 3 or 4
+
+        // M10: consume one life when the match fully completes (all seats
+        // finished). The classic ludo build predates the M2 seam, so it consumes
+        // directly here instead of via window.onGameResult; exactly once per
+        // match. Abandon/reset/disconnect never reach this point.
+        if (finishOrder.length === 4 && !lifeConsumedThisMatch && window.gfgLives && typeof window.gfgLives.consume === 'function') {
+            lifeConsumedThisMatch = true;
+            window.gfgLives.consume();
+        }
 
         console.log(`Position ${position}: ${color.toUpperCase()}`);
 
@@ -199,6 +209,7 @@
     // Reset only the match flags (Local points stay permanent)
     window.resetWinDetection = function () {
         pointsAwardedThisMatch = false;
+        lifeConsumedThisMatch = false;
         finishOrder = [];
     };
 

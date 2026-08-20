@@ -44,6 +44,7 @@
         referral: 11,
         giveaway: 12,
         tier_boost: 13,
+        daily_reward: 14,
     };
 
     function sourceCodeFor(gameId) {

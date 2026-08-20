@@ -113,6 +113,14 @@
                 <div title="Last award banked on-chain">Last: <span data-local-points-last style="color:#2ecc71;">—</span></div>
             </div>
 
+            <!-- M10 lives + daily reward (module-driven slots, filled by /universal/lives/lives.js + daily-reward.js) -->
+            <div id="lives-reward-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; align-items: center; box-sizing: border-box;">
+                <div title="Free-play lives today (refill at midnight GMT)">Lives: <span data-lives-left style="color:#2ecc71;">–</span>/<span data-lives-total style="color:#2ecc71;">–</span></div>
+                <div title="Daily reward for today (claim once)">Daily: <span data-daily-amount style="color:#f39c12;">–</span>P <span data-daily-claimed style="color:#9b59b6;">–</span></div>
+                <button id="claimDailyBtn" style="background: #f39c12; color: #000; border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Claim daily</button>
+            </div>
+            <div id="daily-claim-msg" style="display:none; margin-top:6px; font-size:0.78rem; text-align:center; padding:4px 8px; border-radius:8px; width:100%; box-sizing:border-box;"></div>
+
             <!-- Clickable on-chain verification link (shown after each on-chain roll) -->
             <div id="verify-tx-link" style="display:none; margin-top:6px; font-size:0.78rem; text-align:center; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.35); border-radius:8px; padding:6px 8px; width:100%; box-sizing:border-box;"></div>
 
@@ -158,6 +166,50 @@
     <script src="/universal/result-seam/game-result.js"></script>
     <script src="/universal/points/local-points.js"></script>
     <script src="/universal/ledgers/global-ledger.js"></script>
+    <script src="/universal/subscription/premium-ledger.js"></script>
+    <script src="/universal/lives/lives.js"></script>
+    <script src="/universal/lives/daily-reward.js"></script>
+    <script>
+    // M10 daily-claim UI wiring: show the claim result (success / sign-in /
+    // already claimed / failure) in the banner under the lives-reward bar.
+    (function () {
+        const btn = document.getElementById('claimDailyBtn');
+        const msg = document.getElementById('daily-claim-msg');
+        function show(text, color) {
+            if (!msg) return;
+            msg.style.display = 'block';
+            msg.style.background = color === 'red' ? 'rgba(231,76,60,0.12)' : 'rgba(46,204,113,0.12)';
+            msg.style.border = '1px solid ' + (color === 'red' ? 'rgba(231,76,60,0.45)' : 'rgba(46,204,113,0.45)');
+            msg.textContent = text;
+            setTimeout(function () { if (msg) msg.style.display = 'none'; }, 6000);
+        }
+        if (!btn) return;
+        btn.addEventListener('click', async function () {
+            if (!window.gfgDaily) { show('Daily reward is still loading. Try again in a moment.', 'red'); return; }
+            btn.disabled = true;
+            const res = await window.gfgDaily.claim();
+            btn.disabled = false;
+            if (res && res.ok && res.claimed) {
+                show('+ ' + res.points + 'P daily reward banked on-chain. Come back tomorrow for more!', 'green');
+                if (window.gfgDaily && typeof window.gfgDaily.get === 'function') {
+                    const view = window.gfgDaily.get();
+                    if (document.querySelector('[data-daily-claimed]')) {
+                        document.querySelectorAll('[data-daily-claimed]').forEach(el => { el.textContent = 'Claimed'; });
+                    }
+                }
+            } else if (res && res.claimed) {
+                show('You already claimed your daily reward today.', 'green');
+            } else if (res && res.error === 'signin') {
+                show('Sign in to claim your daily reward (top-right menu).');
+                if (typeof window.openDynamicLogin === 'function') window.openDynamicLogin();
+            } else if (res && res.message) {
+                show(res.message, 'red');
+            } else {
+                show('Could not claim today. Try again shortly.', 'red');
+            }
+        });
+    })();
+</script>
 
     <!-- Ludo lab scripts (duplicate arena build) -->
     <script src="/games/ludo-lab/board.js"></script>
