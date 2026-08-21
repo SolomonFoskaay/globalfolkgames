@@ -63,16 +63,23 @@
     try {
       if (window.globalLedger && typeof window.globalLedger.reset === 'function') window.globalLedger.reset();
     } catch (e) { /* ignore */ }
+    try {
+      if (window.premiumPoints && typeof window.premiumPoints.reset === 'function') window.premiumPoints.reset();
+    } catch (e) { /* ignore */ }
   }
 
   function fetchOnce(sdk) {
     var lp = window.localPoints;
     var gl = window.globalLedger;
+    var pp = window.premiumPoints;
     if (lp && typeof lp.fetch === 'function') {
       try { lp.fetch(); } catch (e) { /* ignore */ }
     }
     if (gl && typeof gl.fetch === 'function') {
       try { gl.fetch(); } catch (e) { /* ignore */ }
+    }
+    if (pp && typeof pp.fetch === 'function') {
+      try { pp.fetch(); } catch (e) { /* ignore */ }
     }
   }
 

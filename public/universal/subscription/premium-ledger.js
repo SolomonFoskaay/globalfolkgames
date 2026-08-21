@@ -301,7 +301,9 @@
 
     function handleDomReady() {
         renderCached();
-        refreshWhenWalletReady();
+        // Do NOT auto-refresh on page load — the single RPC (auth/win) in points-store already
+        // fetches premium together with M3/M4, and the cached value is served everywhere.
+        // Hitting RPC on every page load is what got the AS banned before.
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', handleDomReady);

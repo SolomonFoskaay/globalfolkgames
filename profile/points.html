@@ -236,6 +236,14 @@
                     `;
                     return;
                 }
+                // If no cached ledger but wallet is known, show 0 rather than stuck loading — the single RPC (auth/win) will refresh it
+                if (pp && typeof pp.get === 'function') {
+                    const hasWallet = window.pointsStore ? window.pointsStore.hasWallet() : !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet());
+                    if (hasWallet) {
+                        premiumLedgerEl.innerHTML = '<p class="empty">Premium: 0 Lifetime / 0 Spendable — no premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
+                        return;
+                    }
+                }
                 if (pp && typeof pp.checked === 'function' && pp.checked()) {
                     premiumLedgerEl.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
                 } else {
