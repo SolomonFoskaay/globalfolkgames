@@ -183,19 +183,30 @@
                 <div style="color:#888;font-size:0.85rem;text-align:center;padding:24px;">Enter an email or wallet and tap Search, or Scan all to load on-chain premium PDAs.</div>
             </div>
             <div style="margin-top:8px; font-size:0.78rem; color:#888;">Selected: <span id="selected-wallet" class="mono" style="color:#f39c12;">none</span> <span id="selected-email" style="color:#bbb;"></span></div>
-            <div id="upgrade-card" style="display:none; margin-top:16px; background:rgba(155,89,182,0.06); border:1px solid rgba(155,89,182,0.25); border-radius:10px; padding:16px;">
-                <h3 style="margin:0 0 6px; font-size:0.95rem; color:#9b59b6;">Subscription upgrade / downgrade — separate from adding points</h3>
-                <p style="color:#888; font-size:0.8rem; line-height:1.5; margin:0 0 10px;">Shows the selected user's premium balance auto-loaded. Upgrade checks 5,000 premium spendable on-chain — no shortcut, spend is recorded. Downgrade cancels an active sub that has exceeded time.</p>
-                <div id="upgrade-ledger"><p class="empty">Select a user above to see their premium balance and subscription.</p></div>
-                <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
-                    <button id="btn-upgrade" class="btn-success" disabled>Upgrade to Level 2 (5,000P)</button>
-                    <button id="btn-cancel" class="btn-danger" disabled>Cancel subscription (downgrade)</button>
-                </div>
+            <div id="upgrade-card" style="display:none; margin-top:16px; background:rgba(46,204,113,0.06); border:1px solid rgba(46,204,113,0.25); border-radius:10px; padding:16px;">
+                <h3 style="margin:0 0 6px; font-size:0.95rem; color:#2ecc71;">Upgrade to Level 2 — separate from adding points</h3>
+                <p style="color:#888; font-size:0.8rem; line-height:1.5; margin:0 0 10px;">Pick a user (already loaded above) to see their premium balance. Upgrade checks 5,000 premium spendable on-chain — no shortcut, spend is recorded in lifetime/spendable.</p>
+                <select id="upgrade-user-select" style="width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#1a1a24; color:#fff; margin-bottom:8px;"><option value="">Pick user to upgrade...</option></select>
+                <div id="upgrade-ledger"><p class="empty">Select a user to see their premium balance and upgrade them.</p></div>
+                <button id="btn-upgrade" class="btn-success" disabled style="margin-top:8px;">Upgrade to Level 2 (5,000P)</button>
                 <p id="upgrade-msg" style="font-size:0.8rem; color:#bbb; margin-top:8px;"></p>
-                <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button id="btn-promo" class="btn-secondary" disabled style="font-size:0.78rem;">Promo: Credit 5,000P + Activate (one click)</button>
-                    <span id="action-msg" style="font-size:0.8rem;color:#bbb;align-self:center;"></span>
-                </div>
+            </div>
+
+            <div id="downgrade-card" style="display:none; margin-top:16px; background:rgba(231,76,60,0.06); border:1px solid rgba(231,76,60,0.25); border-radius:10px; padding:16px;">
+                <h3 style="margin:0 0 6px; font-size:0.95rem; color:#e74c3c;">Downgrade / Cancel subscription</h3>
+                <p style="color:#888; font-size:0.8rem; line-height:1.5; margin:0 0 10px;">Pick a user (already loaded above) to see their premium balance. Downgrade cancels an active sub that has exceeded time on the on-chain ledger.</p>
+                <select id="downgrade-user-select" style="width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#1a1a24; color:#fff; margin-bottom:8px;"><option value="">Pick user to downgrade...</option></select>
+                <div id="downgrade-ledger"><p class="empty">Select a user to see their premium balance and downgrade them.</p></div>
+                <button id="btn-cancel" class="btn-danger" disabled style="margin-top:8px;">Cancel subscription (downgrade)</button>
+                <p id="downgrade-msg" style="font-size:0.8rem; color:#bbb; margin-top:8px;"></p>
+            </div>
+
+            <div id="promo-card" style="display:none; margin-top:16px; background:rgba(155,89,182,0.08); border:1px solid rgba(155,89,182,0.3); border-radius:10px; padding:16px;">
+                <h3 style="margin:0 0 6px; font-size:0.95rem; color:#9b59b6;">Promo: Credit 5,000P + Activate (one click)</h3>
+                <p style="color:#888; font-size:0.8rem; line-height:1.5; margin:0 0 10px;">Uses the user it fresh-seeds 5,000P then immediately activates — still consumes premium spendable, so insufficient balance fails. Requires operator token if set on the relay.</p>
+                <input type="password" id="operator-token" placeholder="Operator token (only if relay requires)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#1a1a24; color:#fff; margin-bottom:8px; box-sizing:border-box;">
+                <button id="btn-promo" class="btn-secondary" disabled>Promo: Credit 5,000P + Activate (one click)</button>
+                <span id="action-msg" style="font-size:0.8rem;color:#bbb;align-self:center; margin-left:8px;"></span>
             </div>
         </div>
     </main>
@@ -518,9 +529,12 @@
                                 if(lg){ tSelected.premiumLifetime=lg.premiumLifetime; tSelected.premiumSpendable=lg.premiumSpendable; tSelected.subscriptionLevel=lg.subscriptionLevel; tSelected.subscriptionActiveUntil=lg.subscriptionActiveUntil; }
                                 if($tUpgradeLedger){
                                     const lvl=tSelected.subscriptionLevel||0, until=tSelected.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0, active=lvl>0&&days>0;
-                                    $tUpgradeLedger.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(tSelected.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(tSelected.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active?`<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>`:(lvl>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active?'can downgrade':(tSelected.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
+                                    const bal=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(tSelected.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(tSelected.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active?`<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>`:(lvl>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active?'can downgrade':(tSelected.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
+                                    $tUpgradeLedger.innerHTML=bal;
+                                    const downLed=document.getElementById('downgrade-ledger'); if(downLed) downLed.innerHTML=bal;
                                     if($tBtnUpgrade) $tBtnUpgrade.disabled=!((tSelected.premiumSpendable||0)>=5000 && !active);
                                     if($tBtnCancel) $tBtnCancel.disabled=!active;
+                                    const promoCard=document.getElementById('promo-card'); if(promoCard) promoCard.style.display='none';
                                 }
                             }catch(e){}
                         }
@@ -556,13 +570,14 @@
                     if($tSelWallet) $tSelWallet.textContent=w; if($tSelEmail) $tSelEmail.textContent=e?' ('+e+')':'';
                     const upCard=document.getElementById('upgrade-card'), upLed=document.getElementById('upgrade-ledger'), upBtn=document.getElementById('btn-upgrade'), canBtn=document.getElementById('btn-cancel');
                     if(upCard) upCard.style.display='block';
-                    if(upLed){
-                        const lvl2=lg.subscriptionLevel||0, until2=lg.subscriptionActiveUntil||0, days2=until2>Date.now()?Math.ceil((until2-Date.now())/86400000):0, active2=lvl2>0&&days2>0;
-                        upLed.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(lg.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(lg.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active2?`<span style="color:#2ecc71;">Active Level ${lvl2} (${days2}d left)</span>`:(lvl2>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active2?'can downgrade':(lg.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
-                        if(upBtn) upBtn.disabled=!((lg.premiumSpendable||0)>=5000 && !active2);
-                        if(canBtn) canBtn.disabled=!active2;
-                    }
-                    if(canBtn) canBtn.disabled=false;
+                    const bal2=(()=>{ const lvl2=lg.subscriptionLevel||0, until2=lg.subscriptionActiveUntil||0, days2=until2>Date.now()?Math.ceil((until2-Date.now())/86400000):0, active2=lvl2>0&&days2>0; return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(lg.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(lg.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active2?`<span style="color:#2ecc71;">Active Level ${lvl2} (${days2}d left)</span>`:(lvl2>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active2?'can downgrade':(lg.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`; })();
+                    if(upLed) upLed.innerHTML=bal2;
+                    const downCard=document.getElementById('downgrade-card'), downLed=document.getElementById('downgrade-ledger');
+                    if(downCard) downCard.style.display='block';
+                    if(downLed) downLed.innerHTML=bal2;
+                    if(upBtn) upBtn.disabled=!((lg.premiumSpendable||0)>=5000 && !(lg.subscriptionLevel>0 && lg.subscriptionActiveUntil>Date.now()));
+                    if(canBtn) canBtn.disabled=!(lg.subscriptionLevel>0 && lg.subscriptionActiveUntil>Date.now());
+                    const promoCard=document.getElementById('promo-card'); if(promoCard) promoCard.style.display='block';
                     const promoBtn=document.getElementById('btn-promo'); if(promoBtn) promoBtn.disabled=false;
                     tRenderTable(tCurrentList);
                     if($tMsg) $tMsg.textContent='Found 1 subscriber.';
@@ -642,6 +657,37 @@
                     if($tMsg) $tMsg.textContent='Promo complete. Activated. Sig: '+(j.sig||'ok')+' — re-search to verify.';
                 }catch(e){ if($tMsg) $tMsg.textContent='Promo failed: '+e.message; }
                 _promoBtn.disabled=false;
+            });
+            // Upgrade / downgrade selects auto-populated from the shared Dynamic list (one RPC)
+            const upSel=document.getElementById('upgrade-user-select');
+            if(upSel) upSel.addEventListener('change', async()=>{
+                const w=upSel.value; if(!w) return;
+                tSelected={wallet:w}; 
+                try{
+                    const lg=await tFetchByWallet(w);
+                    if(lg){ tSelected.premiumLifetime=lg.premiumLifetime; tSelected.premiumSpendable=lg.premiumSpendable; tSelected.subscriptionLevel=lg.subscriptionLevel; tSelected.subscriptionActiveUntil=lg.subscriptionActiveUntil; }
+                    const upLed=document.getElementById('upgrade-ledger'), upBtn=document.getElementById('btn-upgrade');
+                    const lvl=tSelected.subscriptionLevel||0, until=tSelected.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0, active=lvl>0&&days>0;
+                    if(upLed) upLed.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(lg?lg.premiumLifetime||0:0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(lg?lg.premiumSpendable||0:0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active?`<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>`:(lvl>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active?'already active (downgrade instead)':(tSelected.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
+                    if(upBtn) upBtn.disabled=!((tSelected.premiumSpendable||0)>=5000 && !active);
+                    const umsg=document.getElementById('upgrade-msg'); if(umsg) umsg.textContent='';
+                    if($tSelWallet) $tSelWallet.textContent=w;
+                }catch(e){}
+            });
+            const downSel=document.getElementById('downgrade-user-select');
+            if(downSel) downSel.addEventListener('change', async()=>{
+                const w=downSel.value; if(!w) return;
+                tSelected={wallet:w};
+                try{
+                    const lg=await tFetchByWallet(w);
+                    if(lg){ tSelected.premiumLifetime=lg.premiumLifetime; tSelected.premiumSpendable=lg.premiumSpendable; tSelected.subscriptionLevel=lg.subscriptionLevel; tSelected.subscriptionActiveUntil=lg.subscriptionActiveUntil; }
+                    const downLed=document.getElementById('downgrade-ledger'), downBtn=document.getElementById('btn-cancel');
+                    const lvl=tSelected.subscriptionLevel||0, until=tSelected.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0, active=lvl>0&&days>0;
+                    if(downLed) downLed.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(lg?lg.premiumLifetime||0:0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(lg?lg.premiumSpendable||0:0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active?`<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>`:(lvl>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active?'can downgrade':'not active (nothing to cancel)'}</p>`;
+                    if(downBtn) downBtn.disabled=!active;
+                    const dmsg=document.getElementById('downgrade-msg'); if(dmsg) dmsg.textContent='';
+                    if($tSelWallet) $tSelWallet.textContent=w;
+                }catch(e){}
             });
         });
     </script>

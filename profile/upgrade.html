@@ -38,6 +38,7 @@
     <script src="/global_header.js"></script>
     <script src="/dash-nav.js"></script>
     <script src="/gfg-explorer.js"></script>
+    <script src="/universal/subscription/premium-ledger.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             window.GFG_DASH_NAV.render({
@@ -146,13 +147,18 @@
                 try {
                     localStorage.setItem(REFRESH_KEY, String(Date.now()));
                     updateRefreshLock();
-                    // Direct RPC — not from cache, to mitigate misuse we only allow via button and lock
+                    // Direct RPC — not from cache, to mitigate misuse we only allow via button and lock.
+                    // Use premiumPoints.fetch() so the module CACHE is seeded too — the Upgrade
+                    // button reads window.premiumPoints.get(), and without this it always sees 0
+                    // spendable and stays disabled even after the balance is shown.
                     let ledger = null;
-                    if (window.magicblockDice && window.magicblockDice.fetchPremiumPointsPdaFor) {
+                    if (window.premiumPoints && typeof window.premiumPoints.fetch === 'function') {
+                        ledger = await window.premiumPoints.fetch();
+                    } else if (window.magicblockDice && window.magicblockDice.fetchPremiumPointsPdaFor) {
                         ledger = await window.magicblockDice.fetchPremiumPointsPdaFor(addr);
                     }
                     if (!ledger) {
-                        // No account yet — show 0
+                        // No account yet — show 0 (upgrade button stays disabled, tells to get premium)
                         renderPremiumCard({ premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0 });
                     } else {
                         renderPremiumCard(ledger);
