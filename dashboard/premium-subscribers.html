@@ -418,7 +418,8 @@
             }
 
             $btn.addEventListener('click', async () => {
-                const player = $player.value.trim().toLowerCase();
+                // Solana base58 is case-sensitive — never toLowerCase() (mangles into another wallet)
+                const player = $player.value.trim();
                 const points = parseInt($points.value, 10);
                 const creditRef = parseInt($ref.value.trim(), 10);
                 if (!player) return alert('Pick a user from the dropdown or paste a wallet.');

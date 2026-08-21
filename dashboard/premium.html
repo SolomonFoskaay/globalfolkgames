@@ -328,7 +328,10 @@
             }
 
             $btn.addEventListener('click', async () => {
-                const player = $player.value.trim().toLowerCase();
+                // IMPORTANT: Solana base58 is case-sensitive — never toLowerCase() an address.
+                // Doing so mangles it into a DIFFERENT valid wallet and the credit lands on a
+                // phantom PDA (the profile then reads 0). Keep the exact address from the picker.
+                const player = $player.value.trim();
                 const points = parseInt($points.value, 10);
                 const creditRef = parseInt($ref.value.trim(), 10);
                 if (!player) return alert('Pick a user from the dropdown or paste a wallet.');

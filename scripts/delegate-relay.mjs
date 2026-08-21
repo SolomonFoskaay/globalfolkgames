@@ -524,6 +524,9 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
   if (!Number.isInteger(points) || points <= 0) throw new Error(`invalid points: ${points}`);
   if (!Number.isInteger(creditRef) || creditRef <= 0) throw new Error(`invalid creditRef: ${creditRef}`);
   const player = new PublicKey(playerPubkey);
+  if (player.toBase58() !== String(playerPubkey || '').trim()) {
+    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
+  }
   const sponsor = loadSponsor();
   const conn = createConnection(BASE_URL, 'confirmed');
   const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
@@ -585,6 +588,9 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
 // If not delegated, it runs base-layer (first-time case). No undelegate dance for the ER path.
 export async function handleCancelPremium(playerPubkey) {
   const player = new PublicKey(playerPubkey);
+  if (player.toBase58() !== String(playerPubkey || '').trim()) {
+    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
+  }
   const sponsor = loadSponsor();
   const baseConn = createConnection(BASE_URL, 'confirmed');
   const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
@@ -622,6 +628,9 @@ export async function handleCancelPremium(playerPubkey) {
 // First credit 5000P (if needed) then activate — both respect the 5000 spend check, so no shortcut.
 export async function handleAdminActivatePremium(playerPubkey) {
   const player = new PublicKey(playerPubkey);
+  if (player.toBase58() !== String(playerPubkey || '').trim()) {
+    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
+  }
   const sponsor = loadSponsor();
   const baseConn = createConnection(BASE_URL, 'confirmed');
   const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
