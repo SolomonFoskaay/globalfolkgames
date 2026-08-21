@@ -8,14 +8,15 @@
     <link rel="stylesheet" href="/changelog/changelog.css">
     <style>
         .prem-form { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
-        .prem-form label { font-size:0.82rem; color:#aaa; }
-        .prem-form input {
+        .prem-form label { font-size:0.82rem; color:#aaa; display:block; margin-bottom:4px; }
+        .prem-form input, .prem-form select {
             width:100%; padding:10px 14px; border-radius:8px;
             border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
             color:#fff; font-size:0.9rem; box-sizing:border-box;
         }
         .prem-form input::placeholder { color:#888; }
-        .prem-form input[type=number] { font-family:monospace; }
+        .prem-form input[readonly] { background:rgba(155,89,182,0.08); color:#bbb; }
+        .prem-form select { background:#1a1a24; }
         .prem-form button {
             padding:12px 20px; border-radius:8px; border:none; cursor:pointer;
             font-weight:600; font-size:0.9rem; background:#f39c12; color:#000;
@@ -64,6 +65,18 @@
             margin-top:8px; font-size:0.8rem; color:#bbb;
         }
         .prev-credits li { margin-bottom:4px; word-break:break-all; }
+        .hint { font-size:0.75rem; color:#888; line-height:1.4; margin-top:4px; }
+        .hint b { color:#bbb; }
+        .inline-row { display:flex; gap:8px; align-items:center; }
+        .inline-row input { flex:1; }
+        .small-btn { padding:8px 12px; font-size:0.78rem; border-radius:6px; border:1px solid #333; background:#1a1a24; color:#bbb; cursor:pointer; }
+        .small-btn:hover { background:#2a2a36; }
+        .search-box { position:relative; }
+        .search-results { max-height:180px; overflow-y:auto; border:1px solid #333; border-radius:8px; background:#1a1a24; margin-top:4px; display:none; }
+        .search-results.show { display:block; }
+        .search-item { padding:8px 10px; cursor:pointer; font-size:0.82rem; color:#ddd; border-bottom:1px solid #2a2a36; }
+        .search-item:hover { background:#2a2a36; }
+        .search-item small { color:#888; margin-left:6px; }
     </style>
 </head>
 <body>
@@ -72,26 +85,58 @@
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Points Credit (M5)</h1>
         <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
             Credit the on-chain PREMIUM points ledger (<b style="color:#f39c12;">[gfgprem, player]</b>, buy-only)
-            after a VERIFIED manual payment. Runs base-layer signed by the sponsor key.
+            after a VERIFIED manual payment. Runs gasless on the MagicBlock ER (sponsor signs, user never pays).
         </p>
 
         <div class="prem-note">
-            <b>How it works:</b> enter the player's Solana wallet address and the premium points amount
-            (beta: 5,000P for $3, Nigeria beta fixed at ₦3,000 — about 70% off regular $10, limited time). Fill or accept the auto-generated credit
-            reference, paste the operator token, and click Credit. The relay writes <b>premium_lifetime</b> and
-            <b>premium_spendable</b> together (idempotent by credit ref, so a retry can never double-credit).
-            It never touches the M3 local or M4 global game-points ledgers.
+            <b>How it works:</b> pick a user from the dropdown (email and in brackets their embedded wallet from Dynamic), or search by email or wallet to filter the list. Choose a premium preset or type any amount. Credit reference and operator token are auto-filled with safe random values that will not break the program — only edit them if you must. The relay writes <b>premium_lifetime</b> and <b>premium_spendable</b> together (idempotent by credit ref, so a retry can never double-credit). It never touches the M3 local or M4 global game-points ledgers.
         </div>
 
         <div class="prem-form">
-            <label for="prem-player">Player Solana wallet address</label>
-            <input type="text" id="prem-player" placeholder="e.g. 7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB" autocomplete="off">
-            <label for="prem-points">Premium points to credit</label>
-            <input type="number" id="prem-points" placeholder="e.g. 5000" min="1" autocomplete="off">
-            <label for="prem-ref">Credit reference (integer, unique per payment)</label>
-            <input type="number" id="prem-ref" placeholder="e.g. 1938472" min="1" autocomplete="off">
-            <label for="prem-token">Operator token (GFG_OPERATOR_TOKEN)</label>
-            <input type="password" id="prem-token" placeholder="operator token" autocomplete="off">
+            <div>
+                <label for="user-search">User (Dynamic account) — email and embedded wallet</label>
+                <input type="text" id="user-search" placeholder="Search by email or wallet..." autocomplete="off">
+                <div id="user-results" class="search-results"></div>
+                <select id="user-select" size="5" style="margin-top:6px; height:110px;">
+                    <option value="">Loading users from Dynamic...</option>
+                </select>
+                <div class="hint">Pick from the dropdown to avoid typing errors. List is from Dynamic (source of truth for email + wallet). <span id="user-count" style="color:#f39c12;"></span></div>
+                <input type="hidden" id="prem-player">
+                <div id="selected-user" style="margin-top:6px; font-size:0.8rem; color:#2ecc71;"></div>
+            </div>
+
+            <div>
+                <label for="points-preset">Premium points to credit — preset</label>
+                <select id="points-preset">
+                    <option value="5000">Premium L2 2x (5,000 Point) — $3 / ₦3,000 beta</option>
+                    <option value="10000">Premium L3 3x (10,000 Point) — future</option>
+                    <option value="15000">Premium L4 4x (15,000 Point) — future</option>
+                    <option value="custom">Custom amount — type below</option>
+                </select>
+                <input type="number" id="prem-points" placeholder="e.g. 5000" min="1" autocomplete="off" style="margin-top:6px;">
+                <div class="hint">Preset fills the amount, but you can still edit the number directly for any promo.</div>
+            </div>
+
+            <div>
+                <label for="prem-ref">Credit reference (unique per payment, auto-filled)</label>
+                <div class="inline-row">
+                    <input type="number" id="prem-ref" placeholder="auto-filled safe integer" min="1" autocomplete="off" readonly>
+                    <button type="button" id="ref-regen" class="small-btn">Regenerate</button>
+                    <button type="button" id="ref-edit" class="small-btn">Edit</button>
+                </div>
+                <div class="hint">This is the on-chain idempotency key (u64). The program rejects a reused ref, so a retry can never double-credit. Auto-filled with a safe random integer — only edit if you need a specific payment id.</div>
+            </div>
+
+            <div>
+                <label for="prem-token">Operator token — what is this?</label>
+                <div class="inline-row">
+                    <input type="password" id="prem-token" placeholder="auto-filled, click eye to show" autocomplete="off" readonly>
+                    <button type="button" id="token-show" class="small-btn">Show</button>
+                    <button type="button" id="token-edit" class="small-btn">Edit</button>
+                </div>
+                <div class="hint"><b>Operator token = GFG_OPERATOR_TOKEN</b> env on the relay. The program checks the stored <code>admin_authority</code> (sponsor key from <code>id.json</code>) and the relay checks this token before it will credit anyone. Without the correct token the relay returns 401. It is auto-filled from your last successful entry and kept in this browser only — only edit if you rotate the token.</div>
+            </div>
+
             <button id="prem-credit-btn">Credit Premium Points</button>
         </div>
 
@@ -147,19 +192,140 @@
             const staff = await window.DashCore.gateStaff();
             if (!staff) return;
 
+            const $search = document.getElementById('user-search');
+            const $results = document.getElementById('user-results');
+            const $select = document.getElementById('user-select');
             const $player = document.getElementById('prem-player');
+            const $selected = document.getElementById('selected-user');
+            const $count = document.getElementById('user-count');
+            const $preset = document.getElementById('points-preset');
             const $points = document.getElementById('prem-points');
             const $ref = document.getElementById('prem-ref');
+            const $refRegen = document.getElementById('ref-regen');
+            const $refEdit = document.getElementById('ref-edit');
             const $token = document.getElementById('prem-token');
+            const $tokenShow = document.getElementById('token-show');
+            const $tokenEdit = document.getElementById('token-edit');
             const $btn = document.getElementById('prem-credit-btn');
-            const $results = document.getElementById('prem-results');
+            const $res = document.getElementById('prem-results');
             const $history = document.getElementById('prem-history');
 
             const HISTORY_KEY = 'gfg_premium_credit_history';
+            const TOKEN_KEY = 'gfg_operator_token_cache';
             const fmtNum = n => Number(n || 0).toLocaleString();
             const esc = s => String(s == null ? '' : s)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            // Auto-fill logic for ref and token
+            function genRef() {
+                // Safe u64: timestamp + random, within 1..2^53 for JS, program accepts up to 2^64
+                const t = Date.now() % 1000000000;
+                const r = Math.floor(Math.random()*900000) + 100000;
+                return String(t*1000 + r);
+            }
+            $ref.value = genRef();
+            $refRegen.addEventListener('click', ()=> { $ref.value = genRef(); $ref.readOnly = true; $refEdit.textContent='Edit'; });
+            $refEdit.addEventListener('click', ()=>{
+                if ($ref.readOnly) { $ref.readOnly = false; $refEdit.textContent='Lock'; $ref.focus(); }
+                else { $ref.readOnly = true; $refEdit.textContent='Edit'; }
+            });
+            // Token: load from cache if exists
+            try {
+                const cached = localStorage.getItem(TOKEN_KEY);
+                if (cached) $token.value = cached;
+            } catch(e){}
+            $tokenShow.addEventListener('click', ()=>{
+                if ($token.type==='password') { $token.type='text'; $tokenShow.textContent='Hide'; $token.readOnly=false; }
+                else { $token.type='password'; $tokenShow.textContent='Show'; }
+            });
+            $tokenEdit.addEventListener('click', ()=>{
+                if ($token.readOnly) { $token.readOnly=false; $token.type='text'; $tokenEdit.textContent='Lock'; $token.focus(); }
+                else { $token.readOnly=true; $token.type='password'; $tokenEdit.textContent='Edit'; }
+            });
+            // Preset sync
+            $preset.addEventListener('change', ()=>{
+                if ($preset.value !== 'custom') $points.value = $preset.value;
+            });
+            $points.value = $preset.value !== 'custom' ? $preset.value : '';
+            $points.addEventListener('input', ()=>{ if ($points.value) $preset.value='custom'; });
+
+            // User dropdown from Dynamic
+            let allUsers = [];
+            async function loadUsers() {
+                try {
+                    const r = await fetch('/api/dynamic-list');
+                    const j = await r.json();
+                    if (j.users && j.users.length) {
+                        allUsers = j.users;
+                        $count.textContent = `— ${allUsers.length} accounts loaded`;
+                        renderSelect(allUsers);
+                    } else {
+                        $count.textContent = j.error ? `— ${j.error}` : '— no users';
+                        $select.innerHTML = '<option value="">No users found — you can still paste a wallet manually below</option>';
+                        // Add manual entry option
+                        allUsers = [];
+                    }
+                } catch(e) {
+                    $count.textContent = '— failed to load, manual wallet paste works';
+                    $select.innerHTML = '<option value="">Failed to load — paste wallet manually</option>';
+                }
+            }
+            function renderSelect(list) {
+                if (!list.length) { $select.innerHTML = '<option value="">No matching users</option>'; return; }
+                $select.innerHTML = list.map(u=>{
+                    const label = `${u.email || 'no-email'} (${u.wallet ? u.wallet.slice(0,6)+'…'+u.wallet.slice(-4) : 'no wallet'})`;
+                    return `<option value="${esc(u.wallet)}">${esc(label)}</option>`;
+                }).join('');
+                // Auto-select first
+                if (list[0] && list[0].wallet) {
+                    $select.value = list[0].wallet;
+                    $player.value = list[0].wallet;
+                    $selected.textContent = `Selected: ${list[0].email} — ${list[0].wallet}`;
+                }
+            }
+            $select.addEventListener('change', ()=>{
+                const w = $select.value;
+                $player.value = w;
+                const u = allUsers.find(x=>x.wallet===w);
+                $selected.textContent = u ? `Selected: ${u.email} — ${u.wallet}` : `Selected wallet: ${w}`;
+            });
+            // Search filter
+            $search.addEventListener('input', ()=>{
+                const q = $search.value.trim().toLowerCase();
+                if (!q) { renderSelect(allUsers); $results.classList.remove('show'); return; }
+                const filtered = allUsers.filter(u=> (u.email && u.email.toLowerCase().includes(q)) || (u.wallet && u.wallet.toLowerCase().includes(q)));
+                renderSelect(filtered);
+                // Also show floating results
+                $results.innerHTML = filtered.slice(0,8).map(u=> `<div class="search-item" data-wallet="${esc(u.wallet)}">${esc(u.email||'no-email')} <small>${esc(u.wallet? u.wallet.slice(0,8)+'…' : '')}</small></div>`).join('');
+                $results.classList.toggle('show', filtered.length>0 && filtered.length<allUsers.length);
+            });
+            $results.addEventListener('click', (e)=>{
+                const item = e.target.closest('.search-item');
+                if (!item) return;
+                const w = item.getAttribute('data-wallet');
+                $player.value = w;
+                $select.value = w;
+                const u = allUsers.find(x=>x.wallet===w);
+                $selected.textContent = u ? `Selected: ${u.email} — ${u.wallet}` : `Selected wallet: ${w}`;
+                $results.classList.remove('show');
+                $search.value = u ? u.email : w;
+            });
+            // Allow manual wallet paste via search box if not in list
+            $search.addEventListener('keydown', (e)=>{
+                if (e.key==='Enter') {
+                    e.preventDefault();
+                    const q = $search.value.trim();
+                    // If q looks like wallet, use it
+                    if (q.length>30) {
+                        $player.value = q;
+                        $selected.textContent = `Manual wallet: ${q}`;
+                        $results.classList.remove('show');
+                    }
+                }
+            });
+
+            loadUsers();
 
             function renderHistory() {
                 const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -171,7 +337,6 @@
                     `<li><b style="color:#f39c12;">${fmtNum(r.points)}</b> premium → ${esc(r.player.slice(0, 8))}…${esc(r.player.slice(-8))} · ref ${esc(r.creditRef)} · ${esc(r.sig ? r.sig.slice(0, 16) + '…' : 'no sig')} · ${esc(new Date(r.ts || Date.now()).toLocaleString())}</li>`
                 ).join('');
             }
-
             function pushHistory(p) {
                 try {
                     const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -180,7 +345,6 @@
                     renderHistory();
                 } catch (e) { /* ignore */ }
             }
-
             function renderLedger(ledger, sig) {
                 const level = ledger.subscriptionLevel || 0;
                 const until = ledger.subscriptionActiveUntil || 0;
@@ -207,7 +371,7 @@
                             <div class="v" style="font-size:0.85rem;font-weight:600;">${fmtNum(ledger.lastCreditPoints)} / ${esc(ledger.lastCreditRef)} / ${ledger.lastCreditTs ? esc(new Date(ledger.lastCreditTs).toLocaleString()) : '-'}</div>
                         </div>
                     </div>
-                    ${sig ? `<div class="prem-row" style="margin-top:10px;"><span class="label">Base-layer tx (devnet explorer)</span><span class="mono"><a href="https://explorer.solana.com/tx/${esc(sig)}?cluster=devnet" target="_blank" rel="noreferrer">${esc(sig)}</a></span></div>` : ''}
+                    ${sig ? `<div class="prem-row" style="margin-top:10px;"><span class="label">ER tx (gasless, sponsor paid)</span><span class="mono"><a href="https://explorer.solana.com/tx/${esc(sig)}?cluster=devnet" target="_blank" rel="noreferrer">${esc(sig)}</a></span></div>` : ''}
                 `;
             }
 
@@ -216,16 +380,17 @@
                 const points = parseInt($points.value, 10);
                 const creditRef = parseInt($ref.value.trim(), 10);
                 const token = $token.value.trim();
-                if (!player) return alert('Enter a player wallet address.');
+                if (!player) return alert('Pick a user from the dropdown or paste a wallet.');
                 try { new PublicKey(player); } catch (e) { return alert('Invalid Solana wallet address.'); }
                 if (!points || points <= 0) return alert('Enter premium points greater than 0.');
-                if (!creditRef) return alert('Enter a credit reference (the verified payment id).');
-                if (!Number.isInteger(creditRef) || creditRef <= 0) return alert('Credit reference must be a positive integer (the on-chain ref is a number).');
-                if (!token || token.length < 8) return alert('Enter the operator token.');
-
+                if (!creditRef) return alert('Credit reference missing — tap Regenerate.');
+                if (!Number.isInteger(creditRef) || creditRef <= 0) return alert('Credit reference must be a positive integer.');
+                if (!token || token.length < 8) return alert('Enter the operator token (ask owner for GFG_OPERATOR_TOKEN).');
+                // Cache token for next time
+                try { localStorage.setItem(TOKEN_KEY, token); } catch(e){}
                 $btn.disabled = true;
-                $btn.textContent = 'Crediting on-chain...';
-                $results.innerHTML = '<div class="empty-state">Relay is signing the credit write on the base layer...</div>';
+                $btn.textContent = 'Crediting on-chain (gasless ER)...';
+                $res.innerHTML = '<div class="empty-state">Relay is signing the credit write gasless on the ER...</div>';
                 try {
                     const res = await fetch('/api/credit-premium', {
                         method: 'POST',
@@ -234,31 +399,31 @@
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-                    // Read back the on-chain ledger (any region, no sign).
                     const ledger = await window.magicblockDice
                         ? window.magicblockDice.fetchPremiumPointsPdaFor(player)
                         : null;
                     pushHistory({ player, points, creditRef, sig: data.sig });
-                    $results.innerHTML = `
+                    $res.innerHTML = `
                         <div class="prem-card">
-                            <h3>Relay receipt</h3>
+                            <h3>Relay receipt (gasless ER, sponsor paid)</h3>
                             <div class="prem-row"><span class="label">Player</span><span class="mono">${esc(data.player || player)}</span></div>
                             <div class="prem-row"><span class="label">Points credited</span><span class="value">${fmtNum(points)}</span></div>
                             <div class="prem-row"><span class="label">Credit ref</span><span class="mono">${esc(data.creditRef)}</span></div>
-                            <div class="prem-row"><span class="label">Undelegated for base-layer credit</span><span class="value">${data.undelegated ? 'yes' : 'no'}</span></div>
-                            <div class="prem-row"><span class="label">Re-delegated to ER</span><span class="value">${data.redelegated ? 'yes' : 'no'}</span></div>
-                            <div class="prem-row"><span class="label">Base-layer signature</span><span class="mono">${esc(data.sig)}</span></div>
+                            <div class="prem-row"><span class="label">Gasless</span><span class="value">${data.gasless ? 'yes (ER)' : 'no (base first-time)'}</span></div>
+                            <div class="prem-row"><span class="label">Signature</span><span class="mono">${esc(data.sig)}</span></div>
                             <div style="margin-top:8px;">
                                 <a href="https://explorer.solana.com/tx/${esc(data.sig)}?cluster=devnet" target="_blank" rel="noreferrer" style="color:#f39c12;font-size:0.85rem;">View on Solana explorer</a>
                             </div>
                         </div>
                         <div class="prem-card">
                             <h3>On-chain ledger readback</h3>
-                            ${ledger ? renderLedger(ledger, data.sig) : '<div class="empty-state">Ledger readback pending (the re-delegated PDA may take a moment to appear on the ER). Refresh after a few seconds.</div>'}
+                            ${ledger ? renderLedger(ledger, data.sig) : '<div class="empty-state">Ledger readback pending (ER). Refresh after a few seconds.</div>'}
                         </div>
                     `;
+                    // Regenerate ref for next credit to avoid duplicate
+                    $ref.value = genRef();
                 } catch (e) {
-                    $results.innerHTML = `<div class="prem-card"><h3 style="color:#e74c3c;">Credit failed</h3><div class="prem-row"><span class="label">Error</span><span class="value">${esc(e.message)}</span></div></div>`;
+                    $res.innerHTML = `<div class="prem-card"><h3 style="color:#e74c3c;">Credit failed</h3><div class="prem-row"><span class="label">Error</span><span class="value">${esc(e.message)}</span></div></div>`;
                 } finally {
                     $btn.disabled = false;
                     $btn.textContent = 'Credit Premium Points';

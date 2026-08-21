@@ -331,6 +331,44 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === 'GET' && req.url === '/api/dynamic-list') {
+    try {
+      const DYNAMIC_API_TOKEN = process.env.DYNAMIC_API_TOKEN || '';
+      const DYNAMIC_ENV_ID = process.env.DYNAMIC_ENV_ID || '';
+      if (!DYNAMIC_API_TOKEN || !DYNAMIC_ENV_ID) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+        res.end(JSON.stringify({ users: [], source: 'unconfigured', error: 'Dynamic API not configured.' }));
+        return;
+      }
+      const url = `https://app.dynamicauth.com/api/v0/environments/${DYNAMIC_ENV_ID}/users?limit=100`;
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${DYNAMIC_API_TOKEN}` } });
+      if (!resp.ok) {
+        const body = await resp.text();
+        throw new Error(`Dynamic API ${resp.status}: ${body.slice(0,200)}`);
+      }
+      const data = await resp.json();
+      const users = (data.users || []).map((u) => {
+        let wallet = null;
+        if (u.verifiedCredentials && Array.isArray(u.verifiedCredentials)) {
+          const solCred = u.verifiedCredentials.find(c => c.chain === 'SOL' || c.format === 'blockchain');
+          if (solCred) wallet = solCred.address;
+        }
+        if (!wallet && u.wallets && Array.isArray(u.wallets)) {
+          const solWallet = u.wallets.find(w => w.chain === 'SOL');
+          if (solWallet) wallet = solWallet.publicKey;
+        }
+        if (!wallet && u.walletPublicKey) wallet = u.walletPublicKey;
+        return { id: u.id, email: u.email || '', wallet: wallet || '', createdAt: u.createdAt || u.created_at || '' };
+      }).filter(u => u.email || u.wallet);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+      res.end(JSON.stringify({ users, count: data.count || users.length, source: 'dynamic' }));
+    } catch (e) {
+      console.error('dynamic-list error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ users: [], source: 'dynamic', error: e.message }));
+    }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/backfill-global') {
     let body = '';
     for await (const chunk of req) body += chunk;
