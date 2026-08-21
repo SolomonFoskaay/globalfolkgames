@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Credit - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .prem-form { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
+        .prem-form label { font-size:0.82rem; color:#aaa; display:block; margin-bottom:4px; }
+        .prem-form input, .prem-form select {
+            width:100%; padding:10px 14px; border-radius:8px;
+            border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+            color:#fff; font-size:0.9rem; box-sizing:border-box;
+        }
+        .prem-form input::placeholder { color:#888; }
+        .prem-form input[readonly] { background:rgba(155,89,182,0.08); color:#bbb; }
+        .prem-form select { background:#1a1a24; }
+        .prem-form button {
+            padding:12px 20px; border-radius:8px; border:none; cursor:pointer;
+            font-weight:600; font-size:0.9rem; background:#f39c12; color:#000;
+        }
+        .prem-form button:hover { background:#e67e22; }
+        .prem-form button:disabled { opacity:0.4; cursor:not-allowed; }
+        .prem-note {
+            background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2);
+            border-radius:8px; padding:12px 16px; margin-bottom:16px;
+            font-size:0.82rem; color:#ccc; line-height:1.6;
+        }
+        .prem-note b { color:#f39c12; }
+        .prem-card {
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+            border-radius:10px; padding:16px; margin-bottom:12px;
+        }
+        .prem-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .prem-card .label { color:var(--muted,#888); font-size:0.8rem; }
+        .prem-card .value { color:#fff; font-weight:600; }
+        .prem-card .mono { font-family:monospace; font-size:0.8rem; color:#9b59b6; word-break:break-all; }
+        .prem-row {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);
+            flex-wrap:wrap; gap:4px;
+        }
+        .prem-row:last-child { border-bottom:none; }
+        .prem-badge {
+            display:inline-block; padding:2px 8px; border-radius:4px;
+            font-size:0.75rem; font-weight:600;
+        }
+        .badge-ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
+        .badge-info { background:rgba(155,89,182,0.15); color:#9b59b6; }
+        .empty-state { color:#888; font-size:0.85rem; text-align:center; padding:24px; }
+        .ledger-grid {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px;
+        }
+        .ledger-cell {
+            background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+            border-radius:8px; padding:12px;
+        }
+        .ledger-cell .l { color:#888; font-size:0.75rem; }
+        .ledger-cell .v { color:#fff; font-size:1.05rem; font-weight:700; }
+        .ledger-cell .v.orange { color:#f39c12; }
+        .ledger-cell .v.purple { color:#9b59b6; }
+        .prev-credits {
+            margin-top:8px; font-size:0.8rem; color:#bbb;
+        }
+        .prev-credits li { margin-bottom:4px; word-break:break-all; }
+        .hint { font-size:0.75rem; color:#888; line-height:1.4; margin-top:4px; }
+        .inline-row { display:flex; gap:8px; align-items:center; }
+        .inline-row input { flex:1; }
+        .small-btn { padding:8px 12px; font-size:0.78rem; border-radius:6px; border:1px solid #333; background:#1a1a24; color:#bbb; cursor:pointer; white-space:nowrap; }
+        .small-btn:hover { background:#2a2a36; }
+        .tracker-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+        .tracker-bar input, .tracker-bar select { padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; }
+        .tracker-bar input::placeholder { color:#888; }
+        .tracker-bar button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:0.85rem; }
+        .btn-primary { background:#f39c12; color:#000; }
+        .btn-secondary { background:#1a1a24; color:#bbb; border:1px solid #333; }
+        .btn-danger { background:#e74c3c; color:#fff; }
+        .btn-success { background:#2ecc71; color:#000; }
+        .segment-cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+        .seg { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:12px; text-align:center; }
+        .seg .n { font-size:1.4rem; font-weight:800; color:#f39c12; }
+        .seg .l { font-size:0.75rem; color:#888; letter-spacing:0.04em; text-transform:uppercase; }
+        .seg.ending .n { color:#e67e22; }
+        .seg.ended .n { color:#e74c3c; }
+        .seg.mid .n { color:#3498db; }
+        .seg.new .n { color:#2ecc71; }
+        .prem-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        .prem-table th, .prem-table td { border:1px solid #2a2a36; padding:8px 8px; text-align:left; }
+        .prem-table th { background:#1a1a24; color:#f39c12; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; }
+        .prem-table td.mono { font-family:monospace; color:#9b59b6; word-break:break-all; }
+        .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:700; }
+        .badge-new { background:rgba(46,204,113,0.15); color:#2ecc71; }
+        .badge-mid { background:rgba(52,152,219,0.15); color:#3498db; }
+        .badge-ending { background:rgba(230,126,34,0.15); color:#e67e22; }
+        .badge-ended { background:rgba(231,76,60,0.15); color:#e74c3c; }
+    </style>
+</head>
+<body>
+    <header id="global-header"></header>
+    <main style="max-width:780px;margin:0 auto;padding:80px 16px 40px;">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Subscribers (M5) — Credit + Tracker</h1>
+        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
+            Staff-only. Top: credit premium points after Paystack verification (gasless on ER). Below: track every subscriber, filter by status, and upgrade/downgrade separately — upgrade checks 5,000 spendable on-chain, no shortcut.
+        </p>
+
+        <div class="prem-note">
+            <b>How it works:</b> pick a user from the dropdown (email and in brackets their embedded wallet from Dynamic — search by email or wallet to filter), choose a preset or type any amount, keep the auto-filled credit reference (safe random value that will not break the program — only edit if you must). The relay uses the Vercel env <code>GFG_Gasless_Sponsor_Keypair</code> (sponsor <code>id.json</code> keypair) to sign gasless on the ER, so you do not need to paste any manual code — just click Credit after verification.</div>
+
+        <div class="prem-form">
+            <div>
+                <label for="user-search">User — Dynamic account (email and wallet)</label>
+                <input type="text" id="user-search" placeholder="Search by email or wallet..." autocomplete="off">
+                <select id="user-select" size="4" style="margin-top:6px; height:110px;">
+                    <option value="">Loading users from Dynamic...</option>
+                </select>
+                <div class="hint">Pick to auto-fill the wallet below and avoid typos. List is from Dynamic (source of truth). <span id="user-count" style="color:#f39c12;"></span></div>
+            </div>
+
+            <div>
+                <label for="prem-player">Player Solana wallet address (auto-filled from picker, or paste manually)</label>
+                <input type="text" id="prem-player" placeholder="e.g. 7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB" autocomplete="off">
+                <div id="selected-user" style="margin-top:4px; font-size:0.78rem; color:#2ecc71;"></div>
+            </div>
+
+            <div>
+                <label for="points-preset">Premium points to credit — preset</label>
+                <select id="points-preset">
+                    <option value="5000">Premium L2 2x (5,000 Point) — $3 / ₦3,000 beta</option>
+                    <option value="10000">Premium L3 3x (10,000 Point) — future</option>
+                    <option value="15000">Premium L4 4x (15,000 Point) — future</option>
+                    <option value="custom">Custom — type any amount below</option>
+                </select>
+                <input type="number" id="prem-points" placeholder="e.g. 5000" min="1" autocomplete="off" style="margin-top:6px;">
+                <div class="hint">Preset fills the number, but you can still edit it for promos.</div>
+            </div>
+
+            <div>
+                <label for="prem-ref">Credit reference (unique per payment, auto-filled)</label>
+                <div class="inline-row">
+                    <input type="number" id="prem-ref" placeholder="auto-filled safe integer" min="1" autocomplete="off" readonly>
+                    <button type="button" id="ref-regen" class="small-btn">Regenerate</button>
+                    <button type="button" id="ref-edit" class="small-btn">Edit</button>
+                </div>
+                <div class="hint">This is the on-chain idempotency key (u64). A reused ref is rejected so a retry can never double-credit. Auto-filled with a safe random integer.</div>
+            </div>
+
+            <button id="prem-credit-btn">Credit Premium Points</button>
+        </div>
+
+        <div id="prem-results">
+            <div class="empty-state">Fill the form above and click Credit to see the relay receipt and the on-chain ledger.</div>
+        </div>
+
+        <div class="prem-card">
+            <h3>Recent credits from this browser</h3>
+            <ul id="prem-history" class="prev-credits">
+                <li class="empty-state">No credits yet this session.</li>
+            </ul>
+        </div>
+
+        <div style="margin-top:24px; border-top:1px solid #333; padding-top:16px;">
+            <h2 style="font-size:1.1rem; color:#9b59b6; margin:0 0 8px;">Subscriber Tracker</h2>
+            <p style="color:#888;font-size:0.82rem;margin:0 0 12px;">Search by Dynamic email or wallet, filter by year/month/status, then upgrade or downgrade in the separate card below — shows the selected user's premium balance auto-loaded.</p>
+            <div class="tracker-bar">
+                <input type="text" id="search-email" placeholder="Dynamic email (e.g. user@example.com)" style="flex:1; min-width:160px;">
+                <input type="text" id="search-wallet" placeholder="Or wallet address" style="flex:1; min-width:160px;">
+                <select id="filter-year"><option value="">Year (all)</option></select>
+                <select id="filter-month"><option value="">Month (all)</option></select>
+                <select id="filter-status"><option value="">Status (all)</option><option value="new">New (last 7d)</option><option value="mid">Mid (8-22d left)</option><option value="ending">Ending soon (≤7d)</option><option value="ended">Ended</option></select>
+                <button id="btn-search" class="btn-primary">Search</button>
+                <button id="btn-scan-all" class="btn-secondary">Scan all (on-chain)</button>
+            </div>
+            <div class="segment-cards" id="segment-cards">
+                <div class="seg new"><div class="n" id="seg-new">–</div><div class="l">New (7d)</div></div>
+                <div class="seg mid"><div class="n" id="seg-mid">–</div><div class="l">Mid (8-22d)</div></div>
+                <div class="seg ending"><div class="n" id="seg-ending">–</div><div class="l">Ending ≤7d</div></div>
+                <div class="seg ended"><div class="n" id="seg-ended">–</div><div class="l">Ended</div></div>
+                <div class="seg"><div class="n" id="seg-total">–</div><div class="l">Total active</div></div>
+            </div>
+            <div id="tracker-results" style="overflow-x:auto;">
+                <div style="color:#888;font-size:0.85rem;text-align:center;padding:24px;">Enter an email or wallet and tap Search, or Scan all to load on-chain premium PDAs.</div>
+            </div>
+            <div style="margin-top:8px; font-size:0.78rem; color:#888;">Selected: <span id="selected-wallet" class="mono" style="color:#f39c12;">none</span> <span id="selected-email" style="color:#bbb;"></span></div>
+            <div id="upgrade-card" style="display:none; margin-top:16px; background:rgba(155,89,182,0.06); border:1px solid rgba(155,89,182,0.25); border-radius:10px; padding:16px;">
+                <h3 style="margin:0 0 6px; font-size:0.95rem; color:#9b59b6;">Subscription upgrade / downgrade — separate from adding points</h3>
+                <p style="color:#888; font-size:0.8rem; line-height:1.5; margin:0 0 10px;">Shows the selected user's premium balance auto-loaded. Upgrade checks 5,000 premium spendable on-chain — no shortcut, spend is recorded. Downgrade cancels an active sub that has exceeded time.</p>
+                <div id="upgrade-ledger"><p class="empty">Select a user above to see their premium balance and subscription.</p></div>
+                <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                    <button id="btn-upgrade" class="btn-success" disabled>Upgrade to Level 2 (5,000P)</button>
+                    <button id="btn-cancel" class="btn-danger" disabled>Cancel subscription (downgrade)</button>
+                </div>
+                <p id="upgrade-msg" style="font-size:0.8rem; color:#bbb; margin-top:8px;"></p>
+                <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btn-promo" class="btn-secondary" disabled style="font-size:0.78rem;">Promo: Credit 5,000P + Activate (one click)</button>
+                    <span id="action-msg" style="font-size:0.8rem;color:#bbb;align-self:center;"></span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/pager.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'premium-subscribers',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
+                        { key: 'premium-subscribers', label: '📈 Premium subscribers', href: '/dashboard/premium-subscribers.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                    { heading: 'Staff', items: [
+                        { key: 'content-guide', label: '✏ Content style guide', href: '/dashboard/content-style-guide.html' },
+                    ]},
+                ]
+            });
+        });
+    </script>
+    <script type="module">
+        import { PublicKey } from '@solana/web3.js';
+
+        // Wait for Dynamic wallet to be ready before gating, so admin is not falsely redirected
+        async function waitForWalletAndGate() {
+            // Give Dynamic a moment to restore the session (up to 4s)
+            for (let i=0; i<8; i++) {
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch(e) {}
+                await new Promise(r=>setTimeout(r, 500));
+            }
+            try {
+                const staff = await window.DashCore.gateStaff();
+                return staff;
+            } catch(e) {
+                console.warn('gateStaff error', e);
+                return false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const staff = await waitForWalletAndGate();
+            if (!staff) return;
+
+            const $search = document.getElementById('user-search');
+            const $select = document.getElementById('user-select');
+            const $player = document.getElementById('prem-player');
+            const $selected = document.getElementById('selected-user');
+            const $count = document.getElementById('user-count');
+            const $preset = document.getElementById('points-preset');
+            const $points = document.getElementById('prem-points');
+            const $ref = document.getElementById('prem-ref');
+            const $refRegen = document.getElementById('ref-regen');
+            const $refEdit = document.getElementById('ref-edit');
+            const $btn = document.getElementById('prem-credit-btn');
+            const $results = document.getElementById('prem-results');
+            const $history = document.getElementById('prem-history');
+
+            const HISTORY_KEY = 'gfg_premium_credit_history';
+            const fmtNum = n => Number(n || 0).toLocaleString();
+            const esc = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            function genRef() {
+                const t = Date.now() % 1000000000;
+                const r = Math.floor(Math.random()*900000) + 100000;
+                return String(t*1000 + r);
+            }
+            try { $ref.value = genRef(); } catch(e) {}
+            try {
+                $preset.addEventListener('change', ()=>{ if ($preset.value !== 'custom') $points.value = $preset.value; });
+                if ($preset.value !== 'custom') $points.value = $preset.value;
+                $points.addEventListener('input', ()=>{ if ($points.value) $preset.value='custom'; });
+            } catch(e) {}
+            try {
+                $refRegen.addEventListener('click', ()=>{ $ref.value = genRef(); $ref.readOnly = true; $refEdit.textContent='Edit'; });
+                $refEdit.addEventListener('click', ()=>{
+                    if ($ref.readOnly) { $ref.readOnly = false; $refEdit.textContent='Lock'; $ref.focus(); }
+                    else { $ref.readOnly = true; $refEdit.textContent='Edit'; }
+                });
+            } catch(e) {}
+
+            let allUsers = [];
+            async function loadUsers() {
+                try {
+                    const r = await fetch('/api/dynamic-list', { cache:'no-store' });
+                    const j = await r.json();
+                    if (j.users && j.users.length) {
+                        allUsers = j.users.filter(u=>u.wallet);
+                        $count.textContent = `— ${allUsers.length} accounts loaded`;
+                        renderSelect(allUsers);
+                    } else {
+                        $count.textContent = j.error ? `— ${j.error}` : '— no users, paste wallet manually';
+                        $select.innerHTML = '<option value="">No users — paste wallet manually below</option>';
+                    }
+                } catch(e) {
+                    $count.textContent = '— failed to load, paste wallet manually';
+                    $select.innerHTML = '<option value="">Failed to load — paste wallet manually</option>';
+                }
+            }
+            function renderSelect(list) {
+                if (!list.length) { $select.innerHTML = '<option value="">No matching users</option>'; return; }
+                $select.innerHTML = list.map(u=>{
+                    const label = `${u.email || 'no-email'} (${u.wallet ? u.wallet.slice(0,6)+'…'+u.wallet.slice(-4) : 'no wallet'})`;
+                    return `<option value="${esc(u.wallet)}">${esc(label)}</option>`;
+                }).join('');
+            }
+            try {
+                $select.addEventListener('change', ()=>{
+                    const w = $select.value;
+                    if (!w) return;
+                    $player.value = w;
+                    const u = allUsers.find(x=>x.wallet===w);
+                    $selected.textContent = u ? `Selected: ${u.email} — ${u.wallet}` : `Selected wallet: ${w}`;
+                });
+                $search.addEventListener('input', ()=>{
+                    const q = $search.value.trim().toLowerCase();
+                    if (!q) { renderSelect(allUsers); return; }
+                    const filtered = allUsers.filter(u=> (u.email && u.email.toLowerCase().includes(q)) || (u.wallet && u.wallet.toLowerCase().includes(q)));
+                    renderSelect(filtered);
+                });
+            } catch(e) {}
+            try { await loadUsers(); } catch(e) {}
+
+            function renderHistory() {
+                try {
+                    const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+                    if (!rows.length) {
+                        $history.innerHTML = '<li class="empty-state">No credits yet this session.</li>';
+                        return;
+                    }
+                    $history.innerHTML = rows.slice(0, 10).map(r =>
+                        `<li><b style="color:#f39c12;">${fmtNum(r.points)}</b> premium → ${esc(r.player.slice(0, 8))}…${esc(r.player.slice(-8))} · ref ${esc(r.creditRef)} · ${esc(r.sig ? r.sig.slice(0, 16) + '…' : 'no sig')} · ${esc(new Date(r.ts || Date.now()).toLocaleString())}</li>`
+                    ).join('');
+                } catch(e) {}
+            }
+            function pushHistory(p) {
+                try {
+                    const rows = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+                    rows.unshift({ player: p.player, points: p.points, creditRef: p.creditRef, sig: p.sig, ts: Date.now() });
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(rows.slice(0, 20)));
+                    renderHistory();
+                } catch (e) {}
+            }
+            function renderLedger(ledger, sig) {
+                const level = ledger.subscriptionLevel || 0;
+                const until = ledger.subscriptionActiveUntil || 0;
+                const daysLeft = until > Date.now() ? Math.ceil((until - Date.now()) / 86400000) : 0;
+                const status = level > 0 && daysLeft > 0
+                    ? `<span class="prem-badge badge-ok">Active Level ${level} (${daysLeft}d left)</span>`
+                    : (level > 0 ? `<span class="prem-badge badge-info">Sub expired / renew soon</span>` : `<span class="prem-badge badge-info">No active sub</span>`);
+                return `
+                    <div class="ledger-grid">
+                        <div class="ledger-cell">
+                            <div class="l">Premium lifetime (never spendable)</div>
+                            <div class="v orange">${fmtNum(ledger.premiumLifetime)}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Premium spendable</div>
+                            <div class="v purple">${fmtNum(ledger.premiumSpendable)}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Subscription status</div>
+                            <div class="v" style="font-size:0.85rem;">${status}</div>
+                        </div>
+                        <div class="ledger-cell">
+                            <div class="l">Last credit (points / ref / time)</div>
+                            <div class="v" style="font-size:0.85rem;font-weight:600;">${fmtNum(ledger.lastCreditPoints)} / ${esc(ledger.lastCreditRef)} / ${ledger.lastCreditTs ? esc(new Date(ledger.lastCreditTs).toLocaleString()) : '-'}</div>
+                        </div>
+                    </div>
+                    ${sig ? `<div class="prem-row" style="margin-top:10px;"><span class="label">ER tx (gasless, sponsor paid)</span><span class="mono"><a href="https://explorer.solana.com/tx/${esc(sig)}?cluster=devnet" target="_blank" rel="noreferrer">${esc(sig)}</a></span></div>` : ''}
+                `;
+            }
+
+            $btn.addEventListener('click', async () => {
+                const player = $player.value.trim().toLowerCase();
+                const points = parseInt($points.value, 10);
+                const creditRef = parseInt($ref.value.trim(), 10);
+                if (!player) return alert('Pick a user from the dropdown or paste a wallet.');
+                try { new PublicKey(player); } catch (e) { return alert('Invalid Solana wallet address.'); }
+                if (!points || points <= 0) return alert('Enter premium points greater than 0.');
+                if (!creditRef) return alert('Credit reference missing — tap Regenerate.');
+                if (!Number.isInteger(creditRef) || creditRef <= 0) return alert('Credit reference must be a positive integer.');
+                $btn.disabled = true;
+                $btn.textContent = 'Crediting on-chain (gasless ER)...';
+                $results.innerHTML = '<div class="empty-state">Relay is signing the credit write gasless on the ER...</div>';
+                try {
+                    const res = await fetch('/api/credit-premium', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ player, points, creditRef }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                    const ledger = await window.magicblockDice
+                        ? window.magicblockDice.fetchPremiumPointsPdaFor(player)
+                        : null;
+                    pushHistory({ player, points, creditRef, sig: data.sig });
+                    $results.innerHTML = `
+                        <div class="prem-card">
+                            <h3>Relay receipt (gasless ER, sponsor paid)</h3>
+                            <div class="prem-row"><span class="label">Player</span><span class="mono">${esc(data.player || player)}</span></div>
+                            <div class="prem-row"><span class="label">Points credited</span><span class="value">${fmtNum(points)}</span></div>
+                            <div class="prem-row"><span class="label">Credit ref</span><span class="mono">${esc(data.creditRef)}</span></div>
+                            <div class="prem-row"><span class="label">Gasless</span><span class="value">${data.gasless ? 'yes (ER)' : 'no (base first-time)'}</span></div>
+                            <div class="prem-row"><span class="label">Signature</span><span class="mono">${esc(data.sig)}</span></div>
+                            <div style="margin-top:8px;">
+                                <a href="https://explorer.solana.com/tx/${esc(data.sig)}?cluster=devnet" target="_blank" rel="noreferrer" style="color:#f39c12;font-size:0.85rem;">View on Solana explorer</a>
+                            </div>
+                        </div>
+                        <div class="prem-card">
+                            <h3>On-chain ledger readback</h3>
+                            ${ledger ? renderLedger(ledger, data.sig) : '<div class="empty-state">Ledger readback pending (ER). Refresh after a few seconds.</div>'}
+                        </div>
+                    `;
+                    $ref.value = genRef();
+                } catch (e) {
+                    $results.innerHTML = `<div class="prem-card"><h3 style="color:#e74c3c;">Credit failed</h3><div class="prem-row"><span class="label">Error</span><span class="value">${esc(e.message)}</span></div></div>`;
+                } finally {
+                    $btn.disabled = false;
+                    $btn.textContent = 'Credit Premium Points';
+                }
+            });
+
+            renderHistory();
+
+            // Tracker section — reuses same admin check and same Dynamic list, no extra imports
+            const $tEmail = document.getElementById('search-email');
+            const $tWallet = document.getElementById('search-wallet');
+            const $tYear = document.getElementById('filter-year');
+            const $tMonth = document.getElementById('filter-month');
+            const $tStatus = document.getElementById('filter-status');
+            const $tSearch = document.getElementById('btn-search');
+            const $tScan = document.getElementById('btn-scan-all');
+            const $tResults = document.getElementById('tracker-results');
+            const $tSegNew = document.getElementById('seg-new');
+            const $tSegMid = document.getElementById('seg-mid');
+            const $tSegEnding = document.getElementById('seg-ending');
+            const $tSegEnded = document.getElementById('seg-ended');
+            const $tSegTotal = document.getElementById('seg-total');
+            const $tUpgradeCard = document.getElementById('upgrade-card');
+            const $tUpgradeLedger = document.getElementById('upgrade-ledger');
+            const $tBtnUpgrade = document.getElementById('btn-upgrade');
+            const $tBtnCancel = document.getElementById('btn-cancel');
+            const $tBtnPromo = document.getElementById('btn-promo');
+            const $tUpgradeMsg = document.getElementById('upgrade-msg');
+            const $tMsg = document.getElementById('action-msg');
+            const $tSelWallet = document.getElementById('selected-wallet');
+            const $tSelEmail = document.getElementById('selected-email');
+            // Year/month filters
+            try {
+                const nowY = new Date().getFullYear();
+                for (let y = nowY; y >= nowY-2; y--) { const o=document.createElement('option'); o.value=String(y); o.textContent=String(y); $tYear.appendChild(o); }
+                for (let m=1; m<=12; m++) { const o=document.createElement('option'); o.value=String(m); o.textContent=new Date(2000,m-1,1).toLocaleString('en',{month:'long'}); $tMonth.appendChild(o); }
+            } catch(e) {}
+            let tCurrentList = [];
+            let tSelected = null;
+            function tStatusFor(l){ const lvl=l.subscriptionLevel||0, until=l.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0; if(lvl===0) return {key:'ended',label:'Ended',days,lvl}; if(days<=0) return {key:'ended',label:'Ended',days,lvl}; if(days<=7) return {key:'ending',label:'Ending soon',days,lvl}; if(days<=23) return {key:'mid',label:'Mid',days,lvl}; return {key:'new',label:'New',days,lvl}; }
+            function tBadge(k,l){ const c=k==='new'?'badge-new':k==='mid'?'badge-mid':k==='ending'?'badge-ending':'badge-ended'; return `<span class="badge ${c}">${l}</span>`; }
+            function tUpdateSegs(list){ let n=0,m=0,e=0,en=0,total=0; list.forEach(r=>{ const s=tStatusFor(r).key; if(s==='new')n++; else if(s==='mid')m++; else if(s==='ending')e++; else en++; if(r.subscriptionLevel>0 && r.subscriptionActiveUntil>Date.now()) total++; }); if($tSegNew) $tSegNew.textContent=n; if($tSegMid) $tSegMid.textContent=m; if($tSegEnding) $tSegEnding.textContent=e; if($tSegEnded) $tSegEnded.textContent=en; if($tSegTotal) $tSegTotal.textContent=total; }
+            function tPasses(r){ const y=$tYear.value, mo=$tMonth.value, st=$tStatus.value; if(y){ const d=new Date(r.lastCreditTs||r.subscriptionActiveUntil||0); if(String(d.getFullYear())!==y) return false; } if(mo){ const d=new Date(r.lastCreditTs||r.subscriptionActiveUntil||0); if(String(d.getMonth()+1)!==mo) return false; } if(st){ if(tStatusFor(r).key!==st) return false; } return true; }
+            function tRenderTable(list){
+                const f=list.filter(tPasses); tUpdateSegs(f);
+                if(!f.length){ $tResults.innerHTML='<div style="color:#888;font-size:0.85rem;text-align:center;padding:24px;">No matching subscribers.</div>'; return; }
+                let html='<table class="prem-table"><thead><tr><th>Email</th><th>Wallet</th><th>Level</th><th>Active until</th><th>Days left</th><th>Status</th><th>Premium Life / Spend</th><th>Last credit</th><th>Select</th></tr></thead><tbody>';
+                f.forEach(r=>{
+                    const s=tStatusFor(r);
+                    const em=r.email?`<span style="color:#bbb;">${esc(r.email)}</span>`:'<span style="color:#666;">—</span>';
+                    const wa=r.wallet?r.wallet.slice(0,6)+'…'+r.wallet.slice(-6):(r.premiumPda?r.premiumPda.slice(0,6)+'…'+r.premiumPda.slice(-6):'—');
+                    const un=r.subscriptionActiveUntil?new Date(r.subscriptionActiveUntil).toLocaleDateString():'—';
+                    html+=`<tr><td>${em}</td><td class="mono" title="${esc(r.wallet||r.premiumPda||'')}">${wa}</td><td>${r.subscriptionLevel||0}</td><td>${un}</td><td>${s.days}</td><td>${tBadge(s.key,s.label)}</td><td>${(r.premiumLifetime||0).toLocaleString()} / ${(r.premiumSpendable||0).toLocaleString()}</td><td>${r.lastCreditPoints?r.lastCreditPoints+'P ref '+r.lastCreditRef:'—'}</td><td><button class="btn-secondary" data-sel="${esc(r.wallet||'')}">Select</button></td></tr>`;
+                });
+                html+='</tbody></table>'; $tResults.innerHTML=html;
+                $tResults.querySelectorAll('button[data-sel]').forEach(btn=>{
+                    btn.addEventListener('click', async()=>{
+                        const w=btn.getAttribute('data-sel'); if(!w) return;
+                        tSelected=f.find(x=>x.wallet===w)||null;
+                        if(tSelected){
+                            $tSelWallet.textContent=w; $tSelEmail.textContent=tSelected.email?' ('+tSelected.email+')':'';
+                            if($tUpgradeCard) $tUpgradeCard.style.display='block';
+                            if($tUpgradeLedger) $tUpgradeLedger.innerHTML='<p class="empty">Loading premium balance for '+w.slice(0,6)+'…</p>';
+                            try{
+                                const lg=await (window.magicblockDice&&window.magicblockDice.fetchPremiumPointsPdaFor?window.magicblockDice.fetchPremiumPointsPdaFor(w):null);
+                                if(lg){ tSelected.premiumLifetime=lg.premiumLifetime; tSelected.premiumSpendable=lg.premiumSpendable; tSelected.subscriptionLevel=lg.subscriptionLevel; tSelected.subscriptionActiveUntil=lg.subscriptionActiveUntil; }
+                                if($tUpgradeLedger){
+                                    const lvl=tSelected.subscriptionLevel||0, until=tSelected.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0, active=lvl>0&&days>0;
+                                    $tUpgradeLedger.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(tSelected.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(tSelected.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active?`<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>`:(lvl>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active?'can downgrade':(tSelected.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
+                                    if($tBtnUpgrade) $tBtnUpgrade.disabled=!((tSelected.premiumSpendable||0)>=5000 && !active);
+                                    if($tBtnCancel) $tBtnCancel.disabled=!active;
+                                }
+                            }catch(e){}
+                        }
+                    });
+                });
+            }
+            async function tFetchByWallet(w){
+                try{
+                    if(window.magicblockDice&&window.magicblockDice.fetchPremiumPointsPdaFor){
+                        const lg=await window.magicblockDice.fetchPremiumPointsPdaFor(w);
+                        if(!lg) return null;
+                        return {wallet:w,email:'',premiumLifetime:lg.premiumLifetime,premiumSpendable:lg.premiumSpendable,subscriptionLevel:lg.subscriptionLevel,subscriptionActiveUntil:lg.subscriptionActiveUntil,lastCreditPoints:lg.lastCreditPoints,lastCreditRef:lg.lastCreditRef,lastCreditTs:lg.lastCreditTs};
+                    }
+                }catch(e){}
+                return null;
+            }
+            if($tSearch) $tSearch.addEventListener('click', async()=>{
+                const em=$tEmail.value.trim().toLowerCase(), wa=$tWallet.value.trim();
+                if($tMsg) $tMsg.textContent='Searching...';
+                tCurrentList=[]; tSelected=null; if($tBtnCancel) $tBtnCancel.disabled=true; if($tBtnPromo) $tBtnPromo.disabled=true; if($tSelWallet) $tSelWallet.textContent='none'; if($tSelEmail) $tSelEmail.textContent='';
+                try{
+                    let w=wa, e=em;
+                    if(em&&!wa){
+                        const r=await fetch('/api/dynamic-search?email='+encodeURIComponent(em));
+                        const j=await r.json();
+                        if(j.users&&j.users.length){ w=j.users[0].wallet; e=j.users[0].email||em; }
+                        else{ if($tMsg) $tMsg.textContent='No Dynamic user for that email.'; $tResults.innerHTML='<div style="color:#e74c3c;text-align:center;padding:16px;">No user found for '+esc(em)+'</div>'; return; }
+                    }
+                    if(!w){ if($tMsg) $tMsg.textContent='Enter an email or wallet.'; return; }
+                    const lg=await tFetchByWallet(w);
+                    if(!lg){ if($tMsg) $tMsg.textContent='No premium PDA for that wallet.'; $tResults.innerHTML='<div style="color:#888;text-align:center;padding:16px;">No premium subscription for '+esc(w)+'</div>'; return; }
+                    lg.email=e; lg.wallet=w; tCurrentList=[lg]; tSelected=lg;
+                    if($tSelWallet) $tSelWallet.textContent=w; if($tSelEmail) $tSelEmail.textContent=e?' ('+e+')':'';
+                    const upCard=document.getElementById('upgrade-card'), upLed=document.getElementById('upgrade-ledger'), upBtn=document.getElementById('btn-upgrade'), canBtn=document.getElementById('btn-cancel');
+                    if(upCard) upCard.style.display='block';
+                    if(upLed){
+                        const lvl2=lg.subscriptionLevel||0, until2=lg.subscriptionActiveUntil||0, days2=until2>Date.now()?Math.ceil((until2-Date.now())/86400000):0, active2=lvl2>0&&days2>0;
+                        upLed.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Lifetime</div><div style="font-size:1rem;color:#f39c12;font-weight:700;">${(lg.premiumLifetime||0).toLocaleString()}</div></div><div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.7rem;color:#888;">Spendable</div><div style="font-size:1rem;color:#9b59b6;font-weight:700;">${(lg.premiumSpendable||0).toLocaleString()}</div></div></div><p style="font-size:0.8rem;color:#bbb;margin-top:8px;">Status: ${active2?`<span style="color:#2ecc71;">Active Level ${lvl2} (${days2}d left)</span>`:(lvl2>0?'<span style="color:#e67e22;">Expired</span>':'<span style="color:#888;">No active sub</span>')} — ${active2?'can downgrade':(lg.premiumSpendable||0)>=5000?'can upgrade (has 5,000P)':'needs 5,000P to upgrade'}</p>`;
+                        if(upBtn) upBtn.disabled=!((lg.premiumSpendable||0)>=5000 && !active2);
+                        if(canBtn) canBtn.disabled=!active2;
+                    }
+                    if(canBtn) canBtn.disabled=false;
+                    const promoBtn=document.getElementById('btn-promo'); if(promoBtn) promoBtn.disabled=false;
+                    tRenderTable(tCurrentList);
+                    if($tMsg) $tMsg.textContent='Found 1 subscriber.';
+                }catch(e){ if($tMsg) $tMsg.textContent='Search failed: '+e.message; }
+            });
+            if($tScan) $tScan.addEventListener('click', async()=>{
+                const tk=document.getElementById('operator-token')?document.getElementById('operator-token').value.trim():'';
+                if($tMsg) $tMsg.textContent='Scanning all premium PDAs on-chain (this may take a few seconds)...';
+                $tResults.innerHTML='<div style="color:#888;text-align:center;padding:24px;">Scanning...</div>';
+                try{
+                    const r=await fetch('/api/premium-subscribers', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tk})});
+                    const j=await r.json();
+                    if(!r.ok) throw new Error(j.error||'scan failed');
+                    tCurrentList=(j.subscribers||[]).map(s=>({wallet:'',premiumPda:s.premiumPda,email:'',premiumLifetime:s.premiumLifetime,premiumSpendable:s.premiumSpendable,subscriptionLevel:s.subscriptionLevel,subscriptionActiveUntil:s.subscriptionActiveUntil,lastCreditPoints:s.lastCreditPoints,lastCreditRef:s.lastCreditRef,lastCreditTs:s.lastCreditTs}));
+                    tRenderTable(tCurrentList);
+                    if($tMsg) $tMsg.textContent='Scan found '+tCurrentList.length+' premium PDAs.';
+                }catch(e){ if($tMsg) $tMsg.textContent='Scan failed: '+e.message; }
+            });
+            [$tYear,$tMonth,$tStatus].forEach(el=>{ if(el) el.addEventListener('change', ()=>tRenderTable(tCurrentList)); });
+            if($tBtnUpgrade) $tBtnUpgrade.addEventListener('click', async()=>{
+                if(!tSelected) return;
+                if(!confirm('Upgrade '+tSelected.wallet+' to Level 2? This will spend 5,000 premium points on-chain (must have 5,000 spendable, otherwise it will fail).')) return;
+                const umsg=document.getElementById('upgrade-msg');
+                if(umsg) umsg.textContent='Upgrading on-chain...';
+                $tBtnUpgrade.disabled=true;
+                try{
+                    const r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:tSelected.wallet})});
+                    const j=await r.json();
+                    if(!r.ok) throw new Error(j.error||'upgrade failed');
+                    if(umsg) umsg.textContent='Upgraded. Sig: '+(j.sig||'ok')+' — re-search to verify.';
+                    if($tMsg) $tMsg.textContent='Upgraded via separate activate.';
+                }catch(e){ if(umsg) umsg.textContent='Upgrade failed: '+e.message; else if($tMsg) $tMsg.textContent='Upgrade failed: '+e.message; }
+                $tBtnUpgrade.disabled=false;
+            });
+            const _origCancel = $tBtnCancel;
+            if(_origCancel) _origCancel.addEventListener('click', async()=>{
+                if(!tSelected) return;
+                if(!confirm('Cancel subscription for '+tSelected.wallet+' ? This will set level to 0 and activeUntil to 0 on-chain.')) return;
+                if($tMsg) $tMsg.textContent='Cancelling on-chain...';
+                _origCancel.disabled=true;
+                try{
+                    const r=await fetch('/api/cancel-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:tSelected.wallet})});
+                    const j=await r.json();
+                    if(!r.ok) throw new Error(j.error||'cancel failed');
+                    if($tMsg) $tMsg.textContent='Cancelled. Sig: '+(j.sig||'ok')+' — re-search to verify.';
+                    const umsg=document.getElementById('upgrade-msg');
+                    if(umsg) umsg.textContent='Cancelled — re-search to verify downgrade.';
+                }catch(e){ if($tMsg) $tMsg.textContent='Cancel failed: '+e.message; }
+                _origCancel.disabled=false;
+            });
+            const _promoBtn = document.getElementById('btn-promo');
+            if(_promoBtn) _promoBtn.addEventListener('click', async()=>{
+                if(!tSelected) return;
+                if(!confirm('Promo give for '+tSelected.wallet+' ? This will credit 5,000P (new ref) and immediately activate. The activate still checks 5,000 premium spendable — insufficient balance will fail.')) return;
+                if($tMsg) $tMsg.textContent='Promo: crediting 5,000P...';
+                _promoBtn.disabled=true;
+                try{
+                    const ref=Date.now()%2147483647;
+                    let r=await fetch('/api/credit-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:tSelected.wallet, points:5000, creditRef:ref})});
+                    let j=await r.json();
+                    if(!r.ok) throw new Error(j.error||'credit failed');
+                    if($tMsg) $tMsg.textContent='Credited 5,000P (ref '+ref+'), now activating...';
+                    r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:tSelected.wallet})});
+                    j=await r.json();
+                    if(!r.ok) throw new Error(j.error||'activate failed');
+                    if($tMsg) $tMsg.textContent='Promo complete. Activated. Sig: '+(j.sig||'ok')+' — re-search to verify.';
+                }catch(e){ if($tMsg) $tMsg.textContent='Promo failed: '+e.message; }
+                _promoBtn.disabled=false;
+            });
+        });
+    </script>
+</body>
+</html>
