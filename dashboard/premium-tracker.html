@@ -113,18 +113,37 @@
                     ]},
                 ]
             });
-            // Simple gate like dashboard homepage — wait briefly for session then check staff
+            // Gate like dashboard homepage — wait for header + Dynamic + profile, then check staff
+            // Show a small loading note while we verify, so the page never looks empty or redirects silently
+            const _gateNote = document.createElement('p');
+            _gateNote.id = 'gate-note';
+            _gateNote.style.cssText = 'color:#f39c12;font-size:0.82rem;text-align:center;padding:12px;';
+            _gateNote.textContent = 'Verifying admin access — loading your wallet session...';
+            const _main = document.querySelector('main');
+            if (_main) _main.prepend(_gateNote);
             let staff = false;
-            for (let i=0; i<8; i++) {
+            for (let i=0; i<20; i++) {
                 try {
+                    const hasHeader = !!document.querySelector('.gfg-header');
+                    const hasRoleFn = typeof window.getChangelogRole === 'function';
                     const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
                     const p = window.currentProfile && window.currentProfile.solana_wallet ? window.currentProfile.solana_wallet : null;
-                    if (w || p) break;
+                    const u = window.currentUser ? window.currentUser.id : null;
+                    if (hasHeader && hasRoleFn && (w || p || u)) break;
                 } catch(e) {}
                 await new Promise(r=>setTimeout(r, 500));
+                if (_gateNote) _gateNote.textContent = 'Verifying admin access — loading your wallet session... (' + (i+1) + '/20)';
             }
             try { staff = await window.DashCore.gateStaff(); } catch(e) { staff = false; }
-            if (!staff) return;
+            if (_gateNote) _gateNote.remove();
+            if (!staff) {
+                // Do not silently return — show why, so you can see the page is not broken
+                const msg = document.createElement('p');
+                msg.style.cssText = 'color:#e74c3c;font-size:0.85rem;text-align:center;padding:24px;';
+                msg.textContent = 'Not staff or wallet not ready — if you are admin, please refresh and wait a few seconds for your wallet to restore.';
+                if (_main) _main.prepend(msg);
+                return;
+            }
 
             const $email = document.getElementById('search-email');
             const $wallet = document.getElementById('search-wallet');

@@ -250,6 +250,82 @@
         }
     }
 
-    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, loadGlobalLedger, bindFolds };
+    function renderPremiumLedgerCard(el, ledger) {
+        const lastCreditTs = ledger.lastCreditTs ? new Date(ledger.lastCreditTs).toLocaleString() : '—';
+        const lastSpendTs = ledger.lastSpendTs ? new Date(ledger.lastSpendTs).toLocaleString() : '—';
+        const subUntil = ledger.subscriptionActiveUntil ? new Date(ledger.subscriptionActiveUntil).toLocaleString() : '—';
+        const subLabel = ledger.subscriptionLevel === 2 ? 'Level 2 (2x)' : (ledger.subscriptionLevel ? 'Level ' + ledger.subscriptionLevel : 'Free (1x)');
+        const daysLeft = ledger.subscriptionActiveUntil && ledger.subscriptionActiveUntil > Date.now() ? Math.ceil((ledger.subscriptionActiveUntil - Date.now())/86400000) : 0;
+        const subStatus = ledger.subscriptionLevel > 0 && daysLeft > 0 ? `Active — ${daysLeft}d left` : (ledger.subscriptionLevel > 0 ? 'Expired' : 'No active subscription');
+        const pda = window.magicblockDice && typeof window.magicblockDice.premiumPointsPda === 'function' ? window.magicblockDice.premiumPointsPda() : null;
+        const pdaLink = (pda && window.gfgExplorer) ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
+        el.innerHTML = `
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Lifetime premium (never spent)</span>
+                    <b style="color:#f39c12; font-size:1.15rem;">${(ledger.premiumLifetime||0).toLocaleString()}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Spendable premium</span>
+                    <b style="color:#9b59b6;">${(ledger.premiumSpendable||0).toLocaleString()}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Subscription</span>
+                    <b>${esc(subLabel)} <span style="color:#666;font-size:0.78rem;">(${esc(subStatus)})</span></b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Active until</span>
+                    <b style="font-size:0.82rem;">${esc(subUntil)}</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Premium credits</span>
+                    <b>${ledger.spendCount ?? 0} <span style="color:#666;font-size:0.78rem;">(${ledger.lastCreditPoints ? '+'+ledger.lastCreditPoints+'P' : '—'})</span></b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Last credit</span>
+                    <b style="font-size:0.82rem;">${ledger.lastCreditPoints ? '+'+ledger.lastCreditPoints+'P ref '+esc(String(ledger.lastCreditRef||'')) : '—'} <span style="color:#666;font-size:0.72rem;">${esc(lastCreditTs)}</span></b>
+                </div>
+                ${ledger.lastSpendTs ? `
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Last spend/activate</span>
+                    <b style="font-size:0.82rem;">${esc(String(ledger.lastSpendRef||''))} <span style="color:#666;font-size:0.72rem;">${esc(lastSpendTs)}</span></b>
+                </div>` : ''}
+                <div style="padding:8px 0;">
+                    <span style="color:var(--muted); font-size:0.82rem;">Premium ledger account (yours, buy-only)</span>
+                    <div style="margin-top:4px;">${pdaLink}</div>
+                    <div style="color:#666;font-size:0.75rem;margin-top:6px;">How you get it: Pay $3 (Nigeria ₦3,000) on Paystack → support verifies and credits 5,000P on-chain gasless on ER. Premium never comes from wins or daily.</div>
+                </div>`;
+    }
+
+    async function loadPremiumLedger(el, ledger) {
+        if (ledger && ledger.premiumLifetime != null) {
+            renderPremiumLedgerCard(el, ledger);
+            return ledger;
+        }
+        const magic = window.magicblockDice;
+        if (!magic || typeof magic.fetchPremiumPointsPdaFor !== 'function') {
+            el.innerHTML = '<p class="empty">Premium ledger unavailable (wallet not ready).</p>';
+            return null;
+        }
+        const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+        const wallet = w || (window.currentProfile ? window.currentProfile.solana_wallet : null);
+        if (!wallet) {
+            el.innerHTML = '<p class="empty">Connect your wallet to see your premium ledger.</p>';
+            return null;
+        }
+        try {
+            const fetched = await magic.fetchPremiumPointsPdaFor(typeof wallet === 'string' ? wallet : wallet.address || wallet);
+            if (!fetched) {
+                el.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
+                return null;
+            }
+            renderPremiumLedgerCard(el, fetched);
+            return fetched;
+        } catch (e) {
+            el.innerHTML = '<p class="empty">Could not read premium ledger (' + esc(e.message) + ').</p>';
+            return null;
+        }
+    }
+
+    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, loadGlobalLedger, loadPremiumLedger, renderPremiumLedgerCard, bindFolds };
 
 })();

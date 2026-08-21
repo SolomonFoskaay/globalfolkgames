@@ -208,47 +208,27 @@
 
             function renderPremium(ledger) {
                 if (!premiumLedgerEl) return;
-                const pp = window.premiumPoints;
-                const cur = ledger && ledger.premiumLifetime != null ? ledger : (pp ? pp.get() : null);
-                if (cur && cur.premiumLifetime != null) {
-                    const life = (cur.premiumLifetime||0).toLocaleString();
-                    const spend = (cur.premiumSpendable||0).toLocaleString();
-                    const lvl = cur.subscriptionLevel || 0;
-                    const until = cur.subscriptionActiveUntil || 0;
-                    const days = until > Date.now() ? Math.ceil((until - Date.now())/86400000) : 0;
-                    const active = lvl>0 && days>0;
-                    const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired — renew to keep 2x</span>' : '<span style="color:#888;">No active subscription</span>');
-                    premiumLedgerEl.innerHTML = `
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                            <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
-                                <div style="font-size:0.75rem;color:#888;">Lifetime</div>
-                                <div style="font-size:1.2rem;color:#f39c12;font-weight:800;">${life}</div>
-                                <div style="font-size:0.7rem;color:#888;">never spent</div>
-                            </div>
-                            <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
-                                <div style="font-size:0.75rem;color:#888;">Spendable</div>
-                                <div style="font-size:1.2rem;color:#9b59b6;font-weight:800;">${spend}</div>
-                                <div style="font-size:0.7rem;color:#888;">buys Level 2</div>
-                            </div>
-                        </div>
-                        <p style="font-size:0.82rem;color:var(--muted);">${status} · Last credit: ${(cur.lastCreditPoints||0).toLocaleString()}P ref ${cur.lastCreditRef||'—'}</p>
-                        <p style="font-size:0.78rem;color:#888;margin-top:6px;">How you get it: Pay $3 (Nigeria ₦3,000) on Paystack, support verifies and credits 5,000P on-chain gasless on ER. Then tap Activate on the Premium page. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>
-                    `;
+                if (ledger && ledger.premiumLifetime != null) {
+                    window.ProfileCore.renderPremiumLedgerCard(premiumLedgerEl, ledger);
                     return;
                 }
-                // If no cached ledger but wallet is known, show 0 rather than stuck loading — the single RPC (auth/win) will refresh it
-                if (pp && typeof pp.get === 'function') {
-                    const hasWallet = window.pointsStore ? window.pointsStore.hasWallet() : !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet());
-                    if (hasWallet) {
-                        premiumLedgerEl.innerHTML = '<p class="empty">Premium: 0 Lifetime / 0 Spendable — no premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
-                        return;
-                    }
+                const pp = window.premiumPoints;
+                const cur = pp ? pp.get() : null;
+                if (cur && cur.premiumLifetime != null) {
+                    window.ProfileCore.renderPremiumLedgerCard(premiumLedgerEl, cur);
+                    return;
                 }
                 if (pp && typeof pp.checked === 'function' && pp.checked()) {
-                    premiumLedgerEl.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
-                } else {
-                    premiumLedgerEl.innerHTML = '<p class="empty">Loading premium ledger...</p>';
+                    // Checked and still no ledger — show 0, not stuck loading
+                    window.ProfileCore.renderPremiumLedgerCard(premiumLedgerEl, { premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0, lastSpendTs:0, lastSpendRef:'', spendCount:0 });
+                    return;
                 }
+                // Has wallet but not yet checked — show 0 immediately (cached value will replace on next auth/win)
+                if (window.pointsStore && window.pointsStore.hasWallet()) {
+                    window.ProfileCore.renderPremiumLedgerCard(premiumLedgerEl, { premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0, lastSpendTs:0, lastSpendRef:'', spendCount:0 });
+                    return;
+                }
+                premiumLedgerEl.innerHTML = '<p class="empty">Loading premium ledger...</p>';
             }
 
             // One-shot boot: once the wallet client is actually ready, snapshot
