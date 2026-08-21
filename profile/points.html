@@ -45,6 +45,12 @@
             <div id="points-local-ledger"><p class="empty">Select a game to see its ledger.</p></div>
         </section>
 
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <h3>Premium points (on-chain, buy-only)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your premium ledger is separate from game points. <b style="color:#f39c12;">Lifetime</b> is your permanent credential (never spent). <b style="color:#9b59b6;">Spendable</b> buys the Level 2 boost and future extras. Premium points are only gotten via Paystack purchase after support verifies your payment — never from wins, daily, or referral. Gasless on the MagicBlock ER (sponsor pays).</p>
+            <div id="points-premium-ledger"><p class="empty">Loading premium ledger...</p></div>
+        </section>
+
         <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
             <h3>Premium subscription</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your Level 2 (2x) boost, daily reward and lives are managed on a dedicated page. Regular price <span style="text-decoration:line-through;">$10</span> — beta now <b style="color:#f39c12;">$3</b> (Nigeria beta <b style="color:#2ecc71;">₦3,000</b>) for 30 days. Limited time.</p>
@@ -84,6 +90,7 @@
             const lifetimeEl = document.getElementById('points-lifetime');
             const localLedgerEl = document.getElementById('points-local-ledger');
             const globalLedgerEl = document.getElementById('points-global-ledger');
+            const premiumLedgerEl = document.getElementById('points-premium-ledger');
             const gameSelect = document.getElementById('points-game-select');
             const gameSearch = document.getElementById('points-game-search');
             let selectedGame = 'ludo';
@@ -199,6 +206,43 @@
                 }
             }
 
+            function renderPremium(ledger) {
+                if (!premiumLedgerEl) return;
+                const pp = window.premiumPoints;
+                const cur = ledger && ledger.premiumLifetime != null ? ledger : (pp ? pp.get() : null);
+                if (cur && cur.premiumLifetime != null) {
+                    const life = (cur.premiumLifetime||0).toLocaleString();
+                    const spend = (cur.premiumSpendable||0).toLocaleString();
+                    const lvl = cur.subscriptionLevel || 0;
+                    const until = cur.subscriptionActiveUntil || 0;
+                    const days = until > Date.now() ? Math.ceil((until - Date.now())/86400000) : 0;
+                    const active = lvl>0 && days>0;
+                    const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired — renew to keep 2x</span>' : '<span style="color:#888;">No active subscription</span>');
+                    premiumLedgerEl.innerHTML = `
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                            <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
+                                <div style="font-size:0.75rem;color:#888;">Lifetime</div>
+                                <div style="font-size:1.2rem;color:#f39c12;font-weight:800;">${life}</div>
+                                <div style="font-size:0.7rem;color:#888;">never spent</div>
+                            </div>
+                            <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
+                                <div style="font-size:0.75rem;color:#888;">Spendable</div>
+                                <div style="font-size:1.2rem;color:#9b59b6;font-weight:800;">${spend}</div>
+                                <div style="font-size:0.7rem;color:#888;">buys Level 2</div>
+                            </div>
+                        </div>
+                        <p style="font-size:0.82rem;color:var(--muted);">${status} · Last credit: ${(cur.lastCreditPoints||0).toLocaleString()}P ref ${cur.lastCreditRef||'—'}</p>
+                        <p style="font-size:0.78rem;color:#888;margin-top:6px;">How you get it: Pay $3 (Nigeria ₦3,000) on Paystack, support verifies and credits 5,000P on-chain gasless on ER. Then tap Activate on the Premium page. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>
+                    `;
+                    return;
+                }
+                if (pp && typeof pp.checked === 'function' && pp.checked()) {
+                    premiumLedgerEl.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
+                } else {
+                    premiumLedgerEl.innerHTML = '<p class="empty">Loading premium ledger...</p>';
+                }
+            }
+
             // One-shot boot: once the wallet client is actually ready, snapshot
             // the current ledgers and start the sync. Repeated attempts are a
             // bounded poll (the Dynamic session restores AFTER DOMContentLoaded).
@@ -230,11 +274,10 @@
                         }
                     });
                 }
-                // M5: re-render the Active Tier card when the premium ledger
-                // refreshes (credit verified, sub activated, expiry reaches).
+                // M5: re-render the Active Tier card + premium ledger when the premium ledger refreshes
                 if (window.premiumPoints && typeof window.premiumPoints.subscribe === 'function') {
-                    window.premiumPoints.subscribe(function () {
-                        if (window.currentProfile) renderTierCard();
+                    window.premiumPoints.subscribe(function (ledger) {
+                        if (window.currentProfile) { renderTierCard(); renderPremium(ledger); }
                     });
                 }
             }
@@ -245,7 +288,7 @@
                     render(!!window.currentUser);
                     renderGlobal(window.globalLedger ? window.globalLedger.get() : null);
                     renderLocalCard(selectedGame);
-                    if (window.currentProfile) renderTierCard();
+                    if (window.currentProfile) { renderTierCard(); renderPremium(window.premiumPoints ? window.premiumPoints.get() : null); }
                     return;
                 }
                 if (walletPoll++ < 24) setTimeout(bootOnWalletReady, 600); // ~15s budget

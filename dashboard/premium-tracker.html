@@ -39,7 +39,13 @@
     </style>
 </head>
 <body>
-    <main style="max-width:980px;margin:0 auto;padding:80px 16px 40px;">
+    <div id="gate-loading" style="position:fixed;inset:0;background:#0f0f13;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;text-align:center;padding:24px;">
+        <div style="width:40px;height:40px;border:3px solid #333;border-top-color:#f39c12;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        <p style="color:#f39c12;font-weight:700;margin-top:16px;">Verifying admin access...</p>
+        <p style="color:#888;font-size:0.82rem;margin-top:6px;max-width:320px;">Loading your wallet session and checking staff access. Content stays hidden until verified.</p>
+        <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
+    <main id="tracker-main" style="max-width:980px;margin:0 auto;padding:80px 16px 40px; display:none;">
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Tracker (M5)</h1>
         <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 14px;">Staff-only list of every premium subscriber. Dynamic is the source of truth for email and wallet (Supabase is only backup for devnet wipe restore). Scan by wallet or Dynamic email, filter by year/month/status, cancel defective perpetual subs, or run promo giveaways (credit 5,000P + activate — still consumes premium, no shortcut).</p>
 
@@ -104,18 +110,26 @@
                     ]},
                 ]
             });
-            // Wait for Dynamic wallet to restore before gating, so admin is not falsely redirected
+            // Robust gate: wait for global header, Dynamic session, and roles to be ready
+            // Double the wait (up to 10s) and keep content hidden until verified, so the page never flashes then redirects
             let staff = false;
-            for (let i=0; i<10; i++) {
+            for (let i=0; i<20; i++) {
                 try {
+                    const hasHeader = !!document.querySelector('.gfg-header');
+                    const hasRoleFn = typeof window.getChangelogRole === 'function';
                     const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
                     const p = window.currentProfile && window.currentProfile.solana_wallet ? window.currentProfile.solana_wallet : null;
-                    if (w || p) break;
+                    // Need header + role fn + at least wallet or profile hint that session is restoring
+                    if (hasHeader && hasRoleFn && (w || p || i>6)) break;
                 } catch(e) {}
                 await new Promise(r=>setTimeout(r, 500));
             }
             try { staff = await window.DashCore.gateStaff(); } catch(e) { staff = false; }
-            if (!staff) return;
+            const gateEl = document.getElementById('gate-loading');
+            const mainEl = document.getElementById('tracker-main');
+            if (!staff) return; // gateStaff already redirected to '/'
+            if (gateEl) gateEl.style.display = 'none';
+            if (mainEl) mainEl.style.display = 'block';
 
             const $email = document.getElementById('search-email');
             const $wallet = document.getElementById('search-wallet');
