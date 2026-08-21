@@ -82,8 +82,7 @@
         </p>
 
         <div class="prem-note">
-            <b>How it works:</b> pick a user from the dropdown (email and in brackets their embedded wallet from Dynamic — search by email or wallet to filter), choose a preset or type any amount, keep the auto-filled credit reference and operator token (both are safe random values that will not break the program — only edit if you must). The relay writes <b>premium_lifetime</b> and <b>premium_spendable</b> together (idempotent by credit ref). It never touches M3/M4.
-        </div>
+            <b>How it works:</b> pick a user from the dropdown (email and in brackets their embedded wallet from Dynamic — search by email or wallet to filter), choose a preset or type any amount, keep the auto-filled credit reference (safe random value that will not break the program — only edit if you must). The relay uses the Vercel env <code>GFG_Gasless_Sponsor_Keypair</code> (sponsor <code>id.json</code> keypair) to sign gasless on the ER, so you do not need to paste any manual code — just click Credit after verification.</div>
 
         <div class="prem-form">
             <div>
@@ -121,16 +120,6 @@
                     <button type="button" id="ref-edit" class="small-btn">Edit</button>
                 </div>
                 <div class="hint">This is the on-chain idempotency key (u64). A reused ref is rejected so a retry can never double-credit. Auto-filled with a safe random integer.</div>
-            </div>
-
-            <div>
-                <label for="prem-token">Operator token — what is this?</label>
-                <div class="inline-row">
-                    <input type="password" id="prem-token" placeholder="auto-filled from last use" autocomplete="off" readonly>
-                    <button type="button" id="token-show" class="small-btn">Show</button>
-                    <button type="button" id="token-edit" class="small-btn">Edit</button>
-                </div>
-                <div class="hint"><b>Operator token = GFG_OPERATOR_TOKEN</b> env on the relay. The program checks the stored <code>admin_authority</code> (sponsor key from <code>id.json</code>) and the relay checks this token before crediting. Without it the relay returns 401. Auto-filled from this browser's last success — only edit if you rotated the token.</div>
             </div>
 
             <button id="prem-credit-btn">Credit Premium Points</button>
@@ -217,15 +206,11 @@
             const $ref = document.getElementById('prem-ref');
             const $refRegen = document.getElementById('ref-regen');
             const $refEdit = document.getElementById('ref-edit');
-            const $token = document.getElementById('prem-token');
-            const $tokenShow = document.getElementById('token-show');
-            const $tokenEdit = document.getElementById('token-edit');
             const $btn = document.getElementById('prem-credit-btn');
             const $results = document.getElementById('prem-results');
             const $history = document.getElementById('prem-history');
 
             const HISTORY_KEY = 'gfg_premium_credit_history';
-            const TOKEN_KEY = 'gfg_operator_token_cache';
             const fmtNum = n => Number(n || 0).toLocaleString();
             const esc = s => String(s == null ? '' : s)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -238,10 +223,6 @@
             }
             try { $ref.value = genRef(); } catch(e) {}
             try {
-                const cached = localStorage.getItem(TOKEN_KEY);
-                if (cached) $token.value = cached;
-            } catch(e) {}
-            try {
                 $preset.addEventListener('change', ()=>{ if ($preset.value !== 'custom') $points.value = $preset.value; });
                 if ($preset.value !== 'custom') $points.value = $preset.value;
                 $points.addEventListener('input', ()=>{ if ($points.value) $preset.value='custom'; });
@@ -251,14 +232,6 @@
                 $refEdit.addEventListener('click', ()=>{
                     if ($ref.readOnly) { $ref.readOnly = false; $refEdit.textContent='Lock'; $ref.focus(); }
                     else { $ref.readOnly = true; $refEdit.textContent='Edit'; }
-                });
-                $tokenShow.addEventListener('click', ()=>{
-                    if ($token.type==='password') { $token.type='text'; $tokenShow.textContent='Hide'; }
-                    else { $token.type='password'; $tokenShow.textContent='Show'; }
-                });
-                $tokenEdit.addEventListener('click', ()=>{
-                    if ($token.readOnly) { $token.readOnly=false; $token.type='text'; $tokenEdit.textContent='Lock'; $token.focus(); }
-                    else { $token.readOnly=true; $token.type='password'; $tokenEdit.textContent='Edit'; }
                 });
             } catch(e) {}
 
@@ -358,14 +331,11 @@
                 const player = $player.value.trim().toLowerCase();
                 const points = parseInt($points.value, 10);
                 const creditRef = parseInt($ref.value.trim(), 10);
-                const token = $token.value.trim();
                 if (!player) return alert('Pick a user from the dropdown or paste a wallet.');
                 try { new PublicKey(player); } catch (e) { return alert('Invalid Solana wallet address.'); }
                 if (!points || points <= 0) return alert('Enter premium points greater than 0.');
                 if (!creditRef) return alert('Credit reference missing — tap Regenerate.');
                 if (!Number.isInteger(creditRef) || creditRef <= 0) return alert('Credit reference must be a positive integer.');
-                if (!token || token.length < 8) return alert('Enter the operator token (ask owner for GFG_OPERATOR_TOKEN).');
-                try { localStorage.setItem(TOKEN_KEY, token); } catch(e){}
                 $btn.disabled = true;
                 $btn.textContent = 'Crediting on-chain (gasless ER)...';
                 $results.innerHTML = '<div class="empty-state">Relay is signing the credit write gasless on the ER...</div>';
@@ -373,7 +343,7 @@
                     const res = await fetch('/api/credit-premium', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ player, points, creditRef, token }),
+                        body: JSON.stringify({ player, points, creditRef }),
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));

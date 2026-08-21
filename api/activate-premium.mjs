@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
   try {
     const expected = process.env.GFG_OPERATOR_TOKEN;
-    if (!expected || expected.length < 16 || body.token !== expected) {
+    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }

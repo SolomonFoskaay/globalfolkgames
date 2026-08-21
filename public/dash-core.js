@@ -30,16 +30,41 @@
     }
 
     // Staff gate mirrors the changelog admin page (client-side UX gate).
-    // Resolves true for staff; non-staff are redirected to '/'.
+    // Fixed 2026-08-21: wait for Dynamic wallet to restore before checking role,
+    // and cache the result so a slow restore never falsely redirects an admin
+    // 3 times before the 4th stays. Once staff is confirmed, it never redirects again.
+    let gateCache = null;
+    let gatePending = null;
     async function gateStaff() {
-        try {
-            if (window.getChangelogRole) {
-                const role = await window.getChangelogRole();
-                if (role === 'admin' || role === 'moderator') return true;
+        if (gateCache === true) return true;
+        if (gateCache === false) { window.location.replace('/'); return false; }
+        if (gatePending) return gatePending;
+        gatePending = (async () => {
+            // Wait up to 5s for the wallet session to restore (Dynamic is async)
+            for (let i = 0; i < 10; i++) {
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile && window.currentProfile.solana_wallet ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 500));
             }
-        } catch (e) { /* fall through */ }
-        window.location.replace('/');
-        return false;
+            try {
+                if (window.getChangelogRole) {
+                    const role = await window.getChangelogRole();
+                    if (role === 'admin' || role === 'moderator') {
+                        gateCache = true;
+                        return true;
+                    }
+                }
+            } catch (e) { /* fall through */ }
+            gateCache = false;
+            window.location.replace('/');
+            return false;
+        })();
+        const res = await gatePending;
+        gatePending = null;
+        return res;
     }
 
     // ---------- Ops panel + endpoint watchlist (server probe) ----------

@@ -104,7 +104,17 @@
                     ]},
                 ]
             });
-            const staff = await window.DashCore.gateStaff();
+            // Wait for Dynamic wallet to restore before gating, so admin is not falsely redirected
+            let staff = false;
+            for (let i=0; i<10; i++) {
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile && window.currentProfile.solana_wallet ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch(e) {}
+                await new Promise(r=>setTimeout(r, 500));
+            }
+            try { staff = await window.DashCore.gateStaff(); } catch(e) { staff = false; }
             if (!staff) return;
 
             const $email = document.getElementById('search-email');

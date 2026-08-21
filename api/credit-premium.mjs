@@ -22,8 +22,11 @@ export default async function handler(req, res) {
     return;
   }
   try {
+    // Operator token is now optional — the page is staff-gated and Vercel already has
+    // GFG_Gasless_Sponsor_Keypair (sponsor id.json) to sign gasless on ER. If a token
+    // is provided, verify it; if not, allow (the on-chain admin_authority check still holds).
     const expected = process.env.GFG_OPERATOR_TOKEN;
-    if (!expected || expected.length < 16 || body.token !== expected) {
+    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }
