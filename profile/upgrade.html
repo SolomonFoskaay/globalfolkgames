@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Upgrade Subscription | Profile | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>Upgrade Subscription</h2>
+            <p class="auth-hint" id="upgrade-status" style="margin-top:8px;">Checking your premium balance...</p>
+        </section>
+
+        <div class="dash-grid">
+
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <h3>Your premium balance — direct on-chain check</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 10 minutes (max 6 times per hour). Tap Refresh to check.</p>
+            <div id="upgrade-ledger"><p class="empty">Tap Refresh to load your live premium balance.</p></div>
+            <button id="refresh-premium" class="launch-btn onchain" style="margin-top:12px; width:100%;">Refresh premium balance (direct RPC)</button>
+            <p id="refresh-hint" style="color:var(--muted); font-size:0.75rem; margin-top:6px; text-align:center;"></p>
+        </section>
+
+        <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
+            <h3>Upgrade to Level 2 (2x)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">If you have 5,000 premium points in your spendable balance, you can upgrade here. This checks on-chain that only premium points count (other points do not count). If you do not have enough, it will tell you to go to the Premium page to get premium points.</p>
+            <div id="upgrade-action-msg" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></div>
+            <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 2 (cost 5,000P)</button>
+            <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits you 5,000P, come here to see it and tap Upgrade. No Paystack mention here — just pay as instructed on the Premium page.</p>
+        </section>
+
+        </div>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.GFG_DASH_NAV.render({
+                brand: '👤 Profile',
+                active: 'upgrade',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Profile home', href: '/profile/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
+                        { key: 'upgrade', label: '⬆️ Upgrade subscription', href: '/profile/upgrade.html' },
+                        { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
+                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                    ]},
+                ]
+            });
+
+            const statusEl = document.getElementById('upgrade-status');
+            const ledgerEl = document.getElementById('upgrade-ledger');
+            const refreshBtn = document.getElementById('refresh-premium');
+            const refreshHint = document.getElementById('refresh-hint');
+            const upgradeBtn = document.getElementById('upgrade-btn');
+            const actionMsg = document.getElementById('upgrade-action-msg');
+
+            const REFRESH_KEY = 'gfg_upgrade_refresh_lock';
+            const LOCK_MS = 10 * 60 * 1000; // 10 minutes
+
+            function canRefresh() {
+                try {
+                    const last = parseInt(localStorage.getItem(REFRESH_KEY) || '0', 10);
+                    return Date.now() - last >= LOCK_MS;
+                } catch(e) { return true; }
+            }
+            function updateRefreshLock() {
+                try {
+                    const last = parseInt(localStorage.getItem(REFRESH_KEY) || '0', 10);
+                    const diff = Date.now() - last;
+                    if (diff < LOCK_MS) {
+                        const left = Math.ceil((LOCK_MS - diff)/60000);
+                        refreshBtn.disabled = true;
+                        refreshHint.textContent = `Refresh locked — try again in ${left} minute${left!==1?'s':''} (max 6 times per hour to protect the RPC).`;
+                        setTimeout(updateRefreshLock, 60000);
+                    } else {
+                        refreshBtn.disabled = false;
+                        refreshHint.textContent = 'Ready to refresh (once every 10 minutes).';
+                    }
+                } catch(e) {}
+            }
+            updateRefreshLock();
+
+            function renderPremiumCard(ledger) {
+                const life = (ledger.premiumLifetime||0).toLocaleString();
+                const spend = (ledger.premiumSpendable||0).toLocaleString();
+                const lvl = ledger.subscriptionLevel||0;
+                const until = ledger.subscriptionActiveUntil||0;
+                const days = until > Date.now() ? Math.ceil((until - Date.now())/86400000) : 0;
+                const active = lvl>0 && days>0;
+                const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired</span>' : '<span style="color:#888;">No active subscription</span>');
+                ledgerEl.innerHTML = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                        <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
+                            <div style="font-size:0.75rem;color:#888;">Lifetime</div>
+                            <div style="font-size:1.2rem;color:#f39c12;font-weight:800;">${life}</div>
+                            <div style="font-size:0.7rem;color:#888;">never spent</div>
+                        </div>
+                        <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
+                            <div style="font-size:0.75rem;color:#888;">Spendable</div>
+                            <div style="font-size:1.2rem;color:#9b59b6;font-weight:800;">${spend}</div>
+                            <div style="font-size:0.7rem;color:#888;">buys Level 2</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Subscription</span><b>${status}</b></div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Active until</span><b style="font-size:0.82rem;">${until ? new Date(until).toLocaleString() : '—'}</b></div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">Last credit</span><b style="font-size:0.82rem;">${(ledger.lastCreditPoints||0).toLocaleString()}P ref ${ledger.lastCreditRef||'—'}</b></div>
+                `;
+                // Update upgrade button
+                if ((ledger.premiumSpendable||0) >= 5000 && !active) {
+                    upgradeBtn.disabled = false;
+                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You have 5,000P — you can upgrade now.</span>';
+                } else if (active) {
+                    upgradeBtn.disabled = true;
+                    actionMsg.innerHTML = '<span style="color:#888;">You already have an active Level 2 subscription.</span>';
+                } else {
+                    upgradeBtn.disabled = true;
+                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
+                }
+                if (ledger.premiumLifetime != null) {
+                    statusEl.textContent = 'Premium balance loaded — you have ' + spend + ' spendable.';
+                }
+            }
+
+            refreshBtn.addEventListener('click', async () => {
+                if (!canRefresh()) { updateRefreshLock(); return; }
+                const wallet = (window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null) || (window.currentProfile ? window.currentProfile.solana_wallet : null);
+                let addr = wallet;
+                if (addr && typeof addr !== 'string') addr = addr.address || String(addr);
+                if (!addr) {
+                    ledgerEl.innerHTML = '<p class="empty">Sign in to see your premium balance.</p>';
+                    statusEl.textContent = 'Sign in to check your premium balance.';
+                    return;
+                }
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = 'Checking on-chain...';
+                ledgerEl.innerHTML = '<p class="empty">Reading your premium ledger directly from the chain...</p>';
+                try {
+                    localStorage.setItem(REFRESH_KEY, String(Date.now()));
+                    updateRefreshLock();
+                    // Direct RPC — not from cache, to mitigate misuse we only allow via button and lock
+                    let ledger = null;
+                    if (window.magicblockDice && window.magicblockDice.fetchPremiumPointsPdaFor) {
+                        ledger = await window.magicblockDice.fetchPremiumPointsPdaFor(addr);
+                    }
+                    if (!ledger) {
+                        // No account yet — show 0
+                        renderPremiumCard({ premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0 });
+                    } else {
+                        renderPremiumCard(ledger);
+                    }
+                    refreshBtn.textContent = 'Refresh premium balance (direct RPC)';
+                } catch(e) {
+                    ledgerEl.innerHTML = '<p class="empty">Could not read premium ledger (' + e.message + ').</p>';
+                    statusEl.textContent = 'Could not load premium balance.';
+                    refreshBtn.textContent = 'Refresh premium balance (direct RPC)';
+                    updateRefreshLock();
+                }
+            });
+
+            // Also try to show cached value on first load without RPC
+            try {
+                const pp = window.premiumPoints ? window.premiumPoints.get() : null;
+                if (pp && pp.premiumLifetime != null) {
+                    renderPremiumCard(pp);
+                    statusEl.textContent = 'Showing cached premium balance — tap Refresh for live on-chain check.';
+                } else {
+                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 10 minutes).';
+                }
+            } catch(e) {}
+
+            upgradeBtn.addEventListener('click', async () => {
+                if (!window.premiumPoints || typeof window.premiumPoints.activate !== 'function') {
+                    actionMsg.textContent = 'Upgrade not ready — wallet not connected.';
+                    return;
+                }
+                const pp = window.premiumPoints.get();
+                if (!pp || (pp.premiumSpendable||0) < 5000) {
+                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
+                    return;
+                }
+                upgradeBtn.disabled = true;
+                upgradeBtn.textContent = 'Upgrading on-chain...';
+                actionMsg.textContent = 'Upgrading — checking 5,000 premium points on-chain...';
+                try {
+                    const sig = await window.premiumPoints.activate();
+                    if (sig) {
+                        actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + sig.slice(0,16) + '...</span>';
+                        // Refresh the ledger display
+                        setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1000);
+                    } else {
+                        throw new Error('Upgrade failed — not enough premium points or already active.');
+                    }
+                } catch(e) {
+                    actionMsg.textContent = 'Upgrade failed: ' + (e.message || e);
+                } finally {
+                    upgradeBtn.disabled = false;
+                    upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
+                }
+            });
+
+            // Keep status honest on auth changes
+            if (typeof window.addEventListener === 'function') {
+                window.addEventListener('gfg:auth-changed', ()=> {
+                    try {
+                        const pp2 = window.premiumPoints ? window.premiumPoints.get() : null;
+                        if (pp2) renderPremiumCard(pp2);
+                    } catch(e) {}
+                });
+            }
+        });
+    </script>
+</body>
+</html>
