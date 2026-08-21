@@ -12,7 +12,7 @@
 
 import { createServer } from 'http';
 import { Keypair } from '@solana/web3.js';
-import { handleDelegate, handleMigratePoints } from './delegate-relay.mjs';
+import { handleDelegate, handleMigratePoints, handleCreditPremium, handleCancelPremium, handleAdminActivatePremium } from './delegate-relay.mjs';
 import { runProbe } from './endpoints-probe.mjs';
 import { handleHouseRoll } from './roll-relay.mjs';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState } from './comp-relay.mjs';
@@ -238,6 +238,42 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('credit-premium error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/cancel-premium') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { player, token } = JSON.parse(body || '{}');
+      const expected = process.env.GFG_OPERATOR_TOKEN;
+      if (!expected || token !== expected) throw new Error('unauthorized operator token');
+      if (!player) throw new Error('missing "player" pubkey');
+      const result = await handleCancelPremium(player);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('cancel-premium error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/activate-premium') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { player, token } = JSON.parse(body || '{}');
+      const expected = process.env.GFG_OPERATOR_TOKEN;
+      if (!expected || token !== expected) throw new Error('unauthorized operator token');
+      if (!player) throw new Error('missing "player" pubkey');
+      const result = await handleAdminActivatePremium(player);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('activate-premium error:', e.message);
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
     }

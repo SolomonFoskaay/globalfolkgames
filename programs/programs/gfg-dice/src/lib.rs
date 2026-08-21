@@ -820,6 +820,21 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// (M5) Admin cancels a defective/perpetual subscription. Authority-gated
+    /// (only stored admin_authority may call), sets level=0 and active_until=0.
+    /// Used from the premium tracker to revoke a sub that escaped expiry.
+    /// Runs base-layer or ER signed by admin, delegation-aware (undelegate if needed).
+    pub fn admin_cancel_subscription(ctx: Context<AdminCancelSubscriptionCtx>) -> Result<()> {
+        let prem = &mut ctx.accounts.premium_points;
+        require!(
+            prem.admin_authority == ctx.accounts.admin.key(),
+            PointsError::NotAdmin
+        );
+        prem.subscription_level = 0;
+        prem.subscription_active_until = 0;
+        Ok(())
+    }
+
     /// Commits the latest state and returns the PREMIUM points PDA to this
     /// program (runs on ER). Mirrors `undelegate_global_points` so a premium
     /// PDA can leave a flaky region and be re-pinned. Additive, 2026-08-20.
@@ -1163,6 +1178,19 @@ pub struct SpendPremiumPointsCtx<'info> {
 pub struct ActivateSubscriptionCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
+/// Context for `admin_cancel_subscription`. Authority-gated: only the stored
+/// admin_authority (sponsor/ecror) may cancel a defective perpetual sub.
+/// Player does NOT sign; admin does. Runs base-layer (undelegate if delegated).
+#[derive(Accounts)]
+pub struct AdminCancelSubscriptionCtx<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
     /// CHECK: The player's wallet authority (seed basis for the PDA).
     pub player_authority: AccountInfo<'info>,
     #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]

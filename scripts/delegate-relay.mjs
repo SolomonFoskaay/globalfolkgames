@@ -558,6 +558,76 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
   return { player: player.toBase58(), points, creditRef, sig, undelegated, redelegated: undelegated };
 }
 
+// M5 admin cancel: revoke a defective perpetual sub (authority-gated).
+// Delegation-aware like credit: undelegate if delegated -> base-layer cancel -> re-delegate.
+export async function handleCancelPremium(playerPubkey) {
+  const player = new PublicKey(playerPubkey);
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
+  const program = new Program(idl, provider);
+  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
+  const retry = async (fn, n = 4, delay = 400) => {
+    for (let i = 0; i < n; i++) { try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); } }
+    return null;
+  };
+  const info = await retry(() => conn.getAccountInfo(premiumPointsPda));
+  if (!info) throw new Error('premium PDA not found for player');
+  const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
+  const wasDelegated = !!(status && status.isDelegated);
+  if (wasDelegated) await undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda);
+  let sig = null;
+  try {
+    sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.adminCancelSubscription()
+        .accounts({ admin: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
+        .transaction()
+    );
+  } finally {
+    if (wasDelegated) {
+      const dsig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
+      if (dsig) console.log(`  re-delegated premium PDA ${premiumPointsPda.toBase58()} (${dsig})`);
+    }
+  }
+  console.log(`[relay] cancelled subscription for ${player.toBase58()} (sig ${sig}, wasDelegated ${wasDelegated})`);
+  return { player: player.toBase58(), sig, wasDelegated, redelegated: wasDelegated };
+}
+
+// M5 promo: admin gives subscription via the normal 5000P route. First credit 5000P
+// (idempotent ref), then activate. Both respect the spend check, so no shortcut.
+export async function handleAdminActivatePremium(playerPubkey) {
+  const player = new PublicKey(playerPubkey);
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
+  const program = new Program(idl, provider);
+  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
+  const retry = async (fn, n = 4, delay = 400) => {
+    for (let i = 0; i < n; i++) { try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); } }
+    return null;
+  };
+  const info = await retry(() => conn.getAccountInfo(premiumPointsPda));
+  if (!info) throw new Error('premium PDA not found for player');
+  const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
+  const wasDelegated = !!(status && status.isDelegated);
+  if (wasDelegated) await undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda);
+  let sig = null;
+  try {
+    sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.activateSubscription()
+        .accounts({ payer: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
+        .transaction()
+    );
+  } finally {
+    if (wasDelegated) {
+      const dsig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
+      if (dsig) console.log(`  re-delegated premium PDA ${premiumPointsPda.toBase58()} (${dsig})`);
+    }
+  }
+  console.log(`[relay] admin activated subscription for ${player.toBase58()} (sig ${sig})`);
+  return { player: player.toBase58(), sig, wasDelegated, redelegated: wasDelegated };
+}
+
 // Undelegate the premium PDA back to base (runs commit+undelegate on its
 // hosting ER region, sponsor signs). Mirrors migrate-to-as's undelegate step.
 async function undelegatePremiumPda(program, conn, sponsor, player, premiumPointsPda) {

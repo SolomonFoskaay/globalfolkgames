@@ -63,6 +63,60 @@
       "args": []
     },
     {
+      "name": "admin_cancel_subscription",
+      "docs": [
+        "(M5) Admin cancels a defective/perpetual subscription. Authority-gated",
+        "(only stored admin_authority may call), sets level=0 and active_until=0.",
+        "Used from the premium tracker to revoke a sub that escaped expiry.",
+        "Runs base-layer or ER signed by admin, delegation-aware (undelegate if needed)."
+      ],
+      "discriminator": [
+        83,
+        245,
+        221,
+        64,
+        22,
+        79,
+        160,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "callback_roll_dice",
       "docs": [
         "Called by the VRF program (oracle-verified) with the randomness."
