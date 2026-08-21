@@ -157,6 +157,20 @@
         </div>
     </div>
 
+    <!-- Zero-lives blocking overlay: shown when today's lives are used up and never
+         dismissed by itself, so Replay cannot become an unlimited-play exploit. It
+         blocks the board center and points players to the subscription page for the
+         feature summary (no prices). -->
+    <div id="lives-blocked-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,15,19,0.92); z-index:12000; align-items:center; justify-content:center; text-align:center; padding:20px;">
+        <div style="background:#1a1a24; border:1px solid rgba(243,156,18,0.5); border-radius:16px; padding:24px 18px; max-width:340px; width:100%; box-sizing:border-box;">
+            <div style="font-size:2.2rem;">⏰</div>
+            <h2 style="color:#f39c12; margin:8px 0 6px;">No lives left today</h2>
+            <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">double lives</b>, <b style="color:#2ecc71;">double win points</b>, and a <b style="color:#f39c12;">bigger daily reward</b>.</p>
+            <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f39c12; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
+            <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) at midnight GMT.</div>
+        </div>
+    </div>
+
     <!-- Global scripts (needed for points + auth). Ludo-lab needs the ER VRF
          SDK, so it points the shared loader at its own bootstrap module. No
          header display options are passed: the global header is uniform. -->

@@ -138,10 +138,13 @@
         var day = utcDayKey();
         if (s.day !== day) { s.day = day; s.used = 0; }
         var total = totalForLevel();
-        if (s.used >= total) { persist(); notify(); return false; }
+        if (s.used >= total) { persist(); render(); return false; }
         s.used = (s.used || 0) + 1;
         persist();
-        notify();
+        // Re-render the [data-lives-*] slots immediately so the board bar updates
+        // the instant a match completes — without a page refresh. This closes the
+        // 'Play Again' exploit where a stale meter let users play unlimited games.
+        render();
         return true;
     }
 

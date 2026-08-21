@@ -279,8 +279,13 @@ function initiateArenaMatch() {
         if (lives && lives.livesLeft <= 0) {
             const mins = Math.ceil((lives.resetsInMs || 0) / 60000);
             displayEducationalLog(`ERROR: No lives left for today. Lives refill at midnight (GMT+00)${mins > 0 ? `, about ${mins} min away` : ''}.`);
-            if (typeof window.showAuthBanner === 'function') {
-                window.showAuthBanner(`No lives left today. Your meter refills at midnight (GMT), roughly ${mins > 0 ? mins + ' minutes' : 'soon'}.\n\nBecome a Level-2 subscriber for 10 lives a day instead of 5.`, true);
+            // Persistent centre overlay (never auto-dismisses) pointing to the
+            // subscription page — stops the Replay-forever exploit where a stale
+            // meter let users keep playing without a refresh.
+            if (typeof window.showLivesBlocked === 'function') {
+                window.showLivesBlocked(true);
+            } else if (typeof window.showAuthBanner === 'function') {
+                window.showAuthBanner(`No lives left today. Your meter refills at midnight (GMT), roughly ${mins > 0 ? mins + ' minutes' : 'soon'}.\n\nGo Premium for double lives.`, true);
             }
             return;
         }
@@ -379,6 +384,32 @@ function passTurnSequence() {
             if (typeof triggerAutomatedComputerDiceRoll === 'function') triggerAutomatedComputerDiceRoll();
         }, 1500);
     }
+}
+
+// The zero-lives centre overlay (persistent, no auto-dismiss). Shown when a
+// match cannot start because lives are used up, and auto-shown right after a
+// completed match the moment the meter reaches 0 (Play Again then cannot
+// bypass the limit — the life was already consumed and the bar re-rendered).
+window.showLivesBlocked = function (show) {
+    const ov = document.getElementById('lives-blocked-overlay');
+    if (!ov) return;
+    if (show) {
+        ov.style.display = 'flex';
+    } else {
+        ov.style.display = 'none';
+    }
+};
+
+// Auto-show the zero-lives overlay after the ceremony if the meter just hit 0.
+function maybeBlockOnZeroLives() {
+    try {
+        if (window.gfgLives && typeof window.gfgLives.get === 'function') {
+            const lives = window.gfgLives.get();
+            if (lives && lives.livesLeft <= 0 && typeof window.showLivesBlocked === 'function') {
+                setTimeout(function () { window.showLivesBlocked(true); }, 400);
+            }
+        }
+    } catch (e) { /* ignore */ }
 }
 
 // ===== ENDGAME (M1 locked spec) =====
@@ -562,6 +593,9 @@ window.showResultCeremony = function () {
     }
 
     overlay.classList.add('visible');
+
+    // If this completed match used the last life, block Replay (persistent).
+    maybeBlockOnZeroLives();
 };
 
 // "Play Again": start a fresh match with the SAME locked seat setup (no

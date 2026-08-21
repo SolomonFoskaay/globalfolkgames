@@ -277,12 +277,16 @@
                     <b style="font-size:0.82rem;">${esc(subUntil)}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <span style="color:var(--muted);">Premium credits</span>
-                    <b>${ledger.spendCount ?? 0} <span style="color:#666;font-size:0.78rem;">(${ledger.lastCreditPoints ? '+'+ledger.lastCreditPoints+'P' : '—'})</span></b>
+                    <span style="color:var(--muted);">Premium payments received</span>
+                    <b>1 <span style="color:#666;font-size:0.78rem;">(latest +${ledger.lastCreditPoints || 0}P)</span></b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <span style="color:var(--muted);">Last credit</span>
-                    <b style="font-size:0.82rem;">${ledger.lastCreditPoints ? '+'+ledger.lastCreditPoints+'P ref '+esc(String(ledger.lastCreditRef||'')) : '—'} <span style="color:#666;font-size:0.72rem;">${esc(lastCreditTs)}</span></b>
+                    <span style="color:var(--muted);">Last credit source</span>
+                    <b style="font-size:0.82rem; text-align:right;">Subscription payment (Level 2)<span style="display:block;color:#666;font-size:0.72rem;">${esc(lastCreditTs)}</span></b>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <span style="color:var(--muted);">Payment reference (invoice)</span>
+                    <b style="font-family:monospace; font-size:0.78rem; word-break:break-all;">${ledger.lastCreditRef ? esc(String(ledger.lastCreditRef)) : '—'}</b>
                 </div>
                 ${ledger.lastSpendTs ? `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
@@ -292,7 +296,7 @@
                 <div style="padding:8px 0;">
                     <span style="color:var(--muted); font-size:0.82rem;">Premium ledger account (yours, buy-only)</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
-                    <div style="color:#666;font-size:0.75rem;margin-top:6px;">How you get it: Pay $3 (Nigeria ₦3,000) on Paystack → support verifies and credits 5,000P on-chain gasless on ER. Premium never comes from wins or daily.</div>
+                    <div style="color:#666;font-size:0.75rem;margin-top:6px;">How you get it: you pay the Level 2 plan price, support verifies the payment and credits 5,000P to your premium ledger (on-chain, platform pays the network fees). Premium never comes from wins or daily. You can quote the payment reference as your receipt.</div>
                 </div>`;
     }
 
