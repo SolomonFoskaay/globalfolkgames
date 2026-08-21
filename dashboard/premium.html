@@ -183,10 +183,28 @@
     <script type="module">
         import { PublicKey } from '@solana/web3.js';
 
+        // Wait for Dynamic wallet to be ready before gating, so admin is not falsely redirected
+        async function waitForWalletAndGate() {
+            // Give Dynamic a moment to restore the session (up to 4s)
+            for (let i=0; i<8; i++) {
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch(e) {}
+                await new Promise(r=>setTimeout(r, 500));
+            }
+            try {
+                const staff = await window.DashCore.gateStaff();
+                return staff;
+            } catch(e) {
+                console.warn('gateStaff error', e);
+                return false;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
-            // Gate first — if not staff, DashCore will redirect to '/' and we stop
-            let staff = false;
-            try { staff = await window.DashCore.gateStaff(); } catch(e) { staff = false; }
+            const staff = await waitForWalletAndGate();
             if (!staff) return;
 
             const $search = document.getElementById('user-search');
@@ -213,7 +231,6 @@
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-            // Auto-fill ref and token (safe, never breaks program)
             function genRef() {
                 const t = Date.now() % 1000000000;
                 const r = Math.floor(Math.random()*900000) + 100000;
@@ -224,7 +241,6 @@
                 const cached = localStorage.getItem(TOKEN_KEY);
                 if (cached) $token.value = cached;
             } catch(e) {}
-            // Preset sync
             try {
                 $preset.addEventListener('change', ()=>{ if ($preset.value !== 'custom') $points.value = $preset.value; });
                 if ($preset.value !== 'custom') $points.value = $preset.value;
@@ -246,7 +262,6 @@
                 });
             } catch(e) {}
 
-            // User dropdown — Dynamic is source of truth, Supabase only for restore
             let allUsers = [];
             async function loadUsers() {
                 try {
@@ -287,7 +302,6 @@
                     renderSelect(filtered);
                 });
             } catch(e) {}
-            // Load users only after gate succeeded, fail-soft
             try { await loadUsers(); } catch(e) {}
 
             function renderHistory() {
