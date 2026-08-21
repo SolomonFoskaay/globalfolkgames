@@ -45,12 +45,12 @@
             <div id="points-local-ledger"><p class="empty">Select a game to see its ledger.</p></div>
         </section>
 
-        <section class="game-card" id="tier-card-section" style="border:1px solid var(--accent, #f39c12);">
-            <h3>Active Tier (Premium plan)</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">A monthly boost bought with premium points (a one-off $10 / N3,000 purchase, verified manually by the owner). Level 2 doubles base win points on the global ledger for 30 days. No auto-renew: when the window lapses you drop back to the free 1x plan.</p>
-            <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin-bottom:10px;">--</p>
-            <div id="tier-buy-row" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
-            <p id="tier-spendable" style="color:var(--muted); font-size:0.8rem; margin-top:10px;">--</p>
+        <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
+            <h3>Premium subscription</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your Level 2 (2x) boost, daily reward and lives are managed on a dedicated page. Regular price <span style="text-decoration:line-through;">$10</span> — beta now <b style="color:#f39c12;">$3</b> (Nigeria beta <b style="color:#2ecc71;">₦3,000</b>) for 30 days. Limited time.</p>
+            <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin:10px 0;">--</p>
+            <a href="/profile/subscription.html" class="launch-btn onchain" style="display:inline-block; text-decoration:none; text-align:center;">View Premium plans — beta offer</a>
+            <p id="tier-spendable" style="color:var(--muted); font-size:0.78rem; margin-top:10px;">--</p>
         </section>
 
         </div>
@@ -72,6 +72,7 @@
                     ]},
                     { heading: 'Detail', items: [
                         { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
+                        { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
                         { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
                     ]},
                 ]
@@ -269,11 +270,7 @@
 
             function renderTierCard() {
                 const statusEl = document.getElementById('tier-status');
-                const buyRow = document.getElementById('tier-buy-row');
                 const spendableEl = document.getElementById('tier-spendable');
-                // M5 (on-chain): the subscription truth lives in the premium PDA.
-                // Fall back to the legacy Supabase tier only if the module isn't
-                // loaded yet (it bootstraps via the header).
                 const prem = window.premiumPoints ? window.premiumPoints.get() : null;
                 const tier = window.activeTier ? window.activeTier.get() : null;
                 const legacy = (typeof window.getActiveTier === 'function') ? window.getActiveTier() : { tier: 1, mult: 1 };
@@ -282,50 +279,18 @@
                 const mult = level > 1 ? (level === 2 ? 2 : level) : 1;
                 const daysLeft = tier && tier.level > 0 ? tier.daysLeft : (legacy && legacy.expiresAt ? Math.max(0, Math.ceil((legacy.expiresAt - Date.now()) / 86400000)) : 0);
                 const active = level > 0 && daysLeft > 0;
-                const premiumSpendable = prem ? (prem.premiumSpendable || 0) : 0;
 
+                if (!statusEl) return;
                 if (active) {
-                    statusEl.innerHTML = 'You have <b style="color:#f39c12;">Level ' + level + ' (' + mult + 'x)</b> on win points, active until <b>' + new Date((tier ? tier.expiry : legacy.expiresAt)).toLocaleDateString() + '</b> (' + daysLeft + ' days left). No auto-renew: when it lapses you return to the free plan until your next purchase is verified.</span>';
+                    statusEl.innerHTML = 'You have <b style="color:#f39c12;">Level ' + level + ' (' + mult + 'x)</b> active until <b>' + new Date((tier ? tier.expiry : legacy.expiresAt)).toLocaleDateString() + '</b> (' + daysLeft + ' days left). <a href="/profile/subscription.html" style="color:#f39c12; text-decoration:underline;">Manage plan</a> — no auto-renew, renew manually if you want to.';
                 } else {
-                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. Buy the Level-2 plan below to multiply your win points. <span style="display:block;margin-top:6px;font-size:0.8rem;color:var(--muted);">How it works: the Level-2 plan costs 5,000 premium points (a one-off purchase worth $10 / N3,000 in Nigeria), lasts 30 days, multiplies base win points by 2x on the global ledger, and NEVER auto-renews. Pay with the button below, email your receipt to the owner, and your premium points are credited on-chain after verification.</span>';
+                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. <a href="/profile/subscription.html" style="color:#f39c12; text-decoration:underline;">See Premium beta</a> — regular <span style="text-decoration:line-through;">$10</span> now <b>$3</b> (Nigeria beta <b>₦3,000</b>) for 30 days, 2x wins, 200P daily, 10 lives. Non-refundable, no auto-debit.';
                 }
 
                 if (spendableEl) {
                     spendableEl.innerHTML = prem
-                        ? 'Premium balance: <b style="color:#9b59b6;">' + (prem.premiumLifetime || 0).toLocaleString() + '</b> lifetime credential · <b style="color:#f39c12;">' + premiumSpendable.toLocaleString() + '</b> spendable' + (prem.lastCreditRef ? ' · last credit ref: <span class="mono">' + prem.lastCreditRef + '</span>' : '')
-                        : '--';
-                }
-
-                buyRow.innerHTML = '';
-                if (!active && premiumSpendable >= 5000) {
-                    const btn = document.createElement('button');
-                    btn.className = 'launch-btn onchain';
-                    btn.style.marginTop = '0';
-                    btn.style.flex = '1';
-                    btn.style.minWidth = '110px';
-                    btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
-                    btn.onclick = async function () {
-                        if (window.premiumPoints && typeof window.premiumPoints.activate === 'function') {
-                            btn.disabled = true;
-                            btn.textContent = 'Activating on-chain...';
-                            const sig = await window.premiumPoints.activate();
-                            if (window.refreshAuthHeader) window.refreshAuthHeader().then(() => render(!!window.currentUser));
-                            renderTierCard();
-                            if (window.showAuthBanner) window.showAuthBanner(sig ? 'Level 2 active for 30 days. Welcome to the 2x club!' : 'Activation failed on-chain. Try again.', !sig);
-                        }
-                    };
-                    buyRow.appendChild(btn);
-                } else if (!active) {
-                    const btn = document.createElement('button');
-                    btn.className = 'launch-btn onchain';
-                    btn.style.marginTop = '0';
-                    btn.style.flex = '1';
-                    btn.style.minWidth = '110px';
-                    btn.textContent = 'Pay N3,000 · Level 2 (2x)';
-                    btn.onclick = function () {
-                        window.open('https://paystack.shop/pay/globalfolkgames2xplan', '_blank');
-                    };
-                    buyRow.appendChild(btn);
+                        ? 'Premium balance: <b style="color:#9b59b6;">' + (prem.premiumLifetime || 0).toLocaleString() + '</b> lifetime · <b style="color:#f39c12;">' + (prem.premiumSpendable || 0).toLocaleString() + '</b> spendable' + ' · <a href="/profile/subscription.html" style="color:#9b59b6; text-decoration:underline;">Go Premium</a>'
+                        : 'Premium balance: -- · <a href="/profile/subscription.html" style="color:#9b59b6; text-decoration:underline;">Go Premium</a>';
                 }
             }
 

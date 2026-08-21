@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Premium Subscription | Profile | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .beta-badge { display:inline-block; background: linear-gradient(135deg,#f39c12,#e67e22); color:#000; font-weight:800; font-size:0.72rem; letter-spacing:0.06em; padding:4px 10px; border-radius:999px; margin-bottom:10px; }
+        .price-card { border:1px solid rgba(243,156,18,0.35); background: linear-gradient(180deg, rgba(243,156,18,0.08), rgba(155,89,182,0.06)); border-radius:14px; padding:18px 16px; }
+        .price-strike { text-decoration: line-through; color:#888; font-size:0.92rem; }
+        .price-now { font-size:1.9rem; font-weight:900; color:#f39c12; line-height:1; }
+        .price-now small { font-size:0.85rem; color:#bbb; font-weight:600; }
+        .price-ng { font-size:1.35rem; font-weight:800; color:#2ecc71; margin-top:6px; }
+        .benefit-grid { display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px; }
+        @media(min-width:600px){ .benefit-grid{ grid-template-columns:1fr 1fr; } }
+        .benefit { background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 12px; }
+        .benefit b { color:#fff; }
+        .compare-table { width:100%; border-collapse: collapse; margin-top:10px; font-size:0.84rem; }
+        .compare-table th, .compare-table td { border:1px solid #2a2a36; padding:8px 10px; text-align:left; }
+        .compare-table th { background:#1a1a24; color:#f39c12; font-size:0.78rem; letter-spacing:0.04em; text-transform:uppercase; }
+        .compare-table td:first-child { color:#bbb; }
+        .cta-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+        .cta-row a, .cta-row button { flex:1; min-width:160px; }
+        .fine-print { font-size:0.78rem; color:#888; line-height:1.6; margin-top:10px; }
+        .fine-print b { color:#bbb; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <span class="beta-badge">BETA LAUNCH DISCOUNT — LIMITED TIME</span>
+            <h2>Go Premium: Level 2 (2x Boost)</h2>
+            <p class="auth-hint" id="sub-status" style="margin-top:8px;">Checking your plan...</p>
+        </section>
+
+        <div class="dash-grid">
+
+        <!-- Price hero -->
+        <section class="game-card price-card">
+            <h3 style="margin-bottom:6px;">One plan that multiplies everything you earn</h3>
+            <p style="color:var(--muted); font-size:0.86rem; line-height:1.6;">Pay once, get <b style="color:#f39c12;">5,000 premium points</b> credited on-chain and a <b style="color:#f39c12;">Level 2 (2x)</b> boost for 30 days. Premium points buy your subscription and work anywhere spendable points work — plus places spendable never can.</p>
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:16px; align-items:baseline;">
+                <div>
+                    <div class="price-strike">Regular $10.00 / month</div>
+                    <div class="price-now">$3 <small>/ 30 days — beta price</small></div>
+                    <div class="price-ng">Nigeria beta: ₦3,000 <small style="color:#888; font-weight:600;">for 30 days</small></div>
+                    <div style="font-size:0.78rem; color:#888; margin-top:4px;">Global $3 is about ₦4,500+ at current rates. Nigeria beta at ₦3,000 saves you over 70% off the regular $10 (about ₦13,000+) — and even cheaper than the already discounted $3.</div>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px 12px; font-size:0.8rem; color:#bbb; line-height:1.5; flex:1; min-width:220px;">
+                    <b style="color:#f39c12;">Why the discount?</b> You are early. This beta price is for our Nigeria-first launch and is available for a limited time. When beta ends, the price returns to $10/month.
+                </div>
+            </div>
+            <div class="cta-row">
+                <a id="pay-btn" href="https://paystack.shop/pay/globalfolkgames2xplan" target="_blank" rel="noopener noreferrer" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:inline-block;">Pay ₦3,000 / $3 — Unlock Level 2 (2x)</a>
+                <a href="/subscription-paid/" class="launch-btn" style="text-align:center; text-decoration:none; display:inline-block; background:#1a1a24; border:1px solid #333; color:#bbb;">I have paid — confirm payment</a>
+            </div>
+            <p class="fine-print"><b>Non-refundable, no auto-renew.</b> This is a one-time 30-day membership. Once paid it cannot be refunded. It does not auto-renew or auto-debit — you renew manually each month only if you want to.</p>
+            <p id="sub-current" style="font-size:0.84rem; color:#bbb; margin-top:10px;"></p>
+            <div id="sub-activate-row" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+            <p id="sub-premium-balance" style="font-size:0.8rem; color:#888; margin-top:8px;"></p>
+        </section>
+
+        <!-- Benefits -->
+        <section class="game-card">
+            <h3>What Level 2 gives you</h3>
+            <div class="benefit-grid">
+                <div class="benefit"><b>2x on every win</b><br><span style="color:var(--muted); font-size:0.82rem;">A 100P base win banks 200P on your global ledger. Applied as a separate boost at flow-up — your pure win record is never inflated.</span></div>
+                <div class="benefit"><b>200P daily reward</b><br><span style="color:var(--muted); font-size:0.82rem;">Free is 25P/day. Premium is 200P/day — one claim per day, every day your plan is active.</span></div>
+                <div class="benefit"><b>10 lives per day</b><br><span style="color:var(--muted); font-size:0.82rem;">Free is 5 lives/day. Premium is 10/day. Lives reset at midnight GMT and are used only when a match completes — abandon or disconnect never costs a life.</span></div>
+                <div class="benefit"><b>Competition ready</b><br><span style="color:var(--muted); font-size:0.82rem;">Premium spendable works for competition entries and future extras where regular spendable cannot.</span></div>
+            </div>
+            <table class="compare-table">
+                <thead><tr><th></th><th>Free (Level 1)</th><th>Premium (Level 2) — beta</th></tr></thead>
+                <tbody>
+                    <tr><td>Win multiplier</td><td>1x</td><td><b style="color:#2ecc71;">2x</b></td></tr>
+                    <tr><td>Daily reward</td><td>25P</td><td><b style="color:#2ecc71;">200P</b></td></tr>
+                    <tr><td>Lives per day</td><td>5</td><td><b style="color:#2ecc71;">10</b></td></tr>
+                    <tr><td>Duration</td><td>Forever</td><td>30 days per purchase</td></tr>
+                    <tr><td>Renewal</td><td>—</td><td>Manual — no auto-debit</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- How it works -->
+        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+            <h3>How it works</h3>
+            <ol style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:8px 0 0; padding-left:18px;">
+                <li>Tap <b style="color:#f39c12;">Pay ₦3,000 / $3</b> — you go to Paystack (manual bank transfer, cards disabled).</li>
+                <li>Paystack shows a temporary account number — make the transfer.</li>
+                <li>You are redirected to <b>/subscription-paid</b> — fill the short confirmation form and send it to support.</li>
+                <li>Support verifies within 24 hours and credits <b>5,000 premium points</b> on-chain to your wallet.</li>
+                <li>Come back here and tap <b>Activate Level 2</b> — 5,000 premium points are spent on-chain and your 30-day 2x window starts. No auto-renew.</li>
+            </ol>
+            <p class="fine-print">Premium points live in your on-chain wallet <code style="color:#9b59b6;">[gfgprem, your wallet]</code> — lifetime credential + spendable. They never merge into your game points.</p>
+        </section>
+
+        <!-- FAQ -->
+        <section class="game-card">
+            <h3>Common questions</h3>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Is this refundable?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">No. All premium purchases are <b>non-refundable</b>. Please confirm before you pay. The plan is intentionally not auto-renewing so you are never charged again without choosing to renew.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Will I be auto-charged next month?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">Never. When the 30 days end you drop back to the free 1x plan. Renew manually only if you want to.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Do I need premium to play?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">No. Ludo is free to play with 5 lives a day and free rewards. Premium simply multiplies what you already earn.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">I paid but do not see my boost yet</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">Fill the confirmation form at <a href="/subscription-paid/" style="color:#f39c12;">/subscription-paid</a> and contact support. Verification is usually within 24 hours, then tap Activate here.</p></details>
+            <p style="margin-top:14px;"><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20subscription%20support" style="color:#f39c12; font-size:0.86rem;">Contact support — GlobalFolkGames@gmail.com</a></p>
+        </section>
+
+        </div>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/universal/subscription/premium-ledger.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.GFG_DASH_NAV.render({
+                brand: '👤 Profile',
+                active: 'subscription',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Profile home', href: '/profile/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
+                        { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
+                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                    ]},
+                ]
+            });
+
+            const statusEl = document.getElementById('sub-status');
+            const currentEl = document.getElementById('sub-current');
+            const activateRow = document.getElementById('sub-activate-row');
+            const balanceEl = document.getElementById('sub-premium-balance');
+
+            function render() {
+                const prem = window.premiumPoints ? window.premiumPoints.get() : null;
+                const tier = window.activeTier ? window.activeTier.get() : null;
+                const signedIn = !!(window.currentUser || window.currentProfile);
+
+                if (!signedIn) {
+                    statusEl.textContent = 'Sign in from the menu to see your plan.';
+                    currentEl.textContent = '';
+                    activateRow.innerHTML = '';
+                    if (balanceEl) balanceEl.textContent = '';
+                    return;
+                }
+                if (prem && prem.premiumLifetime != null && balanceEl) {
+                    balanceEl.innerHTML = 'Premium balance: <b style="color:#9b59b6;">' + (prem.premiumLifetime||0).toLocaleString() + '</b> lifetime · <b style="color:#f39c12;">' + (prem.premiumSpendable||0).toLocaleString() + '</b> spendable';
+                }
+                if (tier && tier.active) {
+                    statusEl.innerHTML = 'You have <b style="color:#2ecc71;">Level ' + tier.level + ' (' + tier.level + 'x)</b> active.';
+                    currentEl.innerHTML = 'Active until <b>' + new Date(tier.expiry).toLocaleDateString() + '</b> — ' + tier.daysLeft + ' days left. No auto-renew.';
+                    activateRow.innerHTML = '';
+                } else {
+                    statusEl.textContent = 'You are on the free plan (1x). Beta price: $3 or ₦3,000 for Level 2 (2x) — 30 days.';
+                    const spendable = prem ? (prem.premiumSpendable||0) : 0;
+                    if (spendable >= 5000) {
+                        currentEl.textContent = 'Your 5,000 premium points are ready — activate below to start your 30-day boost.';
+                        activateRow.innerHTML = '';
+                        const btn = document.createElement('button');
+                        btn.className = 'launch-btn onchain';
+                        btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
+                        btn.onclick = async function(){
+                            btn.disabled = true; btn.textContent = 'Activating on-chain...';
+                            const sig = window.premiumPoints ? await window.premiumPoints.activate() : null;
+                            if (window.refreshAuthHeader) await window.refreshAuthHeader();
+                            render();
+                            if (window.showAuthBanner) window.showAuthBanner(sig ? 'Level 2 active for 30 days — welcome to 2x!' : 'Activation failed. Try again.', !sig);
+                            btn.disabled = false; btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
+                        };
+                        activateRow.appendChild(btn);
+                    } else {
+                        currentEl.textContent = 'After payment, support credits 5,000 premium points to your wallet, then you activate here. Current spendable: ' + spendable.toLocaleString() + '/5,000.';
+                        activateRow.innerHTML = '';
+                    }
+                }
+            }
+
+            render();
+            if (window.premiumPoints && window.premiumPoints.subscribe) window.premiumPoints.subscribe(render);
+            if (window.refreshAuthHeader) window.refreshAuthHeader().then(render).catch(render);
+            window.addEventListener('gfg:auth-changed', render);
+            let poll=0; (function p(){ if((window.premiumPoints&&window.premiumPoints.get&&window.premiumPoints.get())||poll++>20) return render(); setTimeout(p,700); })();
+        });
+    </script>
+</body>
+</html>

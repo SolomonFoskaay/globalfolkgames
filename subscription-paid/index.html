@@ -41,7 +41,8 @@
     <main class="mobile-container">
         <section class="onboarding-billboard">
             <h2>Payment received, thank you!</h2>
-            <p>Your Level 2 (2x) payment of N3,000 has gone through. One last step unlocks your boost.</p>
+            <p>Your Level 2 (2x) beta payment — <span style="text-decoration:line-through;">$10</span> now <b>$3</b> (Nigeria beta <b>₦3,000</b> for 30 days, limited time) — has gone through. One last step unlocks your boost.</p>
+            <p style="font-size:0.78rem; color:#888; margin-top:6px; line-height:1.5;">Global beta $3 is about 70% off the regular $10. Nigeria beta ₦3,000 is an even bigger save (regular $10 is about ₦13,000+). This discount is for our Nigeria-first beta launch and is available for a limited time.</p>
         </section>
 
         <section class="game-card">
@@ -49,9 +50,10 @@
             <ul class="steps">
                 <li>Fill the short form below. It tells us the bank account your transfer came from, so we can match it to your GlobalFolkGames account.</li>
                 <li>Your account email and wallet are filled in for you when you are signed in. If they look empty, sign in with the buttons at the top, then refresh this page.</li>
-                <li>We verify the payment and credit your account, usually within 24 hours. You get 5,000 premium points and a 2x boost on your win points for 30 days.</li>
-                <li>You will see your boost appear on your profile points page, no auto-renew, so nothing charges again afterwards.</li>
+                <li>Our support team verifies the payment and credits your account, usually within 24 hours. You get 5,000 premium points and a Level 2 (2x) boost for 30 days.</li>
+                <li>You will see your boost on your <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> page. <b>No auto-renew and non-refundable</b> — once paid it cannot be refunded, and nothing charges again. Renew manually only if you want to.</li>
             </ul>
+            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">Beta pricing: regular <span style="text-decoration:line-through;">$10</span> now $3 globally (about 70% off). Nigeria beta is ₦3,000 for the same 5,000 premium points — even better value for our launch market. Limited time.</p>
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
@@ -97,7 +99,7 @@
                 <div class="receipt-hint">Set to N3,000 for the Level 2 plan. Editable in case the price changes.</div>
 
                 <div class="form-actions">
-                    <button type="submit" id="submit-receipt" class="launch-btn onchain">Submit to owner</button>
+                    <button type="submit" id="submit-receipt" class="launch-btn onchain">Submit to support</button>
                     <button type="button" id="copy-receipt" class="copy-btn">Copy details</button>
                 </div>
 
@@ -107,8 +109,9 @@
 
         <section class="game-card">
             <h3>Questions?</h3>
-            <p style="margin-bottom:10px;">Contact the owner directly, we reply within 1 to 2 business days.</p>
-            <p><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20plan%20support" class="auth-btn primary" style="display:inline-block; text-decoration:none;">Email the owner</a></p>
+            <p style="margin-bottom:10px;">Contact our support team — we reply within 1 to 2 business days.</p>
+            <p><a href="mailto:GlobalFolkGames@gmail.com?subject=Premium%20plan%20support" class="auth-btn primary" style="display:inline-block; text-decoration:none;">Contact support</a></p>
+            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5;">Non-refundable: all premium purchases are final once paid. No auto-renew — renew manually each month only if you choose to.</p>
         </section>
     </main>
 
@@ -250,7 +253,7 @@
                 var body = encodeURIComponent(buildEmailLines());
                 var subject = encodeURIComponent(summarize(body));
                 window.location.href = 'mailto:GlobalFolkGames@gmail.com?subject=' + subject + '&body=' + body;
-                statusEl.textContent = 'Your email app should now open with the details filled in. If it did not open, tap "Copy details" and paste them into an email to the owner, thank you!';
+                statusEl.textContent = 'Your email app should now open with the details filled in. If it did not open, tap "Copy details" and paste them into an email to support, thank you!';
                 statusEl.style.color = '#2ecc71';
             });
 
@@ -259,7 +262,7 @@
                 var text = buildEmailLines();
                 function done(ok) {
                     statusEl.textContent = ok
-                        ? 'Details copied. Paste them into an email to the owner, thank you!'
+                        ? 'Details copied. Paste them into an email to support, thank you!'
                         : 'Could not copy automatically. Select and copy the email title below.';
                     statusEl.style.color = '#2ecc71';
                     if (!ok) {

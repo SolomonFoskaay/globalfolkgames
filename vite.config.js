@@ -30,6 +30,7 @@ export default defineConfig({
         forum: './forum/index.html',
         profile: './profile/index.html',
         'profile-points': './profile/points.html',
+        'profile-subscription': './profile/subscription.html',
         'profile-activity': './profile/activity.html',
         'subscription-paid': './subscription-paid/index.html',
         dashboard: './dashboard/index.html',
