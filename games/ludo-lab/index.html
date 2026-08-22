@@ -173,8 +173,11 @@
         </div>
     </div>
 
-    <!-- Always-visible booster promo pill (hidden while a booster is live). -->
-    <div id="booster-promo-pill" onclick="window.location.href='/profile/booster.html'" style="position:fixed; left:12px; bottom:12px; z-index:9000; background:linear-gradient(135deg,#f39c12,#e67e22); color:#000; font-weight:800; font-size:0.78rem; padding:10px 14px; border-radius:999px; box-shadow:0 4px 14px rgba(243,156,18,0.5); cursor:pointer; max-width:220px; text-align:center;">🔥 Get 72h UNLIMITED lives for $1<br><span style="font-weight:600; font-size:0.7rem;">no subscription needed</span></div>
+    <!-- Always-visible booster promo pill (hidden while a booster is live).
+     Compact glass chip: max ~46vw so it never covers more than half the mobile
+     screen, thin 2-line copy, translucent see-through so the game stays
+     visible around it. -->
+    <div id="booster-promo-pill" onclick="window.location.href='/profile/booster.html'" style="position:fixed; left:10px; bottom:10px; z-index:9000; width:min(46vw, 210px); box-sizing:border-box; background:rgba(17,14,49,0.55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); border:1px solid rgba(243,156,18,0.5); color:#ffe1a1; font-weight:800; font-size:0.66rem; line-height:1.3; padding:8px 10px; border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,0.35); cursor:pointer; text-align:center;">72h <span style="color:#ffde59;">UNLIMITED lives</span> · $1<br><span style="font-weight:600; font-size:0.62rem; color:#ffe9b8;">no subscription needed</span></div>
     <script>
     (function () {
         try {
