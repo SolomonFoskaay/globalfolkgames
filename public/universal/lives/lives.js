@@ -99,6 +99,24 @@
         return isPremiumActive() ? PREMIUM_LIVES : FREE_LIVES;
     }
 
+    // ---- M5 v3 booster (72h unlimited lives) -------------------------------
+    // While now < booster_active_until the lives pool is unlimited and nothing
+    // is consumed. The value is the player's own premium PDA field, read by the
+    // premium-ledger module (window.premiumPoints) which refreshes on auth and
+    // on any premium change (credit, activate, boost).
+    function boosterUntilMs() {
+        try {
+            var p = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
+            var until = Number(p && p.boosterActiveUntil ? p.boosterActiveUntil : 0);
+            return until > 0 ? until : 0;
+        } catch (e) { return 0; }
+    }
+
+    function isBoosterActive() {
+        var until = boosterUntilMs();
+        return until > 0 && until > Date.now();
+    }
+
     // ---- storage (wallet + day scoped) ------------------------------------
     function slice() {
         var wk = walletKey();
@@ -122,18 +140,34 @@
 
     // ---- core api -----------------------------------------------------------
     function get() {
+        // M5 v3: booster active => unlimited lives until booster_active_until.
+        if (isBoosterActive()) {
+            var until = boosterUntilMs();
+            return {
+                livesLeft: 999999,
+                totalForLevel: 999999,
+                boosterActive: true,
+                resetsInMs: Math.max(0, until - Date.now()),
+                boosterUntilMs: until,
+            };
+        }
         var total = totalForLevel();
         var used = usedToday();
         return {
             livesLeft: Math.max(0, total - used),
             totalForLevel: total,
             resetsInMs: msUntilUtcMidnight(),
+            boosterActive: false,
+            boosterUntilMs: 0,
         };
     }
 
     // Consume one life (called on a completed match — the module wires this to
     // the seam below). Returns true if a life was actually consumed.
     function consume() {
+        // M5 v3: a booster makes lives unlimited, so a completed match never
+        // draws the meter while the booster runs.
+        if (isBoosterActive()) { render(); return true; }
         var s = slice();
         var day = utcDayKey();
         if (s.day !== day) { s.day = day; s.used = 0; }
@@ -169,9 +203,13 @@
         var leftEls = document.querySelectorAll('[data-lives-left]');
         var totalEls = document.querySelectorAll('[data-lives-total]');
         var resetEls = document.querySelectorAll('[data-lives-resets-ms]');
-        for (var i = 0; i < leftEls.length; i++) leftEls[i].textContent = view.livesLeft;
-        for (var j = 0; j < totalEls.length; j++) totalEls[j].textContent = view.totalForLevel;
+        var boostEls = document.querySelectorAll('[data-lives-booster-until]');
+        var leftTxt = view.boosterActive ? '∞' : String(view.livesLeft);
+        var totalTxt = view.boosterActive ? '∞' : String(view.totalForLevel);
+        for (var i = 0; i < leftEls.length; i++) leftEls[i].textContent = leftTxt;
+        for (var j = 0; j < totalEls.length; j++) totalEls[j].textContent = totalTxt;
         for (var k = 0; k < resetEls.length; k++) resetEls[k].textContent = view.resetsInMs;
+        for (var q = 0; q < boostEls.length; q++) boostEls[q].textContent = view.boosterUntilMs || '';
     }
 
     function render() {

@@ -471,6 +471,9 @@ function decodePremiumPointsRaw(d) {
     lastSpendReason: d.length >= 107 ? d[106] : 0,
     spendCount: d.length >= 115 ? Number(d.readBigUInt64LE(107)) : 0,
     lastCreditReason: version >= 2 && d.length >= 116 ? d[115] : 1,
+    // M5 v3: booster_active_until (i64 secs) at 116-123. Present on v3 (132-byte)
+    // accounts; v1/v2 default to 0.
+    boosterActiveUntil: (version >= 3 && d.length >= 124) ? Number(d.readBigInt64LE(116)) * 1000 : 0,
   };
 }
 
@@ -491,6 +494,7 @@ function decodePremiumPoints(acct) {
     lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
     spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
     lastCreditReason: Number(acct.lastCreditReason ?? acct.last_credit_reason ?? 1),
+    boosterActiveUntil: Number(acct.boosterActiveUntil ?? acct.booster_active_until ?? 0) * 1000,
   };
 }
 

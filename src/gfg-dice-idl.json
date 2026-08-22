@@ -8,6 +8,60 @@
   },
   "instructions": [
     {
+      "name": "activate_booster",
+      "docs": [
+        "(M5 v3) Activates the 72h unlimited-life booster by spending premium",
+        "spendable (BOOSTER_COST = $1 / N1,500). No win multiplier: it only makes",
+        "lives unlimited. Extends from now (or the current active booster) by 72h.",
+        "Gasless on the ER (session key signs). One plan/booster per account flow."
+      ],
+      "discriminator": [
+        194,
+        10,
+        104,
+        52,
+        119,
+        13,
+        123,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "activate_subscription",
       "docs": [
         "(M5) Activates the Level-2 (2x) subscription from PREMIUM spendable.",
@@ -2632,11 +2686,6 @@
     },
     {
       "name": "register_profile_handle",
-      "docs": [
-        "Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves",
-        "pending -> paid, records the payout receipt (ts + ref). Idempotent by",
-        "payout_ref: a repeat of the same ref is rejected."
-      ],
       "discriminator": [
         70,
         201,
@@ -3331,27 +3380,7 @@
         },
         {
           "name": "premium_points",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  112,
-                  114,
-                  101,
-                  109
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "player_authority"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "magic_program",
@@ -3448,6 +3477,40 @@
         194,
         15,
         56
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "premium_points",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "upgrade_premium_points_v3",
+      "docs": [
+        "Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves",
+        "pending -> paid, records the payout receipt (ts + ref). Idempotent by",
+        "payout_ref: a repeat of the same ref is rejected."
+      ],
+      "discriminator": [
+        233,
+        234,
+        197,
+        23,
+        86,
+        203,
+        124,
+        226
       ],
       "accounts": [
         {
@@ -4226,6 +4289,14 @@
               "Only present on version >= 2 accounts; v1 accounts default to 1 on read."
             ],
             "type": "u8"
+          },
+          {
+            "name": "booster_active_until",
+            "docs": [
+              "M5 v3: unlimited-life booster window (unix ts, 72h from activation). while",
+              "active, M10 lives are unlimited. version must be >= 3 to have this field."
+            ],
+            "type": "i64"
           }
         ]
       }

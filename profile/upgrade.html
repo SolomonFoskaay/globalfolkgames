@@ -33,6 +33,13 @@
             <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits you 5,000P, come here, refresh your balance, and tap Upgrade to start your 30-day Level 2 boost.</p>
         </section>
 
+        <section class="game-card" style="border:1px solid #2ecc71;">
+            <h3>72h unlimited-lives booster</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Spend 1,500 premium points (the 24h "Support" plan) for 72 hours (3 days) of unlimited play on any game and any plan, free or Level 2. The countdown starts the moment you tap Activate. It buys time, not points: payout rates stay exactly the same, and it never touches your lifetime balances.</p>
+            <div id="booster-status" style="font-size:0.85rem; color:var(--muted); margin-bottom:8px;"></div>
+            <button id="booster-btn" class="launch-btn onchain" style="width:100%;">Activate 72h booster (cost 1,500P)</button>
+        </section>
+
         </div>
     </main>
 
@@ -285,6 +292,62 @@
                     } catch(e) {}
                 });
             }
+
+            // ---- M5 v3: 72h unlimited-lives booster ----------------------------
+            const BOOSTER_COST = 1500;
+            const boosterBtn = document.getElementById('booster-btn');
+            const boosterStatus = document.getElementById('booster-status');
+            let boosterTimer = null;
+
+            function boosterView() {
+                let pp = null;
+                try { pp = window.premiumPoints ? window.premiumPoints.get() : null; } catch(e) {}
+                const until = pp ? Number(pp.boosterActiveUntil || 0) : 0;
+                return { pp, until, active: until > Date.now() };
+            }
+            function renderBooster() {
+                const v = boosterView();
+                if (v.active) {
+                    const leftMs = v.until - Date.now();
+                    const h = Math.floor(leftMs / 3600000);
+                    const m = Math.floor((leftMs % 3600000) / 60000);
+                    if (boosterStatus) boosterStatus.innerHTML = '<span style="color:#2ecc71;font-weight:700;">Booster active. Unlimited lives for ' + h + 'h ' + m + 'm.</span>';
+                    if (boosterBtn) boosterBtn.textContent = 'Booster active (extends on tap)';
+                    if (boosterBtn) boosterBtn.style.background = '#2ecc71';
+                } else {
+                    const has = v.pp ? Number(v.pp.premiumSpendable || 0) : 0;
+                    if (boosterStatus) boosterStatus.innerHTML = has >= BOOSTER_COST
+                        ? 'You have ' + has.toLocaleString() + 'P premium spendable. One tap activates 72h of unlimited lives, no multiplier.'
+                        : '<span style="color:#e67e22;">You need 1,500P premium points. Your spendable is ' + has.toLocaleString() + 'P. Get premium points on <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a>.</span>';
+                    if (boosterBtn) { boosterBtn.textContent = 'Activate 72h booster (cost 1,500P)'; boosterBtn.style.background = ''; boosterBtn.disabled = has < BOOSTER_COST; }
+                }
+            }
+            if (boosterBtn) boosterBtn.addEventListener('click', async () => {
+                const v = boosterView();
+                if (!window.magicblockDice || typeof window.magicblockDice.activateBooster !== 'function') {
+                    if (boosterStatus) boosterStatus.textContent = 'Not signed in, or the on-chain booster is not ready yet. Sign in and try again.';
+                    return;
+                }
+                if (!v.pp || Number(v.pp.premiumSpendable || 0) < BOOSTER_COST) {
+                    if (boosterStatus) boosterStatus.textContent = 'You need 1,500P premium spendable to activate the booster.';
+                    return;
+                }
+                boosterBtn.disabled = true;
+                if (boosterStatus) boosterStatus.textContent = 'Activating your 72h booster on-chain (gasless, a few seconds)...';
+                try {
+                    await window.magicblockDice.activateBooster();
+                    if (window.premiumPoints && typeof window.premiumPoints.refresh === 'function') await window.premiumPoints.refresh();
+                    else if (typeof window.premiumPoints === 'object' && window.premiumPoints.fetch) await window.premiumPoints.fetch();
+                    if (boosterStatus) boosterStatus.textContent = 'Done! Your lives are unlimited for 72 hours.';
+                    renderBooster();
+                } catch (e) {
+                    if (boosterStatus) boosterStatus.innerHTML = 'Booster failed: ' + String(e.message || e).slice(0, 160) + '. Your premium balance is untouched.';
+                }
+                boosterBtn.disabled = false;
+            });
+            renderBooster();
+            if (boosterTimer) clearInterval(boosterTimer);
+            boosterTimer = setInterval(renderBooster, 60000);
         });
     </script>
 </body>

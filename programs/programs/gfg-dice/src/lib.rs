@@ -118,6 +118,8 @@ pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70
 // M5 — Active Tier Level-2 2x launch plan (owner-locked 2026-08-20).
 pub const PREMIUM_PLAN_COST: u64 = 5_000; // premium spendable required to activate Level 2
 pub const SUBSCRIPTION_DAYS: i64 = 30; // active-sub window (no auto-renew)
+pub const BOOSTER_COST: u64 = 1_500; // $1 / N1,500 - premium spendable for 72h unlimited life
+pub const BOOSTER_HOURS: i64 = 72; // unlimited-life booster window
 pub const DAY_SECS: i64 = 24 * 60 * 60;
 
 /// Registered M1A game tags for per-game point ledgers. Add a game here when
@@ -705,7 +707,7 @@ pub mod gfg_dice {
     /// the account (mirrors the Competition sponsor pattern).
     pub fn initialize_premium_points(ctx: Context<InitializePremiumPoints>) -> Result<()> {
         let prem = &mut ctx.accounts.premium_points;
-        prem.version = 2u8; // current layout (v1 accounts are migrated by upgrade_premium_points)
+        prem.version = 3u8; // current v3 layout (v1/v2 migrate via upgrade instructions)
         prem.admin_authority = ctx.accounts.payer.key();
         prem.premium_lifetime = 0;
         prem.premium_spendable = 0;
@@ -719,6 +721,7 @@ pub mod gfg_dice {
         prem.last_spend_reason = 0;
         prem.spend_count = 0;
         prem.last_credit_reason = 0;
+        prem.booster_active_until = 0;
         Ok(())
     }
 
@@ -732,7 +735,8 @@ pub mod gfg_dice {
         let mig = &mut ctx.accounts.premium_points;
         let old = mig.try_as_from()?.clone();
         let next = PremiumPoints {
-            version: 2u8,
+            version: 3u8,
+            booster_active_until: 0,
             admin_authority: old.admin_authority,
             premium_lifetime: old.premium_lifetime,
             premium_spendable: old.premium_spendable,
@@ -780,7 +784,7 @@ pub mod gfg_dice {
         require!(points > 0, PointsError::ZeroPoints);
         let prem = &mut ctx.accounts.premium_points;
         // v2 layout required (run upgrade_premium_points first for legacy accounts).
-        require!(prem.version >= 2, PointsError::NeedsUpgrade);
+        require!(prem.version >= 3, PointsError::NeedsUpgrade);
         require!(
             prem.admin_authority == ctx.accounts.admin.key(),
             PointsError::NotAdmin
@@ -800,7 +804,7 @@ pub mod gfg_dice {
         prem.last_credit_points = points;
         prem.last_credit_ref = credit_ref;
         prem.last_credit_ts = Clock::get()?.unix_timestamp;
-        prem.version = 2u8;
+        prem.version = 3u8;
         prem.last_credit_reason = reason; // 1 = subscription_payment, 2 = in_game_purchase, ...
         Ok(())
     }
@@ -840,6 +844,7 @@ pub mod gfg_dice {
     /// GASLESS on the ER (session key signs).
     pub fn activate_subscription(ctx: Context<ActivateSubscriptionCtx>) -> Result<()> {
         let prem = &mut ctx.accounts.premium_points;
+        require!(prem.version >= 3, PointsError::NeedsUpgrade);
         // One active plan at a time: reject a second upgrade while the current
         // 30-day window is still live, so a user can't spend another 5,000P to
         // stack/extend the same plan. They may re-activate only after expiry.
@@ -985,6 +990,49 @@ pub mod gfg_dice {
     /// Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves
     /// pending -> paid, records the payout receipt (ts + ref). Idempotent by
     /// payout_ref: a repeat of the same ref is rejected.
+    pub fn upgrade_premium_points_v3(ctx: Context<UpgradePremiumV3Ctx>) -> Result<()> {
+        let mig = &mut ctx.accounts.premium_points;
+        let old = mig.try_as_from()?.clone();
+        let next = PremiumPoints {
+            version: 3u8,
+            admin_authority: old.admin_authority,
+            premium_lifetime: old.premium_lifetime,
+            premium_spendable: old.premium_spendable,
+            subscription_level: old.subscription_level,
+            subscription_active_until: old.subscription_active_until,
+            last_credit_ts: old.last_credit_ts,
+            last_credit_points: old.last_credit_points,
+            last_credit_ref: old.last_credit_ref,
+            last_spend_ts: old.last_spend_ts,
+            last_spend_ref: old.last_spend_ref,
+            last_spend_reason: old.last_spend_reason,
+            spend_count: old.spend_count,
+            last_credit_reason: old.last_credit_reason,
+            booster_active_until: 0,
+        };
+        mig.migrate(next)
+    }
+
+    /// (M5 v3) Activates the 72h unlimited-life booster by spending premium
+    /// spendable (BOOSTER_COST = $1 / N1,500). No win multiplier: it only makes
+    /// lives unlimited. Extends from now (or the current active booster) by 72h.
+    /// Gasless on the ER (session key signs). One plan/booster per account flow.
+    pub fn activate_booster(ctx: Context<ActivateBoosterCtx>) -> Result<()> {
+        let prem = &mut ctx.accounts.premium_points;
+        require!(prem.version >= 3, PointsError::NeedsUpgrade);
+        require!(prem.premium_spendable >= BOOSTER_COST, PointsError::InsufficientPremiumBalance);
+        let now = Clock::get()?.unix_timestamp;
+        let current = if prem.booster_active_until > now { prem.booster_active_until } else { now };
+        let until = current.checked_add(BOOSTER_HOURS * 3600).ok_or(PointsError::Overflow)?;
+        prem.premium_spendable = prem.premium_spendable.checked_sub(BOOSTER_COST).ok_or(PointsError::InsufficientPremiumBalance)?;
+        prem.booster_active_until = until;
+        prem.last_spend_reason = 30; // BOOST_ACTIVATE
+        prem.last_spend_ref = until as u64;
+        prem.last_spend_ts = now;
+        prem.spend_count = prem.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1401,6 +1449,33 @@ pub struct RecordAffiliatePeriodCtx<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Context for `upgrade_premium_points_v3` (M5 v3): migrates a v2 premium account
+/// (124 bytes) to v3 (adds booster_active_until). Permissionless; reallocs +8 bytes.
+#[derive(Accounts)]
+pub struct UpgradePremiumV3Ctx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        realloc = 8 + PremiumPoints::INIT_SPACE,
+        realloc::payer = payer,
+        realloc::zero = false
+    )]
+    pub premium_points: Migration<'info, PremiumPointsV2, PremiumPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `activate_booster` (M5 v3). Gasless on the ER (session key signs).
+#[derive(Accounts)]
+pub struct ActivateBoosterCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
 /// Context for `register_profile_handle` (M6). Self-service: the player's wallet
 /// (session key) signs to claim a handle, gasless on the ER.
 #[derive(Accounts)]
@@ -1462,6 +1537,11 @@ pub struct AdminCancelSubscriptionCtx<'info> {
 
 /// Context for `undelegate_premium_points`: returns the PREMIUM PDA to this
 /// program (runs on the ER). Mirrors CommitAndUndelegateGlobalPointsInput.
+/// premium_points is UNTYPED so a legacy v1/v2 premium account (115/124 bytes)
+/// can be undelegated even though the current PremiumPoints layout is 132 bytes
+/// (a typed Account<PremiumPoints> deserialize would reject the shorter bytes,
+/// Custom 3003 = AccountDidNotDeserialize). The Magic commit intent only reads
+/// the account key, never its data.
 #[commit]
 #[derive(Accounts)]
 pub struct CommitAndUndelegatePremiumPointsInput<'info> {
@@ -1469,8 +1549,9 @@ pub struct CommitAndUndelegatePremiumPointsInput<'info> {
     pub payer: Signer<'info>,
     /// CHECK: The player's wallet authority (seed basis for the PDA).
     pub player_authority: AccountInfo<'info>,
-    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
-    pub premium_points: Account<'info, PremiumPoints>,
+    /// CHECK: The premium points PDA to undelegate (untyped).
+    #[account(mut)]
+    pub premium_points: UncheckedAccount<'info>,
 }
 
 /// Context for `spend_local`. Runs on the ER (gasless): the player's session
@@ -1721,6 +1802,54 @@ pub struct PremiumPoints {
     /// read source without extra metadata). 1 = subscription_payment (Level 2).
     /// Only present on version >= 2 accounts; v1 accounts default to 1 on read.
     pub last_credit_reason: u8,
+    /// M5 v3: unlimited-life booster window (unix ts, 72h from activation). while
+    /// active, M10 lives are unlimited. version must be >= 3 to have this field.
+    pub booster_active_until: i64,
+}
+
+/// Exact byte layout of the v2 PremiumPoints account (version 2, includes
+/// last_credit_reason). Used ONLY by the permissionless `upgrade_premium_points_v3`
+/// migration so v2 accounts upgrade cleanly to v3 (R2).
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct PremiumPointsV2 {
+    pub version: u8,
+    pub admin_authority: Pubkey,
+    pub premium_lifetime: u64,
+    pub premium_spendable: u64,
+    pub subscription_level: u8,
+    pub subscription_active_until: i64,
+    pub last_credit_ts: i64,
+    pub last_credit_points: u64,
+    pub last_credit_ref: u64,
+    pub last_spend_ts: i64,
+    pub last_spend_ref: u64,
+    pub last_spend_reason: u8,
+    pub spend_count: u64,
+    pub last_credit_reason: u8,
+}
+
+impl Owner for PremiumPointsV2 {
+    fn owner() -> Pubkey { crate::ID }
+}
+
+impl anchor_lang::AccountDeserialize for PremiumPointsV2 {
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
+        Self::skip_disc_read(buf).map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+    fn try_deserialize(buf: &mut &[u8]) -> Result<Self> {
+        Self::skip_disc_read(buf).map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+}
+
+impl PremiumPointsV2 {
+    fn skip_disc_read(buf: &mut &[u8]) -> std::result::Result<Self, anchor_lang::solana_program::program_error::ProgramError> {
+        if buf.len() < 8 {
+            return Err(anchor_lang::solana_program::program_error::ProgramError::AccountDataTooSmall);
+        }
+        *buf = &buf[8..];
+        <Self as anchor_lang::AnchorDeserialize>::deserialize(buf)
+            .map_err(|_| anchor_lang::solana_program::program_error::ProgramError::InvalidAccountData)
+    }
 }
 
 /// Exact byte layout of the original (v1) PremiumPoints account (115 bytes incl
@@ -1926,11 +2055,6 @@ pub enum PointsError {
     #[msg("allocation belongs to a different player")]
     NotYourAllocation,
     #[msg("allocation already claimed")]
-    AlreadyClaimed,
-    #[msg("premium points credit requires the admin authority signer")]
-    NotAdmin,
-    #[msg("premium points credit_ref already used (duplicate credit guard)")]
-    DuplicateCredication already claimed")]
     AlreadyClaimed,
     #[msg("premium points credit requires the admin authority signer")]
     NotAdmin,

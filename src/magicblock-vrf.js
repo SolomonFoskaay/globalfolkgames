@@ -464,6 +464,9 @@ function decodePremiumPointsRaw(d) {
     lastSpendReason: d.length >= 107 ? d[106] : 0,
     spendCount: d.length >= 115 ? Number(d.readBigUInt64LE(107)) : 0,
     lastCreditReason: (d.length >= 9 ? d[8] : 0) >= 2 && d.length >= 116 ? d[115] : 1,
+    // M5 v3: booster_active_until (i64 secs) at 116-123. Present on v3 (132-byte)
+    // accounts; v1/v2 default to 0.
+    boosterActiveUntil: d.length >= 8 && d[8] >= 3 && d.length >= 124 ? Number(d.readBigInt64LE(116)) * 1000 : 0,
   };
 }
 
@@ -483,6 +486,7 @@ function decodePremiumPoints(acct) {
     lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
     lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
     spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+    boosterActiveUntil: Number(acct.boosterActiveUntil ?? acct.booster_active_until ?? 0) * 1000,
   };
 }
 
@@ -903,6 +907,34 @@ export async function activateSubscription() {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
+// M5 v3 — activates the 72h unlimited-lives booster: deducts BOOSTER_COST
+// (1,500) premium spendable and sets booster_active_until = now + 72h (extends
+// an already-active booster). No win multiplier. Gasless on the ER; the player's
+// session key signs.
+export async function activateBooster() {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { wallet } = ctx;
+  const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(premiumPda, wallet.publicKey);
+  await waitForErPickup(premiumPda);
+
+  const regionUrl = await regionUrlFor(premiumPda);
+
+  const sig = await withErRetry('activate_booster', async (ctx) => ctx.program.methods
+    .activateBooster()
+    .accounts({
+      premiumPoints: premiumPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc(), { regionUrl });
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
 // M5 — operator-gated PREMIUM credit via the sponsor relay (the sponsor key
 // signs base-layer, never the client). The relay is idempotent by credit_ref.
 // Posts to /api/credit-premium and resolves the on-chain ledger after.
@@ -1257,6 +1289,12 @@ export function initMagicBlockDice() {
     // spendable, sets a 30-day sub, NO auto-renew). Gasless ER write.
     activateSubscription() {
       return activateSubscription();
+    },
+
+    // M5 v3 — activates the 72h unlimited-lives booster (deducts 1,500 premium
+    // spendable, sets booster_active_until = now + 72h). Gasless ER write.
+    activateBooster() {
+      return activateBooster();
     },
 
     // M5 — operator-gated PREMIUM credit (staff UI only). The relay calls back

@@ -1,0 +1,5 @@
+- M5 v3 PremiumBooster: a 72h unlimited-lives booster bought with premium spendable points. One-plan flow (no win multiplier, the default already handles that via a single Level-2 plan). Gasless on the ER.
+- PremiumPoints account layout bumped to v3 (adds booster_active_until). Version-gated reads. Permissionless + idempotent upgrade path: existing v2 accounts migrate via new upgrade_premium_points_v3 (same program id, additive seeds, solana-upgrade-safety compliant); v1 accounts already migrate via upgrade_premium_points into v3.
+- New activate_booster instruction (cost + duration shared on the program). Relay stays the signer for our self-test only; the client's session key signs their own booster.
+- Region-aware ER writes + failover for premium points (same src/gfg-rpc.js registry as global/spend).
+- Booster validity rule for lives: lives-free while now < booster_active_until (no minutes-based resolution; simple, provable).
