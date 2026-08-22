@@ -43,6 +43,7 @@ export default defineConfig({
         'dashboard-recovery': './dashboard/recovery.html',
         'dashboard-premium': './dashboard/premium.html',
         'dashboard-premium-subscribers': './dashboard/premium-subscribers.html',
+        'dashboard-affiliate': './dashboard/affiliate.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
         verify: './verify/index.html',
         // The header loader (public/global_header.js) injects the Dynamic

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affiliate Payouts - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        body { background:#0f0f13; }
+        .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .hint { font-size:0.8rem; color:#888; line-height:1.5; }
+        label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
+        input, textarea, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
+        textarea { min-height:90px; font-family:monospace; }
+        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+        .btn-primary { background:#f39c12; color:#000; margin-top:8px; }
+        .btn-success { background:#2ecc71; color:#000; }
+        .btn-danger { background:#e74c3c; color:#fff; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; color:#9b59b6; word-break:break-all; }
+        .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+        .row input { flex:1; min-width:130px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Affiliate payouts (M6)</h1>
+        <p class="hint" style="margin:0 0 12px;">Immutable on-chain earnings ledger. Each month the relay records 15% of referred subscriptions in USD cents with an eligibility flag (earned / paid / forfeited). This page views all affiliates and lets you record a period, mark a payout paid, or settle a list of pairs. No owner/admin wallet is hardcoded: every record is authority-gated by the relay sponsor that signs it.</p>
+
+        <div class="card">
+            <h3>All affiliates</h3>
+            <p class="hint">Pending is what is owed out. Paid and forfeited are tracked on-chain forever.</p>
+            <button class="btn-primary" id="btn-list">Load affiliate ledgers</button>
+            <div id="aff-list"><p class="hint">Click Load to fetch every affiliate ledger (one server RPC).</p></div>
+        </div>
+
+        <div class="card">
+            <h3>Record a month (relay-signed, on-chain)</h3>
+            <p class="hint">eligibility 0 = earned (15%), 2 = forfeited. USD cents (15% of $3 plan = 45).</p>
+            <div class="row">
+                <input id="rec-aff" placeholder="affiliate wallet" >
+                <input id="rec-ref" placeholder="referred wallet" >
+                <input id="rec-period" placeholder="period (yyyymm)" type="number">
+                <input id="rec-usd" placeholder="usdCents e.g. 45" type="number">
+                <select id="rec-elig"><option value="0">0 = earned</option><option value="2">2 = forfeited</option></select>
+            </div>
+            <button class="btn-success" id="btn-record">Record period</button>
+            <div class="hint" id="rec-msg"></div>
+        </div>
+
+        <div class="card">
+            <h3>Pay an affiliate (moves pending to paid)</h3>
+            <div class="row">
+                <input id="pay-aff" placeholder="affiliate wallet" >
+                <input id="pay-usd" placeholder="usdCents to pay" type="number">
+                <input id="pay-ref" placeholder="payout ref (unique int)" type="number">
+            </div>
+            <button class="btn-success" id="btn-pay">Mark paid on-chain</button>
+            <div class="hint" id="pay-msg"></div>
+        </div>
+
+        <div class="card">
+            <h3>Settle a period (compute + record pairs)</h3>
+            <p class="hint">pairs list, one per line: affiliate,referred. The relay reads both premium ledgers on-chain and records earned/forfeited for the period.</p>
+            <input id="st-period" placeholder="period (yyyymm)" type="number">
+            <textarea id="st-pairs" placeholder="affiliate,referred&#10;affiliate,referred"></textarea>
+            <button class="btn-primary" id="btn-settle">Settle period</button>
+            <div class="hint" id="st-msg"></div>
+        </div>
+    </div>
+
+    <script src="/global_header.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'affiliate',
+                sections: [
+                    { heading: 'Overview', items: [ { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' } ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
+                        { key: 'premium-subscribers', label: '📈 Premium subscribers', href: '/dashboard/premium-subscribers.html' },
+                        { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
+                        { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+        });
+    </script>
+    <script>
+        (async function(){
+            // Same gate as other admin pages (waits for wallet, caches result).
+            for (let i=0; i<8; i++) {
+                try { const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null; const p = window.currentProfile ? window.currentProfile.solana_wallet : null; if (w || p) break; } catch(e){}
+                await new Promise(r=>setTimeout(r,500));
+            }
+            try { const ok = await window.DashCore.gateStaff(); if (!ok) return; } catch(e){ return; }
+
+            const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const usd = c => '$' + (Number(c||0)/100).toFixed(2);
+            const listBox = document.getElementById('aff-list');
+            const $ = id => document.getElementById(id);
+
+            function renderList(list){
+                if (!list.length){ listBox.innerHTML='<p class="hint">No affiliate ledgers on-chain yet.</p>'; return; }
+                listBox.innerHTML = '<table><thead><tr><th>Affiliate</th><th>Lifetime</th><th>Pending</th><th>Paid</th><th>Forfeited</th><th>Months</th></tr></thead><tbody>' +
+                    list.map(a => '<tr><td class="mono">'+esc(a.affiliate.slice(0,10))+'…</td><td>'+usd(a.lifetimeUsdCents)+'</td><td style="color:#f39c12;">'+usd(a.pendingUsdCents)+'</td><td>'+usd(a.paidUsdCents)+'</td><td style="color:#888;">'+usd(a.forfeitedUsdCents)+'</td><td>'+a.entryCount+'</td></tr>').join('') + '</tbody></table>';
+            }
+            $('btn-list').addEventListener('click', async ()=>{
+                listBox.innerHTML='<p class="hint">Fetching ledgers...</p>';
+                try { const r = await fetch('/api/affiliate?list=1'); const j = await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); renderList(j.affiliates||[]); } catch(e){ listBox.innerHTML='<p class="hint">Failed: '+esc(e.message)+'</p>'; }
+            });
+            $('btn-record').addEventListener('click', async ()=>{
+                const body = { action:'record', affiliate:$('rec-aff').value.trim(), referral:$('rec-ref').value.trim(), period:parseInt($('rec-period').value,10), usdCents:parseInt($('rec-usd').value,10), eligibility:parseInt($('rec-elig').value,10) };
+                $('rec-msg').textContent='Recording on-chain...';
+                try { const r = await fetch('/api/affiliate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); $('rec-msg').textContent='Recorded. sig '+String(j.sig||'').slice(0,16)+'...'; } catch(e){ $('rec-msg').textContent='Failed: '+esc(e.message); }
+            });
+            $('btn-pay').addEventListener('click', async ()=>{
+                const body = { action:'pay', affiliate:$('pay-aff').value.trim(), usdCents:parseInt($('pay-usd').value,10), payoutRef:parseInt($('pay-ref').value,10) };
+                $('pay-msg').textContent='Marking paid on-chain...';
+                try { const r = await fetch('/api/affiliate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); $('pay-msg').textContent='Paid. sig '+String(j.sig||'').slice(0,16)+'...'; } catch(e){ $('pay-msg').textContent='Failed: '+esc(e.message); }
+            });
+            $('btn-settle').addEventListener('click', async ()=>{
+                const pairs = $('st-pairs').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{ const [a,r]=l.split(','); return { affiliate:a&&a.trim(), referral:r&&r.trim() }; }).filter(p=>p.affiliate&&p.referral);
+                $('st-msg').textContent='Settling '+pairs.length+' pair(s)...';
+                try { const r = await fetch('/api/affiliate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'settle', period:parseInt($('st-period').value,10), usdCentsPerSub:300, pairs})}); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); $('st-msg').textContent=JSON.stringify(j).slice(0,400); } catch(e){ $('st-msg').textContent='Failed: '+esc(e.message); }
+            });
+        })();
+    </script>
+</body>
+</html>

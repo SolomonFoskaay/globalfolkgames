@@ -2214,6 +2214,173 @@
       ]
     },
     {
+      "name": "record_affiliate_payout",
+      "docs": [
+        "Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves",
+        "pending -> paid, records the payout receipt (ts + ref). Idempotent by",
+        "payout_ref: a repeat of the same ref is rejected."
+      ],
+      "discriminator": [
+        93,
+        233,
+        243,
+        230,
+        81,
+        139,
+        21,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "affiliate_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  102
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "affiliate"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "affiliate",
+          "type": "pubkey"
+        },
+        {
+          "name": "usd_cents",
+          "type": "u64"
+        },
+        {
+          "name": "payout_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "record_affiliate_period",
+      "docs": [
+        "Creates/updates the affiliate ledger for one affiliate->referral month.",
+        "Authority = stored account authority (relay/sponsor). Idempotent per",
+        "(affiliate, referral, period). Run GASLESS on the ER when delegated."
+      ],
+      "discriminator": [
+        74,
+        234,
+        244,
+        207,
+        26,
+        183,
+        15,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "affiliate_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  102
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "affiliate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "affiliate_pair",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  114,
+                  101,
+                  102,
+                  112,
+                  97,
+                  105,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "affiliate"
+              },
+              {
+                "kind": "arg",
+                "path": "referral"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "affiliate",
+          "type": "pubkey"
+        },
+        {
+          "name": "referral",
+          "type": "pubkey"
+        },
+        {
+          "name": "period",
+          "type": "u32"
+        },
+        {
+          "name": "usd_cents",
+          "type": "u64"
+        },
+        {
+          "name": "eligibility",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "record_global_points",
       "docs": [
         "Credits the player's GLOBAL POINTS PDA. Runs GASLESS on the ER (session",
@@ -3246,6 +3413,32 @@
   ],
   "accounts": [
     {
+      "name": "AffiliateAccount",
+      "discriminator": [
+        189,
+        94,
+        244,
+        154,
+        243,
+        52,
+        127,
+        157
+      ]
+    },
+    {
+      "name": "AffiliatePair",
+      "discriminator": [
+        70,
+        173,
+        201,
+        108,
+        165,
+        120,
+        190,
+        176
+      ]
+    },
+    {
       "name": "Competition",
       "discriminator": [
         193,
@@ -3424,9 +3617,158 @@
       "code": 6019,
       "name": "NeedsUpgrade",
       "msg": "premium account needs upgrade_premium_points (v2 layout) first"
+    },
+    {
+      "code": 6020,
+      "name": "DuplicateAffiliatePeriod",
+      "msg": "affiliate period for this referral already recorded"
     }
   ],
   "types": [
+    {
+      "name": "AffiliateAccount",
+      "docs": [
+        "M6 — per-affiliate immutable audit ledger. Authority = relay/sponsor.",
+        "Running totals are permanent; `entries` keeps the most recent 68 months."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "affiliate",
+            "type": "pubkey"
+          },
+          {
+            "name": "lifetime_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "pending_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "paid_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "forfeited_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "entry_count",
+            "type": "u32"
+          },
+          {
+            "name": "payout_count",
+            "type": "u32"
+          },
+          {
+            "name": "last_payout_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_payout_ref",
+            "type": "u64"
+          },
+          {
+            "name": "entries",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "AffiliateEntry"
+                  }
+                },
+                24
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AffiliateEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "period",
+            "type": "u32"
+          },
+          {
+            "name": "referral",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "0 = earned (pending), 1 = paid, 2 = forfeited"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AffiliatePair",
+      "docs": [
+        "M6 — per (affiliate, referral) state that drives the 60-day permanent",
+        "forfeit and pause/resume rules."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "affiliate",
+            "type": "pubkey"
+          },
+          {
+            "name": "referral",
+            "type": "pubkey"
+          },
+          {
+            "name": "first_subscribed_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_earned_period",
+            "type": "u32"
+          },
+          {
+            "name": "consecutive_inactive_periods",
+            "type": "u16"
+          },
+          {
+            "name": "forfeited",
+            "type": "bool"
+          },
+          {
+            "name": "paid_period_count",
+            "type": "u16"
+          }
+        ]
+      }
+    },
     {
       "name": "Competition",
       "docs": [

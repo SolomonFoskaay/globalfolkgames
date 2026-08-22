@@ -107,6 +107,9 @@ pub const RESULT: &[u8] = b"gfgresult";
 pub const COMP: &[u8] = b"gfgcomp";
 pub const GLOBAL_TAG: &[u8] = b"global"; // reserved M4 global points tag, no game may use this
 pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (buy-only)
+pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref, affiliate]
+pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
+pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
@@ -915,6 +918,93 @@ pub mod gfg_dice {
         .build_and_invoke()?;
         Ok(())
     }
+
+    // ================= M6 AFFILIATE (relay-signed immutable audit ledger) ===========
+    // The platform (relay, stored as account authority) records each referral-month
+    // accrual ON-CHAIN in USD cents (15% of $3 = $0.45), with an eligibility flag so
+    // nothing can be accused of being manipulated: 0 = earned (pending), 1 = paid,
+    // 2 = forfeited. Totals are permanent; the account keeps a rolling ring of the
+    // most recent 68 month-records for detail, and running totals for all history.
+
+    /// Creates/updates the affiliate ledger for one affiliate->referral month.
+    /// Authority = stored account authority (relay/sponsor). Idempotent per
+    /// (affiliate, referral, period). Run GASLESS on the ER when delegated.
+    pub fn record_affiliate_period(
+        ctx: Context<RecordAffiliatePeriodCtx>,
+        affiliate: Pubkey,
+        referral: Pubkey,
+        period: u32,
+        usd_cents: u64,
+        eligibility: u8,
+    ) -> Result<()> {
+        let acct = &mut ctx.accounts.affiliate_account;
+        if acct.authority == Pubkey::default() {
+            acct.authority = ctx.accounts.payer.key();
+        }
+        require!(acct.authority == ctx.accounts.payer.key(), PointsError::NotAdmin);
+        require!(av_has_period(&acct, period, referral) == false, PointsError::DuplicateAffiliatePeriod);
+        let now = Clock::get()?.unix_timestamp;
+        // Update running totals by eligibility.
+        if eligibility == 0 {
+            acct.lifetime_usd_cents = acct.lifetime_usd_cents.checked_add(usd_cents).ok_or(PointsError::Overflow)?;
+            acct.pending_usd_cents = acct.pending_usd_cents.checked_add(usd_cents).ok_or(PointsError::Overflow)?;
+        } else if eligibility == 2 {
+            acct.forfeited_usd_cents = acct.forfeited_usd_cents.checked_add(usd_cents).ok_or(PointsError::Overflow)?;
+        }
+        // Rolling ring entry.
+        let idx = (acct.entry_count as usize) % AFFILIATE_ENTRIES;
+        acct.entries[idx] = AffiliateEntry {
+            period,
+            referral,
+            amount_usd_cents: usd_cents,
+            status: eligibility,
+            ts: now,
+        };
+        acct.entry_count = acct.entry_count.checked_add(1).ok_or(PointsError::Overflow)?;
+
+        // Pair bookkeeping (drives the 60-day permanent forfeit + pause/resume).
+        let pair = &mut ctx.accounts.affiliate_pair;
+        if pair.first_subscribed_ts == 0 {
+            pair.first_subscribed_ts = now;
+        }
+        if eligibility == 0 {
+            pair.consecutive_inactive_periods = 0;
+            pair.last_earned_period = period;
+            pair.forfeited = false;
+            pair.paid_period_count = pair.paid_period_count.saturating_add(1);
+        } else if eligibility == 2 {
+            pair.consecutive_inactive_periods = pair.consecutive_inactive_periods.saturating_add(1);
+            if pair.consecutive_inactive_periods >= 2 {
+                pair.forfeited = true;
+            }
+        }
+        Ok(())
+    }
+
+    /// Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves
+    /// pending -> paid, records the payout receipt (ts + ref). Idempotent by
+    /// payout_ref: a repeat of the same ref is rejected.
+    pub fn record_affiliate_payout(
+        ctx: Context<AffiliatePayoutCtx>,
+        affiliate: Pubkey,
+        usd_cents: u64,
+        payout_ref: u64,
+    ) -> Result<()> {
+        let acct = &mut ctx.accounts.affiliate_account;
+        require!(acct.authority == ctx.accounts.payer.key(), PointsError::NotAdmin);
+        require!(acct.last_payout_ref != payout_ref, PointsError::DuplicateCreditRef);
+        require!(acct.pending_usd_cents >= usd_cents, PointsError::InsufficientPremiumBalance);
+        acct.pending_usd_cents = acct.pending_usd_cents.checked_sub(usd_cents).ok_or(PointsError::InsufficientPremiumBalance)?;
+        acct.paid_usd_cents = acct.paid_usd_cents.checked_add(usd_cents).ok_or(PointsError::Overflow)?;
+        acct.payout_count = acct.payout_count.saturating_add(1);
+        acct.last_payout_ts = Clock::get()?.unix_timestamp;
+        acct.last_payout_ref = payout_ref;
+        Ok(())
+    }
+}
+
+fn av_has_period(acct: &AffiliateAccount, period: u32, referral: Pubkey) -> bool {
+    acct.entries.iter().any(|e| e.period == period && e.referral == referral)
 }
 
 #[derive(Accounts)]
@@ -1268,6 +1358,43 @@ pub struct UpgradePremiumPointsCtx<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Context for `record_affiliate_period` (M6). Creates the affiliate ledger and
+/// pair account if missing (payer, the relay/sponsor, pays rent and becomes the
+/// stored authority). Runs base-layer for first creation, ER gasless when delegated.
+#[derive(Accounts)]
+#[instruction(affiliate: Pubkey, referral: Pubkey, period: u32, usd_cents: u64, eligibility: u8)]
+pub struct RecordAffiliatePeriodCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + AffiliateAccount::INIT_SPACE,
+        seeds = [AFFILIATE_SEED, affiliate.as_ref()],
+        bump
+    )]
+    pub affiliate_account: Account<'info, AffiliateAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + AffiliatePair::INIT_SPACE,
+        seeds = [AFFILIATE_PAIR_SEED, affiliate.as_ref(), referral.as_ref()],
+        bump
+    )]
+    pub affiliate_pair: Account<'info, AffiliatePair>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `record_affiliate_payout` (M6).
+#[derive(Accounts)]
+#[instruction(affiliate: Pubkey, usd_cents: u64, payout_ref: u64)]
+pub struct AffiliatePayoutCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [AFFILIATE_SEED, affiliate.as_ref()], bump)]
+    pub affiliate_account: Account<'info, AffiliateAccount>,
+}
+
 /// Context for `close_premium_points`. Authority-gated (stored admin_authority);
 /// closes the account and returns rent to `destination` so a broken account can be
 /// reset and recreated cleanly (devnet maintenance only).
@@ -1582,6 +1709,54 @@ pub struct PremiumPointsV1 {
     pub spend_count: u64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct AffiliateEntry {
+    pub period: u32,
+    pub referral: Pubkey,
+    pub amount_usd_cents: u64,
+    /// 0 = earned (pending), 1 = paid, 2 = forfeited
+    pub status: u8,
+    pub ts: i64,
+}
+
+/// M6 — per-affiliate immutable audit ledger. Authority = relay/sponsor.
+/// Running totals are permanent; `entries` keeps the most recent 68 months.
+#[account]
+pub struct AffiliateAccount {
+    pub version: u8,
+    pub authority: Pubkey,
+    pub affiliate: Pubkey,
+    pub lifetime_usd_cents: u64,
+    pub pending_usd_cents: u64,
+    pub paid_usd_cents: u64,
+    pub forfeited_usd_cents: u64,
+    pub entry_count: u32,
+    pub payout_count: u32,
+    pub last_payout_ts: i64,
+    pub last_payout_ref: u64,
+    pub entries: Box<[AffiliateEntry; AFFILIATE_ENTRIES]>,
+}
+
+impl anchor_lang::Space for AffiliateAccount {
+    const INIT_SPACE: usize =
+        1 + 32 + 32 + 8 + 8 + 8 + 8 + 4 + 4 + 8 + 8 + AFFILIATE_ENTRIES * 53;
+}
+
+/// M6 — per (affiliate, referral) state that drives the 60-day permanent
+/// forfeit and pause/resume rules.
+#[account]
+#[derive(InitSpace)]
+pub struct AffiliatePair {
+    pub version: u8,
+    pub affiliate: Pubkey,
+    pub referral: Pubkey,
+    pub first_subscribed_ts: i64,
+    pub last_earned_period: u32,
+    pub consecutive_inactive_periods: u16,
+    pub forfeited: bool,
+    pub paid_period_count: u16,
+}
+
 impl Owner for PremiumPointsV1 {
     fn owner() -> Pubkey { crate::ID }
 }
@@ -1718,4 +1893,6 @@ pub enum PointsError {
     AlreadyActive,
     #[msg("premium account needs upgrade_premium_points (v2 layout) first")]
     NeedsUpgrade,
+    #[msg("affiliate period for this referral already recorded")]
+    DuplicateAffiliatePeriod,
 }

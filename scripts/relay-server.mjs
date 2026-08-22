@@ -18,6 +18,10 @@ import { handleHouseRoll } from './roll-relay.mjs';
 import { createComp, fundComp, closeComp, settleComp, claimComp, fetchCompState } from './comp-relay.mjs';
 import { pickErRpcUrl } from '../src/gfg-rpc.js';
 import { sourceCodeFor } from './point-sources.mjs';
+import {
+  handleRecordAffiliatePeriod, handleAffiliatePayout,
+  settleAffiliatePeriod, readAffiliateLedger, handleSignupBonus, listAffiliateAccounts,
+} from './affiliate-relay.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -292,6 +296,85 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('comp error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/affiliate/list') {
+    try {
+      const list = await listAffiliateAccounts();
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ count: list.length, affiliates: list }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && req.url.startsWith('/api/affiliate')) {
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const wallet = (url.searchParams.get('wallet') || '').trim();
+      if (!wallet) throw new Error('wallet query param required');
+      const ledger = await readAffiliateLedger(wallet);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+      res.end(JSON.stringify({ wallet, code: wallet, ...(ledger || {}) }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/affiliate/record') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const result = await handleRecordAffiliatePeriod(JSON.parse(body || '{}'));
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/affiliate/pay') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const result = await handleAffiliatePayout(JSON.parse(body || '{}'));
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/affiliate/settle') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const result = await settleAffiliatePeriod(JSON.parse(body || '{}'));
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/signup') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { wallet } = JSON.parse(body || '{}');
+      if (!wallet) throw new Error('missing wallet');
+      const result = await handleSignupBonus(wallet);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: true, ...result }));
+    } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
     }
