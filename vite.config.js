@@ -32,6 +32,7 @@ export default defineConfig({
         'profile-points': './profile/points.html',
         'profile-upgrade': './profile/upgrade.html',
         'profile-subscription': './profile/subscription.html',
+        'profile-affiliate': './profile/affiliate.html',
         'profile-activity': './profile/activity.html',
         'subscription-paid': './subscription-paid/index.html',
         dashboard: './dashboard/index.html',

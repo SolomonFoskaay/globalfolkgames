@@ -244,9 +244,9 @@
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
+                    <span id="active-tier-badge" class="gfg-tier-badge" style="display:none; padding:1px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; white-space:nowrap; margin-right:6px;"></span>
                     <div class="gfg-user-pill" id="gfg-user-pill">
                         <span id="display-points">⭐ 0 Pts</span>
-                        <span id="active-tier-badge" style="display:none; margin-left:6px; padding:1px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; white-space:nowrap;"></span>
                     </div>
                     <button id="gfg-menu-btn" class="gfg-menu-btn" aria-label="Open menu" aria-haspopup="true">☰</button>
                 </div>
@@ -391,6 +391,11 @@
         window.addEventListener('storage', (e) => {
             if (e.key && e.key.indexOf('premium') >= 0) updateActiveTierBadge();
         });
+        // Self-healing badge: the header can be re-rendered (auth flows, pages that
+        // call initGlobalHeader again), which recreates the badge with its default
+        // display:none and hides it. Re-apply every 2s from the PURE cache (no RPC)
+        // so it always stays visible and current.
+        setInterval(updateActiveTierBadge, 2000);
     }
 
     window.initGlobalHeader = function (options) {
