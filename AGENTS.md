@@ -58,13 +58,15 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   non-cancellable/non-refundable) activates a 30-day on-chain sub (no auto-renew)
   and powers the 2x win multiplier at M4 flow-up. Owner-approved 2026-08-20; the
   M5 spec in architecture.json is the LAUNCH GUIDE (payment pipe, admin credit,
-  receipts/logs, daily reward + lives boosted values, 1-year affiliate, daily earn
+  receipts/logs, daily reward + lives boosted values, 12-month affiliate, daily earn
   campaign).
-- **M6 — Point sources:** launch = 500P signup bonus + 1-year affiliate (25% of a
-  referred player's first premium purchase + 200P, recurs 365 days, referrer must
-  hold an active sub at the referral's upgrade or the share is forfeited
-  permanently, manual Naira payout 3-7 days). Giveaway/social deferred. All feed
-  M4b+M4c via kind=1 credits, never M3/M4a. In-progress.
+- **M6 — Point sources:** launch = 500P signup bonus (once per wallet, permanent
+  on-chain fence) + 12-month affiliate (15% of each subscription month a referred
+  player pays, pegged to USD cents on-chain, 15% of $3 = 45c; the referrer must
+  hold an ACTIVE Level-2 sub that month or that month is forfeited, and 2
+  consecutive inactive periods (~60 days) permanently close that pair; manual
+  Naira payout 3-7 days). Giveaway/social deferred. All feed M4b+M4c via kind=1
+  credits, never M3/M4a. In-progress.
 - **M7 — Competitions:** LAUNCH SIMPLEST VERSION ships with M5: 30-day daily earn
   campaign, Ludo only, spendable entry (global/local/premium) + optional
   non-spendable expert filter, 5 winners x ~N100 airtime = N500/day, public
@@ -267,8 +269,9 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   swept every live premium ledger (v1/v2 -> v3) and re-pinned to AS. Client:
   magicblockDice.activateBooster (session-key, gasless, region-aware) + M10 lives
   reads boosterActiveUntil -> unlimited while active; card on /profile/upgrade.
-- M6: in-progress — 500P signup bonus + 1-year affiliate (25% + 200P, active-sub
-  gate, manual Naira 3-7 days). Giveaway/social deferred.
+- M6: in-progress — 500P signup bonus (on-chain fence) + 12-month affiliate (15%
+  per referred subscription month, USD cents, active-sub monthly gate + 60-day
+  pair-forfeit, manual Naira 3-7 days). Giveaway/social deferred.
 - M7: in-progress — LAUNCH SIMPLEST daily earn campaign ships with M5 (30-day,
   5 x N100 airtime/day, Ludo only, spendable entry + non-spendable filter).
   Full competition platform deferred.
