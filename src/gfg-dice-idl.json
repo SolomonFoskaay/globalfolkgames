@@ -2215,11 +2215,6 @@
     },
     {
       "name": "record_affiliate_payout",
-      "docs": [
-        "Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves",
-        "pending -> paid, records the payout receipt (ts + ref). Idempotent by",
-        "payout_ref: a repeat of the same ref is rejected."
-      ],
       "discriminator": [
         93,
         233,
@@ -2632,6 +2627,67 @@
         {
           "name": "match_ref",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "register_profile_handle",
+      "docs": [
+        "Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves",
+        "pending -> paid, records the payout receipt (ts + ref). Idempotent by",
+        "payout_ref: a repeat of the same ref is rejected."
+      ],
+      "discriminator": [
+        70,
+        201,
+        171,
+        166,
+        54,
+        251,
+        90,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "handle_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  104,
+                  97,
+                  110,
+                  100,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "handle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "handle",
+          "type": "string"
         }
       ]
     },
@@ -3515,6 +3571,19 @@
         115,
         64
       ]
+    },
+    {
+      "name": "ProfileHandle",
+      "discriminator": [
+        251,
+        63,
+        130,
+        120,
+        254,
+        224,
+        141,
+        86
+      ]
     }
   ],
   "errors": [
@@ -3622,6 +3691,16 @@
       "code": 6020,
       "name": "DuplicateAffiliatePeriod",
       "msg": "affiliate period for this referral already recorded"
+    },
+    {
+      "code": 6021,
+      "name": "DuplicateHandle",
+      "msg": "profile handle already taken"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidHandle",
+      "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     }
   ],
   "types": [
@@ -4147,6 +4226,27 @@
               "Only present on version >= 2 accounts; v1 accounts default to 1 on read."
             ],
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProfileHandle",
+      "docs": [
+        "M6 — public identity handle. A player claims a handle once (gasless self-",
+        "register); the account binds handle -> wallet so referral links and public",
+        "leaderboards can show a handle and never an email or wallet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_ts",
+            "type": "i64"
           }
         ]
       }

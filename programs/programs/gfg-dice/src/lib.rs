@@ -110,6 +110,7 @@ pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (bu
 pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref, affiliate]
 pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
+pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
@@ -984,6 +985,21 @@ pub mod gfg_dice {
     /// Marks an affiliate payout (authority-gated, relay/sponsor signs). Moves
     /// pending -> paid, records the payout receipt (ts + ref). Idempotent by
     /// payout_ref: a repeat of the same ref is rejected.
+    pub fn register_profile_handle(
+        ctx: Context<RegisterProfileHandleCtx>,
+        handle: String,
+    ) -> Result<()> {
+        let h = handle.trim();
+        require!(h.len() >= 5 && h.len() <= 24, PointsError::InvalidHandle);
+        let valid = h.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        require!(valid, PointsError::InvalidHandle);
+        let acct = &mut ctx.accounts.handle_account;
+        require!(acct.owner == Pubkey::default(), PointsError::DuplicateHandle);
+        acct.owner = ctx.accounts.payer.key();
+        acct.created_ts = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
     pub fn record_affiliate_payout(
         ctx: Context<AffiliatePayoutCtx>,
         affiliate: Pubkey,
@@ -1385,6 +1401,24 @@ pub struct RecordAffiliatePeriodCtx<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Context for `register_profile_handle` (M6). Self-service: the player's wallet
+/// (session key) signs to claim a handle, gasless on the ER.
+#[derive(Accounts)]
+#[instruction(handle: String)]
+pub struct RegisterProfileHandleCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + ProfileHandle::INIT_SPACE,
+        seeds = [PROFILE_HANDLE_SEED, handle.as_bytes()],
+        bump
+    )]
+    pub handle_account: Account<'info, ProfileHandle>,
+    pub system_program: Program<'info, System>,
+}
+
 /// Context for `record_affiliate_payout` (M6).
 #[derive(Accounts)]
 #[instruction(affiliate: Pubkey, usd_cents: u64, payout_ref: u64)]
@@ -1737,6 +1771,16 @@ pub struct AffiliateAccount {
     pub entries: Box<[AffiliateEntry; AFFILIATE_ENTRIES]>,
 }
 
+/// M6 — public identity handle. A player claims a handle once (gasless self-
+/// register); the account binds handle -> wallet so referral links and public
+/// leaderboards can show a handle and never an email or wallet.
+#[account]
+#[derive(InitSpace)]
+pub struct ProfileHandle {
+    pub owner: Pubkey,
+    pub created_ts: i64,
+}
+
 impl anchor_lang::Space for AffiliateAccount {
     const INIT_SPACE: usize =
         1 + 32 + 32 + 8 + 8 + 8 + 8 + 4 + 4 + 8 + 8 + AFFILIATE_ENTRIES * 53;
@@ -1886,6 +1930,11 @@ pub enum PointsError {
     #[msg("premium points credit requires the admin authority signer")]
     NotAdmin,
     #[msg("premium points credit_ref already used (duplicate credit guard)")]
+    DuplicateCredication already claimed")]
+    AlreadyClaimed,
+    #[msg("premium points credit requires the admin authority signer")]
+    NotAdmin,
+    #[msg("premium points credit_ref already used (duplicate credit guard)")]
     DuplicateCreditRef,
     #[msg("insufficient premium spendable balance")]
     InsufficientPremiumBalance,
@@ -1895,4 +1944,8 @@ pub enum PointsError {
     NeedsUpgrade,
     #[msg("affiliate period for this referral already recorded")]
     DuplicateAffiliatePeriod,
+    #[msg("profile handle already taken")]
+    DuplicateHandle,
+    #[msg("profile handle is invalid (5-24 chars, letters/numbers only)")]
+    InvalidHandle,
 }

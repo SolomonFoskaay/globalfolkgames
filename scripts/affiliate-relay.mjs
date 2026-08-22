@@ -19,6 +19,8 @@ import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
 import bs58 from 'bs58';
+import { registerProfileHandle, resolveHandleToWallet, deriveProfileHandle, isValidProfileHandle } from './handle.mjs';
+import { writeFileSync, existsSync } from 'fs';
 import './load-env.mjs';
 
 export const AFFILIATE_SEED = Buffer.from('gfgref');
@@ -170,6 +172,51 @@ export async function listAffiliateAccounts() {
     });
   }
   return out;
+}
+
+// Combined signup flow: 1) register the handle->wallet on-chain, 2) resolve the
+// inviter from refHandle and record the referral mapping (durable local ledger,
+// best-effort), 3) claim the 500P signup bonus (idempotent). No cron anywhere:
+// this runs per signup only.
+const REFERRALS_FILE = new URL('./gfg-referrals.json', import.meta.url).pathname;
+function loadReferrals() {
+  try {
+    if (existsSync(REFERRALS_FILE)) return JSON.parse(readFileSync(REFERRALS_FILE, 'utf8')) || [];
+  } catch (e) { /* ignore */ }
+  return [];
+}
+function persistReferral(entry) {
+  try {
+    const list = loadReferrals();
+    if (!list.some(r => r.wallet === entry.wallet)) {
+      list.push(entry);
+      writeFileSync(REFERRALS_FILE, JSON.stringify(list, null, 2));
+    }
+  } catch (e) { /* fail-open: dedup happens at settle too */ }
+}
+
+export async function handleSignupFlow({ wallet, handle, refHandle }) {
+  const w = new PublicKey(wallet);
+  if (w.toBase58() !== String(wallet).trim()) throw new Error('invalid wallet address (base58 is case-sensitive)');
+  const results = { wallet: w.toBase58(), handleRegistered: false, inviter: null, bonus: null };
+  // 1) register the handle (idempotent; if taken by this wallet treat as ok).
+  if (handle && isValidProfileHandle(handle)) {
+    try { const r = await registerProfileHandle(w.toBase58(), handle); results.handleRegistered = true; results.handle = r.handle; }
+    catch (e) { results.handleError = e.message; }
+  }
+  // 2) resolve inviter from refHandle and record the pair.
+  if (refHandle && isValidProfileHandle(refHandle) && refHandle !== (handle || '')) {
+    try {
+      const inviter = await resolveHandleToWallet(refHandle);
+      if (inviter && inviter !== w.toBase58()) {
+        results.inviter = inviter;
+        persistReferral({ affiliate: inviter, referral: w.toBase58(), refHandle, at: Date.now() });
+      }
+    } catch (e) { results.refError = e.message; }
+  }
+  // 3) claim the signup bonus (already idempotent by wallet-derived matchRef).
+  results.bonus = await handleSignupBonus(w.toBase58());
+  return results;
 }
 
 // Signup bonus 500P (M6): kind=1 signup_bonus (source_code 10, reason 2) into the

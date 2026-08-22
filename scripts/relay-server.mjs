@@ -20,7 +20,7 @@ import { pickErRpcUrl } from '../src/gfg-rpc.js';
 import { sourceCodeFor } from './point-sources.mjs';
 import {
   handleRecordAffiliatePeriod, handleAffiliatePayout,
-  settleAffiliatePeriod, readAffiliateLedger, handleSignupBonus, listAffiliateAccounts,
+  settleAffiliatePeriod, readAffiliateLedger, handleSignupFlow, listAffiliateAccounts,
 } from './affiliate-relay.mjs';
 import './load-env.mjs';
 
@@ -369,9 +369,9 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { wallet } = JSON.parse(body || '{}');
-      if (!wallet) throw new Error('missing wallet');
-      const result = await handleSignupBonus(wallet);
+      const b = JSON.parse(body || '{}');
+      if (!b.wallet) throw new Error('missing wallet');
+      const result = await handleSignupFlow({ wallet: b.wallet, handle: b.handle, refHandle: b.refHandle });
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ ok: true, ...result }));
     } catch (e) {

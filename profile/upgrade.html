@@ -18,7 +18,7 @@
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
             <h3>Your premium balance — direct on-chain check</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 10 minutes (max 6 times per hour). Tap Refresh to check.</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 2 minutes (max 30 times per hour). Tap Refresh to check.</p>
             <div id="upgrade-ledger"><p class="empty">Tap Refresh to load your live premium balance.</p></div>
             <button id="refresh-premium" class="launch-btn onchain" style="margin-top:12px; width:100%;">Refresh premium balance (direct RPC)</button>
             <p id="refresh-hint" style="color:var(--muted); font-size:0.75rem; margin-top:6px; text-align:center;"></p>
@@ -67,7 +67,7 @@
             const actionMsg = document.getElementById('upgrade-action-msg');
 
             const REFRESH_KEY = 'gfg_upgrade_refresh_lock';
-            const LOCK_MS = 10 * 60 * 1000; // 10 minutes
+            const LOCK_MS = 2 * 60 * 1000; // 2 minutes for testing
 
             function canRefresh() {
                 try {
@@ -86,7 +86,7 @@
                         setTimeout(updateRefreshLock, 60000);
                     } else {
                         refreshBtn.disabled = false;
-                        refreshHint.textContent = 'Ready to refresh (once every 10 minutes).';
+                        refreshHint.textContent = 'Ready to refresh (once every 2 minutes).';
                     }
                 } catch(e) {}
             }
@@ -142,7 +142,7 @@
                 } else if (!balanceChecked) {
                     // Must do a fresh balance check first (unlocks after tapping Refresh).
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#f39c12;">Tap <b>Refresh</b> above (once every 10 minutes) to check your balance, then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f39c12;">Tap <b>Refresh</b> above (once every 2 minutes) to check your balance, then Upgrade unlocks.</span>';
                 } else if ((ledger.premiumSpendable||0) >= 5000) {
                     upgradeBtn.disabled = false;
                     actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have 5,000P. Tap Upgrade to start your 30-day Level 2 boost.</span>';
@@ -206,13 +206,13 @@
                     renderPremiumCard(pp);
                     statusEl.textContent = 'Showing cached premium balance — tap Refresh for live on-chain check.';
                 } else {
-                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 10 minutes).';
+                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 2 minutes).';
                 }
             } catch(e) {}
 
             upgradeBtn.addEventListener('click', async () => {
                 if (!balanceChecked) {
-                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 10 minutes), then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 2 minutes), then Upgrade unlocks.</span>';
                     return;
                 }
                 if (!window.premiumPoints || typeof window.premiumPoints.activate !== 'function') {
@@ -236,16 +236,28 @@
                     actionMsg.textContent = 'Upgrading — spending 5,000 premium points on-chain...';
                     try {
                         const sig = await window.premiumPoints.activate();
-                    if (sig) {
-                        actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
-                        // Refresh the ledger display -> the button becomes permanently
-                        // disabled and a live 30-day countdown starts on it.
-                        setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1200);
-                    } else {
-                        throw new Error('Upgrade failed — not enough premium points or already active.');
-                    }
-} catch(e) {
-                        actionMsg.textContent = 'Upgrade failed: ' + (e.message || e);
+                        if (sig) {
+                            actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
+                            setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1200);
+                        } else {
+                            // Either the write is already active on-chain, or it failed.
+                            // Re-fetch the LIVE ledger and render it so the user sees the
+                            // real state (a live 30-day countdown if already active).
+                            try {
+                                const fresh = await window.premiumPoints.fetch();
+                                if (fresh && (fresh.subscriptionLevel||0) > 0 && (fresh.subscriptionActiveUntil||0) > Date.now()) {
+                                    renderPremiumCard(fresh);
+                                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are already on Level 2. See the live countdown above (the button is locked until it ends).</span>';
+                                } else {
+                                    const why = window.premiumPoints && window.premiumPoints.lastError ? ' (' + window.premiumPoints.lastError + ')' : '';
+                                    throw new Error('Upgrade failed' + why + '. Enough premium points should have been checked on-chain.');
+                                }
+                            } catch (e2) {
+                                throw e2;
+                            }
+                        }
+                    } catch(e) {
+                        actionMsg.textContent = 'Upgrade failed: ' + (e.message || e) + (window.premiumPoints && window.premiumPoints.lastError ? ' — ' + window.premiumPoints.lastError : '');
                     } finally {
                         upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
                     }

@@ -1,9 +1,10 @@
-// api/signup.mjs
-// Vercel serverless: claim the M6 signup bonus (500P, kind=1, source signup_bonus)
-// for a wallet. Idempotent by a stable matchRef derived from the wallet, so the
-// program's duplicate guard prevents double-credit even on retries.
+// api_handlers/signup.mjs
+// Signup: claim the 500P bonus (idempotent), register the player's profile handle
+// on-chain, and (if a refHandle was shared by the inviter) record the referral pair
+// so the affiliate month-end settle can process it later. No cron, no external
+// automation: these are per-signup actions only.
 
-import { handleSignupBonus } from '../scripts/affiliate-relay.mjs';
+import { handleSignupFlow } from '../scripts/affiliate-relay.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' && req.body.length ? JSON.parse(req.body) : (req.body || {});
     if (!body.wallet) throw new Error('missing wallet');
-    const result = await handleSignupBonus(body.wallet);
+    const result = await handleSignupFlow({ wallet: body.wallet, handle: body.handle, refHandle: body.refHandle });
     res.status(200).json({ ok: true, ...result });
   } catch (e) {
     console.error('signup error:', e.message);
