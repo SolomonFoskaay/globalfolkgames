@@ -1,0 +1,82 @@
+/* public/theme.css — GLOBAL GAMEY THEME (Subway-Surfers vibe).
+ * Single place for the site-wide background + ambient animation. Read/edited
+ * once, applies everywhere because header.js injects this file on every page.
+ * Content stays on top: cards keep their own (translucent dark) backgrounds, so
+ * the bright animated backdrop never hurts readability.
+ *
+ * Future changes (colors, motion, speed) happen HERE only, not per page.
+ */
+
+:root {
+  --game-sky: #5b8def;
+  --game-indigo: #7c6cf6;
+  --game-pink: #f472b6;
+  --game-teal: #2dd4bf;
+  --game-orange: #f39c12;
+  --game-speed: 26s;
+}
+
+html, body {
+  background-color: #4a6fd6;
+}
+
+body {
+  background:
+    radial-gradient(1200px 640px at 12% -10%, rgba(243, 156, 18, 0.55), transparent 55%),
+    radial-gradient(1000px 720px at 88% 8%, rgba(244, 114, 182, 0.45), transparent 55%),
+    radial-gradient(1100px 760px at 50% 115%, rgba(45, 212, 191, 0.45), transparent 60%),
+    linear-gradient(160deg, #3f6fd8 0%, #5b8def 38%, #7c6cf6 68%, #5753cf 100%);
+  background-attachment: fixed;
+  background-blend-mode: normal;
+}
+
+/* Two big slow-drifting glow orbs behind everything (already blobs baked into
+   the body layers above; these add gentle life). pointer-events none so they
+   never block taps. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  width: 46vw;
+  height: 46vw;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+  will-change: transform;
+}
+
+body::before {
+  top: -12vw;
+  left: -10vw;
+  background: radial-gradient(circle, rgba(243, 156, 18, 0.9), transparent 70%);
+  animation: gfg-float-a var(--game-speed) ease-in-out infinite alternate;
+}
+
+body::after {
+  bottom: -14vw;
+  right: -12vw;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.85), transparent 70%);
+  animation: gfg-float-b var(--game-speed) ease-in-out infinite alternate;
+}
+
+@keyframes gfg-float-a {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(9vw, 7vh) scale(1.15); }
+}
+
+@keyframes gfg-float-b {
+  from { transform: translate(0, 0) scale(1.12); }
+  to   { transform: translate(-8vw, -6vh) scale(1); }
+}
+
+/* Respect users who prefer reduced motion: static backdrop. */
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { animation: none; }
+}
+
+/* Content stays legible: keep readable surfaces on their own cards. */
+.game-card, .onboarding-billboard, header.menu-trigger, .dash-rail-content {
+  position: relative;
+}

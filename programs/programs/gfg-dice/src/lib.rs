@@ -118,7 +118,7 @@ pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70
 // M5 — Active Tier Level-2 2x launch plan (owner-locked 2026-08-20).
 pub const PREMIUM_PLAN_COST: u64 = 5_000; // premium spendable required to activate Level 2
 pub const SUBSCRIPTION_DAYS: i64 = 30; // active-sub window (no auto-renew)
-pub const BOOSTER_COST: u64 = 1_500; // $1 / N1,500 - premium spendable for 72h unlimited life
+pub const BOOSTER_COST: u64 = 500; // $1 / 500P (base rate $0.002 per point, USD - never Naira) for 72h unlimited life
 pub const BOOSTER_HOURS: i64 = 72; // unlimited-life booster window
 pub const DAY_SECS: i64 = 24 * 60 * 60;
 
@@ -1014,7 +1014,7 @@ pub mod gfg_dice {
     }
 
     /// (M5 v3) Activates the 72h unlimited-life booster by spending premium
-    /// spendable (BOOSTER_COST = $1 / N1,500). No win multiplier: it only makes
+    /// spendable (BOOSTER_COST = $1 / 500P, base rate $0.002/pt USD). No win
     /// lives unlimited. Extends from now (or the current active booster) by 72h.
     /// Gasless on the ER (session key signs). One plan/booster per account flow.
     pub fn activate_booster(ctx: Context<ActivateBoosterCtx>) -> Result<()> {

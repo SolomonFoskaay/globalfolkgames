@@ -167,9 +167,34 @@
             <h2 style="color:#f39c12; margin:8px 0 6px;">No lives left today</h2>
             <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">double lives</b>, <b style="color:#2ecc71;">double win points</b>, and a <b style="color:#f39c12;">bigger daily reward</b>.</p>
             <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f39c12; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
+            <div style="margin-top:8px; font-size:0.8rem; color:#bbb; line-height:1.5;">Or get <b style="color:#2ecc71;">UNLIMITED lives for 72 hours</b> for $1 (500 premium points), no subscription needed.</div>
+            <button id="lives-go-booster" onclick="window.location.href='/profile/upgrade.html#booster-card'" style="width:100%; background:#2ecc71; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; margin-top:8px;">Get 72h unlimited lives ($1 / 500P)</button>
             <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) in <span id="lives-reset-countdown" style="color:#f39c12; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
         </div>
     </div>
+
+    <!-- Always-visible booster promo pill (hidden while a booster is live). -->
+    <div id="booster-promo-pill" onclick="window.location.href='/profile/upgrade.html#booster-card'" style="position:fixed; left:12px; bottom:12px; z-index:9000; background:linear-gradient(135deg,#f39c12,#e67e22); color:#000; font-weight:800; font-size:0.78rem; padding:10px 14px; border-radius:999px; box-shadow:0 4px 14px rgba(243,156,18,0.5); cursor:pointer; max-width:220px; text-align:center;">🔥 Get 72h UNLIMITED lives for $1<br><span style="font-weight:600; font-size:0.7rem;">no subscription needed</span></div>
+    <script>
+    (function () {
+        try {
+            var hidePill = false;
+            var check = function () {
+                try {
+                    var p = window.premiumPoints && typeof window.premiumPoints.get === 'function' ? window.premiumPoints.get() : null;
+                    var until = Number(p && p.boosterActiveUntil ? p.boosterActiveUntil : 0);
+                    hidePill = until > Date.now();
+                } catch (e) { hidePill = false; }
+                var pill = document.getElementById('booster-promo-pill');
+                if (pill) pill.style.display = hidePill ? 'none' : 'block';
+            };
+            check();
+            if (window.premiumPoints && typeof window.premiumPoints.subscribe === 'function') window.premiumPoints.subscribe(check);
+            window.addEventListener('gfg:auth-changed', check);
+            setInterval(check, 60000);
+        } catch (e) { /* promo is cosmetic */ }
+    })();
+    </script>
 
     <!-- Global scripts (needed for points + auth). Ludo-lab needs the ER VRF
          SDK, so it points the shared loader at its own bootstrap module. No

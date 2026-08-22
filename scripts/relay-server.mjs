@@ -23,6 +23,7 @@ import {
   settleAffiliatePeriod, readAffiliateLedger, handleSignupFlow, listAffiliateAccounts,
 } from './affiliate-relay.mjs';
 import { getHandleForWallet } from './handle.mjs';
+import { isSignupClaimed } from './affiliate-relay.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -321,7 +322,7 @@ const server = createServer(async (req, res) => {
       const ledger = await readAffiliateLedger(wallet);
       const handle = getHandleForWallet(wallet) || null;
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
-      res.end(JSON.stringify({ wallet, handle, ...(ledger || {}) }));
+      res.end(JSON.stringify({ wallet, handle, signupClaimed: isSignupClaimed(wallet), ...(ledger || {}) }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
@@ -377,6 +378,13 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ ok: true, ...result }));
     } catch (e) {
+      // A repeat claim of the lifetime 500P bonus is a clean "already claimed",
+      // never an error: tell the client so it can disable the button for good.
+      if (isSignupClaimed(b.wallet)) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+        res.end(JSON.stringify({ ok: true, signupClaimed: true, alreadyClaimed: true }));
+        return;
+      }
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
     }

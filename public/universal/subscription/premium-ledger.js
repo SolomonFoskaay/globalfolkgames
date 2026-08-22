@@ -400,6 +400,20 @@
         return '0';
     }
 
+    // The boost is its OWN kind=1 credit on M4, but the GlobalPoints duplicate
+    // guard is ONE last_match_ref: the game-win write already occupies it. Derive
+    // a distinct ref from the SAME proof roll (bytes 4-11 as u64) so the boost
+    // write passes the guard while staying provably bound to that win.
+    function boostRefForSig(sig) {
+        if (!sig) return '0';
+        try {
+            if (window.magicblockDice && typeof window.magicblockDice.boostRefFromSignature === 'function') {
+                return String(window.magicblockDice.boostRefFromSignature(sig));
+            }
+        } catch (e) { /* fall through */ }
+        return '0';
+    }
+
     async function applyTierBoost(env) {
         // Only for the signed-in user's verified finish, with an on-chain proof.
         var userSeat = null;
@@ -410,9 +424,10 @@
         if (!userSeat) return;
         var proofSig = env.proof && env.proof.signature;
         if (!proofSig) return;
-        var matchRef = matchRefForSig(proofSig);
-        if (!matchRef || matchRef === '0') return;
-        if (boostProcessed[matchRef]) return; // already boosted this match
+        var matchRef = matchRefForSig(proofSig);     // the game-win ref (M4 occupies it)
+        var boostRef = boostRefForSig(proofSig);     // the boost's own ref (same roll)
+        if (!boostRef || boostRef === '0') return;
+        if (boostProcessed[boostRef]) return; // already boosted this match
 
         // Sub must be active for the boost to apply.
         var view = activeView();
@@ -441,7 +456,7 @@
                 source: 'tier_boost',
                 points: boost,
                 reason: BOOST_REASON,
-                matchRef: matchRef,
+                matchRef: boostRef,
             });
             // Confirm the write actually landed (re-read the global ledger): a
             // sig OR the ledger's last match_ref matching proves it. Marking
@@ -449,9 +464,9 @@
             // program's own last_match_ref guard is the final idempotent wall).
             var gl = window.globalLedger && typeof window.globalLedger.get === 'function'
                 ? window.globalLedger.get() : null;
-            var landed = !!sig || (gl && String(gl.lastMatchRef || '') === String(matchRef));
+            var landed = !!sig || (gl && String(gl.lastMatchRef || '') === String(boostRef));
             if (landed) {
-                boostProcessed[matchRef] = { gameId: env.gameId, points: boost, at: Date.now() };
+                boostProcessed[boostRef] = { gameId: env.gameId, points: boost, at: Date.now() };
                 persistBoostProcessed();
                 console.log('[premium-ledger] tier_boost credited ' + boost + 'pt (Level ' + view.level + ' x' + mult + ') for match ' + matchRef);
             } else {

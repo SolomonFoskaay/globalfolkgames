@@ -5,6 +5,7 @@
 // automation: these are per-signup actions only.
 
 import { handleSignupFlow } from '../scripts/affiliate-relay.mjs';
+import { isSignupClaimed } from '../scripts/affiliate-relay.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -17,6 +18,12 @@ export default async function handler(req, res) {
     const result = await handleSignupFlow({ wallet: body.wallet, handle: body.handle, refHandle: body.refHandle });
     res.status(200).json({ ok: true, ...result });
   } catch (e) {
+    // A repeat claim of the lifetime 500P bonus is a clean "already claimed",
+    // never an error: tell the client so it can disable the button for good.
+    if (isSignupClaimed(body.wallet)) {
+      res.status(200).json({ ok: true, signupClaimed: true, alreadyClaimed: true });
+      return;
+    }
     console.error('signup error:', e.message);
     res.status(500).json({ error: e.message });
   }

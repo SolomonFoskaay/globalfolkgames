@@ -63,6 +63,24 @@
   }
 
   var cachedLedger = null, ledgerAt = 0;
+
+  // ---- lifetime signup-bonus claim flag (ONE per wallet, ever) -------------
+  // Persisted per-wallet in localStorage and mirrored by the server map
+  // (gfg-signups.json -> /api/affiliate signupClaimed). The on-chain duplicate
+  // guard is the real fence; this just makes the button honest everywhere.
+  var CLAIM_KEY = 'gfg_signup_claimed_v1';
+  function claimedWallet() { var w = wallet(); return w ? w.toLowerCase() : null; }
+  function markClaimed() {
+    var wk = claimedWallet(); if (!wk) return;
+    try { localStorage.setItem(CLAIM_KEY + '_' + wk, '1'); } catch (e) {}
+  }
+  function signupClaimed() {
+    var wk = claimedWallet(); if (!wk) return false;
+    try { if (localStorage.getItem(CLAIM_KEY + '_' + wk)) return true; } catch (e) {}
+    if (cachedLedger && cachedLedger.signupClaimed) { markClaimed(); return true; }
+    return false;
+  }
+
   function getLedger(force) {
     var w = wallet();
     if (!w) return Promise.resolve(null);
@@ -75,6 +93,7 @@
           cachedHandle = j.handle;
           try { localStorage.setItem('gfg_handle_' + w, j.handle); } catch (e) {}
         }
+        if (j && j.signupClaimed) markClaimed();
         return j;
       })
       .catch(function () { return null; });
@@ -101,6 +120,7 @@
           cachedHandle = j.handle;
           var wk = wallet(); if (wk) { try { localStorage.setItem('gfg_handle_' + wk, j.handle); } catch (e2) {} }
         }
+        if (j && (j.signupClaimed || j.alreadyClaimed)) markClaimed();
         cachedLedger = null; ledgerAt = 0;
         fillSlots(null);
         return j;
@@ -131,7 +151,7 @@
     fillSlots(null);
   }
 
-  window.gfgReferral = { handle, shareLink, claimSignupBonus, getLedger, refresh };
+  window.gfgReferral = { handle, shareLink, claimSignupBonus, getLedger, refresh, signupClaimed, markClaimed };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(refresh, 800); });
   else setTimeout(refresh, 800);

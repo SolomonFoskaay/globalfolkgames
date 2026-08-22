@@ -1066,6 +1066,25 @@ export function matchRefFromSignature(sig) {
   }
 }
 
+// boostRef for the SAME proof-roll signature: bytes 4-11 as a u64. The M5 tier
+// boost rides its own kind=1 credit on M4, and the GlobalPoints duplicate guard
+// is a SINGLE last_match_ref, so a second write with the game-win ref is rejected
+// (DuplicateMatchRef). This derives a distinct-but-bound ref from the same roll:
+// deterministic, provably tied to that win, and never equal to the game ref.
+export function boostRefFromSignature(sig) {
+  if (!sig) return new BN(0);
+  try {
+    const bytes = bs58.decode(sig);
+    if (!bytes || bytes.length < 12) return new BN(0);
+    const view = new DataView(new ArrayBuffer(8));
+    for (let i = 0; i < 8; i++) view.setUint8(i, bytes[4 + i]);
+    const hex = Buffer.from(new Uint8Array(view.buffer)).toString('hex');
+    return new BN(hex, 16);
+  } catch (e) {
+    return new BN(0);
+  }
+}
+
 export function initMagicBlockDice() {
   // Reason codes for on-chain points records (shared with win-detection.js).
   window.POINT_REASONS = POINT_REASONS;
@@ -1146,6 +1165,13 @@ export function initMagicBlockDice() {
     // program stores, so the on-chain record traces to the exact winning roll.
     matchRefFromSignature(sig) {
       return matchRefFromSignature(sig);
+    },
+
+    // Bytes 4-11 of the same proof-roll signature as u64 — a distinct ref for
+    // the M5 tier-boost kind=1 credit so it passes the single last_match_ref
+    // dedupe guard (the game win already occupies match_ref).
+    boostRefFromSignature(sig) {
+      return boostRefFromSignature(sig);
     },
 
     // M4 — records a global points credit on-chain (gasless ER write).

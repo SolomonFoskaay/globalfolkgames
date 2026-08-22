@@ -361,6 +361,16 @@
         document.body.appendChild(el);
     }
 
+    // Inject a stylesheet once (deduped by href). put in <head> so it sits in
+    // the cascade before any page-inline styles that want to win.
+    function ensureStyle(href) {
+        if (document.querySelector('link[href="' + href + '"]')) return;
+        const el = document.createElement('link');
+        el.rel = 'stylesheet';
+        el.href = href;
+        document.head.appendChild(el);
+    }
+
     // Sitewide tier badge: shows the signed-in user's plan in front of the points
     // pill (Level 1 gray, Level 2 · 2x gold). PURE cache read — no RPC on load:
     // it reads window.activeTier.get() which is fed by the two RPC triggers
@@ -399,6 +409,13 @@
     }
 
     window.initGlobalHeader = function (options) {
+        // Sitewide colorful gamey theme: injected once on every page so the
+        // bright Subway-Surfers backdrop is controlled from ONE css file
+        // (public/theme.css). Pages that ship their own dark body background in
+        // an inline <style> keep it; theme.css loads right after the shared
+        // style.css link so it wins over that link but not over inline styles.
+        ensureStyle('/theme.css');
+
         // Ensure the universal point modules are present on EVERY page. The
         // header pill reads M3/M4 ledgers via window.localPoints / window.
         // globalLedger, so pages that don't explicitly load them would otherwise

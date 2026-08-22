@@ -259,7 +259,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   (single launch beta $3 / Nigeria N4,000 plan, on-chain [gfgprem, player] buy-only ledger, 30-day
   sub no auto-renew, admin credit flow, 1-year affiliate + daily earn campaign in
   the same launch bundle). Launch-guide spec lives in M5.
-  Booster (M5 v3, live): 72h unlimited-lives for 1,500P premium spendable on any
+  Booster (M5 v3, live): 72h unlimited-lives for 500P premium spendable ($1,
+  base value $0.002 per point, USD rate never Naira) on any
   plan (no multiplier). PremiumPoints layout bumped to v3 (booster_active_until)
   with permissionless upgrade_premium_points_v3; premium undelegate ctx is
   unttyped so legacy v1/v2 ledgers can leave a region; scripts/upgrade-premium-v3.mjs

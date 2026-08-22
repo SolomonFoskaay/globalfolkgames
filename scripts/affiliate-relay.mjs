@@ -11,7 +11,31 @@
 //     is forfeited (never back-paid).
 //   - 2 consecutive inactive periods (~60 days) permanently close that pair.
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+
+// Durable wallet -> signup-claimed map (gitignored local ledger; Supabase
+// optional). Makes the 500P signup bonus ONE PER LIFETIME: the button is
+// disabled everywhere once a wallet claims. Vercel (no fs) falls back to the
+// client's localStorage flag; the on-chain duplicate guard is the real fence.
+const SIGNUPS_FILE = new URL('./gfg-signups.json', import.meta.url).pathname;
+export function markSignupClaimed(wallet) {
+  if (!wallet) return;
+  try {
+    const map = existsSync(SIGNUPS_FILE) ? JSON.parse(readFileSync(SIGNUPS_FILE, 'utf8')) : {};
+    map[wallet] = { at: Date.now() };
+    writeFileSync(SIGNUPS_FILE, JSON.stringify(map, null, 2));
+  } catch (e) { /* fail-open */ }
+}
+export function isSignupClaimed(wallet) {
+  if (!wallet) return false;
+  try {
+    if (existsSync(SIGNUPS_FILE)) {
+      const map = JSON.parse(readFileSync(SIGNUPS_FILE, 'utf8'));
+      return !!map[wallet];
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
 import { homedir } from 'os';
 import { join } from 'path';
 import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
@@ -20,7 +44,6 @@ import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
 import bs58 from 'bs58';
 import { registerProfileHandle, resolveHandleToWallet, deriveProfileHandle, isValidProfileHandle, persistHandle, getHandleForWallet } from './handle.mjs';
-import { writeFileSync, existsSync } from 'fs';
 import './load-env.mjs';
 
 export const AFFILIATE_SEED = Buffer.from('gfgref');
@@ -219,6 +242,8 @@ export async function handleSignupFlow({ wallet, handle, refHandle }) {
   }
   // 3) claim the signup bonus (already idempotent by wallet-derived matchRef).
   results.bonus = await handleSignupBonus(w.toBase58());
+  markSignupClaimed(w.toBase58());
+  results.signupClaimed = true;
   return results;
 }
 

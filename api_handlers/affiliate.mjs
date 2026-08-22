@@ -12,6 +12,7 @@ import {
   settleAffiliatePeriod, readAffiliateLedger, listAffiliateAccounts,
 } from '../scripts/affiliate-relay.mjs';
 import { getHandleForWallet } from '../scripts/handle.mjs';
+import { isSignupClaimed } from '../scripts/affiliate-relay.mjs';
 
 export default async function handler(req, res) {
   try {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
       const wallet = (url.searchParams.get('wallet') || '').trim();
       if (!wallet) throw new Error('wallet query param required');
       const ledger = await readAffiliateLedger(wallet);
-      res.status(200).json({ wallet, handle: getHandleForWallet(wallet) || null, ...(ledger || {}) });
+      res.status(200).json({ wallet, handle: getHandleForWallet(wallet) || null, signupClaimed: isSignupClaimed(wallet), ...(ledger || {}) });
       return;
     }
     if (req.method !== 'POST') {

@@ -87,9 +87,31 @@
         function usd(c){ return '$' + (Number(c||0)/100).toFixed(2); }
         function el(id){ return document.getElementById(id); }
 
+        // M6: the 500P signup bonus is ONE PER LIFETIME. Once claimed (locally or
+        // server-acknowledged) the button is disabled and relabelled forever, so a
+        // user can never spam-claim or see a confusing "sign in" state again.
+        function renderClaimBtn(){
+            var btn = el('ref-claim-btn');
+            if (!btn) return;
+            var claimed = window.gfgReferral && typeof window.gfgReferral.signupClaimed === 'function' && window.gfgReferral.signupClaimed();
+            if (claimed) {
+                btn.disabled = true;
+                btn.textContent = '500 signup points already claimed';
+                btn.style.background = '#333';
+                btn.style.color = '#888';
+                btn.style.cursor = 'default';
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Claim 500 signup points';
+                btn.style.background = '#f39c12';
+                btn.style.color = '#000';
+                btn.style.cursor = 'pointer';
+            }
+        }
+
         function refreshHandleUI(){
             try {
-                var handle = window.gfgReferral ? window.gfgReferral.handle() : null;
+                var h = window.gfgReferral ? window.gfgReferral.handle() : null;
                 var codeEl = document.querySelector('[data-ref-code]');
                 var linkEl = document.querySelector('[data-ref-link]');
                 var signedIn = !!handle || !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || !!(window.currentUser);
@@ -97,10 +119,12 @@
                     if (codeEl) codeEl.textContent = 'Sign in to get your code';
                     if (linkEl) linkEl.textContent = '';
                     if (statusEl) statusEl.textContent = 'Sign in to see your referral link and earnings.';
+                    renderClaimBtn();
                     return;
                 }
                 if (codeEl) codeEl.textContent = handle || 'Loading your handle...';
                 if (linkEl) linkEl.textContent = (window.gfgReferral && window.gfgReferral.shareLink()) || '';
+                renderClaimBtn();
             } catch (e) {}
         }
 
@@ -130,9 +154,22 @@
             } catch (e) { if (statusEl) statusEl.textContent = 'Could not render earnings: ' + e.message; }
         }
 
+        renderClaimBtn();
+
         function load(force){
-            if (!window.gfgReferral || typeof window.gfgReferral.getLedger !== 'function') { refreshHandleUI(); return; }
-            window.gfgReferral.getLedger(!!force).then(render);
+            if (!window.gfgReferral || typeof window.gfgReferral.getLedger !== 'function') { refreshHandleUI(); renderClaimBtn(); return; }
+            if (force && statusEl) statusEl.textContent = 'Refreshing your on-chain earnings...';
+            window.gfgReferral.getLedger(!!force).then(function (l) {
+                render(l);
+                if (force) {
+                    var done = (l && l.account)
+                        ? 'Refreshed. Your earnings are pulled straight from the on-chain ledger.'
+                        : 'Refreshed. No affiliate ledger on-chain yet (earnings begin after a friend you referred buys their first plan).';
+                    if (statusEl && document.getElementById('aff-entries') && !document.querySelector('#aff-entries table')) statusEl.textContent = done;
+                    else if (statusEl && l && l.account) statusEl.textContent = 'Refreshed. Ledger loaded.';
+                }
+                renderClaimBtn();
+            });
         }
 
         var copyBtn = el('ref-copy-btn');
@@ -147,16 +184,27 @@
 
         var claimBtn = el('ref-claim-btn');
         if (claimBtn) claimBtn.addEventListener('click', async function(){
+            if (window.gfgReferral && typeof window.gfgReferral.signupClaimed === 'function' && window.gfgReferral.signupClaimed()) { renderClaimBtn(); return; }
             claimBtn.disabled = true;
             var msg = el('ref-msg');
             if (msg) msg.textContent = 'Claiming your 500 signup points...';
             try {
                 var res = window.gfgReferral ? await window.gfgReferral.claimSignupBonus() : null;
-                if (msg) msg.textContent = (res && res.ok) ? 'Done! 500 signup points credited on-chain. Refreshing your balances...' : 'Already claimed, or signing in is required first (one bonus per account).';
+                var claimed = res && (res.ok && (res.signupClaimed || res.alreadyClaimed || res.bonus));
+                if (claimed) {
+                    window.gfgReferral && typeof window.gfgReferral.markClaimed === 'function' && window.gfgReferral.markClaimed();
+                    if (msg) msg.textContent = '500 signup points credited on-chain. Refreshing your balances...';
+                } else if (res && res.ok) {
+                    window.gfgReferral && typeof window.gfgReferral.markClaimed === 'function' && window.gfgReferral.markClaimed();
+                    if (msg) msg.textContent = 'Done. 500 signup points credited on-chain.';
+                } else {
+                    if (msg) msg.textContent = 'Signing in is required first (one bonus per account, claimed once ever).';
+                }
                 refreshHandleUI();
+                renderClaimBtn();
                 load(true);
             } catch (e) { if (msg) msg.textContent = 'Claim failed: ' + e.message; }
-            claimBtn.disabled = false;
+            renderClaimBtn();
         });
 
         var refreshBtn = el('refresh-ledger');
