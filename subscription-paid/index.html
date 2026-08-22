@@ -53,7 +53,7 @@
                 <li id="next-reward-line">Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 2 (2x) boost for 30 days.</li>
                 <li>You will see your boost on your <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> page (or on the <a href="/profile/booster.html" style="color:#2ecc71;">booster page</a> for the unlimited-lives pack). <b>No auto-renew and non-refundable</b> — nothing charges again without you choosing it.</li>
             </ul>
-            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">Beta pricing: the Level 2 (2x) plan is <span style="text-decoration:line-through;">$10</span> now $3 globally, Nigeria beta ₦4,000 for 5,000 premium points. The 72h unlimited-lives booster is $1 (₦1,000 beta) for 500 premium points. Limited time.</p>
+            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">Beta pricing: the Level 2 (2x) plan is <span style="text-decoration:line-through;">$10</span> now $3 globally, Nigeria beta ₦4,000 for 5,000 premium points. The 72h unlimited-lives booster is $1 (₦1,500 Nigeria beta) for 500 premium points. Limited time.</p>
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
@@ -97,7 +97,7 @@
 
                 <label for="pay-amount">Amount paid (Naira)</label>
                 <input type="number" id="pay-amount" value="4000" min="1" step="1" autocomplete="off">
-                <div class="receipt-hint" id="amount-hint">Level 2 plan: ₦4,000. 72h booster: ₦1,000. Editable in case the price changes.</div>
+                <div class="receipt-hint" id="amount-hint">Level 2 plan: ₦4,000. 72h booster: ₦1,500. Editable in case the price changes.</div>
 
                 <div class="form-actions">
                     <button type="submit" id="submit-receipt" class="launch-btn onchain">Submit to support</button>
@@ -131,12 +131,12 @@
             var signedOutBox = document.getElementById('signedout-box');
             var storedKey = 'gfg_premium_payment_draft_v1';
 
-            var PLAN_AMOUNTS = { '2x': 4000, 'booster': 1000 };
+            var PLAN_AMOUNTS = { '2x': 4000, 'booster': 1500 };
             var PLAN_NEXT = {
                 '2x': 'Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 2 (2x) boost for 30 days.',
                 'booster': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.'
             };
-            var PLAN_HINTS = { '2x': 'Level 2 (2x): 5,000 premium points, ₦4,000 (Nigeria beta) / $3 (global).', 'booster': '72h Unlimited Lives: 500 premium points, ₦1,000 (Nigeria beta) / $1 (global).' };
+            var PLAN_HINTS = { '2x': 'Level 2 (2x): 5,000 premium points, ₦4,000 (Nigeria beta) / $3 (global).', 'booster': '72h Unlimited Lives: 500 premium points, ₦1,500 (Nigeria beta) / $1 (global).' };
             planEl.addEventListener('change', function () {
                 if (PLAN_AMOUNTS[planEl.value]) {
                     amountEl.value = PLAN_AMOUNTS[planEl.value];

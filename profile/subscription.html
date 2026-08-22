@@ -29,6 +29,7 @@
 <body>
 
     <main class="mobile-container dash-rail-content">
+        <script>window.GFG_PAYMENT_URL = "https://paystack.shop/pay/globalfolkgames2xplan"; /* EDIT here to change payment provider */</script>
         <section class="onboarding-billboard">
             <span class="beta-badge">BETA LAUNCH DISCOUNT — LIMITED TIME</span>
             <h2>Go Premium: Level 2 (2x Boost)</h2>
@@ -137,6 +138,7 @@
             const balanceEl = document.getElementById('sub-premium-balance');
             const payBtn = document.getElementById('pay-btn');
             const paidConfirmLink = document.getElementById('paid-confirm-link');
+            try { if (payBtn && window.GFG_PAYMENT_URL) payBtn.href = window.GFG_PAYMENT_URL; } catch (e) {}
 
             let activeUntil = 0;
             function tickPlanCountdown() {
