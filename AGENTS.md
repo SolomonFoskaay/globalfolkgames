@@ -54,7 +54,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 - **M5 — Active Tier subscription + Premium points:** the money + launch engine.
   Premium points live on their own on-chain ledger ([gfgprem, player], buy-only,
   premium_lifetime + premium_spendable); a single Level-2 2x plan at launch
-  ($10/30 days, NG cash-discount N3,000 via Paystack manual bank transfer,
+  ($10/30 days, launch beta NG N4,000 via Paystack manual bank transfer,
   non-cancellable/non-refundable) activates a 30-day on-chain sub (no auto-renew)
   and powers the 2x win multiplier at M4 flow-up. Owner-approved 2026-08-20; the
   M5 spec in architecture.json is the LAUNCH GUIDE (payment pipe, admin credit,
@@ -256,7 +256,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   owns the wallet infrastructure. Gasless grant/equip/revoke via session key,
   sliced reads (dataSlice). Module at public/universal/inventory/.
 - M5: in-progress — Active Tier (Level-2 2x) + Premium points launch engine
-  (single $10/N3,000 plan, on-chain [gfgprem, player] buy-only ledger, 30-day
+  (single launch beta $3 / Nigeria N4,000 plan, on-chain [gfgprem, player] buy-only ledger, 30-day
   sub no auto-renew, admin credit flow, 1-year affiliate + daily earn campaign in
   the same launch bundle). Launch-guide spec lives in M5.
 - M6: in-progress — 500P signup bonus + 1-year affiliate (25% + 200P, active-sub

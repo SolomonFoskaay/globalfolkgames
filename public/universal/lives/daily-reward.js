@@ -258,6 +258,19 @@
             render();
         });
     }
+    // The reward amount follows the active tier (free 25 / Level-2 200): re-render
+    // live whenever the premium ledger refreshes (activate/fetch) or its wallet
+    // cache changes in another tab.
+    try {
+        if (window.premiumPoints && typeof window.premiumPoints.subscribe === 'function') {
+            window.premiumPoints.subscribe(function () { render(); });
+        }
+    } catch (e) { /* ignore */ }
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('storage', function (e) {
+            if (e.key && e.key.indexOf('gfg_premium_ledger') >= 0) render();
+        });
+    }
 
     // ---- public API ---------------------------------------------------------
     window.gfgDaily = {

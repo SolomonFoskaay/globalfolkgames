@@ -299,11 +299,33 @@
         })();
     }
 
+    // RPC policy (owner contract): page loads must NOT hit the RPC (that got AS
+    // banned before). But a FRESH session (new browser / incognito / silent restore
+    // without gfg:auth-changed) has NO snapshot, so the tier badge and lives/daily
+    // would sit at the default L1 forever. The compromise: a wallet-ready poll
+    // seeds the cache with ONE fetch on the FIRST appearance of a wallet that has
+    // no snapshot yet. After that, every page renders from the wallet-keyed cache
+    // with zero RPC (auth-changed and win still refresh it, same as M3/M4).
     function handleDomReady() {
         renderCached();
-        // Do NOT auto-refresh on page load — the single RPC (auth/win) in points-store already
-        // fetches premium together with M3/M4, and the cached value is served everywhere.
-        // Hitting RPC on every page load is what got the AS banned before.
+        var pollActive = false;
+        var deadline = Date.now() + 15000;
+        (function poll() {
+            try {
+                var sdk = window.magicblockDice;
+                var addr = readAddress();
+                if (addr && sdk && typeof sdk.isConfigured === 'function' && sdk.isConfigured()) {
+                    syncCacheToWallet();
+                    renderCached();
+                    // Seed on first appearance only when no snapshot exists yet.
+                    if (!cached && !hasChecked() && typeof refreshLedger === 'function') {
+                        refreshLedger(true);
+                    }
+                    return;
+                }
+                if (Date.now() < deadline) setTimeout(poll, 700);
+            } catch (e) { /* ignore */ }
+        })();
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', handleDomReady);

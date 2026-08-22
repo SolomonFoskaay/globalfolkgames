@@ -45,15 +45,15 @@
                 <div>
                     <div class="price-strike">Regular $10.00 / month</div>
                     <div class="price-now">$3 <small>/ 30 days — beta price</small></div>
-                    <div class="price-ng">Nigeria beta: ₦3,000 <small style="color:#888; font-weight:600;">for 30 days</small></div>
-                    <div style="font-size:0.78rem; color:#888; margin-top:4px;">Global $3 is about ₦4,500+ at current rates. Nigeria beta at ₦3,000 saves you over 70% off the regular $10 (about ₦13,000+) — and even cheaper than the already discounted $3.</div>
+                    <div class="price-ng">Nigeria beta: ₦4,000 <small style="color:#888; font-weight:600;">for 30 days</small></div>
+                    <div style="font-size:0.78rem; color:#888; margin-top:4px;">Global $3 is about ₦4,500+ at current rates. Nigeria beta at ₦4,000 saves you over 70% off the regular $10 (about ₦13,000+) — and even cheaper than the already discounted $3.</div>
                 </div>
                 <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px 12px; font-size:0.8rem; color:#bbb; line-height:1.5; flex:1; min-width:220px;">
                     <b style="color:#f39c12;">Why the discount?</b> You are early. This beta price is for our Nigeria-first launch and is available for a limited time. When beta ends, the price returns to $10/month.
                 </div>
             </div>
             <div class="cta-row">
-                <a id="pay-btn" href="https://paystack.shop/pay/globalfolkgames2xplan" target="_blank" rel="noopener noreferrer" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:inline-block;">Pay ₦3,000 / $3 — Unlock Level 2 (2x)</a>
+                <a id="pay-btn" href="https://paystack.shop/pay/globalfolkgames2xplan" target="_blank" rel="noopener noreferrer" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:inline-block;">Pay ₦4,000 / $3 — Unlock Level 2 (2x)</a>
                 <a id="paid-confirm-link" href="/subscription-paid/" class="launch-btn" style="text-align:center; text-decoration:none; display:inline-block; background:#1a1a24; border:1px solid #333; color:#bbb;">I have paid — confirm payment</a>
             </div>
             <p class="fine-print"><b>Non-refundable, no auto-renew.</b> This is a one-time 30-day membership. Once paid it cannot be refunded. It does not auto-renew or auto-debit — you renew manually each month only if you want to.</p>
@@ -87,7 +87,7 @@
         <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
             <h3>How it works</h3>
             <ol style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:8px 0 0; padding-left:18px;">
-                <li>Tap <b style="color:#f39c12;">Pay ₦3,000 / $3</b> — you go to the secure payment page and follow the steps.</li>
+                <li>Tap <b style="color:#f39c12;">Pay ₦4,000 / $3</b> — you go to the secure payment page and follow the steps.</li>
                 <li>Complete the payment with the details shown.</li>
                 <li>You are redirected to <b>/subscription-paid</b> — fill the short confirmation form and send it to support.</li>
                 <li>Support verifies within 24 hours and credits <b>5,000 premium points</b> on-chain to your wallet.</li>
@@ -179,7 +179,7 @@
                 } else {
                     activeUntil = 0;
                     setPaymentVisible(true);
-                    statusEl.textContent = 'You are on the free plan (1x). Beta price: $3 or ₦3,000 for Level 2 (2x) — 30 days.';
+                    statusEl.textContent = 'You are on the free plan (1x). Beta price: $3 or ₦4,000 for Level 2 (2x) — 30 days.';
                     const spendable = prem ? (prem.premiumSpendable||0) : 0;
                     if (spendable >= 5000) {
                         currentEl.textContent = 'Your 5,000 premium points are ready — activate below to start your 30-day boost.';
