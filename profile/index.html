@@ -28,21 +28,6 @@
             </ul>
         </section>
 
-        <section class="game-card" style="border:1px solid rgba(46,204,113,0.4);">
-            <h3>Referral program</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin-top:6px;">Share your link. When a friend subscribes, you earn <b style="color:#2ecc71;">15% of each subscription</b> they pay, for up to 12 months. Your earnings are recorded on-chain so they can never be changed or lost. You need an active plan in the month their payment activates to earn that month.</p>
-            <div style="margin-top:10px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; word-break:break-all; font-family:monospace; font-size:0.82rem; color:#2ecc71;" data-ref-link>Share link</div>
-            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
-                <button id="ref-copy-btn" type="button" style="background:#2ecc71; color:#000; border:none; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; flex:1;">Copy my link</button>
-                <button id="ref-claim-btn" type="button" style="background:#f39c12; color:#000; border:none; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>
-            </div>
-            <div style="display:flex; gap:16px; margin-top:12px; justify-content:space-between; flex-wrap:wrap;">
-                <div style="font-size:0.82rem; color:var(--muted);">Lifetime earned <b data-ref-earned style="color:#2ecc71; margin-left:6px;">--</b></div>
-                <div style="font-size:0.82rem; color:var(--muted);">Pending payout <b data-ref-pending style="color:#f39c12; margin-left:6px;">--</b></div>
-            </div>
-            <p id="ref-msg" style="color:var(--muted); font-size:0.78rem; margin-top:8px;"></p>
-        </section>
-
         <section class="game-card" style="border:1px solid rgba(155,89,182,0.4);">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>Your on-chain wallet</h3>
@@ -59,8 +44,6 @@
     </main>
 
     <script src="/global_header.js"></script>
-    <script src="/universal/identity/handle.js"></script>
-    <script src="/universal/point-sources/referral.js"></script>
     <script src="/dash-nav.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -148,48 +131,7 @@
                 copyWallet();
             });
 
-            // Referral card wiring (M6): copy share link, claim signup bonus.
-            const refMsg = document.getElementById('ref-msg');
-            const refCopyBtn = document.getElementById('ref-copy-btn');
-            const refClaimBtn = document.getElementById('ref-claim-btn');
-            const refLinkEl = document.querySelector('[data-ref-link]');
-            if (refCopyBtn) refCopyBtn.addEventListener('click', function () {
-                const link = window.gfgReferral ? window.gfgReferral.shareLink() : null;
-                const done = (ok) => { if (refMsg) refMsg.textContent = ok ? 'Link copied. Invite friends!' : 'Hold and copy the link manually.'; };
-                if (!link) { if (refMsg) refMsg.textContent = 'Sign in to get your referral link.'; return; }
-                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(()=>done(true), ()=>done(false));
-                else done(false);
-            });
-            if (refClaimBtn) refClaimBtn.addEventListener('click', async function () {
-                refClaimBtn.disabled = true;
-                if (refMsg) refMsg.textContent = 'Claiming your 500 signup points...';
-                const res = window.gfgReferral ? await window.gfgReferral.claimSignupBonus() : null;
-                if (res && res.ok) {
-                    if (refMsg) refMsg.textContent = 'Done! 500 signup points credited on-chain (claimed once per account).';
-                } else {
-                    if (refMsg) refMsg.textContent = 'Already claimed, or signing in is required first (one bonus per account).';
-                }
-                refClaimBtn.disabled = false;
-            });
-
-            function render() {
-                if (!currentWallet()) {
-                    statusEl.textContent = 'Sign in from the menu at the top to see your profile.';
-                    walletAddrEl.textContent = 'Sign in to see your wallet.';
-                    walletCopyMsg.textContent = '';
-                    return;
-                }
-                renderWallet();
-                if (!window.currentProfile) {
-                    statusEl.textContent = 'Signed in, loading your profile...';
-                    return;
-                }
-                const p = window.currentProfile;
-                const name = p.display_name || p.username || 'Player';
-                statusEl.textContent = 'Welcome, ' + name + '!';
-            }
-
-            // Re-render the wallet when auth changes (sign-in / sign-out on the
+                        // Re-render the wallet when auth changes (sign-in / sign-out on the
             // same page) or the header refreshes the session.
             render();
             if (window.refreshAuthHeader) {

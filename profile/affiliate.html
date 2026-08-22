@@ -17,10 +17,10 @@
         <div class="dash-grid">
 
         <section class="game-card" style="border:1px solid rgba(46,204,113,0.4);">
-            <h3>Your referral link
-            <div style="font-size:0.82rem; color:#2ecc71; font-weight:700; margin-top:6px;" data-ref-code>GFG-XXXXXX</div></h3>
+            <h3>Your referral link</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin-top:6px;">Share it and you earn <b style="color:#2ecc71;">15% of each subscription</b> a referred friend pays, for up to 12 months after their first. You must be on an active plan in the month their payment activates to earn that month. Earnings are recorded on-chain, so they are permanent and provable.</p>
-            <div style="margin-top:10px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; word-break:break-all; font-family:monospace; font-size:0.82rem; color:#2ecc71;" data-ref-link>Share link</div>
+            <div style="font-size:0.86rem; color:#2ecc71; font-weight:800; margin-top:8px; font-family:monospace;" data-ref-code>—</div>
+            <div style="margin-top:8px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; word-break:break-all; font-family:monospace; font-size:0.8rem; color:#2ecc71;" data-ref-link>—</div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button id="ref-copy-btn" style="background:#2ecc71; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Copy my link</button>
                 <button id="ref-claim-btn" style="background:#f39c12; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>
@@ -48,7 +48,7 @@
                     <div style="font-size:1.1rem; color:#888; font-weight:800;" id="aff-forfeited">$0.00</div>
                 </div>
             </div>
-            <p id="aff-note" style="color:var(--muted); font-size:0.78rem; line-height:1.5; margin-top:10px;">Pending is what the platform owes you and pays out manually after you request it. Forfeited amounts are months skipped because you were not on an active plan in that month.</p>
+            <p id="aff-note" style="color:var(--muted); font-size:0.78rem; line-height:1.5; margin-top:10px;">Pending is what the platform owes you and pays out manually after you request it. Forfeited amounts are months skipped because you were not on an active plan that month.</p>
             <div style="margin-top:12px;">
                 <button id="refresh-ledger" style="background:#1a1a24; color:#bbb; border:1px solid #333; border-radius:8px; padding:9px 14px; cursor:pointer; width:100%; font-size:0.85rem;">Refresh earnings</button>
             </div>
@@ -67,69 +67,110 @@
     <script src="/universal/point-sources/referral.js"></script>
     <script src="/dash-nav.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            window.GFG_DASH_NAV.render({
-                brand: '👤 Profile',
-                active: 'affiliate',
-                sections: [
-                    { heading: 'Overview', items: [ { key: 'home', label: '🏠 Profile home', href: '/profile/' } ]},
-                    { heading: 'Detail', items: [
-                        { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
-                        { key: 'upgrade', label: '⬆️ Upgrade subscription', href: '/profile/upgrade.html' },
-                        { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
-                        { key: 'affiliate', label: '🤝 Affiliate earnings', href: '/profile/affiliate.html' },
-                        { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
-                    ]},
-                ]
-            });
+    document.addEventListener('DOMContentLoaded', function () {
+        try { window.GFG_DASH_NAV.render({
+            brand: '👤 Profile', active: 'affiliate',
+            sections: [
+                { heading: 'Overview', items: [ { key: 'home', label: '🏠 Profile home', href: '/profile/' } ]},
+                { heading: 'Detail', items: [
+                    { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
+                    { key: 'upgrade', label: '⬆️ Upgrade subscription', href: '/profile/upgrade.html' },
+                    { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
+                    { key: 'affiliate', label: '🤝 Affiliate earnings', href: '/profile/affiliate.html' },
+                    { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                ]},
+            ] });
+        } catch (e) {}
 
-            const statusEl = document.getElementById('aff-status');
-            const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-            const usd = c => '$' + (Number(c||0)/100).toFixed(2);
-            const $ = id => document.getElementById(id);
+        var statusEl = document.getElementById('aff-status');
+        function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function usd(c){ return '$' + (Number(c||0)/100).toFixed(2); }
+        function el(id){ return document.getElementById(id); }
 
-            const copyBtn = $('ref-copy-btn'), claimBtn = $('ref-claim-btn'), refMsg = $('ref-msg');
-
-            copyBtn.addEventListener('click', ()=>{
-                const link = window.gfgReferral ? window.gfgReferral.shareLink() : null;
-                if (!link) { refMsg.textContent = 'Sign in to get your referral link.'; return; }
-                const done = ok => { refMsg.textContent = ok ? 'Link copied. Invite friends!' : 'Hold and copy the link manually.'; };
-                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(()=>done(true), ()=>done(false));
-                else done(false);
-            });
-            claimBtn.addEventListener('click', async ()=>{
-                claimBtn.disabled = true; refMsg.textContent = 'Claiming your 500 signup points...';
-                const res = window.gfgReferral ? await window.gfgReferral.claimSignupBonus() : null;
-                refMsg.textContent = (res && res.ok) ? 'Done! 500 signup points credited on-chain (once per account).' : 'Already claimed, or sign in is required first (one bonus per account).';
-                claimBtn.disabled = false;
-            });
-
-            function render(ledger){
-                if (!ledger || !ledger.account) {
-                    statusEl.textContent = 'No affiliate ledger yet. Share your referral link to start earning.';
+        function refreshHandleUI(){
+            try {
+                var handle = window.gfgReferral ? window.gfgReferral.handle() : null;
+                var codeEl = document.querySelector('[data-ref-code]');
+                var linkEl = document.querySelector('[data-ref-link]');
+                var signedIn = !!handle || !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || !!(window.currentUser);
+                if (!signedIn) {
+                    if (codeEl) codeEl.textContent = 'Sign in to get your code';
+                    if (linkEl) linkEl.textContent = '';
+                    if (statusEl) statusEl.textContent = 'Sign in to see your referral link and earnings.';
                     return;
                 }
-                statusEl.textContent = 'Ledger loaded.';
-                $('aff-lifetime').textContent = usd(ledger.lifetimeUsdCents);
-                $('aff-pending').textContent = usd(ledger.pendingUsdCents);
-                $('aff-paid').textContent = usd(ledger.paidUsdCents);
-                $('aff-forfeited').textContent = usd(ledger.forfeitedUsdCents);
-                const entries = (ledger.entries||[]).slice().reverse();
-                if (!entries.length) { $('aff-entries').innerHTML = '<p class="empty">No months recorded yet.</p>'; return; }
-                $('aff-entries').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="border:1px solid #333;padding:6px;color:#f39c12;">Period</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Status</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Amount</th></tr></thead><tbody>' +
-                    entries.map(e => {
-                        const st = e.status === 0 ? '<span style="color:#2ecc71;">Earned (pending)</span>' : e.status === 1 ? '<span style="color:#fff;">Paid</span>' : '<span style="color:#888;">Forfeited</span>';
-                        return '<tr><td style="border:1px solid #333;padding:6px;">' + e.period + '</td><td style="border:1px solid #333;padding:6px;">' + st + '</td><td style="border:1px solid #333;padding:6px;">' + usd(e.amountUsdCents) + '</td></tr>';
-                    }).join('') + '</tbody></table>';
-            }
-            function load(){
-                if (!window.gfgReferral) return;
-                window.gfgReferral.getLedger(true).then(l => render(l));
-            }
-            $('refresh-ledger').addEventListener('click', load);
-            load();
-            if (window.gfgReferral) setTimeout(window.gfgReferral.refresh, 600);
+                if (codeEl) codeEl.textContent = handle || 'Loading your handle...';
+                if (linkEl) linkEl.textContent = (window.gfgReferral && window.gfgReferral.shareLink()) || '';
+            } catch (e) {}
+        }
+
+        function render(ledger){
+            try {
+                if (!ledger || !ledger.account) {
+                    if (statusEl) statusEl.textContent = 'No affiliate ledger yet. Share your referral link to start earning.';
+                    el('aff-entries').innerHTML = '<p class="empty">No months recorded yet.</p>';
+                    refreshHandleUI();
+                    return;
+                }
+                if (statusEl) statusEl.textContent = 'Ledger loaded.';
+                el('aff-lifetime').textContent = usd(ledger.lifetimeUsdCents);
+                el('aff-pending').textContent = usd(ledger.pendingUsdCents);
+                el('aff-paid').textContent = usd(ledger.paidUsdCents);
+                el('aff-forfeited').textContent = usd(ledger.forfeitedUsdCents);
+                var entries = (ledger.entries||[]).slice().reverse();
+                if (!entries.length) { el('aff-entries').innerHTML = '<p class="empty">No months recorded yet.</p>'; }
+                else {
+                    el('aff-entries').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="border:1px solid #333;padding:6px;color:#f39c12;">Period</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Status</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Amount</th></tr></thead><tbody>' +
+                        entries.map(function(e){
+                            var st = e.status === 0 ? '<span style="color:#2ecc71;">Earned (pending)</span>' : e.status === 1 ? '<span style="color:#fff;">Paid</span>' : '<span style="color:#888;">Forfeited</span>';
+                            return '<tr><td style="border:1px solid #333;padding:6px;">' + e.period + '</td><td style="border:1px solid #333;padding:6px;">' + st + '</td><td style="border:1px solid #333;padding:6px;">' + usd(e.amountUsdCents) + '</td></tr>';
+                        }).join('') + '</tbody></table>';
+                }
+                refreshHandleUI();
+            } catch (e) { if (statusEl) statusEl.textContent = 'Could not render earnings: ' + e.message; }
+        }
+
+        function load(force){
+            if (!window.gfgReferral || typeof window.gfgReferral.getLedger !== 'function') { refreshHandleUI(); return; }
+            window.gfgReferral.getLedger(!!force).then(render);
+        }
+
+        var copyBtn = el('ref-copy-btn');
+        if (copyBtn) copyBtn.addEventListener('click', function(){
+            var link = window.gfgReferral && window.gfgReferral.shareLink();
+            var msg = el('ref-msg');
+            if (!link) { if (msg) msg.textContent = 'Sign in to get your referral link.'; return; }
+            var done = function(ok){ if (msg) msg.textContent = ok ? 'Link copied. Invite friends!' : 'Hold and copy the link manually.'; };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function(){ done(true); }, function(){ done(false); });
+            else done(false);
         });
+
+        var claimBtn = el('ref-claim-btn');
+        if (claimBtn) claimBtn.addEventListener('click', async function(){
+            claimBtn.disabled = true;
+            var msg = el('ref-msg');
+            if (msg) msg.textContent = 'Claiming your 500 signup points...';
+            try {
+                var res = window.gfgReferral ? await window.gfgReferral.claimSignupBonus() : null;
+                if (msg) msg.textContent = (res && res.ok) ? 'Done! 500 signup points credited on-chain. Refreshing your balances...' : 'Already claimed, or signing in is required first (one bonus per account).';
+                refreshHandleUI();
+                load(true);
+            } catch (e) { if (msg) msg.textContent = 'Claim failed: ' + e.message; }
+            claimBtn.disabled = false;
+        });
+
+        var refreshBtn = el('refresh-ledger');
+        if (refreshBtn) refreshBtn.addEventListener('click', function(){ load(true); });
+
+        // initial
+        refreshHandleUI();
+        load(false);
+        // re-run when auth settles (session restore) or premium cache changes
+        window.addEventListener('gfg:auth-changed', function(){ refreshHandleUI(); load(false); });
+        window.addEventListener('storage', function(e){ if (e.key && e.key.indexOf('gfg_') >= 0) { refreshHandleUI(); load(false); } });
+        var tries = 0;
+        (function poll(){ tries++; refreshHandleUI(); if (tries < 20) setTimeout(poll, 500); })();
+    });
     </script>
 </body>
 </html>

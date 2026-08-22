@@ -19,7 +19,7 @@ import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
 import bs58 from 'bs58';
-import { registerProfileHandle, resolveHandleToWallet, deriveProfileHandle, isValidProfileHandle } from './handle.mjs';
+import { registerProfileHandle, resolveHandleToWallet, deriveProfileHandle, isValidProfileHandle, persistHandle, getHandleForWallet } from './handle.mjs';
 import { writeFileSync, existsSync } from 'fs';
 import './load-env.mjs';
 
@@ -201,8 +201,11 @@ export async function handleSignupFlow({ wallet, handle, refHandle }) {
   const results = { wallet: w.toBase58(), handleRegistered: false, inviter: null, bonus: null };
   // 1) register the handle (idempotent; if taken by this wallet treat as ok).
   if (handle && isValidProfileHandle(handle)) {
-    try { const r = await registerProfileHandle(w.toBase58(), handle); results.handleRegistered = true; results.handle = r.handle; }
-    catch (e) { results.handleError = e.message; }
+    try {
+      const r = await registerProfileHandle(w.toBase58(), handle);
+      results.handleRegistered = true; results.handle = r.handle;
+      persistHandle(w.toBase58(), r.handle); // so wallet->handle resolves everywhere
+    } catch (e) { results.handleError = e.message; }
   }
   // 2) resolve inviter from refHandle and record the pair.
   if (refHandle && isValidProfileHandle(refHandle) && refHandle !== (handle || '')) {

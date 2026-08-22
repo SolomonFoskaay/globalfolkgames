@@ -94,7 +94,6 @@
                         { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
                         { key: 'premium-subscribers', label: '📈 Premium subscribers', href: '/dashboard/premium-subscribers.html' },
                         { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
-                        { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
                         { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
                     ]},
                 ]
@@ -102,13 +101,23 @@
         });
     </script>
     <script>
-        (async function(){
-            // Same gate as other admin pages (waits for wallet, caches result).
+        // Same working gate as /dashboard/premium-subscribers — never touch it.
+        async function waitForWalletAndGate() {
             for (let i=0; i<8; i++) {
-                try { const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null; const p = window.currentProfile ? window.currentProfile.solana_wallet : null; if (w || p) break; } catch(e){}
-                await new Promise(r=>setTimeout(r,500));
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch(e) {}
+                await new Promise(r=>setTimeout(r, 500));
             }
-            try { const ok = await window.DashCore.gateStaff(); if (!ok) return; } catch(e){ return; }
+            try { return await window.DashCore.gateStaff(); }
+            catch(e) { console.warn('gateStaff error', e); return false; }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const staff = await waitForWalletAndGate();
+            if (!staff) return;
 
             const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const usd = c => '$' + (Number(c||0)/100).toFixed(2);
@@ -139,7 +148,7 @@
                 $('st-msg').textContent='Settling '+pairs.length+' pair(s)...';
                 try { const r = await fetch('/api/affiliate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'settle', period:parseInt($('st-period').value,10), usdCentsPerSub:300, pairs})}); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); $('st-msg').textContent=JSON.stringify(j).slice(0,400); } catch(e){ $('st-msg').textContent='Failed: '+esc(e.message); }
             });
-        })();
+        });
     </script>
 </body>
 </html>

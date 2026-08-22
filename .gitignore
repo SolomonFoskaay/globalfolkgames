@@ -22,6 +22,7 @@ pnpm-debug.log*
 # Sponsor spend ledger (relay state, machine-local)
 .gfg-spend-ledger.json
 scripts/gfg-referrals.json
+scripts/gfg-handles.json
 
 # Server-side probe log (dashboard leak/ops observations; machine-local)
 .gfg-probe-log.jsonl

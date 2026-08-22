@@ -76,6 +76,40 @@ export async function registerProfileHandle(wallet, handle) {
   return { handle, wallet: w.toBase58(), sig, account: pda.toBase58() };
 }
 
+// wallet -> handle map (durable local ledger, gitignored; Supabase registered
+// profiles used when available). Needed because the handle is the PDA seed and
+// cannot be reverse-derived from the wallet on-chain.
+import { writeFileSync, existsSync } from 'fs';
+const HANDLES_FILE = new URL('./gfg-handles.json', import.meta.url).pathname;
+export function persistHandle(wallet, handle) {
+  if (!wallet || !handle) return;
+  try {
+    const map = existsSync(HANDLES_FILE) ? JSON.parse(readFileSync(HANDLES_FILE, 'utf8')) : {};
+    map[wallet] = handle;
+    writeFileSync(HANDLES_FILE, JSON.stringify(map, null, 2));
+  } catch (e) { /* fail-open */ }
+  try { void persistHandleSupabase(wallet, handle); } catch (e) { /* fail-open */ }
+}
+export function getHandleForWallet(wallet) {
+  try {
+    if (existsSync(HANDLES_FILE)) {
+      const map = JSON.parse(readFileSync(HANDLES_FILE, 'utf8'));
+      if (map[wallet]) return map[wallet];
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+async function persistHandleSupabase(wallet, handle) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  // update the profiles row for this wallet's embedded Dynamic profile
+  await fetch(url + '/rest/v1/profiles?solana_wallet=eq.' + encodeURIComponent(wallet), {
+    method: 'PATCH', headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ handle }),
+  }).catch(() => {});
+}
+
 const REGIONS = ['https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/', 'https://api.devnet.solana.com'];
 // Resolve a handle to its owner wallet by reading the on-chain registry.
 export async function resolveHandleToWallet(handle) {

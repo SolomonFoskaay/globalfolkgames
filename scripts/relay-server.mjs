@@ -22,6 +22,7 @@ import {
   handleRecordAffiliatePeriod, handleAffiliatePayout,
   settleAffiliatePeriod, readAffiliateLedger, handleSignupFlow, listAffiliateAccounts,
 } from './affiliate-relay.mjs';
+import { getHandleForWallet } from './handle.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -318,8 +319,9 @@ const server = createServer(async (req, res) => {
       const wallet = (url.searchParams.get('wallet') || '').trim();
       if (!wallet) throw new Error('wallet query param required');
       const ledger = await readAffiliateLedger(wallet);
+      const handle = getHandleForWallet(wallet) || null;
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
-      res.end(JSON.stringify({ wallet, code: wallet, ...(ledger || {}) }));
+      res.end(JSON.stringify({ wallet, handle, ...(ledger || {}) }));
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));

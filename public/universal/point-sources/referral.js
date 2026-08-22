@@ -26,15 +26,27 @@
   }
 
   var cachedHandle = null;
+  function dynamicId() {
+    try {
+      var u = window.getDynamicUser ? window.getDynamicUser() : null;
+      if (u) {
+        var id = u.id || u.userId || u.dynamicId || (u.user && (u.user.id || u.user.userId)) || null;
+        if (id) return id;
+      }
+    } catch (e) {}
+    try { if (window.currentProfile && window.currentProfile.dynamic_id) return window.currentProfile.dynamic_id; } catch (e) {}
+    return null;
+  }
   function handle() {
     if (cachedHandle) return cachedHandle;
-    var id = null;
-    try { id = (window.getDynamicUser && window.getDynamicUser() && window.getDynamicUser().id) || null; } catch (e) {}
-    if (!id) {
-      try { if (window.currentProfile && window.currentProfile.dynamic_id) id = window.currentProfile.dynamic_id; } catch (e) {}
-    }
+    // 1) fall back to a per-wallet cached handle once we know it (from the server or a derive)
+    var w = wallet();
+    if (w) { try { var saved = localStorage.getItem('gfg_handle_' + w); if (saved && window.isValidProfileHandle && window.isValidProfileHandle(saved)) { cachedHandle = saved; return saved; } } catch (e) {} }
+    // 2) derive from Dynamic's stable user id, never email/wallet
+    var id = dynamicId();
     var h = (window.deriveProfileHandle && id) ? window.deriveProfileHandle(id) : null;
     cachedHandle = h;
+    if (h && w) { try { localStorage.setItem('gfg_handle_' + w, h); } catch (e) {} }
     return h;
   }
 
@@ -57,7 +69,14 @@
     if (!force && cachedLedger && Date.now() - ledgerAt < 120000) return Promise.resolve(cachedLedger);
     return fetch('/api/affiliate?wallet=' + encodeURIComponent(w), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
-      .then(function (j) { cachedLedger = j; ledgerAt = Date.now(); return j; })
+      .then(function (j) {
+        cachedLedger = j; ledgerAt = Date.now();
+        if (j && j.handle && window.isValidProfileHandle && window.isValidProfileHandle(j.handle)) {
+          cachedHandle = j.handle;
+          try { localStorage.setItem('gfg_handle_' + w, j.handle); } catch (e) {}
+        }
+        return j;
+      })
       .catch(function () { return null; });
   }
 
@@ -70,6 +89,22 @@
     try { if (ref) localStorage.setItem('gfg_pending_ref', ref); } catch (e) {}
     return fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); })
+      .then(function (j) {
+        // A claim is a real user action: force one fresh on-chain refresh so the
+        // header points and M3/M4/premium caches update immediately (not on the
+        // next page load). pointsStore is the single place that decides when RPC
+        // fires (auth/win), so claiming reuses that same trigger.
+        try {
+          if (window.pointsStore && typeof window.pointsStore.refresh === 'function') window.pointsStore.refresh();
+        } catch (e) {}
+        if (j && j.handle && window.isValidProfileHandle && window.isValidProfileHandle(j.handle)) {
+          cachedHandle = j.handle;
+          var wk = wallet(); if (wk) { try { localStorage.setItem('gfg_handle_' + wk, j.handle); } catch (e2) {} }
+        }
+        cachedLedger = null; ledgerAt = 0;
+        fillSlots(null);
+        return j;
+      })
       .catch(function (e) { return { ok: false, error: e.message }; });
   }
 
