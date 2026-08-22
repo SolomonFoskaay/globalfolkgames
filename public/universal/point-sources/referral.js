@@ -109,13 +109,15 @@
     return fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); })
       .then(function (j) {
-        // A claim is a real user action: force one fresh on-chain refresh so the
-        // header points and M3/M4/premium caches update immediately (not on the
-        // next page load). pointsStore is the single place that decides when RPC
-        // fires (auth/win), so claiming reuses that same trigger.
+        // A claim credits the GLOBAL ledger server-side (relay-signed). The
+        // header pill reads the global ledger cache, so refresh JUST that
+        // module. Deliberately NOT window.pointsStore.refresh(): that entry
+        // point wipes all cached ledgers sitewide, and if the wallet read is
+        // momentarily unavailable it clears caches with NO refetch scheduled,
+        // which froze every points display until the next real login/logout.
         try {
-          if (window.pointsStore && typeof window.pointsStore.refresh === 'function') window.pointsStore.refresh();
-        } catch (e) {}
+          if (window.globalLedger && typeof window.globalLedger.fetch === 'function') window.globalLedger.fetch();
+        } catch (e) { /* cache-only display is fine */ }
         if (j && j.handle && window.isValidProfileHandle && window.isValidProfileHandle(j.handle)) {
           cachedHandle = j.handle;
           var wk = wallet(); if (wk) { try { localStorage.setItem('gfg_handle_' + wk, j.handle); } catch (e2) {} }

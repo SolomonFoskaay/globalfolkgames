@@ -222,6 +222,15 @@ export async function handleSignupFlow({ wallet, handle, refHandle }) {
   const w = new PublicKey(wallet);
   if (w.toBase58() !== String(wallet).trim()) throw new Error('invalid wallet address (base58 is case-sensitive)');
   const results = { wallet: w.toBase58(), handleRegistered: false, inviter: null, bonus: null };
+
+  // LIFETIME FENCE: a wallet that already claimed the 500P signup bonus never
+  // gets it again, whatever the client sends (incognito, refreshed tab, a
+  // different device). The on-chain duplicate guard only blocks the *previous*
+  // match_ref, so it CANNOT be relied on as the permanent fence. This map
+  // check runs FIRST and short-circuits before any write.
+  if (isSignupClaimed(w.toBase58())) {
+    return { ...results, signupClaimed: true, alreadyClaimed: true };
+  }
   // 1) register the handle (idempotent; if taken by this wallet treat as ok).
   if (handle && isValidProfileHandle(handle)) {
     try {
@@ -240,31 +249,66 @@ export async function handleSignupFlow({ wallet, handle, refHandle }) {
       }
     } catch (e) { results.refError = e.message; }
   }
-  // 3) claim the signup bonus (already idempotent by wallet-derived matchRef).
-  results.bonus = await handleSignupBonus(w.toBase58());
+  // 3) claim the signup bonus (now protected by the permanent ON-CHAIN fence:
+  //    the program's `claim_signup_bonus` rejects a second claim with
+  //    SignupAlreadyClaimed). Map that rejection to a clean "already claimed"
+  //    so even a cold Vercel instance (no shared map) answers 200, never a 500.
+  try {
+    results.bonus = await handleSignupBonus(w.toBase58());
+  } catch (e) {
+    const msg = String((e && (e.message || e)) || '');
+    if (/6015|SignupAlreadyClaimed|already claimed/i.test(msg)) {
+      markSignupClaimed(w.toBase58());
+      results.bonus = { alreadyClaimed: true };
+      return { ...results, signupClaimed: true, alreadyClaimed: true };
+    }
+    throw e;
+  }
   markSignupClaimed(w.toBase58());
   results.signupClaimed = true;
   return results;
 }
 
-// Signup bonus 500P (M6): kind=1 signup_bonus (source_code 10, reason 2) into the
-// global ledger. Idempotent by a stable matchRef derived from the wallet, so the
-// program's duplicate guard makes a repeat a clean no-op. Server-side (sponsor).
+// Signup bonus 500P (M6): credited via the program's `claim_signup_bonus`,
+// which atomically rates the permanent on-chain fence account ([gfgclaim,
+// player]). The PROGRAM rejects any repeat for a wallet forever, so the 500P
+// is one-per-lifetime even if a server map or the frontend is bypassed. The
+// relay (sponsor) initializes the claim account once (base collar) then calls
+// the instruction (base collar — once per signup, no delegation needed).
+const CLAIM_SEED = Buffer.from('gfgclaim');
+const SIGNUP_MATCH_REF_SALT = 'signup|';
+async function signupClaimPda(w) {
+  return PublicKey.findProgramAddressSync([CLAIM_SEED, w.toBytes()], PROGRAM)[0];
+}
+async function ensureSignupClaim(program, conn, sponsor, w) {
+  const claimPda = await signupClaimPda(w);
+  const info = await conn.getAccountInfo(claimPda).catch(() => null);
+  if (info) return claimPda;
+  const tx = await program.methods.initializeSignupClaim()
+    .accounts({ payer: sponsor.publicKey, playerAuthority: w, signupClaim: claimPda, systemProgram: SystemProgram.programId })
+    .transaction();
+  tx.feePayer = sponsor.publicKey;
+  const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
+  await conn.confirmTransaction({ signature: sig }, 'confirmed');
+  return claimPda;
+}
 export async function handleSignupBonus(wallet) {
   const w = new PublicKey(wallet);
   const { sponsor, conn, program } = await sponsorProgram();
   const globalPda = PublicKey.findProgramAddressSync([Buffer.from('gfgpoints'), Buffer.from('global'), w.toBytes()], PROGRAM)[0];
   let h = 0x811c9dc5;
-  const s = 'signup|' + w.toBase58();
+  const s = SIGNUP_MATCH_REF_SALT + w.toBase58();
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
   const matchRef = h % 2147483647 || 1;
-  const tx = await program.methods.recordGlobalPoints(1, 10, new BN(500), 2, new BN(matchRef))
-    .accounts({ payer: sponsor.publicKey, playerAuthority: w, globalPoints: globalPda })
+  await ensureSignupClaim(program, conn, sponsor, w);
+  const claimPda = await signupClaimPda(w);
+  const tx = await program.methods.claimSignupBonus(new BN(matchRef))
+    .accounts({ payer: sponsor.publicKey, playerAuthority: w, globalPoints: globalPda, signupClaim: claimPda })
     .transaction();
   tx.feePayer = sponsor.publicKey;
   const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
   await conn.confirmTransaction({ signature: sig }, 'confirmed');
-  console.log(`[affiliate] signup bonus 500P -> ${w.toBase58()} ref=${matchRef} sig=${String(sig).slice(0, 24)}`);
+  console.log(`[affiliate] signup bonus 500P -> ${w.toBase58()} ref=${matchRef} sig=${String(sig).slice(0, 24)} (on-chain fence set)`);
   return { sig, matchRef };
 }
 

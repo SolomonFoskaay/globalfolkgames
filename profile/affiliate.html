@@ -23,7 +23,7 @@
             <div style="margin-top:8px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; word-break:break-all; font-family:monospace; font-size:0.8rem; color:#2ecc71;" data-ref-link>—</div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button id="ref-copy-btn" style="background:#2ecc71; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Copy my link</button>
-                <button id="ref-claim-btn" style="background:#f39c12; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>
+                <span id="ref-claim-wrap" style="flex:1; display:flex;"></span>
             </div>
             <p id="ref-msg" style="color:var(--muted); font-size:0.78rem; margin-top:8px;"></p>
         </section>
@@ -88,24 +88,25 @@
         function el(id){ return document.getElementById(id); }
 
         // M6: the 500P signup bonus is ONE PER LIFETIME. Once claimed (locally or
-        // server-acknowledged) the button is disabled and relabelled forever, so a
-        // user can never spam-claim or see a confusing "sign in" state again.
+        // server-acknowledged) the claim BUTTON IS REMOVED from the DOM and
+        // replaced with read-only text, so it can never be clicked again even by
+        // accident. Server-side (relay map) and the on-chain writes are the real
+        // fence; this is the UI that cannot retrigger.
         function renderClaimBtn(){
-            var btn = el('ref-claim-btn');
-            if (!btn) return;
+            var wrap = document.getElementById('ref-claim-wrap');
+            if (!wrap) return;
             var claimed = window.gfgReferral && typeof window.gfgReferral.signupClaimed === 'function' && window.gfgReferral.signupClaimed();
             if (claimed) {
-                btn.disabled = true;
-                btn.textContent = '500 signup points already claimed';
-                btn.style.background = '#333';
-                btn.style.color = '#888';
-                btn.style.cursor = 'default';
+                if (!document.getElementById('ref-claim-done')) {
+                    wrap.innerHTML = '<p id="ref-claim-done" style="margin:0; padding:10px 12px; background:#1a1a24; border:1px solid rgba(46,204,113,0.35); border-radius:8px; color:#2ecc71; font-weight:700; font-size:0.85rem; text-align:center;">500 signup points already claimed &#10003;</p>';
+                }
             } else {
-                btn.disabled = false;
-                btn.textContent = 'Claim 500 signup points';
-                btn.style.background = '#f39c12';
-                btn.style.color = '#000';
-                btn.style.cursor = 'pointer';
+                var btn = document.getElementById('ref-claim-btn');
+                if (!btn) {
+                    wrap.innerHTML = '<button id="ref-claim-btn" style="background:#f39c12; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>';
+                    btn = document.getElementById('ref-claim-btn');
+                }
+                if (btn) { btn.disabled = false; btn.textContent = 'Claim 500 signup points'; btn.style.background = '#f39c12'; btn.style.color = '#000'; btn.style.cursor = 'pointer'; }
             }
         }
 
@@ -182,21 +183,25 @@
             else done(false);
         });
 
-        var claimBtn = el('ref-claim-btn');
-        if (claimBtn) claimBtn.addEventListener('click', async function(){
+        // The claim button is (re)created inside #ref-claim-wrap, so bind by
+        // delegation: a click anywhere on the wrap that lands on #ref-claim-btn.
+        var claimWrap = el('ref-claim-wrap');
+        if (claimWrap) claimWrap.addEventListener('click', async function (ev) {
+            if (ev.target && ev.target.id === 'ref-claim-btn') await doClaim();
+        });
+        async function doClaim() {
+            var btn = el('ref-claim-btn');
+            if (!btn) return;
             if (window.gfgReferral && typeof window.gfgReferral.signupClaimed === 'function' && window.gfgReferral.signupClaimed()) { renderClaimBtn(); return; }
-            claimBtn.disabled = true;
+            btn.disabled = true;
             var msg = el('ref-msg');
             if (msg) msg.textContent = 'Claiming your 500 signup points...';
             try {
                 var res = window.gfgReferral ? await window.gfgReferral.claimSignupBonus() : null;
                 var claimed = res && (res.ok && (res.signupClaimed || res.alreadyClaimed || res.bonus));
-                if (claimed) {
+                if (claimed || (res && res.ok)) {
                     window.gfgReferral && typeof window.gfgReferral.markClaimed === 'function' && window.gfgReferral.markClaimed();
                     if (msg) msg.textContent = '500 signup points credited on-chain. Refreshing your balances...';
-                } else if (res && res.ok) {
-                    window.gfgReferral && typeof window.gfgReferral.markClaimed === 'function' && window.gfgReferral.markClaimed();
-                    if (msg) msg.textContent = 'Done. 500 signup points credited on-chain.';
                 } else {
                     if (msg) msg.textContent = 'Signing in is required first (one bonus per account, claimed once ever).';
                 }
@@ -205,7 +210,7 @@
                 load(true);
             } catch (e) { if (msg) msg.textContent = 'Claim failed: ' + e.message; }
             renderClaimBtn();
-        });
+        }
 
         var refreshBtn = el('refresh-ledger');
         if (refreshBtn) refreshBtn.addEventListener('click', function(){ load(true); });

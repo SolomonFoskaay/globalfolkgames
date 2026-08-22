@@ -109,6 +109,8 @@ pub const GLOBAL_TAG: &[u8] = b"global"; // reserved M4 global points tag, no ga
 pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (buy-only)
 pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref, affiliate]
 pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
+pub const CLAIM_SEED: &[u8] = b"gfgclaim";        // M6 signup-bonus fence [gfgclaim, player] (permanent, on-chain)
+pub const SIGNUP_BONUS_POINTS: u64 = 500;         // M6 500P lifetime signup bonus (once per account, ever)
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -668,6 +670,56 @@ pub mod gfg_dice {
         dest.last_match_ref = match_ref;
         dest.last_recorded_ts = Clock::get()?.unix_timestamp;
         dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// (M6 — signup bonus, PERMANENT ON-CHAIN FENCE) Credits the 500P lifetime
+    /// signup bonus AND marks the player's `[gfgclaim, player]` account as
+    /// claimed, atomically. The claim account is the hard gate: once set it can
+    /// NEVER be unset by anyone, so the same wallet can never claim twice even
+    /// if the frontend or a server map is bypassed or lost. This single write
+    /// replaces the old relay recordGlobalPoints(kind=1, source=10) path.
+    /// Runs base-layer (sponsor signs, rare — once per signup), so the claim
+    /// account never needs delegating.
+    pub fn claim_signup_bonus(ctx: Context<ClaimSignupBonusCtx>, match_ref: u64) -> Result<()> {
+        let claim = &mut ctx.accounts.signup_claim;
+        require!(claim.claimed == 0, PointsError::SignupAlreadyClaimed); // THE FENCE
+        let dest = &mut ctx.accounts.global_points;
+        require!(
+            dest.award_count == 0 || dest.last_match_ref != match_ref,
+            PointsError::DuplicateMatchRef
+        );
+        // kind=1 semantics: credits M4b lifetime + M4c spendable, NEVER M4a pure.
+        dest.global_lifetime = dest
+            .global_lifetime
+            .checked_add(SIGNUP_BONUS_POINTS)
+            .ok_or(PointsError::Overflow)?;
+        dest.global_spendable_balance = dest
+            .global_spendable_balance
+            .checked_add(SIGNUP_BONUS_POINTS)
+            .ok_or(PointsError::Overflow)?;
+        let now = Clock::get()?.unix_timestamp;
+        dest.last_source = 10; // signup_bonus
+        dest.last_points = SIGNUP_BONUS_POINTS;
+        dest.last_reason = 2; // signup_bonus
+        dest.last_match_ref = match_ref;
+        dest.last_recorded_ts = now;
+        dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        claim.claimed = 1;
+        claim.claim_ref = match_ref;
+        claim.claimed_ts = now;
+        Ok(())
+    }
+
+    /// (M6) One-time base-layer init of the player's signup-claim fence account
+    /// ([gfgclaim, player], owner = this program). The relay (sponsor) runs it
+    /// right before `claim_signup_bonus`; idempotent by the account existing.
+    pub fn initialize_signup_claim(ctx: Context<InitializeSignupClaimCtx>) -> Result<()> {
+        let claim = &mut ctx.accounts.signup_claim;
+        claim.version = 1u8;
+        claim.claimed = 0u8;
+        claim.claimed_ts = 0;
+        claim.claim_ref = 0;
         Ok(())
     }
 
@@ -1322,6 +1374,40 @@ pub struct RecordGlobalPointsCtx<'info> {
     pub global_points: Account<'info, GlobalPoints>,
 }
 
+/// Context for `claim_signup_bonus` (M6). Base-layer, sponsor-signed, once per
+/// signup. The `signup_claim` account (already initialized) is the permanent
+/// on-chain fence: the program rejects any repeat, forever.
+#[derive(Accounts)]
+pub struct ClaimSignupBonusCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [POINTS, GLOBAL_TAG, player_authority.key().as_ref()], bump)]
+    pub global_points: Account<'info, GlobalPoints>,
+    #[account(mut, seeds = [CLAIM_SEED, player_authority.key().as_ref()], bump)]
+    pub signup_claim: Account<'info, SignupClaim>,
+}
+
+/// Context for `initialize_signup_claim` (M6). Sponsor (relay) creates the
+/// per-wallet claim-fence account once, before the first claim.
+#[derive(Accounts)]
+pub struct InitializeSignupClaimCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + 1 + 1 + 8 + 8,
+        seeds = [CLAIM_SEED, player_authority.key().as_ref()],
+        bump
+    )]
+    pub signup_claim: Account<'info, SignupClaim>,
+    pub system_program: Program<'info, System>,
+}
+
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
 /// key is the payer, and the global points PDA must already exist + be
 /// delegated.
@@ -1762,6 +1848,19 @@ pub struct GlobalPoints {
     pub spend_count: u64,
 }
 
+/// M6 signup-bonus fence account ([gfgclaim, player]), ONE per wallet. Holds
+/// an immutable "claimed" flag so the 500P signup bonus can only ever be
+/// granted once in the program's lifetime, even if a client or server map is
+/// forged or lost. Never changes seed; additive-only account type.
+#[account]
+#[derive(Default)]
+pub struct SignupClaim {
+    pub version: u8,      // 1 = current
+    pub claimed: u8,      // 0 = not claimed, 1 = claimed (permanent)
+    pub claimed_ts: i64,  // unix ts when claimed
+    pub claim_ref: u64,   // the credit match_ref used
+}
+
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
 /// points, the launch engine). One account per player, seed [gfgprem, player].
 /// Runs gasless on the ER.
@@ -2056,6 +2155,8 @@ pub enum PointsError {
     NotYourAllocation,
     #[msg("allocation already claimed")]
     AlreadyClaimed,
+    #[msg("signup bonus already claimed (once per account, forever)")]
+    SignupAlreadyClaimed,
     #[msg("premium points credit requires the admin authority signer")]
     NotAdmin,
     #[msg("premium points credit_ref already used (duplicate credit guard)")]

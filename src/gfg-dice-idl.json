@@ -11,7 +11,7 @@
       "name": "activate_booster",
       "docs": [
         "(M5 v3) Activates the 72h unlimited-life booster by spending premium",
-        "spendable (BOOSTER_COST = $1 / N1,500). No win multiplier: it only makes",
+        "spendable (BOOSTER_COST = $1 / 500P, base rate $0.002/pt USD). No win",
         "lives unlimited. Extends from now (or the current active booster) by 72h.",
         "Gasless on the ER (session key signs). One plan/booster per account flow."
       ],
@@ -312,6 +312,107 @@
         {
           "name": "winner_index",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "claim_signup_bonus",
+      "docs": [
+        "(M6 — signup bonus, PERMANENT ON-CHAIN FENCE) Credits the 500P lifetime",
+        "signup bonus AND marks the player's `[gfgclaim, player]` account as",
+        "claimed, atomically. The claim account is the hard gate: once set it can",
+        "NEVER be unset by anyone, so the same wallet can never claim twice even",
+        "if the frontend or a server map is bypassed or lost. This single write",
+        "replaces the old relay recordGlobalPoints(kind=1, source=10) path.",
+        "Runs base-layer (sponsor signs, rare — once per signup), so the claim",
+        "account never needs delegating."
+      ],
+      "discriminator": [
+        61,
+        155,
+        123,
+        31,
+        83,
+        235,
+        152,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "global_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signup_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -2062,6 +2163,64 @@
       "args": []
     },
     {
+      "name": "initialize_signup_claim",
+      "docs": [
+        "(M6) One-time base-layer init of the player's signup-claim fence account",
+        "([gfgclaim, player], owner = this program). The relay (sponsor) runs it",
+        "right before `claim_signup_bonus`; idempotent by the account existing."
+      ],
+      "discriminator": [
+        128,
+        119,
+        176,
+        171,
+        78,
+        130,
+        214,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "signup_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "migrate_points",
       "docs": [
         "(M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)",
@@ -3647,6 +3806,19 @@
         141,
         86
       ]
+    },
+    {
+      "name": "SignupClaim",
+      "discriminator": [
+        22,
+        208,
+        12,
+        121,
+        164,
+        55,
+        37,
+        164
+      ]
     }
   ],
   "errors": [
@@ -3727,41 +3899,46 @@
     },
     {
       "code": 6015,
+      "name": "SignupAlreadyClaimed",
+      "msg": "signup bonus already claimed (once per account, forever)"
+    },
+    {
+      "code": 6016,
       "name": "NotAdmin",
       "msg": "premium points credit requires the admin authority signer"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "DuplicateCreditRef",
       "msg": "premium points credit_ref already used (duplicate credit guard)"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InsufficientPremiumBalance",
       "msg": "insufficient premium spendable balance"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "AlreadyActive",
       "msg": "subscription already active — one plan at a time, re-upgrade only after expiry"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "NeedsUpgrade",
       "msg": "premium account needs upgrade_premium_points (v2 layout) first"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "DuplicateAffiliatePeriod",
       "msg": "affiliate period for this referral already recorded"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "DuplicateHandle",
       "msg": "profile handle already taken"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     }
@@ -4318,6 +4495,36 @@
           {
             "name": "created_ts",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SignupClaim",
+      "docs": [
+        "M6 signup-bonus fence account ([gfgclaim, player]), ONE per wallet. Holds",
+        "an immutable \"claimed\" flag so the 500P signup bonus can only ever be",
+        "granted once in the program's lifetime, even if a client or server map is",
+        "forged or lost. Never changes seed; additive-only account type."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "claimed",
+            "type": "u8"
+          },
+          {
+            "name": "claimed_ts",
+            "type": "i64"
+          },
+          {
+            "name": "claim_ref",
+            "type": "u64"
           }
         ]
       }

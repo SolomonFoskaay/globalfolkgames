@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Unlimited Lives Booster | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .beta-badge { display:inline-block; background: linear-gradient(135deg,#2ecc71,#20b866); color:#000; font-weight:800; font-size:0.72rem; letter-spacing:0.06em; padding:4px 10px; border-radius:999px; margin-bottom:10px; }
+        .price-card { border:1px solid rgba(46,204,113,0.4); background: linear-gradient(180deg, rgba(46,204,113,0.10), rgba(155,89,182,0.06)); border-radius:14px; padding:18px 16px; }
+        .price-strike { text-decoration: line-through; color:#888; font-size:0.92rem; }
+        .price-now { font-size:1.9rem; font-weight:900; color:#2ecc71; line-height:1; }
+        .price-now small { font-size:0.85rem; color:#bbb; font-weight:600; }
+        .price-ng { font-size:1.2rem; font-weight:800; color:#f39c12; margin-top:6px; }
+        .benefit-grid { display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px; }
+        @media(min-width:600px){ .benefit-grid{ grid-template-columns:1fr 1fr; } }
+        .benefit { background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 12px; }
+        .benefit b { color:#fff; }
+        .compare-table { width:100%; border-collapse: collapse; margin-top:10px; font-size:0.84rem; }
+        .compare-table th, .compare-table td { border:1px solid #2a2a36; padding:8px 10px; text-align:left; }
+        .compare-table th { background:#1a1a24; color:#2ecc71; font-size:0.78rem; letter-spacing:0.04em; text-transform:uppercase; }
+        .compare-table td:first-child { color:#bbb; }
+        .cta-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+        .cta-row a, .cta-row button { flex:1; min-width:160px; }
+        .fine-print { font-size:0.78rem; color:#888; line-height:1.6; margin-top:10px; }
+        .fine-print b { color:#bbb; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <span class="beta-badge">BETA LAUNCH — LIMITED TIME</span>
+            <h2>72 Hours of Unlimited Lives</h2>
+            <p class="auth-hint" id="boost-status" style="margin-top:8px;">Checking your booster...</p>
+        </section>
+
+        <div class="dash-grid">
+
+        <!-- Price hero -->
+        <section class="game-card price-card">
+            <h3 style="margin-bottom:6px;">Run out of lives? Never again for three days.</h3>
+            <p style="color:var(--muted); font-size:0.86rem; line-height:1.6;">For <b style="color:#2ecc71;">$1 (500 premium points)</b> you get <b style="color:#2ecc71;">unlimited play for 72 hours</b> on any game, on any plan, free or Premium. Your lives meter goes unlimited the moment you tap Activate, with a live countdown. No subscription needed.</p>
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:16px; align-items:baseline;">
+                <div>
+                    <div class="price-now">$1 <small>/ 72 hours of unlimited lives</small></div>
+                    <div class="price-ng">Nigeria beta: ₦1,000 (500 premium points)</div>
+                    <div style="font-size:0.78rem; color:#888; margin-top:4px;">Point value is fixed at $0.002 per point (500P = $1) on the international USD rate, never Naira. Paying is a one-time choice; nothing renews or auto-debits.</div>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px 12px; font-size:0.8rem; color:#bbb; line-height:1.5; flex:1; min-width:220px;">
+                    <b style="color:#2ecc71;">It buys time, not points.</b> No win multiplier, no point stacking. While it runs, your payout rates stay exactly the same and your lifetime balances are never touched. The value is playtime: more chances to win in the daily earn window.
+                </div>
+            </div>
+            <div class="cta-row">
+                <a id="pay-btn" href="https://paystack.shop/pay/globalfolkgames2xplan" target="_blank" rel="noopener noreferrer" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:inline-block;">Pay ₦1,000 / $1 — Get unlimited lives</a>
+                <a id="paid-confirm-link" href="/subscription-paid/" class="launch-btn" style="text-align:center; text-decoration:none; display:inline-block; background:#1a1a24; border:1px solid #333; color:#bbb;">I have paid — confirm payment</a>
+            </div>
+            <p class="fine-print"><b>Non-refundable.</b> The booster is a one-time 72-hour window. It never auto-charges again, and lives return to normal when the window ends.</p>
+            <p id="boost-current" style="font-size:0.84rem; color:#bbb; margin-top:10px;"></p>
+            <div id="boost-activate-row" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+            <p id="boost-premium-balance" style="font-size:0.8rem; color:#888; margin-top:8px;"></p>
+        </section>
+
+        <!-- Benefits -->
+        <section class="game-card">
+            <h3>What the booster gives you</h3>
+            <div class="benefit-grid">
+                <div class="benefit"><b>UNLIMITED lives, 72 hours</b><br><span style="color:var(--muted); font-size:0.82rem;">Your lives meter shows ∞ with a live countdown. Matches that used a life cost nothing while it runs. Works on any game (Ludo today, more coming).</span></div>
+                <div class="benefit"><b>Any plan, any account</b><br><span style="color:var(--muted); font-size:0.82rem;">Free or Level 2 Premium, it makes no difference. The booster stacks on top of whatever plan you have.</span></div>
+                <div class="benefit"><b>Wins keep winning</b><br><span style="color:var(--muted); font-size:0.82rem;">No multiplier, but real playtime: hundreds of free games that keep banking your normal win points and daily rewards.</span></div>
+                <div class="benefit"><b>Countdown starts on your tap</b><br><span style="color:var(--muted); font-size:0.82rem;">The 72 hours only start when you activate it, so you can buy it now and use it when it suits you. Extend a live booster: a new purchase adds 72 more hours on top.</span></div>
+            </div>
+            <table class="compare-table">
+                <thead><tr><th></th><th>Free (Level 1)</th><th>72h Unlimited booster</th></tr></thead>
+                <tbody>
+                    <tr><td>Lives</td><td>5 per day</td><td><b style="color:#2ecc71;">Unlimited for 72h</b></td></tr>
+                    <tr><td>Win multiplier</td><td>1x</td><td>1x (same, never inflated)</td></tr>
+                    <tr><td>Daily reward</td><td>25P</td><td>25P (or 200P on Premium)</td></tr>
+                    <tr><td>Works on</td><td>Any plan</td><td>Any plan, free or Premium</td></tr>
+                    <tr><td>Auto-renew</td><td>—</td><td>Never. One-time 72h window</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- How it works -->
+        <section class="game-card" style="border:1px solid #2ecc71;">
+            <h3>How it works (same steps as Premium)</h3>
+            <ol style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:8px 0 0; padding-left:18px;">
+                <li>Tap <b style="color:#2ecc71;">Pay ₦1,000 / $1</b> — you go to the secure payment page and follow the steps.</li>
+                <li>Complete the payment.</li>
+                <li>You are redirected to <b>/subscription-paid</b> — choose <b>"72h Unlimited Lives booster"</b> in the plan dropdown and send the confirmation to support.</li>
+                <li>Support verifies within 24 hours and credits <b>500 premium points</b> on-chain to your wallet.</li>
+                <li>Come back to your <a href="/profile/upgrade.html#booster-card" style="color:#2ecc71;">Upgrade page, booster card</a> and tap <b>Activate</b> — the 500 premium points are spent on-chain and your 72-hour unlimited window starts with a live countdown.</li>
+            </ol>
+            <p class="fine-print">Premium points live in your on-chain wallet <code style="color:#2ecc71;">[gfgprem, your wallet]</code>. The booster state (booster_active_until) is stored there too, so the live countdown is on-chain and provable.</p>
+        </section>
+
+        <!-- FAQ -->
+        <section class="game-card">
+            <h3>Common questions</h3>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#2ecc71; font-weight:700;">Does it increase my win points?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">No. The booster only makes your lives unlimited. Win points stay at exactly their normal rate, and your lifetime balances are never touched. Value = more playtime, more chances to win.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#2ecc71; font-weight:700;">Will it charge me again after 72 hours?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">Never. It is a one-time 72-hour window with no auto-renew. When it ends you go back to your normal daily lives.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#2ecc71; font-weight:700;">Do I need Premium to buy it?</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">No. It works on any plan. You only need 500 premium points credited, which you get by paying for the booster.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#2ecc71; font-weight:700;">I paid but do not see my boost yet</summary><p style="color:var(--muted); font-size:0.84rem; line-height:1.6; margin-top:6px;">Fill the confirmation form at <a href="/subscription-paid/" style="color:#2ecc71;">/subscription-paid</a> (choose the booster in the dropdown) and contact support. Verification is usually within 24 hours, then activate it on the <a href="/profile/upgrade.html#booster-card" style="color:#2ecc71;">Upgrade page</a>.</p></details>
+            <p style="margin-top:14px;"><a href="mailto:GlobalFolkGames@gmail.com?subject=Unlimited%20lives%20booster%20support" style="color:#2ecc71; font-size:0.86rem;">Contact support — GlobalFolkGames@gmail.com</a></p>
+        </section>
+
+        </div>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/universal/subscription/premium-ledger.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                window.GFG_DASH_NAV.render({
+                    brand: '👤 Profile',
+                    active: 'booster',
+                    sections: [
+                        { heading: 'Overview', items: [ { key: 'home', label: '🏠 Profile home', href: '/profile/' } ]},
+                        { heading: 'Detail', items: [
+                            { key: 'points', label: '⭐ Points and level', href: '/profile/points.html' },
+                            { key: 'booster', label: '⚡ Unlimited lives booster', href: '/profile/booster.html' },
+                            { key: 'upgrade', label: '⬆️ Upgrade subscription', href: '/profile/upgrade.html' },
+                            { key: 'subscription', label: '💎 Premium subscription', href: '/profile/subscription.html' },
+                            { key: 'affiliate', label: '🤝 Affiliate earnings', href: '/profile/affiliate.html' },
+                            { key: 'activity', label: '🔗 On-chain activity', href: '/profile/activity.html' },
+                        ]},
+                    ]
+                });
+            } catch (e) {}
+
+            var statusEl = document.getElementById('boost-status');
+            var currentEl = document.getElementById('boost-current');
+            var actRow = document.getElementById('boost-activate-row');
+            var balanceEl = document.getElementById('boost-premium-balance');
+
+            function renderBooster() {
+                try {
+                    var pp = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
+                    var until = pp ? Number(pp.boosterActiveUntil || 0) : 0;
+                    var active = until > Date.now();
+                    var used = Number(pp ? pp.premiumSpendable || 0 : 0);
+                    if (active) {
+                        var left = until - Date.now();
+                        var h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+                        if (statusEl) statusEl.innerHTML = '<span style="color:#2ecc71; font-weight:800;">Booster ACTIVE. Unlimited lives for another ' + h + 'h ' + m + 'm.</span>';
+                        if (currentEl) currentEl.textContent = 'Your lives are unlimited right now. Extend it any time with another purchase.';
+                        if (actRow) actRow.innerHTML = '<a href="/profile/upgrade.html#booster-card" class="launch-btn onchain" style="text-align:center; text-decoration:none;">Go to booster card</a>';
+                    } else {
+                        if (statusEl) statusEl.textContent = used >= 500
+                            ? 'You have ' + used.toLocaleString() + 'P premium spendable. Once you pay, just activate on your Upgrade page.'
+                            : 'No booster running. Pay once, support credits 500 premium points, then you activate.';
+                        if (actRow) actRow.innerHTML = '<a href="/profile/upgrade.html#booster-card" class="launch-btn onchain" style="text-align:center; text-decoration:none;">Activate booster (spends 500P)</a>';
+                    }
+                    if (balanceEl) balanceEl.textContent = 'Your premium spendable: ' + used.toLocaleString() + 'P (out of your on-chain premium ledger)';
+                } catch (e) { /* display only */ }
+            }
+            renderBooster();
+            if (window.premiumPoints && typeof window.premiumPoints.subscribe === 'function') window.premiumPoints.subscribe(renderBooster);
+            window.addEventListener('gfg:auth-changed', renderBooster);
+            setInterval(renderBooster, 30000);
+        });
+    </script>
+</body>
+</html>
