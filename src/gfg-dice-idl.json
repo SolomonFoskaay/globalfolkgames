@@ -317,6 +317,69 @@
       "args": []
     },
     {
+      "name": "close_premium_points",
+      "docs": [
+        "(M5) Authority-gated close of a premium account (returns rent to the",
+        "player_authority). Used to reset a corrupted/lost test account for a clean",
+        "recreate; never used in normal product flow. Additive, same program id."
+      ],
+      "discriminator": [
+        140,
+        187,
+        111,
+        49,
+        111,
+        5,
+        254,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "programdata",
+          "docs": [
+            "Bpf-upgradeable ProgramData account (only read to authorize the deployer close)."
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "commit",
       "docs": [
         "Manually pushes the delegated state back to the base layer (runs on ER)."
@@ -440,6 +503,10 @@
         {
           "name": "credit_ref",
           "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
         }
       ]
     },
@@ -3138,6 +3205,43 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "upgrade_premium_points",
+      "docs": [
+        "(M5) Permissionless, idempotent migration of a v1 premium account into the",
+        "current v2 layout (adds last_credit_reason). Safe for anyone to call for any",
+        "account; no-ops when the account is already v2. Runs base-layer or ER; the",
+        "payer (any wallet) funds the rent delta for the +1 byte (realloc via Anchor",
+        "Migration). Preserves every existing field, defaults last_credit_reason to 1",
+        "(subscription_payment) so no data is lost and reads stay valid on v1 too."
+      ],
+      "discriminator": [
+        54,
+        199,
+        21,
+        204,
+        201,
+        194,
+        15,
+        56
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "premium_points",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -3310,6 +3414,16 @@
       "code": 6017,
       "name": "InsufficientPremiumBalance",
       "msg": "insufficient premium spendable balance"
+    },
+    {
+      "code": 6018,
+      "name": "AlreadyActive",
+      "msg": "subscription already active — one plan at a time, re-upgrade only after expiry"
+    },
+    {
+      "code": 6019,
+      "name": "NeedsUpgrade",
+      "msg": "premium account needs upgrade_premium_points (v2 layout) first"
     }
   ],
   "types": [
@@ -3682,6 +3796,15 @@
           {
             "name": "spend_count",
             "type": "u64"
+          },
+          {
+            "name": "last_credit_reason",
+            "docs": [
+              "On-chain WHY of the most recent credit (M3/M4-style reason tag so modules can",
+              "read source without extra metadata). 1 = subscription_payment (Level 2).",
+              "Only present on version >= 2 accounts; v1 accounts default to 1 on read."
+            ],
+            "type": "u8"
           }
         ]
       }

@@ -520,7 +520,7 @@ async function delegatePremiumPointsPda(program, conn, sponsor, player, premiumP
 // credit base-layer -> re-delegate to AS so the player's ER spends keep
 // working. This mirrors the migrate-to-as pattern.
 // Returns { player, points, creditRef, sig, undelegated, redelegated }.
-export async function handleCreditPremium(playerPubkey, points, creditRef) {
+export async function handleCreditPremium(playerPubkey, points, creditRef, reason = 1) {
   if (!Number.isInteger(points) || points <= 0) throw new Error(`invalid points: ${points}`);
   if (!Number.isInteger(creditRef) || creditRef <= 0) throw new Error(`invalid creditRef: ${creditRef}`);
   const player = new PublicKey(playerPubkey);
@@ -541,36 +541,46 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
     return null;
   };
 
-  // Ensure the premium PDA exists (init if missing). The sponsor is the payer,
+  // Ensure the premium PDA exists (init if missing, v2). The sponsor is the payer,
   // so the account's stored adminAuthority = sponsor key = our credit signer.
-  const info = await retry(() => conn.getAccountInfo(premiumPointsPda));
+  let info = await retry(() => conn.getAccountInfo(premiumPointsPda));
   if (!info) {
     await sendAndConfirmBase(conn, sponsor,
       await program.methods.initializePremiumPoints()
         .accounts({ premiumPoints: premiumPointsPda, payer: sponsor.publicKey, playerAuthority: player })
         .transaction()
     );
+    info = await retry(() => conn.getAccountInfo(premiumPointsPda));
+  }
+  // v1 legacy account -> migrate to v2 first (permissionless, sponsor pays rent delta).
+  if (info && info.data.length && info.data.length < 124) {
+    await sendAndConfirmBase(conn, sponsor,
+      await program.methods.upgradePremiumPoints()
+        .accounts({ payer: sponsor.publicKey, premiumPoints: premiumPointsPda, systemProgram: SystemProgram.programId })
+        .transaction()
+    );
   }
 
   // Gasless ER rule: if the premium PDA is delegated, the credit runs GASLESS on its hosting ER region (sponsor is payer, user never pays).
-  // If not delegated, it runs base-layer (first-time case). No undelegate dance for the ER path.
+  // If not delegated, it runs base-layer. No undelegate dance for the ER path.
   const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
   const wasDelegated = !!(status && status.isDelegated);
   let sig = null;
+  const buildArgs = [new BN(points), new BN(creditRef), reason];
   if (wasDelegated) {
     const regionUrl = (await resolvedRegionUrl(premiumPointsPda, conn)) || pickErRpcUrl();
     const erProgram = erProgramForSponsor(regionUrl, sponsor);
-    sig = await erProgram.methods.creditPremiumPoints(new BN(points), new BN(creditRef))
+    sig = await erProgram.methods.creditPremiumPoints(...buildArgs)
       .accounts({
         admin: sponsor.publicKey,
         playerAuthority: player,
         premiumPoints: premiumPointsPda,
       })
       .rpc();
-    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on ER ${regionUrl} (creditRef ${creditRef}, sig ${sig})`);
+    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on ER ${regionUrl} (creditRef ${creditRef}, reason ${reason}, sig ${sig})`);
   } else {
     sig = await sendAndConfirmBase(conn, sponsor,
-      await program.methods.creditPremiumPoints(new BN(points), new BN(creditRef))
+      await program.methods.creditPremiumPoints(...buildArgs)
         .accounts({
           admin: sponsor.publicKey,
           playerAuthority: player,
@@ -578,9 +588,9 @@ export async function handleCreditPremium(playerPubkey, points, creditRef) {
         })
         .transaction()
     );
-    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on base (creditRef ${creditRef}, sig ${sig})`);
+    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on base (creditRef ${creditRef}, reason ${reason}, sig ${sig})`);
   }
-  return { player: player.toBase58(), points, creditRef, sig, wasDelegated, gasless: wasDelegated };
+  return { player: player.toBase58(), points, creditRef, reason, sig, wasDelegated, gasless: wasDelegated };
 }
 
 // M5 admin cancel: revoke a defective perpetual sub (authority-gated, gasless on ER).
@@ -640,6 +650,16 @@ export async function handleAdminActivatePremium(playerPubkey) {
   };
   const info = await retry(() => baseConn.getAccountInfo(premiumPointsPda));
   if (!info) throw new Error('premium PDA not found for player');
+  // v1 legacy account -> migrate to v2 first so activate (v2 layout) works.
+  if (info.data && info.data.length && info.data.length < 124) {
+    const provider0 = new AnchorProvider(baseConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
+    const program0 = new Program(idl, provider0);
+    await sendAndConfirmBase(baseConn, sponsor,
+      await program0.methods.upgradePremiumPoints()
+        .accounts({ payer: sponsor.publicKey, premiumPoints: premiumPointsPda, systemProgram: SystemProgram.programId })
+        .transaction()
+    );
+  }
   const status = await retry(() => getDelegationStatus(baseConn, premiumPointsPda));
   const wasDelegated = !!(status && status.isDelegated);
   let sig = null;

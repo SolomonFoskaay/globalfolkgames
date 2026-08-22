@@ -88,6 +88,7 @@
 // https://docs.magicblock.gg/pages/ephemeral-rollups-ers/how-to-guide/quickstart
 
 use anchor_lang::prelude::*;
+use anchor_lang::accounts::migration::Migration;
 
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral, vrf, vrf_callback};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
@@ -700,7 +701,7 @@ pub mod gfg_dice {
     /// the account (mirrors the Competition sponsor pattern).
     pub fn initialize_premium_points(ctx: Context<InitializePremiumPoints>) -> Result<()> {
         let prem = &mut ctx.accounts.premium_points;
-        prem.version = 1u8;
+        prem.version = 2u8; // current layout (v1 accounts are migrated by upgrade_premium_points)
         prem.admin_authority = ctx.accounts.payer.key();
         prem.premium_lifetime = 0;
         prem.premium_spendable = 0;
@@ -713,7 +714,36 @@ pub mod gfg_dice {
         prem.last_spend_ref = 0;
         prem.last_spend_reason = 0;
         prem.spend_count = 0;
+        prem.last_credit_reason = 0;
         Ok(())
+    }
+
+    /// (M5) Permissionless, idempotent migration of a v1 premium account into the
+    /// current v2 layout (adds last_credit_reason). Safe for anyone to call for any
+    /// account; no-ops when the account is already v2. Runs base-layer or ER; the
+    /// payer (any wallet) funds the rent delta for the +1 byte (realloc via Anchor
+    /// Migration). Preserves every existing field, defaults last_credit_reason to 1
+    /// (subscription_payment) so no data is lost and reads stay valid on v1 too.
+    pub fn upgrade_premium_points(ctx: Context<UpgradePremiumPointsCtx>) -> Result<()> {
+        let mig = &mut ctx.accounts.premium_points;
+        let old = mig.try_as_from()?.clone();
+        let next = PremiumPoints {
+            version: 2u8,
+            admin_authority: old.admin_authority,
+            premium_lifetime: old.premium_lifetime,
+            premium_spendable: old.premium_spendable,
+            subscription_level: old.subscription_level,
+            subscription_active_until: old.subscription_active_until,
+            last_credit_ts: old.last_credit_ts,
+            last_credit_points: old.last_credit_points,
+            last_credit_ref: old.last_credit_ref,
+            last_spend_ts: old.last_spend_ts,
+            last_spend_ref: old.last_spend_ref,
+            last_spend_reason: old.last_spend_reason,
+            spend_count: old.spend_count,
+            last_credit_reason: 1, // subscription_payment
+        };
+        mig.migrate(next)
     }
 
     /// Delegates the player's PREMIUM points PDA into an ER session (base
@@ -741,9 +771,12 @@ pub mod gfg_dice {
         ctx: Context<CreditPremiumPointsCtx>,
         points: u64,
         credit_ref: u64,
+        reason: u8,
     ) -> Result<()> {
         require!(points > 0, PointsError::ZeroPoints);
         let prem = &mut ctx.accounts.premium_points;
+        // v2 layout required (run upgrade_premium_points first for legacy accounts).
+        require!(prem.version >= 2, PointsError::NeedsUpgrade);
         require!(
             prem.admin_authority == ctx.accounts.admin.key(),
             PointsError::NotAdmin
@@ -763,6 +796,8 @@ pub mod gfg_dice {
         prem.last_credit_points = points;
         prem.last_credit_ref = credit_ref;
         prem.last_credit_ts = Clock::get()?.unix_timestamp;
+        prem.version = 2u8;
+        prem.last_credit_reason = reason; // 1 = subscription_payment, 2 = in_game_purchase, ...
         Ok(())
     }
 
@@ -840,6 +875,30 @@ pub mod gfg_dice {
         );
         prem.subscription_level = 0;
         prem.subscription_active_until = 0;
+        Ok(())
+    }
+
+    /// (M5) Authority-gated close of a premium account (returns rent to the
+    /// player_authority). Used to reset a corrupted/lost test account for a clean
+    /// recreate; never used in normal product flow. Additive, same program id.
+    pub fn close_premium_points(ctx: Context<ClosePremiumPointsCtx>) -> Result<()> {
+        let prem = &ctx.accounts.premium_points;
+        // Stored admin_authority is the normal key. For broken/corrupted devnet
+        // accounts whose admin field no longer matches (e.g. a bad migration),
+        // the program's upgrade authority (deployer) may close them too — the
+        // deployer key already has full control over the program, so this grants
+        // no new privilege.
+        let is_admin = prem.admin_authority == ctx.accounts.admin.key();
+        if !is_admin {
+            require!(
+                ctx.accounts.programdata.upgrade_authority_address == Some(ctx.accounts.admin.key()),
+                PointsError::NotAdmin
+            );
+        }
+        let acct = prem.to_account_info();
+        let lamports = acct.lamports();
+        **acct.try_borrow_mut_lamports()? = 0;
+        **ctx.accounts.destination.to_account_info().try_borrow_mut_lamports()? += lamports;
         Ok(())
     }
 
@@ -1192,6 +1251,41 @@ pub struct ActivateSubscriptionCtx<'info> {
     pub premium_points: Account<'info, PremiumPoints>,
 }
 
+/// Context for `upgrade_premium_points`: migrates a v1 premium account to v2
+/// (adds last_credit_reason). Permissionless (any payer may run it for any
+/// account); idempotent; reallocs the account +1 byte via Anchor Migration.
+#[derive(Accounts)]
+pub struct UpgradePremiumPointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        realloc = 8 + PremiumPoints::INIT_SPACE,
+        realloc::payer = payer,
+        realloc::zero = false
+    )]
+    pub premium_points: Migration<'info, PremiumPointsV1, PremiumPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `close_premium_points`. Authority-gated (stored admin_authority);
+/// closes the account and returns rent to `destination` so a broken account can be
+/// reset and recreated cleanly (devnet maintenance only).
+#[derive(Accounts)]
+pub struct ClosePremiumPointsCtx<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    /// CHECK: rent recipient.
+    #[account(mut)]
+    pub destination: UncheckedAccount<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// Bpf-upgradeable ProgramData account (only read to authorize the deployer close).
+    pub programdata: Account<'info, ProgramData>,
+}
+
 /// Context for `admin_cancel_subscription`. Authority-gated: only the stored
 /// admin_authority (sponsor/ecror) may cancel a defective perpetual sub.
 /// Player does NOT sign; admin does. Runs base-layer (undelegate if delegated).
@@ -1449,7 +1543,7 @@ pub struct GlobalPoints {
 #[account]
 #[derive(InitSpace)]
 pub struct PremiumPoints {
-    pub version: u8,               // layout version (1)
+    pub version: u8,               // layout version: 1 (original), 2 (adds last_credit_reason)
     pub admin_authority: Pubkey,   // the sponsor/ecror who may credit the ledger
     pub premium_lifetime: u64,     // permanent, never spendable
     pub premium_spendable: u64,    // spendable premium balance (buys the sub)
@@ -1462,6 +1556,55 @@ pub struct PremiumPoints {
     pub last_spend_ref: u64,
     pub last_spend_reason: u8,
     pub spend_count: u64,
+    /// On-chain WHY of the most recent credit (M3/M4-style reason tag so modules can
+    /// read source without extra metadata). 1 = subscription_payment (Level 2).
+    /// Only present on version >= 2 accounts; v1 accounts default to 1 on read.
+    pub last_credit_reason: u8,
+}
+
+/// Exact byte layout of the original (v1) PremiumPoints account (115 bytes incl
+/// discriminator). Used ONLY by the permissionless `upgrade_premium_points`
+/// migration so old bytes keep deserializing and upgrade cleanly (upgrade-safety R2).
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct PremiumPointsV1 {
+    pub version: u8,
+    pub admin_authority: Pubkey,
+    pub premium_lifetime: u64,
+    pub premium_spendable: u64,
+    pub subscription_level: u8,
+    pub subscription_active_until: i64,
+    pub last_credit_ts: i64,
+    pub last_credit_points: u64,
+    pub last_credit_ref: u64,
+    pub last_spend_ts: i64,
+    pub last_spend_ref: u64,
+    pub last_spend_reason: u8,
+    pub spend_count: u64,
+}
+
+impl Owner for PremiumPointsV1 {
+    fn owner() -> Pubkey { crate::ID }
+}
+
+impl anchor_lang::AccountDeserialize for PremiumPointsV1 {
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
+        Self::skip_disc_read(buf).map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+    fn try_deserialize(buf: &mut &[u8]) -> Result<Self> {
+        Self::skip_disc_read(buf).map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+}
+
+impl PremiumPointsV1 {
+    fn skip_disc_read(buf: &mut &[u8]) -> std::result::Result<Self, anchor_lang::solana_program::program_error::ProgramError> {
+        // Skip the 8-byte account discriminator, then read the 13 borsh fields.
+        if buf.len() < 8 {
+            return Err(anchor_lang::solana_program::program_error::ProgramError::AccountDataTooSmall);
+        }
+        *buf = &buf[8..];
+        <Self as anchor_lang::AnchorDeserialize>::deserialize(buf)
+            .map_err(|_| anchor_lang::solana_program::program_error::ProgramError::InvalidAccountData)
+    }
 }
 
 /// Exact byte layout of the LEGACY (pre-game_tag) PlayerPoints account created
@@ -1573,4 +1716,6 @@ pub enum PointsError {
     InsufficientPremiumBalance,
     #[msg("subscription already active — one plan at a time, re-upgrade only after expiry")]
     AlreadyActive,
+    #[msg("premium account needs upgrade_premium_points (v2 layout) first")]
+    NeedsUpgrade,
 }

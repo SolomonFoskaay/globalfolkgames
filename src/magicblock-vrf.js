@@ -321,6 +321,7 @@ function decodePlayerPoints(acct) {
     lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
     lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
     spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+    lastCreditReason: Number(acct.lastCreditReason ?? acct.last_credit_reason ?? 1),
   };
 }
 
@@ -460,6 +461,7 @@ function decodePremiumPointsRaw(d) {
     lastSpendRef: d.length >= 106 ? String(d.readBigUInt64LE(98)) : '0',
     lastSpendReason: d.length >= 107 ? d[106] : 0,
     spendCount: d.length >= 115 ? Number(d.readBigUInt64LE(107)) : 0,
+    lastCreditReason: (d.length >= 9 ? d[8] : 0) >= 2 && d.length >= 116 ? d[115] : 1,
   };
 }
 
@@ -1228,21 +1230,11 @@ export function initMagicBlockDice() {
     //   lastSpendReason, spendCount }
     // or null if the PDA isn't visible yet.
     async fetchPremiumPointsPda() {
-      const ctx = getErProgram();
-      if (!ctx) return null;
-      const { wallet } = ctx;
-      const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
-      const candidates = await regionCandidatesFor(premiumPda);
-      for (const url of candidates) {
-        try {
-          const regionCtx = getErProgramFor(url);
-          const acct = await regionCtx.program.account.premiumPoints.fetch(premiumPda);
-          return decodePremiumPoints(acct);
-        } catch (e) {
-          // Account not on this region yet (or region down) — try the next one.
-        }
-      }
-      return null;
+      // Version-aware raw read works for v1 and v2 layouts and surfaces
+      // lastCreditReason; the typed Anchor fetch requires the exact layout.
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return (await readPremiumPointsByAddress(wallet.publicKey.toBase58())) || null;
     },
 
     // M5 — read the PREMIUM ledger BY WALLET ADDRESS, no Dynamic signing

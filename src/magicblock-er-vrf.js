@@ -446,8 +446,11 @@ function decodeGlobalPointsRaw(d) {
 // 107-114: spend_count (u64)
 function decodePremiumPointsRaw(d) {
   const adminOffset = 9;
+  // v2 layout (>= 116 bytes) has last_credit_reason at offset 115 (M3/M4-style reason).
+  // v1 accounts default reason to 1 (subscription_payment) so reads stay valid.
+  const version = d.length >= 9 ? d[8] : 0;
   return {
-    version: d.length >= 9 ? d[8] : 0,
+    version,
     adminAuthority: d.length >= 41 ? bs58.encode(d.subarray(adminOffset, adminOffset + 32)) : '',
     premiumLifetime: d.length >= 49 ? Number(d.readBigUInt64LE(41)) : 0,
     premiumSpendable: d.length >= 57 ? Number(d.readBigUInt64LE(49)) : 0,
@@ -460,6 +463,7 @@ function decodePremiumPointsRaw(d) {
     lastSpendRef: d.length >= 106 ? String(d.readBigUInt64LE(98)) : '0',
     lastSpendReason: d.length >= 107 ? d[106] : 0,
     spendCount: d.length >= 115 ? Number(d.readBigUInt64LE(107)) : 0,
+    lastCreditReason: version >= 2 && d.length >= 116 ? d[115] : 1,
   };
 }
 
@@ -479,6 +483,7 @@ function decodePremiumPoints(acct) {
     lastSpendRef: (acct.lastSpendRef ?? acct.last_spend_ref)?.toString() ?? '0',
     lastSpendReason: Number(acct.lastSpendReason ?? acct.last_spend_reason ?? 0),
     spendCount: Number(acct.spendCount ?? acct.spend_count ?? 0),
+    lastCreditReason: Number(acct.lastCreditReason ?? acct.last_credit_reason ?? 1),
   };
 }
 
@@ -1228,21 +1233,12 @@ export function initMagicBlockDice() {
     //   lastSpendReason, spendCount }
     // or null if the PDA isn't visible yet.
     async fetchPremiumPointsPda() {
-      const ctx = getErProgram();
-      if (!ctx) return null;
-      const { wallet } = ctx;
-      const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
-      const candidates = await regionCandidatesFor(premiumPda);
-      for (const url of candidates) {
-        try {
-          const regionCtx = getErProgramFor(url);
-          const acct = await regionCtx.program.account.premiumPoints.fetch(premiumPda);
-          return decodePremiumPoints(acct);
-        } catch (e) {
-          // Account not on this region yet (or region down) — try the next one.
-        }
-      }
-      return null;
+      // Prefer the version-aware raw read (works for both v1 and v2 layouts, and
+      // surfaces lastCreditReason); typed Anchor fetch requires the exact current
+      // layout, so a legacy account would otherwise fail.
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return (await readPremiumPointsByAddress(wallet.publicKey.toBase58())) || null;
     },
 
     // M5 — read the PREMIUM ledger BY WALLET ADDRESS, no Dynamic signing

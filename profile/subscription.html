@@ -54,7 +54,7 @@
             </div>
             <div class="cta-row">
                 <a id="pay-btn" href="https://paystack.shop/pay/globalfolkgames2xplan" target="_blank" rel="noopener noreferrer" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:inline-block;">Pay ₦3,000 / $3 — Unlock Level 2 (2x)</a>
-                <a href="/subscription-paid/" class="launch-btn" style="text-align:center; text-decoration:none; display:inline-block; background:#1a1a24; border:1px solid #333; color:#bbb;">I have paid — confirm payment</a>
+                <a id="paid-confirm-link" href="/subscription-paid/" class="launch-btn" style="text-align:center; text-decoration:none; display:inline-block; background:#1a1a24; border:1px solid #333; color:#bbb;">I have paid — confirm payment</a>
             </div>
             <p class="fine-print"><b>Non-refundable, no auto-renew.</b> This is a one-time 30-day membership. Once paid it cannot be refunded. It does not auto-renew or auto-debit — you renew manually each month only if you want to.</p>
             <p id="sub-current" style="font-size:0.84rem; color:#bbb; margin-top:10px;"></p>
@@ -134,6 +134,23 @@
             const currentEl = document.getElementById('sub-current');
             const activateRow = document.getElementById('sub-activate-row');
             const balanceEl = document.getElementById('sub-premium-balance');
+            const payBtn = document.getElementById('pay-btn');
+            const paidConfirmLink = document.getElementById('paid-confirm-link');
+
+            let activeUntil = 0;
+            function tickPlanCountdown() {
+                if (activeUntil <= Date.now()) { if (currentEl) currentEl.textContent = 'This plan has ended. You can subscribe again now (or renew your boost).'; return; }
+                const left = activeUntil - Date.now();
+                const d = Math.floor(left/86400000), h = Math.floor(left%86400000/3600000), m = Math.floor(left%3600000/60000), s = Math.floor(left%60000/1000);
+                const pad = n => String(n).padStart(2,'0');
+                if (currentEl) currentEl.innerHTML = 'Active until <b>' + new Date(activeUntil).toLocaleDateString() + '</b> — <b style="color:#2ecc71;">' + d + 'd ' + pad(h) + ':' + pad(m) + ':' + pad(s) + '</b> left. No auto-renew — you can subscribe again only after this plan ends.';
+            }
+            setInterval(tickPlanCountdown, 1000);
+
+            function setPaymentVisible(visible) {
+                if (payBtn) payBtn.style.display = visible ? '' : 'none';
+                if (paidConfirmLink) paidConfirmLink.style.display = visible ? '' : 'none';
+            }
 
             function render() {
                 const prem = window.premiumPoints ? window.premiumPoints.get() : null;
@@ -145,16 +162,22 @@
                     currentEl.textContent = '';
                     activateRow.innerHTML = '';
                     if (balanceEl) balanceEl.textContent = '';
+                    setPaymentVisible(true);
                     return;
                 }
                 if (prem && prem.premiumLifetime != null && balanceEl) {
                     balanceEl.innerHTML = 'Premium balance: <b style="color:#9b59b6;">' + (prem.premiumLifetime||0).toLocaleString() + '</b> lifetime · <b style="color:#f39c12;">' + (prem.premiumSpendable||0).toLocaleString() + '</b> spendable';
                 }
                 if (tier && tier.active) {
-                    statusEl.innerHTML = 'You have <b style="color:#2ecc71;">Level ' + tier.level + ' (' + tier.level + 'x)</b> active.';
-                    currentEl.innerHTML = 'Active until <b>' + new Date(tier.expiry).toLocaleDateString() + '</b> — ' + tier.daysLeft + ' days left. No auto-renew.';
+                    // Already subscribed: block paying/confirming again until this plan ends.
+                    activeUntil = tier.expiry || 0;
+                    statusEl.innerHTML = 'You are already on <b style="color:#2ecc71;">Level ' + tier.level + ' (' + tier.level + 'x)</b>.';
+                    setPaymentVisible(false);
                     activateRow.innerHTML = '';
+                    tickPlanCountdown();
                 } else {
+                    activeUntil = 0;
+                    setPaymentVisible(true);
                     statusEl.textContent = 'You are on the free plan (1x). Beta price: $3 or ₦3,000 for Level 2 (2x) — 30 days.';
                     const spendable = prem ? (prem.premiumSpendable||0) : 0;
                     if (spendable >= 5000) {
@@ -163,13 +186,27 @@
                         const btn = document.createElement('button');
                         btn.className = 'launch-btn onchain';
                         btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
-                        btn.onclick = async function(){
-                            btn.disabled = true; btn.textContent = 'Activating on-chain...';
-                            const sig = window.premiumPoints ? await window.premiumPoints.activate() : null;
-                            if (window.refreshAuthHeader) await window.refreshAuthHeader();
-                            render();
-                            if (window.showAuthBanner) window.showAuthBanner(sig ? 'Level 2 active for 30 days — welcome to 2x!' : 'Activation failed. Try again.', !sig);
-                            btn.disabled = false; btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
+                        btn.onclick = function(){
+                            const doActivate = async function () {
+                                btn.disabled = true; btn.textContent = 'Activating on-chain...';
+                                const sig = window.premiumPoints ? await window.premiumPoints.activate() : null;
+                                if (window.refreshAuthHeader) await window.refreshAuthHeader();
+                                render();
+                                if (window.showAuthBanner) window.showAuthBanner(sig ? 'Level 2 active for 30 days — welcome to 2x!' : 'Activation failed. Try again.', !sig);
+                                btn.disabled = false; btn.textContent = 'Activate Level 2 (2x) · 5,000 premium';
+                            };
+                            // Reconfirm before spending 5,000 premium points.
+                            if (window.showConfirmDialog) {
+                                window.showConfirmDialog({
+                                    title: 'Activate Level 2?',
+                                    message: 'Are you sure? This will spend 5,000 premium points on your wallet to start a 30-day 2x plan (no auto-renew).',
+                                    okText: 'Yes, subscribe',
+                                    cancelText: 'No, cancel',
+                                    onOk: doActivate,
+                                });
+                            } else if (window.confirm('Spend 5,000 premium points to activate Level 2 for 30 days?')) {
+                                doActivate();
+                            }
                         };
                         activateRow.appendChild(btn);
                     } else {

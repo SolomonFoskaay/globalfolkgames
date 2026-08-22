@@ -229,11 +229,12 @@
                     actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
                     return;
                 }
-                upgradeBtn.disabled = true;
-                upgradeBtn.textContent = 'Upgrading on-chain...';
-                actionMsg.textContent = 'Upgrading — spending 5,000 premium points on-chain...';
-                try {
-                    const sig = await window.premiumPoints.activate();
+                const doUpgrade = async function () {
+                    upgradeBtn.disabled = true;
+                    upgradeBtn.textContent = 'Upgrading on-chain...';
+                    actionMsg.textContent = 'Upgrading — spending 5,000 premium points on-chain...';
+                    try {
+                        const sig = await window.premiumPoints.activate();
                     if (sig) {
                         actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
                         // Refresh the ledger display -> the button becomes permanently
@@ -242,10 +243,23 @@
                     } else {
                         throw new Error('Upgrade failed — not enough premium points or already active.');
                     }
-                } catch(e) {
-                    actionMsg.textContent = 'Upgrade failed: ' + (e.message || e);
-                } finally {
-                    upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
+} catch(e) {
+                        actionMsg.textContent = 'Upgrade failed: ' + (e.message || e);
+                    } finally {
+                        upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
+                    }
+                };
+                // Reconfirm before spending 5,000 premium points (Yes on the left to subscribe).
+                if (window.showConfirmDialog) {
+                    window.showConfirmDialog({
+                        title: 'Upgrade to Level 2?',
+                        message: 'Are you sure? This will spend 5,000 premium points to start a 30-day 2x plan (no auto-renew). Once active, the Upgrade button locks until the plan ends.',
+                        okText: 'Yes, subscribe',
+                        cancelText: 'No, cancel',
+                        onOk: doUpgrade,
+                    });
+                } else if (window.confirm('Spend 5,000 premium points to activate Level 2 for 30 days?')) {
+                    doUpgrade();
                 }
             });
 

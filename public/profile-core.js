@@ -282,7 +282,7 @@
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Last credit source</span>
-                    <b style="font-size:0.82rem; text-align:right;">Subscription payment (Level 2)<span style="display:block;color:#666;font-size:0.72rem;">${esc(lastCreditTs)}</span></b>
+                    <b style="font-size:0.82rem; text-align:right;">${PREMIUM_REASON_LABEL(ledger.lastCreditReason)}<span style="display:block;color:#666;font-size:0.72rem;">${esc(lastCreditTs)}</span></b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Payment reference (invoice)</span>
@@ -330,6 +330,16 @@
         }
     }
 
-    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, loadGlobalLedger, loadPremiumLedger, renderPremiumLedgerCard, bindFolds };
+    // On-chain premium credit reason (M3/M4-style tag stored in last_credit_reason).
+    function PREMIUM_REASON_LABEL(code) {
+        switch (Number(code)) {
+            case 1: return 'Subscription payment (Level 2)';
+            case 2: return 'In-game premium purchase';
+            case 3: return 'Promo / giveaway credit';
+            default: return 'Subscription payment (Level 2)';
+        }
+    }
+
+    window.ProfileCore = { esc, loadOnchainActivity, loadPointsLedger, loadGlobalLedger, loadPremiumLedger, renderPremiumLedgerCard, PREMIUM_REASON_LABEL, bindFolds };
 
 })();
