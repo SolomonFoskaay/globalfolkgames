@@ -801,6 +801,14 @@ pub mod gfg_dice {
     /// GASLESS on the ER (session key signs).
     pub fn activate_subscription(ctx: Context<ActivateSubscriptionCtx>) -> Result<()> {
         let prem = &mut ctx.accounts.premium_points;
+        // One active plan at a time: reject a second upgrade while the current
+        // 30-day window is still live, so a user can't spend another 5,000P to
+        // stack/extend the same plan. They may re-activate only after expiry.
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            !(prem.subscription_level > 0 && prem.subscription_active_until > now),
+            PointsError::AlreadyActive
+        );
         require!(
             prem.premium_spendable >= PREMIUM_PLAN_COST,
             PointsError::InsufficientPremiumBalance
@@ -815,7 +823,7 @@ pub mod gfg_dice {
                 .ok_or(PointsError::Overflow)?;
         prem.last_spend_reason = 20; // SUB_ACTIVATE
         prem.last_spend_ref = prem.subscription_active_until as u64;
-        prem.last_spend_ts = Clock::get()?.unix_timestamp;
+        prem.last_spend_ts = now;
         prem.spend_count = prem.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
         Ok(())
     }
@@ -1563,4 +1571,6 @@ pub enum PointsError {
     DuplicateCreditRef,
     #[msg("insufficient premium spendable balance")]
     InsufficientPremiumBalance,
+    #[msg("subscription already active — one plan at a time, re-upgrade only after expiry")]
+    AlreadyActive,
 }

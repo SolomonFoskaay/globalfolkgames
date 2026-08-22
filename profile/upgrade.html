@@ -28,6 +28,7 @@
             <h3>Upgrade to Level 2 (2x)</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">If you have 5,000 premium points in your spendable balance, you can upgrade here. This checks on-chain that only premium points count (other points do not count). If you do not have enough, it will tell you to go to the Premium page to get premium points.</p>
             <div id="upgrade-action-msg" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></div>
+            <div id="upgrade-countdown" style="display:none; font-size:0.9rem; color:#2ecc71; font-weight:700; margin-bottom:8px;"></div>
             <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 2 (cost 5,000P)</button>
             <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits you 5,000P, come here, refresh your balance, and tap Upgrade to start your 30-day Level 2 boost.</p>
         </section>
@@ -90,14 +91,30 @@
             }
             updateRefreshLock();
 
+            let balanceChecked = false; // requires a fresh balance check before Upgrade unlocks
+            const countdownEl = document.getElementById('upgrade-countdown');
+            let activeUntil = 0;       // used by the live countdown interval
+            function tickCountdown() {
+                if (!countdownEl) return;
+                if (activeUntil <= Date.now()) { countdownEl.style.display='none'; return; }
+                const left = activeUntil - Date.now();
+                const d = Math.floor(left/86400000), h = Math.floor(left%86400000/3600000),
+                      m = Math.floor(left%3600000/60000), s = Math.floor(left%60000/1000);
+                const pad = n => String(n).padStart(2,'0');
+                countdownEl.style.display = 'block';
+                countdownEl.textContent = `⏳ Active for another ${d}d ${pad(h)}:${pad(m)}:${pad(s)} — Upgrade re-locks until this plan ends.`;
+            }
+            setInterval(tickCountdown, 1000);
+
             function renderPremiumCard(ledger) {
                 const life = (ledger.premiumLifetime||0).toLocaleString();
                 const spend = (ledger.premiumSpendable||0).toLocaleString();
                 const lvl = ledger.subscriptionLevel||0;
                 const until = ledger.subscriptionActiveUntil||0;
+                activeUntil = until;
                 const days = until > Date.now() ? Math.ceil((until - Date.now())/86400000) : 0;
                 const active = lvl>0 && days>0;
-                const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl} (${days}d left)</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired</span>' : '<span style="color:#888;">No active subscription</span>');
+                const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl}</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired</span>' : '<span style="color:#888;">No active subscription</span>');
                 ledgerEl.innerHTML = `
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
                         <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
@@ -113,21 +130,29 @@
                     </div>
                     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Subscription</span><b>${status}</b></div>
                     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Active until</span><b style="font-size:0.82rem;">${until ? new Date(until).toLocaleString() : '—'}</b></div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">Last credit</span><b style="font-size:0.82rem;">${(ledger.lastCreditPoints||0).toLocaleString()}P ref ${ledger.lastCreditRef||'—'}</b></div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">Last credit</span><b style="font-size:0.82rem;">${(ledger.lastCreditPoints||0).toLocaleString()}P (Level 2 payment) ref ${ledger.lastCreditRef||'—'}</b></div>
                 `;
-                // Update upgrade button
-                if ((ledger.premiumSpendable||0) >= 5000 && !active) {
-                    upgradeBtn.disabled = false;
-                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You have 5,000P — you can upgrade now.</span>';
-                } else if (active) {
+                // Upgrade button rules (against double-upgrade):
+                if (active) {
+                    // Already on the plan -> permanently disabled + live countdown to expiry.
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#888;">You already have an active Level 2 subscription.</span>';
+                    countdownEl.style.display='block';
+                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are on the Level 2 (2x) plan. The Upgrade button stays locked until this plan ends.</span>';
+                } else if (!balanceChecked) {
+                    // Must do a fresh balance check first (unlocks after tapping Refresh).
+                    upgradeBtn.disabled = true;
+                    actionMsg.innerHTML = '<span style="color:#f39c12;">Tap <b>Refresh</b> above (once every 10 minutes) to check your balance, then Upgrade unlocks.</span>';
+                } else if ((ledger.premiumSpendable||0) >= 5000) {
+                    upgradeBtn.disabled = false;
+                    actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have 5,000P. Tap Upgrade to start your 30-day Level 2 boost.</span>';
                 } else {
                     upgradeBtn.disabled = true;
                     actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
                 }
+                tickCountdown();
                 if (ledger.premiumLifetime != null) {
-                    statusEl.textContent = 'Premium balance loaded — you have ' + spend + ' spendable.';
+                    statusEl.textContent = active? 'Level 2 active — your boost is running.' : ('Balance checked — ' + spend + ' spendable.')
+                        + (balanceChecked? '' : ' Tap Refresh for the live value.');
                 }
             }
 
@@ -157,6 +182,7 @@
                     } else if (window.magicblockDice && window.magicblockDice.fetchPremiumPointsPdaFor) {
                         ledger = await window.magicblockDice.fetchPremiumPointsPdaFor(addr);
                     }
+                    balanceChecked = true; // a successful live check unlocks the Upgrade button
                     if (!ledger) {
                         // No account yet — show 0 (upgrade button stays disabled, tells to get premium)
                         renderPremiumCard({ premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0 });
@@ -184,31 +210,41 @@
             } catch(e) {}
 
             upgradeBtn.addEventListener('click', async () => {
+                if (!balanceChecked) {
+                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 10 minutes), then Upgrade unlocks.</span>';
+                    return;
+                }
                 if (!window.premiumPoints || typeof window.premiumPoints.activate !== 'function') {
                     actionMsg.textContent = 'Upgrade not ready — wallet not connected.';
                     return;
                 }
                 const pp = window.premiumPoints.get();
+                const activePp = pp && (pp.subscriptionLevel||0) > 0 && (pp.subscriptionActiveUntil||0) > Date.now();
+                if (activePp) {
+                    // Already active — the button is locked; re-render with the countdown.
+                    renderPremiumCard(pp);
+                    return;
+                }
                 if (!pp || (pp.premiumSpendable||0) < 5000) {
                     actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
                     return;
                 }
                 upgradeBtn.disabled = true;
                 upgradeBtn.textContent = 'Upgrading on-chain...';
-                actionMsg.textContent = 'Upgrading — checking 5,000 premium points on-chain...';
+                actionMsg.textContent = 'Upgrading — spending 5,000 premium points on-chain...';
                 try {
                     const sig = await window.premiumPoints.activate();
                     if (sig) {
-                        actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + sig.slice(0,16) + '...</span>';
-                        // Refresh the ledger display
-                        setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1000);
+                        actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
+                        // Refresh the ledger display -> the button becomes permanently
+                        // disabled and a live 30-day countdown starts on it.
+                        setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1200);
                     } else {
                         throw new Error('Upgrade failed — not enough premium points or already active.');
                     }
                 } catch(e) {
                     actionMsg.textContent = 'Upgrade failed: ' + (e.message || e);
                 } finally {
-                    upgradeBtn.disabled = false;
                     upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
                 }
             });

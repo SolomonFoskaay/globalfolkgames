@@ -395,10 +395,36 @@ window.showLivesBlocked = function (show) {
     if (!ov) return;
     if (show) {
         ov.style.display = 'flex';
+        startLivesCountdown();
     } else {
         ov.style.display = 'none';
     }
 };
+
+// Live HH:MM:SS countdown to the lives reset (GMT midnight) shown on the
+// zero-lives overlay — one second tick, reads gfgLives.get().resetsInMs.
+let livesCountdownTimer = null;
+function startLivesCountdown() {
+    if (livesCountdownTimer) return;
+    const el = document.getElementById('lives-reset-countdown');
+    if (el) {
+        const ms = window.gfgLives && typeof window.gfgLives.get === 'function'
+            ? (window.gfgLives.get().resetsInMs || 0) : 0;
+        const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000), s = Math.floor(ms % 60000 / 1000);
+        el.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    livesCountdownTimer = setInterval(() => {
+        const e2 = document.getElementById('lives-reset-countdown');
+        if (!e2 || !document.getElementById('lives-blocked-overlay') ||
+            document.getElementById('lives-blocked-overlay').style.display === 'none') {
+            clearInterval(livesCountdownTimer); livesCountdownTimer = null; return;
+        }
+        const ms = window.gfgLives && typeof window.gfgLives.get === 'function'
+            ? (window.gfgLives.get().resetsInMs || 0) : 0;
+        const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000), s = Math.floor(ms % 60000 / 1000);
+        e2.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }, 1000);
+}
 
 // Auto-show the zero-lives overlay after the ceremony if the meter just hit 0.
 function maybeBlockOnZeroLives() {
