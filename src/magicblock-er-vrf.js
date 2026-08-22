@@ -353,23 +353,30 @@ function decodeGlobalPoints(acct) {
 // never US-first — devnet-us is the banned/throttled endpoint). If every ER
 // region returns nothing, the base RPC is tried last, exactly like recovery.
 async function readPdaByAddressRaw(pda, kindLabel) {
-  // Ordered exactly like recovery's ER_REGIONS + BASE_RPC fallback.
-  const candidates = ['https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/'];
-  candidates.push(ER_REGION_URLS.us); // US last — legacy fallback only
+  // Ordered like recovery's ER_REGIONS + BASE_RPC fallback (AS, EU, US, base).
+  // IMPORTANT: a delegated account's truth lives on its HOSTING ER region, so we
+  // prefer ER and only trust base as a LAST resort. A single transient AS hiccup
+  // used to fall all the way to base and read a STALE committed snapshot (e.g. a
+  // pre-activation level 0), which poisoned the wallet cache and made the tier
+  // badge / lives / daily differ page to page. We now retry the ER regions twice
+  // before ever reading base.
+  const candidates = ['https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/', ER_REGION_URLS.us];
   let lastErr = null;
-  for (const url of candidates) {
-    try {
-      const info = await erConnFor(url).getAccountInfo(pda, 'confirmed');
-      if (info && info.data && info.data.length >= 8) {
-        markErRpcSuccess(url);
-        return { data: info.data, url };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (const url of candidates) {
+      try {
+        const info = await erConnFor(url).getAccountInfo(pda, 'confirmed');
+        if (info && info.data && info.data.length >= 8) {
+          markErRpcSuccess(url);
+          return { data: info.data, url };
+        }
+      } catch (e) {
+        lastErr = e;
+        markErRpcFailure(url);
       }
-    } catch (e) {
-      lastErr = e;
-      markErRpcFailure(url);
     }
   }
-  // Base RPC last (recovery's fallback when the ER has nothing).
+  // Base RPC last (only for genuinely base-only accounts; never the ER truth).
   try {
     const baseConn = new Connection(config.baseRpcUrl, 'confirmed');
     const info = await baseConn.getAccountInfo(pda, 'confirmed');
