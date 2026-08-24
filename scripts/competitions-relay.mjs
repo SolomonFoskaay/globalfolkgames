@@ -10,6 +10,8 @@ import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
+import { addWin, addEntry, hasEntry, listEntries, tallyFor, readTierFor, boostFor } from './competitions-wins.mjs';
+import { PLAN_LADDER } from './plans-config.mjs';
 import bs58 from 'bs58';
 import './load-env.mjs';
 
@@ -193,4 +195,31 @@ export async function getWinners({ creator, seq }) {
     list.push({ pda: pda.toBase58(), ...decodeWinner(info.data) });
   }
   return list;
+}
+
+// ---- window-fresh leaderboard (Final Points, live tier boost) ---------------
+function planBoosts() {
+  const map = {};
+  for (const k of Object.keys(PLAN_LADDER)) map[k] = (PLAN_LADDER[k].compFinalBoost || 1000) / 1000;
+  return map;
+}
+export async function getBoard({ creator, seq }) {
+  const comp = await getCompetition({ creator, seq });
+  if (!comp) throw new Error('competition not found');
+  const now = Date.now();
+  const entries = listEntries({ compCreator: creator, seq });
+  const rows = [];
+  for (const wallet of entries) {
+    const wins = tallyFor({ compCreator: creator, seq, wallet });
+    const inWindow = wins.filter(w => w.ts >= comp.startsAt && w.ts <= comp.endsAt);
+    const totalPoints = comp.winnerCount ? inWindow.length : inWindow.length; // wins metric at launch (config 'wins')
+    const level = await readTierFor(wallet);
+    const boost = boostFor(level, comp, planBoosts());
+    const finalPoints = boost != null ? totalPoints * boost : null; // null = hidden (L1 / non-qualifying)
+    rows.push({ wallet, totalPoints, level: level || 1, boost, finalPoints, hidden: boost == null });
+  }
+  const visible = rows.filter(r => !r.hidden).sort((a, b) => (b.finalPoints - a.finalPoints) || (a.wallet < b.wallet ? -1 : 1));
+  const hidden = rows.filter(r => r.hidden);
+  visible.forEach((r, i) => { r.position = i + 1; r.prizePosition = (i < comp.winnerCount) ? i + 1 : null; });
+  return { seq, name: comp.name, status: comp.status, startsAt: comp.startsAt, endsAt: comp.endsAt, endsAtMs: comp.endsAt * 1000, autoStopped: now >= comp.endsAt * 1000, poolUsdCents: comp.poolUsdCents, poolPoints: comp.poolPoints, winnerCount: comp.winnerCount, prizeShares: comp.prizeShares, board: visible, hidden };
 }

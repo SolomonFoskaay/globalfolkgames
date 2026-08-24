@@ -472,6 +472,7 @@
         // it does nothing, so the header never causes page-load RPC. Ensure it
         // everywhere too (idempotent).
         if (!window.pointsStore) ensureScript('/universal/points/points-store.js');
+        if (!window.gfgCompetitions) ensureScript('/universal/competitions/competition-engine.js');
         renderHeader(options || {});
         loadGameRegistry(); // keeps nav labels in sync with the games registry
         // Tier badge: read the cache only; update when the premium module refreshes.

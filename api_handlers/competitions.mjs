@@ -9,8 +9,9 @@
 
 import {
   createCompetition, closeCompetition, cancelCompetition, settleCompetition,
-  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard,
 } from '../scripts/competitions-relay.mjs';
+import { addWin, addEntry, hasEntry } from '../scripts/competitions-wins.mjs';
 
 export default async function handler(req, res) {
   try {
@@ -22,6 +23,11 @@ export default async function handler(req, res) {
       if (seq) {
         const comp = await getCompetition({ creator, seq: Number(seq) });
         if (!comp) { res.status(404).json({ error: 'competition not found' }); return; }
+        if (url.searchParams.get('board') === '1') {
+          const board = await getBoard({ creator, seq: Number(seq) });
+          res.status(200).json(board);
+          return;
+        }
         const w = winners ? await getWinners({ creator, seq: Number(seq) }) : undefined;
         res.status(200).json({ competition: w ? { ...comp, winners: w } : comp });
         return;
@@ -37,8 +43,14 @@ export default async function handler(req, res) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }
-    const base = { token: body.token };
+    const base = { token: body.token, creator: body.creator || null };
     switch (body.action) {
+      case 'win':
+        return res.status(200).json({ recorded: addWin({ compCreator: base.creator, seq: Number(body.seq), wallet: body.wallet, ts: Number(body.ts), proofSig: body.proofSig, game: body.game }) });
+      case 'enter':
+        if (hasEntry({ compCreator: base.creator, seq: Number(body.seq), wallet: body.wallet })) return res.status(200).json({ entered: false, already: true });
+        addEntry({ compCreator: base.creator, seq: Number(body.seq), wallet: body.wallet });
+        return res.status(200).json({ entered: true });
       case 'create':
         return res.status(200).json(await createCompetition({ ...base, seq: Number(body.seq), name: body.name, games: body.games, tierBits: Number(body.tierBits), requireAll: body.requireAll != null ? Number(body.requireAll) : 0, entryCost: Number(body.entryCost), entryFamilies: Number(body.entryFamilies), startsAt: Number(body.startsAt), endsAt: Number(body.endsAt), poolUsdCents: Number(body.poolUsdCents), poolPoints: Number(body.poolPoints), winnerCount: Number(body.winnerCount), prizeShares: (body.prizeShares || []).map(Number), redemption: body.redemption != null ? Number(body.redemption) : 0, payoutMode: body.payoutMode != null ? Number(body.payoutMode) : 0 }));
       case 'close':

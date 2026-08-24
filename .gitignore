@@ -24,6 +24,8 @@ pnpm-debug.log*
 scripts/gfg-referrals.json
 scripts/gfg-handles.json
 scripts/gfg-signups.json
+scripts/gfg-comp-wins.json
+scripts/gfg-comp-entries.json
 
 # Server-side probe log (dashboard leak/ops observations; machine-local)
 .gfg-probe-log.jsonl

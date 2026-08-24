@@ -26,8 +26,9 @@ import { getHandleForWallet } from './handle.mjs';
 import { isSignupClaimed } from './affiliate-relay.mjs';
 import {
   createCompetition, closeCompetition, cancelCompetition, settleCompetition,
-  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard,
 } from './competitions-relay.mjs';
+import { addWin, addEntry, hasEntry } from './competitions-wins.mjs';
 import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
 import './load-env.mjs';
 
@@ -420,6 +421,14 @@ const server = createServer(async (req, res) => {
       const base = { creator: b.creator || null };
       let result;
       switch (b.action) {
+        case 'win':
+          result = { recorded: addWin({ compCreator: base.creator, seq: Number(b.seq), wallet: b.wallet, ts: Number(b.ts), proofSig: b.proofSig, game: b.game }) };
+          break;
+        case 'enter':
+          if (hasEntry({ compCreator: base.creator, seq: Number(b.seq), wallet: b.wallet })) { result = { entered: false, already: true }; break; }
+          addEntry({ compCreator: base.creator, seq: Number(b.seq), wallet: b.wallet });
+          result = { entered: true };
+          break;
         case 'create':
           result = await createCompetition({ ...base, seq: Number(b.seq), name: b.name, games: b.games, tierBits: Number(b.tierBits), requireAll: b.requireAll != null ? Number(b.requireAll) : 0, entryCost: Number(b.entryCost), entryFamilies: Number(b.entryFamilies), startsAt: Number(b.startsAt), endsAt: Number(b.endsAt), poolUsdCents: Number(b.poolUsdCents), poolPoints: Number(b.poolPoints), winnerCount: Number(b.winnerCount), prizeShares: (b.prizeShares || []).map(Number), redemption: b.redemption != null ? Number(b.redemption) : 0, payoutMode: b.payoutMode != null ? Number(b.payoutMode) : 0 });
           break;
@@ -448,6 +457,12 @@ const server = createServer(async (req, res) => {
       if (seq) {
         const comp = await getCompetition({ creator, seq: Number(seq) });
         if (!comp) { res.writeHead(404, { 'Content-Type': 'application/json', ...cors }); res.end(JSON.stringify({ error: 'competition not found' })); return; }
+        if (url.searchParams.get('board') === '1') {
+          const board = await getBoard({ creator, seq: Number(seq) });
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+          res.end(JSON.stringify(board));
+          return;
+        }
         const w = winners ? await getWinners({ creator, seq: Number(seq) }) : undefined;
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
         res.end(JSON.stringify({ competition: w ? { ...comp, winners: w } : comp }));
