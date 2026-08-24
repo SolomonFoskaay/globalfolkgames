@@ -111,6 +111,10 @@ pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref
 pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
 pub const CLAIM_SEED: &[u8] = b"gfgclaim";        // M6 signup-bonus fence [gfgclaim, player] (permanent, on-chain)
 pub const SIGNUP_BONUS_POINTS: u64 = 500;         // M6 500P lifetime signup bonus (once per account, ever)
+pub const COMP2_SEED: &[u8] = b"gfgcomp2";        // M7 competition instance [gfgcomp2, creator, seq]
+pub const GFGWIN_SEED: &[u8] = b"gfgwin";         // M7 winner record [gfgwin, comp, rank]
+pub const MAX_GAMES: usize = 4;
+pub const MAX_WINNERS: usize = 16;
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1119,6 +1123,142 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ================= M7 COMPETITIONS (additive framework, owner 2026-08-22) =========
+    // Config-driven on-chain competition instances ([gfgcomp2, creator, seq]) +
+    // [gfgwin, comp, rank] winner records. Create/close/settle/cancel/mark are
+    // creator-gated (relay/sponsor signs), base-layer (admin frequency). Each
+    // winner payoff = pool_value x shares[rank]/sum(shares), computed by the
+    // program so the on-chain winner ledger is self-consistent.
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_competition(
+        ctx: Context<CreateCompetitionCtx>,
+        seq: u32,
+        name: String,
+        games: Vec<u8>,
+        tier_bits: u8,
+        require_all: u8,
+        entry_cost: u64,
+        entry_families: u8,
+        starts_at: i64,
+        ends_at: i64,
+        pool_usd_cents: u64,
+        pool_points: u64,
+        winner_count: u8,
+        prize_shares: Vec<u32>,
+        redemption: u8,
+        payout_mode: u8,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        require!(ends_at > starts_at && starts_at >= now, PointsError::InvalidCompetition);
+        require!(winner_count >= 1 && winner_count as usize <= MAX_WINNERS, PointsError::InvalidCompetition);
+        require!(prize_shares.len() == winner_count as usize, PointsError::InvalidCompetition);
+        require!(games.len() >= 1 && games.len() <= MAX_GAMES, PointsError::InvalidCompetition);
+        require!(tier_bits != 0, PointsError::InvalidCompetition);
+        require!(pool_usd_cents > 0 && pool_points > 0 && entry_cost > 0, PointsError::InvalidCompetition);
+        for share in &prize_shares { require!(*share > 0, PointsError::InvalidCompetition); }
+
+        let comp = &mut ctx.accounts.competition;
+        comp.version = 1u8;
+        comp.creator = ctx.accounts.payer.key();
+        comp.seq = seq;
+        let mut nm = [0u8; 24];
+        let name_len = name.as_bytes().len().min(24);
+        nm[..name_len].copy_from_slice(&name.as_bytes()[..name_len]);
+        comp.name = nm;
+        let mut gs = [0u8; MAX_GAMES];
+        for (i, g) in games.iter().enumerate() { gs[i] = *g; }
+        comp.games = gs;
+        comp.game_count = games.len() as u8;
+        comp.tier_bits = tier_bits;
+        comp.require_all = require_all;
+        comp.entry_cost = entry_cost;
+        comp.entry_families = entry_families;
+        comp.starts_at = starts_at;
+        comp.ends_at = ends_at;
+        comp.pool_usd_cents = pool_usd_cents;
+        comp.pool_points = pool_points;
+        comp.winner_count = winner_count;
+        let mut sh = [0u32; MAX_WINNERS];
+        for (i, v) in prize_shares.iter().enumerate() { sh[i] = *v; }
+        comp.prize_shares = sh;
+        comp.redemption = redemption;
+        comp.payout_mode = payout_mode;
+        comp.status = 0u8; // open
+        comp.settled_ts = 0;
+        Ok(())
+    }
+
+    pub fn close_competition(ctx: Context<CompetitionSeqCtx>, seq: u32) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let comp = &mut ctx.accounts.competition;
+        require!(comp.creator == ctx.accounts.authority.key(), PointsError::NotCreator);
+        require!(comp.status == 0, PointsError::NotOpen);
+        require!(now >= comp.ends_at, PointsError::StillRunning); // auto-stop (R16)
+        comp.status = 1u8; // closed
+        Ok(())
+    }
+
+    pub fn cancel_competition(ctx: Context<CompetitionSeqCtx>, seq: u32) -> Result<()> {
+        let comp = &mut ctx.accounts.competition;
+        require!(comp.creator == ctx.accounts.authority.key(), PointsError::NotCreator);
+        require!(comp.status == 0 || comp.status == 1, PointsError::NotOpen);
+        comp.status = 3u8; // cancelled
+        Ok(())
+    }
+
+    pub fn record_competition_winner(
+        ctx: Context<RecordCompetitionWinnerCtx>,
+        seq: u32,
+        rank: u8,
+        player: Pubkey,
+    ) -> Result<()> {
+        let comp = &ctx.accounts.competition;
+        require!(comp.creator == ctx.accounts.authority.key(), PointsError::NotCreator);
+        require!(comp.status == 1, PointsError::CompetitionNotClosed);
+        require!(rank >= 1 && rank as usize <= comp.winner_count as usize, PointsError::RankOutOfRange);
+        let idx = (rank - 1) as usize;
+        let total: u64 = comp.prize_shares.iter()
+            .map(|s| *s as u64)
+            .take(comp.winner_count as usize)
+            .sum();
+        require!(total > 0, PointsError::InvalidCompetition);
+        let points = (comp.pool_points * comp.prize_shares[idx] as u64) / total;
+        let usd = (comp.pool_usd_cents * comp.prize_shares[idx] as u64) / total;
+        let w = &mut ctx.accounts.winner;
+        w.version = 1u8;
+        w.comp = comp.key();
+        w.rank = rank;
+        w.player = player;
+        w.points = points;
+        w.usd_cents = usd;
+        w.status = 0u8;
+        w.paid_ts = 0;
+        Ok(())
+    }
+
+    pub fn settle_competition(ctx: Context<CompetitionSeqCtx>, seq: u32) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let comp = &mut ctx.accounts.competition;
+        require!(comp.creator == ctx.accounts.authority.key(), PointsError::NotCreator);
+        require!(comp.status == 1, PointsError::CompetitionNotClosed);
+        comp.status = 2u8; // settled
+        comp.settled_ts = now;
+        Ok(())
+    }
+
+    pub fn mark_winner_paid(ctx: Context<MarkWinnerPaidCtx>, seq: u32, rank: u8) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let comp = &ctx.accounts.competition;
+        require!(comp.creator == ctx.accounts.authority.key(), PointsError::NotCreator);
+        require!(comp.status == 2, PointsError::CompetitionNotSettled);
+        let w = &mut ctx.accounts.winner;
+        require!(w.status == 0, PointsError::AlreadyClaimed);
+        w.status = 1u8;
+        w.paid_ts = now;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1440,6 +1580,64 @@ pub struct InitializeSignupClaimCtx<'info> {
     )]
     pub signup_claim: Account<'info, SignupClaim>,
     pub system_program: Program<'info, System>,
+}
+
+/// Context for `create_competition` (M7). Seeds use [COMP2_SEED, creator, seq].
+#[derive(Accounts)]
+#[instruction(seq: u32, name: String, games: Vec<u8>, tier_bits: u8, require_all: u8, entry_cost: u64, entry_families: u8, starts_at: i64, ends_at: i64, pool_usd_cents: u64, pool_points: u64, winner_count: u8, prize_shares: Vec<u32>, redemption: u8, payout_mode: u8)]
+pub struct CreateCompetitionCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<CompetitionInstance>(),
+        seeds = [COMP2_SEED, payer.key().as_ref(), &seq.to_le_bytes()],
+        bump
+    )]
+    pub competition: Account<'info, CompetitionInstance>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Reusable creator-gated context for close/settle/cancel (COMP2 seed).
+#[derive(Accounts)]
+#[instruction(seq: u32)]
+pub struct CompetitionSeqCtx<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(mut, seeds = [COMP2_SEED, authority.key().as_ref(), &seq.to_le_bytes()], bump)]
+    pub competition: Account<'info, CompetitionInstance>,
+}
+
+/// Context for `record_competition_winner` (per rank; creates its gfgwin record).
+#[derive(Accounts)]
+#[instruction(seq: u32, rank: u8, player: Pubkey)]
+pub struct RecordCompetitionWinnerCtx<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(seeds = [COMP2_SEED, authority.key().as_ref(), &seq.to_le_bytes()], bump)]
+    pub competition: Account<'info, CompetitionInstance>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + std::mem::size_of::<WinnerRecord>(),
+        seeds = [GFGWIN_SEED, competition.key().as_ref(), &[rank]],
+        bump
+    )]
+    pub winner: Account<'info, WinnerRecord>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `mark_winner_paid`.
+#[derive(Accounts)]
+#[instruction(seq: u32, rank: u8)]
+pub struct MarkWinnerPaidCtx<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(seeds = [COMP2_SEED, authority.key().as_ref(), &seq.to_le_bytes()], bump)]
+    pub competition: Account<'info, CompetitionInstance>,
+    #[account(mut, seeds = [GFGWIN_SEED, competition.key().as_ref(), &[rank]], bump)]
+    pub winner: Account<'info, WinnerRecord>,
 }
 
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
@@ -1908,6 +2106,46 @@ pub struct SignupClaim {
     pub claim_ref: u64,   // the credit match_ref used
 }
 
+/// M7 competition instance ([gfgcomp2, creator, seq]) - the competition itself,
+/// fully config-driven (games, tiers, entry, window, pool, shares, redemption).
+#[account]
+pub struct CompetitionInstance {
+    pub version: u8,          // 1 = current
+    pub creator: Pubkey,      // instance authority (admin now, sponsors later)
+    pub seq: u32,
+    pub name: [u8; 24],
+    pub games: [u8; MAX_GAMES],   // source_codes of selected games (0 = empty)
+    pub game_count: u8,
+    pub tier_bits: u8,        // bit k set => level k qualifies (bit2=L2, bit3=L3, ...)
+    pub require_all: u8,      // 0 = any-of tiers, 1 = all-of (future, reserved)
+    pub entry_cost: u64,
+    pub entry_families: u8,   // bit0 global, bit1 local, bit2 premium
+    pub starts_at: i64,
+    pub ends_at: i64,         // auto-stop (R16)
+    pub pool_usd_cents: u64,
+    pub pool_points: u64,     // pool in points ($0.002/pt base, set by creator)
+    pub winner_count: u8,
+    pub prize_shares: [u32; MAX_WINNERS], // redemption units per rank (1..winner_count)
+    pub redemption: u8,       // 0 naira, 1 points, 2 crypto, 3 merch (presentational)
+    pub payout_mode: u8,      // 0 manual, 1 escrow (later)
+    pub status: u8,           // 0 open, 1 closed, 2 settled, 3 cancelled
+    pub settled_ts: i64,
+}
+
+/// M7 winner record ([gfgwin, comp, rank]) - one per prize slot, on-chain proof
+/// of who won which rank and whether they were paid (R15).
+#[account]
+pub struct WinnerRecord {
+    pub version: u8,
+    pub comp: Pubkey,
+    pub rank: u8,
+    pub player: Pubkey,
+    pub points: u64,
+    pub usd_cents: u64,
+    pub status: u8,           // 0 won (pending), 1 paid
+    pub paid_ts: i64,
+}
+
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
 /// points, the launch engine). One account per player, seed [gfgprem, player].
 /// Runs gasless on the ER.
@@ -2206,6 +2444,16 @@ pub enum PointsError {
     SignupAlreadyClaimed,
     #[msg("unsupported subscription level (2 or 3 at launch)")]
     InvalidLevel,
+    #[msg("invalid competition configuration")]
+    InvalidCompetition,
+    #[msg("only the competition creator can do this")]
+    NotCreator,
+    #[msg("competition must be closed before winners are recorded")]
+    CompetitionNotClosed,
+    #[msg("competition must be settled before paying winners")]
+    CompetitionNotSettled,
+    #[msg("prize rank is out of range for this competition")]
+    RankOutOfRange,
     #[msg("premium points credit requires the admin authority signer")]
     NotAdmin,
     #[msg("premium points credit_ref already used (duplicate credit guard)")]

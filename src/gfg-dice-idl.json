@@ -278,6 +278,61 @@
       ]
     },
     {
+      "name": "cancel_competition",
+      "discriminator": [
+        62,
+        4,
+        198,
+        98,
+        200,
+        41,
+        255,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "claim_comp",
       "docs": [
         "A winner claims their allocation gasless on the ER. Requires the winner",
@@ -534,6 +589,61 @@
       "args": []
     },
     {
+      "name": "close_competition",
+      "discriminator": [
+        49,
+        166,
+        127,
+        67,
+        43,
+        108,
+        132,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "close_premium_points",
       "docs": [
         "(M5) Authority-gated close of a premium account (returns rent to the",
@@ -658,6 +768,123 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "create_competition",
+      "discriminator": [
+        110,
+        212,
+        234,
+        212,
+        118,
+        128,
+        158,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "games",
+          "type": "bytes"
+        },
+        {
+          "name": "tier_bits",
+          "type": "u8"
+        },
+        {
+          "name": "require_all",
+          "type": "u8"
+        },
+        {
+          "name": "entry_cost",
+          "type": "u64"
+        },
+        {
+          "name": "entry_families",
+          "type": "u8"
+        },
+        {
+          "name": "starts_at",
+          "type": "i64"
+        },
+        {
+          "name": "ends_at",
+          "type": "i64"
+        },
+        {
+          "name": "pool_usd_cents",
+          "type": "u64"
+        },
+        {
+          "name": "pool_points",
+          "type": "u64"
+        },
+        {
+          "name": "winner_count",
+          "type": "u8"
+        },
+        {
+          "name": "prize_shares",
+          "type": {
+            "vec": "u32"
+          }
+        },
+        {
+          "name": "redemption",
+          "type": "u8"
+        },
+        {
+          "name": "payout_mode",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "credit_premium_points",
@@ -2283,6 +2510,68 @@
       "args": []
     },
     {
+      "name": "mark_winner_paid",
+      "discriminator": [
+        21,
+        217,
+        123,
+        70,
+        167,
+        80,
+        104,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        },
+        {
+          "name": "rank",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "migrate_points",
       "docs": [
         "(M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)",
@@ -2647,6 +2936,76 @@
         {
           "name": "eligibility",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "record_competition_winner",
+      "discriminator": [
+        235,
+        133,
+        65,
+        55,
+        226,
+        47,
+        111,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        },
+        {
+          "name": "rank",
+          "type": "u8"
+        },
+        {
+          "name": "player",
+          "type": "pubkey"
         }
       ]
     },
@@ -3131,6 +3490,61 @@
               3
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "settle_competition",
+      "discriminator": [
+        83,
+        121,
+        9,
+        141,
+        170,
+        133,
+        230,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "competition",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
         }
       ]
     },
@@ -3792,6 +4206,19 @@
       ]
     },
     {
+      "name": "CompetitionInstance",
+      "discriminator": [
+        23,
+        23,
+        142,
+        88,
+        47,
+        250,
+        7,
+        84
+      ]
+    },
+    {
       "name": "GlobalPoints",
       "discriminator": [
         154,
@@ -3880,6 +4307,19 @@
         55,
         37,
         164
+      ]
+    },
+    {
+      "name": "WinnerRecord",
+      "discriminator": [
+        248,
+        27,
+        49,
+        33,
+        45,
+        88,
+        210,
+        100
       ]
     }
   ],
@@ -3971,41 +4411,66 @@
     },
     {
       "code": 6017,
+      "name": "InvalidCompetition",
+      "msg": "invalid competition configuration"
+    },
+    {
+      "code": 6018,
+      "name": "NotCreator",
+      "msg": "only the competition creator can do this"
+    },
+    {
+      "code": 6019,
+      "name": "CompetitionNotClosed",
+      "msg": "competition must be closed before winners are recorded"
+    },
+    {
+      "code": 6020,
+      "name": "CompetitionNotSettled",
+      "msg": "competition must be settled before paying winners"
+    },
+    {
+      "code": 6021,
+      "name": "RankOutOfRange",
+      "msg": "prize rank is out of range for this competition"
+    },
+    {
+      "code": 6022,
       "name": "NotAdmin",
       "msg": "premium points credit requires the admin authority signer"
     },
     {
-      "code": 6018,
+      "code": 6023,
       "name": "DuplicateCreditRef",
       "msg": "premium points credit_ref already used (duplicate credit guard)"
     },
     {
-      "code": 6019,
+      "code": 6024,
       "name": "InsufficientPremiumBalance",
       "msg": "insufficient premium spendable balance"
     },
     {
-      "code": 6020,
+      "code": 6025,
       "name": "AlreadyActive",
       "msg": "subscription already active — one plan at a time, re-upgrade only after expiry"
     },
     {
-      "code": 6021,
+      "code": 6026,
       "name": "NeedsUpgrade",
       "msg": "premium account needs upgrade_premium_points (v2 layout) first"
     },
     {
-      "code": 6022,
+      "code": 6027,
       "name": "DuplicateAffiliatePeriod",
       "msg": "affiliate period for this referral already recorded"
     },
     {
-      "code": 6023,
+      "code": 6028,
       "name": "DuplicateHandle",
       "msg": "profile handle already taken"
     },
     {
-      "code": 6024,
+      "code": 6029,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     }
@@ -4207,6 +4672,113 @@
                 3
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CompetitionInstance",
+      "docs": [
+        "M7 competition instance ([gfgcomp2, creator, seq]) - the competition itself,",
+        "fully config-driven (games, tiers, entry, window, pool, shares, redemption)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "seq",
+            "type": "u32"
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
+          },
+          {
+            "name": "games",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "game_count",
+            "type": "u8"
+          },
+          {
+            "name": "tier_bits",
+            "type": "u8"
+          },
+          {
+            "name": "require_all",
+            "type": "u8"
+          },
+          {
+            "name": "entry_cost",
+            "type": "u64"
+          },
+          {
+            "name": "entry_families",
+            "type": "u8"
+          },
+          {
+            "name": "starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "pool_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "pool_points",
+            "type": "u64"
+          },
+          {
+            "name": "winner_count",
+            "type": "u8"
+          },
+          {
+            "name": "prize_shares",
+            "type": {
+              "array": [
+                "u32",
+                16
+              ]
+            }
+          },
+          {
+            "name": "redemption",
+            "type": "u8"
+          },
+          {
+            "name": "payout_mode",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "settled_ts",
+            "type": "i64"
           }
         ]
       }
@@ -4615,6 +5187,50 @@
           {
             "name": "claimed",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WinnerRecord",
+      "docs": [
+        "M7 winner record ([gfgwin, comp, rank]) - one per prize slot, on-chain proof",
+        "of who won which rank and whether they were paid (R15)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "comp",
+            "type": "pubkey"
+          },
+          {
+            "name": "rank",
+            "type": "u8"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "points",
+            "type": "u64"
+          },
+          {
+            "name": "usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "paid_ts",
+            "type": "i64"
           }
         ]
       }
