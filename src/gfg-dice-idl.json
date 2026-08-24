@@ -1301,6 +1301,183 @@
       "args": []
     },
     {
+      "name": "delegate_competition_tally",
+      "docs": [
+        "Delegate a player's competition tally into an ER session (relay/sponsor",
+        "signs base-layer like the other per-player delegates)."
+      ],
+      "discriminator": [
+        218,
+        168,
+        61,
+        18,
+        189,
+        242,
+        218,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "competition"
+        },
+        {
+          "name": "buffer_tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "tally"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "tally"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "tally"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "tally",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "delegate_global_points",
       "docs": [
         "Delegates the player's GLOBAL POINTS PDA into an ER session (base",
@@ -2198,6 +2375,101 @@
       ]
     },
     {
+      "name": "initialize_competition_tally",
+      "docs": [
+        "One-time init of a player's tally for a competition (rent by the relay/",
+        "sponsor; payer is the player session key on first win via the relay)."
+      ],
+      "discriminator": [
+        26,
+        83,
+        206,
+        158,
+        174,
+        31,
+        250,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "competition",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  119,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "competition"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "initialize_global_points",
       "docs": [
         "Idempotent: creates the player's GLOBAL POINTS PDA if it does not",
@@ -2935,6 +3207,106 @@
         },
         {
           "name": "eligibility",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "record_competition_win",
+      "docs": [
+        "Gasless ER write (session key): +1 win on the player's own tally, only",
+        "while the window is OPEN (auto-stop at ends_at by chain clock) and the",
+        "given proof-time sits inside [starts_at, ends_at]."
+      ],
+      "discriminator": [
+        156,
+        216,
+        129,
+        254,
+        139,
+        7,
+        60,
+        165
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "competition",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  109,
+                  112,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  119,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "competition"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "seq",
+          "type": "u32"
+        },
+        {
+          "name": "ts",
+          "type": "i64"
+        },
+        {
+          "name": "game",
           "type": "u8"
         }
       ]
@@ -3839,6 +4211,46 @@
       "args": []
     },
     {
+      "name": "undelegate_competition_tally",
+      "docs": [
+        "Return a player's competition tally to this program (region-agnostic)."
+      ],
+      "discriminator": [
+        81,
+        182,
+        84,
+        154,
+        185,
+        232,
+        140,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "tally",
+          "writable": true
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "undelegate_global_points",
       "docs": [
         "Commits the latest state and returns the GLOBAL POINTS PDA to this",
@@ -4216,6 +4628,19 @@
         250,
         7,
         84
+      ]
+    },
+    {
+      "name": "CompetitionTally",
+      "discriminator": [
+        28,
+        72,
+        57,
+        217,
+        4,
+        3,
+        129,
+        178
       ]
     },
     {
@@ -4778,6 +5203,43 @@
           },
           {
             "name": "settled_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CompetitionTally",
+      "docs": [
+        "M7 per-player in-window win tally ([gfgwin, comp, player]) - the durable,",
+        "on-chain record of verified wins inside a competition window (R13/R16).",
+        "Written gaslessly by the player's session key (ER); read by the board."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "comp",
+            "type": "pubkey"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "wins",
+            "type": "u64"
+          },
+          {
+            "name": "first_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_ts",
             "type": "i64"
           }
         ]

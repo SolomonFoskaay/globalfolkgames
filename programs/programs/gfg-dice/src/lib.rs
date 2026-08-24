@@ -1259,6 +1259,79 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ===== M7 in-window win tally (H, owner 2026-08-23) ===================
+    // Every verified win inside a live window increments the player's
+    // [gfgwin, comp, player] tally ON-CHAIN (durable on serverless, R13). The
+    // board aggregates tallies; the file ledger stays as a local fallback.
+
+    /// One-time init of a player's tally for a competition (rent by the relay/
+    /// sponsor; payer is the player session key on first win via the relay).
+    pub fn initialize_competition_tally(
+        ctx: Context<InitializeCompetitionTallyCtx>,
+        seq: u32,
+    ) -> Result<()> {
+        let t = &mut ctx.accounts.tally;
+        t.version = 1u8;
+        t.comp = ctx.accounts.competition.key();
+        t.player = ctx.accounts.payer.key();
+        t.wins = 0;
+        t.first_ts = 0;
+        t.last_ts = 0;
+        Ok(())
+    }
+
+    /// Gasless ER write (session key): +1 win on the player's own tally, only
+    /// while the window is OPEN (auto-stop at ends_at by chain clock) and the
+    /// given proof-time sits inside [starts_at, ends_at].
+    pub fn record_competition_win(
+        ctx: Context<RecordCompetitionWinCtx>,
+        seq: u32,
+        ts: i64,
+        game: u8,
+    ) -> Result<()> {
+        let comp = &ctx.accounts.competition;
+        let now = Clock::get()?.unix_timestamp;
+        require!(comp.status == 0, PointsError::NotOpen);
+        require!(now <= comp.ends_at, PointsError::StillRunning); // auto-stop (R16)
+        require!(ts >= comp.starts_at && ts <= comp.ends_at, PointsError::InvalidCompetition);
+        require!(game > 0, PointsError::InvalidCompetition);
+        let t = &mut ctx.accounts.tally;
+        t.wins = t.wins.checked_add(1).ok_or(PointsError::Overflow)?;
+        t.last_ts = ts;
+        if t.first_ts == 0 { t.first_ts = ts; }
+        Ok(())
+    }
+
+    /// Delegate a player's competition tally into an ER session (relay/sponsor
+    /// signs base-layer like the other per-player delegates).
+    pub fn delegate_competition_tally(ctx: Context<DelegateCompetitionTallyInput>) -> Result<()> {
+        ctx.accounts.delegate_tally(
+            &ctx.accounts.payer,
+            &[
+                GFGWIN_SEED,
+                ctx.accounts.competition.key().as_ref(),
+                ctx.accounts.player_authority.key().as_ref(),
+            ],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Return a player's competition tally to this program (region-agnostic).
+    pub fn undelegate_competition_tally(ctx: Context<CommitAndUndelegateCompetitionTallyInput>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.tally.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1807,6 +1880,74 @@ pub struct ActivateBoosterCtx<'info> {
     pub premium_points: Account<'info, PremiumPoints>,
 }
 
+/// Context for `initialize_competition_tally` (H): sponsor/relay creates the
+/// player's per-competition win tally once.
+#[derive(Accounts)]
+#[instruction(seq: u32)]
+pub struct InitializeCompetitionTallyCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The competition creator (comp PDA seed part).
+    pub creator: AccountInfo<'info>,
+    #[account(seeds = [COMP2_SEED, creator.key().as_ref(), &seq.to_le_bytes()], bump)]
+    pub competition: Account<'info, CompetitionInstance>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<CompetitionTally>(),
+        seeds = [GFGWIN_SEED, competition.key().as_ref(), player_authority.key().as_ref()],
+        bump
+    )]
+    pub tally: Account<'info, CompetitionTally>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `record_competition_win` (H): gasless ER write by the player's
+/// session key; auto-stop + window-fresh enforced inside.
+#[derive(Accounts)]
+#[instruction(seq: u32, ts: i64, game: u8)]
+pub struct RecordCompetitionWinCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The competition creator (comp PDA seed part).
+    pub creator: AccountInfo<'info>,
+    #[account(seeds = [COMP2_SEED, creator.key().as_ref(), &seq.to_le_bytes()], bump)]
+    pub competition: Account<'info, CompetitionInstance>,
+    #[account(mut, seeds = [GFGWIN_SEED, competition.key().as_ref(), player_authority.key().as_ref()], bump)]
+    pub tally: Account<'info, CompetitionTally>,
+}
+
+/// Context for `delegate_competition_tally` (H). Mirrors the other delegates.
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateCompetitionTallyInput<'info> {
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The competition instance pubkey (part of the tally seed).
+    pub competition: AccountInfo<'info>,
+    /// CHECK: The tally PDA to delegate.
+    #[account(mut, del)]
+    pub tally: UncheckedAccount<'info>,
+}
+
+/// Context for `undelegate_competition_tally` (H).
+#[commit]
+#[derive(Accounts)]
+pub struct CommitAndUndelegateCompetitionTallyInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The tally PDA to undelegate.
+    #[account(mut)]
+    pub tally: UncheckedAccount<'info>,
+}
+
 /// Context for `register_profile_handle` (M6). Self-service: the player's wallet
 /// (session key) signs to claim a handle, gasless on the ER.
 #[derive(Accounts)]
@@ -2144,6 +2285,19 @@ pub struct WinnerRecord {
     pub usd_cents: u64,
     pub status: u8,           // 0 won (pending), 1 paid
     pub paid_ts: i64,
+}
+
+/// M7 per-player in-window win tally ([gfgwin, comp, player]) - the durable,
+/// on-chain record of verified wins inside a competition window (R13/R16).
+/// Written gaslessly by the player's session key (ER); read by the board.
+#[account]
+pub struct CompetitionTally {
+    pub version: u8,
+    pub comp: Pubkey,
+    pub player: Pubkey,
+    pub wins: u64,
+    pub first_ts: i64,
+    pub last_ts: i64,
 }
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
