@@ -26,7 +26,7 @@ import { getHandleForWallet } from './handle.mjs';
 import { isSignupClaimed } from './affiliate-relay.mjs';
 import {
   createCompetition, closeCompetition, cancelCompetition, settleCompetition,
-  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard, recordWin,
 } from './competitions-relay.mjs';
 import { addWin, addEntry, hasEntry } from './competitions-wins.mjs';
 import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
@@ -421,6 +421,9 @@ const server = createServer(async (req, res) => {
       const base = { creator: b.creator || null };
       let result;
       switch (b.action) {
+        case 'record':
+          result = await recordWin({ creator: base.creator, seq: Number(b.seq), ts: Number(b.ts), game: Number(b.game), wallet: b.wallet });
+          break;
         case 'win':
           result = { recorded: addWin({ compCreator: base.creator, seq: Number(b.seq), wallet: b.wallet, ts: Number(b.ts), proofSig: b.proofSig, game: b.game }) };
           break;

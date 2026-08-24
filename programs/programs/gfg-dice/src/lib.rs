@@ -1273,7 +1273,7 @@ pub mod gfg_dice {
         let t = &mut ctx.accounts.tally;
         t.version = 1u8;
         t.comp = ctx.accounts.competition.key();
-        t.player = ctx.accounts.payer.key();
+        t.player = ctx.accounts.player_authority.key();
         t.wins = 0;
         t.first_ts = 0;
         t.last_ts = 0;

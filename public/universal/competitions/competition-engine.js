@@ -111,7 +111,8 @@
                 return c.status === 0 && (c.games || []).indexOf(gameCode) !== -1 && ts >= c.startsAt && ts <= c.endsAt;
             });
             windows.forEach(function (c) {
-                fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'win', creator: c.creator || null, seq: c.seq, wallet: w, ts: ts, proofSig: proofSig, game: env.gameId }) }).catch(function () {});
+                // H: relay signs the win ON-CHAIN (durable on serverless; tally [gfgwin, comp, player]).
+                fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'record', creator: c.creator || null, seq: c.seq, wallet: w, ts: ts, game: env.gameId, proofSig: proofSig }) }).catch(function () {});
             });
         } catch (e) { /* ignore */ }
     }

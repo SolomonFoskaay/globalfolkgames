@@ -26,6 +26,53 @@ export function compPda(creator, seq) {
   seqBuf.writeUInt32LE(Number(seq) >>> 0, 0);
   return PublicKey.findProgramAddressSync([COMP2_SEED, new PublicKey(creator).toBytes(), seqBuf], PROGRAM)[0];
 }
+export function tallyPda(comp, player) {
+  return PublicKey.findProgramAddressSync([GFGWIN_SEED, new PublicKey(comp).toBytes(), new PublicKey(player).toBytes()], PROGRAM)[0];
+}
+
+function tallyDisc() {
+  return bs58.encode(createHash('sha256').update('account:CompetitionTally').digest().subarray(0, 8));
+}
+// Durable on-chain win tallies for a competition (R13), region-resilient.
+export async function onChainTallies({ creator, seq }) {
+  const comp = compPda(creator, seq);
+  const disc = tallyDisc();
+  const regions = ['https://api.devnet.solana.com', BASE, 'https://devnet-as.magicblock.app/'];
+  const filters = [{ memcmp: { offset: 0, bytes: disc } }, { memcmp: { offset: 9, bytes: comp.toBase58() } }];
+  for (const url of regions) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getProgramAccounts', params: [PROGRAM.toBase58(), { encoding: 'base64', filters }] }) });
+      const j = await r.json();
+      const arr = (j && j.result) || [];
+      return arr.map(a => {
+        const d = Buffer.from(a.account.data[0], 'base64');
+        return { player: d.length >= 73 ? bs58.encode(d.subarray(41, 73)) : '', wins: d.length >= 81 ? Number(d.readBigUInt64LE(73)) : 0, firstTs: d.length >= 89 ? Number(d.readBigInt64LE(81)) : 0, lastTs: d.length >= 97 ? Number(d.readBigInt64LE(89)) : 0 };
+      });
+    } catch (e) { /* next */ }
+  }
+  return [];
+}
+
+// Sponsor-signed on-chain win record (same trust model as affiliate/gfgwin).
+export async function recordWin({ creator = null, seq, ts, game, wallet: player }) {
+  const { sponsor, conn, program } = await sponsorProgram();
+  const authority = creator ? new PublicKey(creator) : sponsor.publicKey;
+  const comp = compPda(authority, seq);
+  const tally = tallyPda(comp, player);
+  const info = await conn.getAccountInfo(tally);
+  if (!info) {
+    const tx = await program.methods.initializeCompetitionTally(new BN(seq))
+      .accounts({ payer: sponsor.publicKey, playerAuthority: new PublicKey(player), creator: authority, competition: comp, tally, systemProgram: SystemProgram.programId })
+      .transaction();
+    await send(conn, sponsor, tx);
+  }
+  const tx2 = await program.methods.recordCompetitionWin(new BN(seq), new BN(ts), game)
+    .accounts({ payer: sponsor.publicKey, playerAuthority: new PublicKey(player), creator: authority, competition: comp, tally })
+    .transaction();
+  const sig = await send(conn, sponsor, tx2);
+  return { sig: String(sig), tally: tally.toBase58() };
+}
+
 export function winPda(comp, rank) {
   return PublicKey.findProgramAddressSync([GFGWIN_SEED, new PublicKey(comp).toBytes(), Buffer.from([Number(rank)])], PROGRAM)[0];
 }
@@ -207,12 +254,17 @@ export async function getBoard({ creator, seq }) {
   const comp = await getCompetition({ creator, seq });
   if (!comp) throw new Error('competition not found');
   const now = Date.now();
-  const entries = listEntries({ compCreator: creator, seq });
+  // Prefer the DURABLE on-chain tallies (R13); fall back to the local file ledger.
+  const tallies = await onChainTallies({ creator, seq });
+  const entries = tallies.length
+    ? tallies.map(t => ({ wallet: t.player, totalPoints: t.wins }))
+    : listEntries({ compCreator: creator, seq }).map(function (wt) {
+        return { wallet: wt, totalPoints: tallyFor({ compCreator: creator, seq, wallet: wt }).filter(w => w.ts >= comp.startsAt && w.ts <= comp.endsAt).length };
+      });
   const rows = [];
-  for (const wallet of entries) {
-    const wins = tallyFor({ compCreator: creator, seq, wallet });
-    const inWindow = wins.filter(w => w.ts >= comp.startsAt && w.ts <= comp.endsAt);
-    const totalPoints = comp.winnerCount ? inWindow.length : inWindow.length; // wins metric at launch (config 'wins')
+  for (const en of entries) {
+    const wallet = en.wallet;
+    const totalPoints = en.totalPoints || 0; // wins metric (window-fresh by instructions when on-chain)
     const level = await readTierFor(wallet);
     const boost = boostFor(level, comp, planBoosts());
     const finalPoints = boost != null ? totalPoints * boost : null; // null = hidden (L1 / non-qualifying)

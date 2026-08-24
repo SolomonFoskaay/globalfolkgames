@@ -9,7 +9,7 @@
 
 import {
   createCompetition, closeCompetition, cancelCompetition, settleCompetition,
-  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard, recordWin,
 } from '../scripts/competitions-relay.mjs';
 import { addWin, addEntry, hasEntry } from '../scripts/competitions-wins.mjs';
 
@@ -45,6 +45,8 @@ export default async function handler(req, res) {
     }
     const base = { token: body.token, creator: body.creator || null };
     switch (body.action) {
+      case 'record':
+        return res.status(200).json(await recordWin({ creator: base.creator, seq: Number(body.seq), ts: Number(body.ts), game: Number(body.game), wallet: body.wallet }));
       case 'win':
         return res.status(200).json({ recorded: addWin({ compCreator: base.creator, seq: Number(body.seq), wallet: body.wallet, ts: Number(body.ts), proofSig: body.proofSig, game: body.game }) });
       case 'enter':
