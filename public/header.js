@@ -371,6 +371,18 @@
         document.head.appendChild(el);
     }
 
+    // Monetag ads tag: one line on every page via the header. Async so it never
+    // blocks load; data-cfasync=false keeps Cloudflare from late-loading it.
+    function injectAdTag() {
+        if (document.querySelector('script[data-zone="272804"]')) return;
+        const sc = document.createElement('script');
+        sc.src = 'https://quge5.com/88/tag.min.js';
+        sc.setAttribute('data-zone', '272804');
+        sc.async = true;
+        sc.setAttribute('data-cfasync', 'false');
+        (document.head || document.documentElement).appendChild(sc);
+    }
+
     // Sitewide tier badge: shows the signed-in user's plan in front of the points
     // pill (Level 1 gray, Level 2 · 2x gold). PURE cache read — no RPC on load:
     // it reads window.activeTier.get() which is fed by the two RPC triggers
@@ -415,6 +427,17 @@
         // an inline <style> keep it; theme.css loads right after the shared
         // style.css link so it wins over that link but not over inline styles.
         ensureStyle('/theme.css');
+
+        // Monetag ads loader: the tag runs on EVERY page from this one spot
+        // (injected into <head> once, deduped by its data-zone), so no page
+        // HTML ever needs the script tag added by hand.
+        injectAdTag();
+
+        // Universal footer: same idea as the header, but for the footer - a
+        // single file (public/footer.js) rendered on every page automatically
+        // (© 2026 - Till Date · GlobalFolkGames + core links). The future
+        // refactor will merge header + footer boot into one central script.
+        if (!window.gfgFooter) ensureScript('/footer.js');
 
         // Ensure the universal point modules are present on EVERY page. The
         // header pill reads M3/M4 ledgers via window.localPoints / window.
