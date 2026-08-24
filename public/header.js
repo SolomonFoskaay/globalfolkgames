@@ -108,7 +108,8 @@
         { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' },
         { label: 'Changelog (raw)', href: '/changelog/admin.html', match: 'changelog-admin' },
         { label: 'Game Economics', href: '/changelog/economics.html', match: 'changelog-economics' },
-        { label: 'Architecture (Modules)', href: '/changelog/architecture.html', match: 'changelog-architecture' }
+        { label: 'Architecture (Modules)', href: '/changelog/architecture.html', match: 'changelog-architecture' },
+        { label: '🎯 Competitions', href: '/dashboard/competitions.html', match: 'dashboard-competitions' }
     ];
 
     // Resolve the connected wallet the same way the changelog page does.

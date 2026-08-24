@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitions - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        body { background:#0f0f13; }
+        .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .hint { font-size:0.8rem; color:#888; line-height:1.5; }
+        label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
+        input, textarea, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
+        input[type=checkbox] { width:auto; margin-right:6px; }
+        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+        .btn-primary { background:#f39c12; color:#000; margin-top:8px; }
+        .btn-success { background:#2ecc71; color:#000; }
+        .btn-danger { background:#e74c3c; color:#fff; }
+        .btn-ghost { background:#1a1a24; color:#bbb; border:1px solid #333; }
+        .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+        .row > div { flex:1; min-width:150px; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .chip { display:inline-block; background:#1a1a24; border:1px solid #2a2a36; border-radius:999px; padding:4px 10px; font-size:0.75rem; color:#ddd; }
+        .chip.warn { border-color:rgba(243,156,18,0.5); color:#f39c12; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#9b59b6; }
+        .share-row { display:flex; gap:6px; align-items:center; margin-top:4px; }
+        .share-row input { flex:1; min-width:60px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Competition framework (M7)</h1>
+        <p class="hint" style="margin:0 0 12px;">Create on-chain competition instances (config only, no code), then settle + pay winners. Every write is relay/sponsor signed; winners + paid status live on-chain (gfgwin). In-window wins are tallied by the engine ledger; the board ranks by Final Points (= Total x live tier boost, L3 1.5 / L2 1.0, L1 hidden).</p>
+
+        <!-- CREATE -->
+        <div class="card" style="border-color:rgba(46,204,113,0.35);">
+            <h3>New competition</h3>
+            <div class="grid2">
+                <div>
+                    <label>Name</label>
+                    <input id="c-name" placeholder="e.g. Ludo Earn (72h)" maxlength="24">
+                    <label>Sequence (unique per creator)</label>
+                    <input id="c-seq" type="number" min="1" value="1">
+                </div>
+                <div>
+                    <label>Pool (USD $) - 500 pts per $1</label>
+                    <input id="c-pool" type="number" step="0.01" min="0.01" value="2">
+                    <label>Pool (points, auto from $)</label>
+                    <input id="c-pool-pts" type="number" min="1" value="1000" readonly style="color:#999;">
+                </div>
+            </div>
+            <label>Games (multi-select)</label>
+            <div><label style="display:inline-block; margin:0 14px 0 0;"><input type="checkbox" id="g-ludo" checked> Ludo</label><label style="display:inline-block; margin:0;"><input type="checkbox" id="g-ayo" disabled> Ayo Olopon (soon)</label></div>
+            <label>Allowed subscription levels (multi-select, any-of)</label>
+            <div><label style="display:inline-block; margin:0 14px 0 0;"><input type="checkbox" id="t2" checked> Level 2</label><label style="display:inline-block; margin:0;"><input type="checkbox" id="t3" checked> Level 3</label></div>
+            <label>Entry spendable families (multi-select, one is enough to pay)</label>
+            <div><label style="display:inline-block; margin:0 14px 0 0;"><input type="checkbox" id="fam-global" checked> Global</label><label style="display:inline-block; margin:0 14px 0 0;"><input type="checkbox" id="fam-premium"> Premium</label><label style="display:inline-block; margin:0;"><input type="checkbox" id="fam-local"> Local</label></div>
+            <div class="grid2">
+                <div>
+                    <label>Entry cost (points)</label>
+                    <input id="c-entry" type="number" min="1" value="500">
+                </div>
+                <div>
+                    <label>Duration</label>
+                    <select id="c-dur">
+                        <option value="6h">6 hours</option>
+                        <option value="12h">12 hours</option>
+                        <option value="24h">24 hours</option>
+                        <option value="2d">2 days</option>
+                        <option value="3d" selected>3 days (72h - launch)</option>
+                        <option value="4d">4 days</option><option value="5d">5 days</option><option value="6d">6 days</option>
+                        <option value="7d">7 days</option><option value="8d">8 days</option><option value="9d">9 days</option><option value="10d">10 days</option>
+                        <option value="15d">15 days</option><option value="30d">30 days</option>
+                        <option value="1w">1 week</option><option value="2w">2 weeks</option><option value="3w">3 weeks</option><option value="4w">4 weeks</option>
+                        <option value="1m">1 month</option>
+                    </select>
+                </div>
+            </div>
+            <label>Prize shares (per rank, in Naira beta units - pool splits proportionally)</label>
+            <div id="shares-box">
+                <div class="share-row">1st <input id="sh0" type="number" value="1000"></div>
+                <div class="share-row">2nd <input id="sh1" type="number" value="600"></div>
+                <div class="share-row">3rd <input id="sh2" type="number" value="300"></div>
+                <div class="share-row">4th <input id="sh3" type="number" value="200"></div>
+                <div class="share-row">5th <input id="sh4" type="number" value="150"></div>
+                <div class="share-row">6th <input id="sh5" type="number" value="100"></div>
+                <div class="share-row">7th <input id="sh6" type="number" value="100"></div>
+                <div class="share-row">8th <input id="sh7" type="number" value="100"></div>
+                <div class="share-row">9th <input id="sh8" type="number" value="100"></div>
+                <div class="share-row">10th <input id="sh9" type="number" value="100"></div>
+            </div>
+            <div class="hint" id="shares-sum"></div>
+            <div class="grid2">
+                <div>
+                    <label>Redemption</label>
+                    <select id="c-red"><option value="0">Naira (cash + airtime)</option><option value="1">Points</option><option value="2">Crypto</option><option value="3">Merch</option></select>
+                </div>
+                <div>
+                    <label>Payout mode</label>
+                    <select id="c-pay"><option value="0">Manual</option><option value="1" disabled>Escrow (later)</option></select>
+                </div>
+            </div>
+            <button class="btn-success" id="btn-create">Create on-chain</button>
+            <div class="hint" id="create-msg"></div>
+        </div>
+
+        <!-- MANAGE -->
+        <div class="card">
+            <h3>Instances</h3>
+            <button class="btn-primary" id="btn-list">Load instances</button>
+            <div id="comp-list"><p class="hint">Click Load to list on-chain instances (and their boards).</p></div>
+        </div>
+
+        <!-- BOARD / SETTLE -->
+        <div class="card" id="manage-box" style="display:none;">
+            <h3 id="m-title">—</h3>
+            <div class="hint" id="m-meta"></div>
+            <div id="board-box"><p class="hint">Loading board...</p></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn-primary" id="m-close">Close (auto-stop reached)</button>
+                <button class="btn-danger" id="m-cancel">Cancel</button>
+                <button class="btn-success" id="m-record">Record winners on-chain (Top N by Final Points)</button>
+                <button class="btn-primary" id="m-settle">Settle</button>
+            </div>
+            <div class="hint" id="m-msg"></div>
+            <div id="winner-box" style="margin-top:12px;"></div>
+        </div>
+    </div>
+
+    <script src="/global_header.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        async function waitForWalletAndGate() {
+            for (let i = 0; i < 8; i++) {
+                try {
+                    const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                    const p = window.currentProfile ? window.currentProfile.solana_wallet : null;
+                    if (w || p) break;
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 500));
+            }
+            try { return await window.DashCore.gateStaff(); } catch (e) { return false; }
+        }
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                window.GFG_DASH_NAV.render({
+                    brand: '🛡 Dashboard', active: 'competitions',
+                    sections: [
+                        { heading: 'Overview', items: [{ key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' }] },
+                        { heading: 'Detail', items: [
+                            { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                            { key: 'competitions', label: '🎯 Competitions', href: '/dashboard/competitions.html' },
+                            { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
+                            { key: 'premium-subscribers', label: '📈 Premium subscribers', href: '/dashboard/premium-subscribers.html' },
+                        ]}
+                    ]
+                });
+            } catch (e) {}
+            if (!await waitForWalletAndGate()) return;
+
+            const $ = id => document.getElementById(id);
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const DUR_MS = { '6h':6*3600, '12h':12*3600, '24h':24*3600, '2d':2*86400, '3d':3*86400, '4d':4*86400, '5d':5*86400, '6d':6*86400, '7d':7*86400, '8d':8*86400, '9d':9*86400, '10d':10*86400, '15d':15*86400, '30d':30*86400, '1w':7*86400, '2w':14*86400, '3w':21*86400, '4w':28*86400, '1m':30*86400 };
+            const nowS = () => Math.floor(Date.now() / 1000);
+
+            function sharesList() {
+                const out = [];
+                for (let i = 0; i < 10; i++) {
+                    const el = $('sh' + i);
+                    if (el) out.push(Number(el.value) || 0);
+                }
+                return out.filter(v => v > 0);
+            }
+            function updateShares() {
+                const list = sharesList();
+                const sum = list.reduce((a, b) => a + b, 0);
+                $('shares-sum').textContent = list.length + ' winner(s) · total share units ' + sum.toLocaleString();
+                $('c-pool-pts').value = Number($('c-pool').value) * 500;
+            }
+            $('c-pool').addEventListener('input', updateShares);
+            for (let i = 0; i < 10; i++) { const el = $('sh' + i); if (el) el.addEventListener('input', updateShares); }
+            updateShares();
+
+            async function post(body) {
+                const r = await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+                return j;
+            }
+
+            $('btn-create').addEventListener('click', async () => {
+                const shares = sharesList();
+                const seq = Number($('c-seq').value);
+                const poolUsd = Number($('c-pool').value);
+                const tierBits = (($('t2').checked ? 4 : 0) | ($('t3').checked ? 8 : 0));
+                let fam = 0;
+                if ($('fam-global').checked) fam |= 1;
+                if ($('fam-premium').checked) fam |= 4;
+                if ($('fam-local').checked) fam |= 2;
+                if (!tierBits) { $('create-msg').textContent = 'Pick at least one allowed level.'; return; }
+                if (!fam) { $('create-msg').textContent = 'Pick at least one entry spendable family.'; return; }
+                if (!shares.length) { $('create-msg').textContent = 'Add at least one prize share.'; return; }
+                const startS = nowS() + 5;
+                const endS = startS + DUR_MS[$('c-dur').value];
+                $('create-msg').textContent = 'Creating on-chain...';
+                try {
+                    const res = await post({ action: 'create', seq, name: $('c-name').value.trim() || 'Ludo Earn', games: $('g-ludo').checked ? [1] : [], tierBits, requireAll: 0, entryCost: Number($('c-entry').value || 500), entryFamilies: fam, startsAt: startS, endsAt: endS, poolUsdCents: Math.round(poolUsd * 100), poolPoints: Math.round(poolUsd * 500), winnerCount: shares.length, prizeShares: shares, redemption: Number($('c-red').value), payoutMode: Number($('c-pay').value) });
+                    $('create-msg').innerHTML = 'Created! <span class="chip warn">' + esc(res.pda) + '</span> sig ' + esc(String(res.sig).slice(0, 12)) + '… · window 72h style start→end ' + new Date(startS * 1000).toISOString() + ' → ' + new Date(endS * 1000).toISOString();
+                    $('c-seq').value = seq + 1;
+                    loadList();
+                } catch (e) { $('create-msg').textContent = 'Failed: ' + e.message; }
+            });
+
+            let comps = [];
+            async function loadList() {
+                try {
+                    const r = await fetch('/api/competitions', { cache: 'no-store' });
+                    const j = await r.json();
+                    comps = (j.competitions || []).filter(c => c.seq && c.creator && (c.name || '').indexOf('SMOKE') === -1);
+                    $('comp-list').innerHTML = comps.length
+                        ? '<table><thead><tr><th>Seq</th><th>Name</th><th>Status</th><th>Pool $</th><th>Window</th><th>Tiers</th><th>Winners</th></tr></thead><tbody>' +
+                          comps.map(c => '<tr style="cursor:pointer;" onclick="window.__manage(' + c.seq + `)"><td>${c.seq}</td><td>${esc(c.name)}</td><td>${['Open','Closed','Settled','Cancelled'][c.status]||c.status}</td><td>$${(c.poolUsdCents/100).toFixed(2)}</td><td style="font-size:0.7rem;">${new Date(c.startsAt*1000).toUTCString().slice(0,11)}</td><td>${Object.keys({2:'L2',3:'L3'}).filter(k=>c.tierBits&(1<<k)).map(k=>'L'+k).join('+')||'--'}</td><td>${c.winnerCount}</td></tr>`).join('') +
+                          '</tbody></table>'
+                        : '<p class="hint">No instances yet.</p>';
+                } catch (e) { $('comp-list').innerHTML = '<p class="hint">Failed: ' + esc(e.message) + '</p>'; }
+            }
+            $('btn-list').addEventListener('click', loadList);
+
+            let cur = null;
+            window.__manage = async function (seq) {
+                const c = comps.find(x => x.seq === seq);
+                if (!c) return alert('not found');
+                cur = c;
+                $('manage-box').style.display = 'block';
+                $('m-title').textContent = 'Seq ' + c.seq + ' · ' + c.name + ' · ' + ['Open','Closed','Settled','Cancelled'][c.status];
+                $('m-meta').textContent = 'Window ' + new Date(c.startsAt*1000).toUTCString() + ' → ' + new Date(c.endsAt*1000).toUTCString() + ' · pool $'+(c.poolUsdCents/100).toFixed(2)+' = '+c.poolPoints+' pts · '+c.winnerCount+' winners';
+                $('m-msg').textContent = '';
+                await loadBoard();
+            };
+            async function loadBoard() {
+                if (!cur) return;
+                $('board-box').innerHTML = '<p class="hint">Loading Final-Points board...</p>';
+                try {
+                    const r = await fetch('/api/competitions?seq=' + cur.seq + '&board=1&creator=' + encodeURIComponent(cur.creator), { cache: 'no-store' });
+                    const j = await r.json();
+                    if (!j || !j.board) { $('board-box').innerHTML = '<p class="hint">No board yet.</p>'; return; }
+                    $('board-box').innerHTML =
+                        '<p class="hint">Auto-stop: <b>' + (j.autoStopped ? 'YES (window ended)' : 'no') + '</b> · visible ' + j.board.length + ' · hidden ' + (j.hidden.length) + '</p>' +
+                        '<table><thead><tr><th>Pos</th><th>Wallet</th><th>Level</th><th>Total</th><th>Final</th><th>Prize</th></tr></thead><tbody>' +
+                        j.board.map(b => `<tr><td><b>${b.position}</b></td><td class="mono">${esc(b.wallet)}</td><td>L${b.level}</td><td>${b.totalPoints}</td><td><b style="color:#2ecc71;">${b.finalPoints}</b></td><td>${b.prizePosition ? (b.prizePosition<=cur.winnerCount?('1st-10th slot #'+b.prizePosition):'—') : '—'}</td></tr>`).join('') +
+                        (j.hidden.length ? '<tr><td colspan="6" class="hint">Hidden (L1 / not on an allowed plan): ' + j.hidden.map(h => esc(h.wallet.slice(0,6)) + '…').join(', ') + '</td></tr>' : '') +
+                        '</tbody></table>';
+                } catch (e) { $('board-box').innerHTML = '<p class="hint">board failed: ' + esc(e.message) + '</p>'; }
+            }
+            $('m-close').onclick = async () => { if (!cur) return; $('m-msg').textContent = 'closing...'; try { const r = await post({ action:'close', seq: cur.seq }); $('m-msg').textContent = 'closed ' + r.sig.slice(0, 12) + '…'; loadList(); loadBoard(); } catch (e) { $('m-msg').textContent = 'Failed: ' + e.message; } };
+            $('m-cancel').onclick = async () => { if (!cur) return; try { await post({ action:'cancel', seq: cur.seq }); $('m-msg').textContent = 'cancelled'; loadList(); } catch (e) { $('m-msg').textContent = 'Failed: ' + e.message; } };
+            $('m-record').onclick = async () => {
+                if (!cur) return;
+                const r0 = await fetch('/api/competitions?seq=' + cur.seq + '&board=1&creator=' + encodeURIComponent(cur.creator), { cache: 'no-store' });
+                const j = await r0.json();
+                const top = (j.board || []).slice(0, cur.winnerCount);
+                if (!top.length) { $('m-msg').textContent = 'No visible winners to record.'; return; }
+                $('m-msg').textContent = 'Recording ' + top.length + ' winners on-chain...';
+                try {
+                    for (let i = 0; i < top.length; i++) await post({ action: 'recordWinner', seq: cur.seq, rank: i + 1, player: top[i].wallet });
+                    await post({ action: 'settle', seq: cur.seq });
+                    $('m-msg').textContent = 'Winners recorded + settled on-chain (' + top.length + '). Mark paid below.';
+                    loadList();
+                    await loadBoard();
+                    await loadWinners();
+                } catch (e) { $('m-msg').textContent = 'Failed: ' + e.message; }
+            };
+            $('m-settle').onclick = async () => { if (!cur) return; try { const r = await post({ action:'settle', seq: cur.seq }); $('m-msg').textContent = 'settled ' + r.sig.slice(0, 12) + '…'; await loadWinners(); } catch (e) { $('m-msg').textContent = 'Failed: ' + e.message; } };
+
+            async function loadWinners() {
+                if (!cur) return;
+                try {
+                    const r = await fetch('/api/competitions?seq=' + cur.seq + '&winners=1&creator=' + encodeURIComponent(cur.creator), { cache: 'no-store' });
+                    const j = await r.json();
+                    const comp = j.competition || {};
+                    const w = comp.winners || [];
+                    $('winner-box').innerHTML = w.length
+                        ? '<div class="hint" style="margin-bottom:6px;">On-chain winners (gfgwin):</div><table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>USD</th><th>Status</th><th></th></tr></thead><tbody>' +
+                          w.map(x => `<tr><td>#${x.rank}</td><td class="mono">${esc(x.player)}</td><td>${x.points}</td><td>$${(x.usdCents/100).toFixed(2)}</td><td style="color:${x.status===1?'#2ecc71':'#f39c12'};">${x.status===1?'PAID':'pending'}</td><td>${x.status===1?'':'<button class="btn-success" onclick="window.__pay('+cur.seq+','+x.rank+')">Mark paid</button>'}</td></tr>`).join('') +
+                          '</tbody></table>'
+                        : '<div class="hint">No on-chain winner records yet (settle records them).</div>';
+                } catch (e) { $('winner-box').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }
+            }
+            window.__pay = async function (seq, rank) {
+                try { const r = await post({ action: 'markPaid', seq, rank }); $('m-msg').textContent = 'winner #' + rank + ' marked paid ' + r.sig.slice(0, 12) + '…'; loadWinners(); } catch (e) { $('m-msg').textContent = 'Failed: ' + e.message; }
+            };
+        });
+    </script>
+</body>
+</html>

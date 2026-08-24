@@ -63,6 +63,7 @@ export default defineConfig({
         'dashboard-premium': './dashboard/premium.html',
         'dashboard-premium-subscribers': './dashboard/premium-subscribers.html',
         'dashboard-affiliate': './dashboard/affiliate.html',
+        'dashboard-competitions': './dashboard/competitions.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
         verify: './verify/index.html',
         // The header loader (public/global_header.js) injects the Dynamic
