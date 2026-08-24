@@ -3,190 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Competitions | GlobalFolkGames</title>
+    <title>Earn Competitions | GlobalFolkGames</title>
+    <meta name="description" content="Join optional earn competitions: play within a window, climb the live Final-Points leaderboard and share real reward pools. Winners and payments are recorded on-chain.">
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .prize-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:10px; }
+        .prize { background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px; text-align:center; }
+        .prize b { color:#2ecc71; font-size:1.05rem; display:block; }
+        .prize span { font-size:0.72rem; color:#888; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; word-break:break-all; }
+        .you { background:rgba(46,204,113,0.10); }
+        .hidden-note { font-size:0.75rem; color:#888; margin-top:6px; }
+    </style>
 </head>
 <body>
-
     <main class="mobile-container dash-rail-content">
         <section class="onboarding-billboard">
-            <h2>🏆 Competitions</h2>
-            <p class="auth-hint" id="comp-status" style="margin-top:8px;">Loading the current competition…</p>
+            <h2>🏆 Earn Competitions</h2>
+            <p class="auth-hint" id="comp-status" style="margin-top:8px;">Loading competitions...</p>
         </section>
 
-        <div id="comp-signin-hint" class="game-card" style="display:none;">
-            <p>Sign in to enter competitions and claim your winnings.</p>
-        </div>
+        <div id="live-box"></div>
+        <div id="coming-box"></div>
 
-        <section class="game-card dash-section" id="comp-card">
-            <div class="dash-fold-head">
-                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <h3>Active competition</h3>
-                    <span id="comp-badge" style="font-size:0.9rem; color:#9b59b6; font-weight:700;">—</span>
-                </div>
-            </div>
-            <div class="dash-fold-summary">One funded, on-chain competition at a time. Play Ludo to enter; the top 3 finishers share a 70% winner pool (30% platform rake).</div>
-            <div class="dash-fold-body" id="comp-body">
-                <p id="comp-prize" style="color:#f39c12; font-size:1.3rem; font-weight:800;">—</p>
-                <p id="comp-meta" style="color:var(--muted); font-size:0.85rem; margin-top:6px;">—</p>
-                <div id="comp-winners" style="margin-top:12px;"></div>
-                <div id="comp-claim-row" style="margin-top:14px;"></div>
-                <p id="comp-claim-receipt" style="margin-top:10px; font-size:0.85rem;"></p>
-            </div>
-        </section>
-
-        <section class="game-card">
+        <section class="game-card" style="margin-top:16px;">
             <h3>How it works</h3>
-            <p>Every competition locks its prize pool on-chain <b>before</b> the event, so the pot is always real and verifiable. When the competition closes, the top 3 finishers of your Ludo matches share <b>70%</b> of the pool (the platform keeps 30% to keep the games free). Winnings land directly in your on-chain points ledger, gasless.</p>
-            <p style="margin-top:8px;">Finish 1st with a valid on-chain roll to bank points, climb the Active Tier, and chase the leaderboard.</p>
-            <p style="margin-top:10px;">
-                <a href="/games/ludo/" class="launch-btn" style="text-decoration:none; display:inline-block;">🎲 Play Ludo</a>
-            </p>
+            <ol style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
+                <li><b style="color:#fff;">Enter a window</b> - be on one of the plans the competition allows, and pay the small entry once.</li>
+                <li><b style="color:#fff;">Play inside the window</b> - only verified wins made while it is live count toward the board. The window stops accepting results the moment it ends.</li>
+                <li><b style="color:#fff;">Watch Final Points</b> - your board score is Total Points, boosted live by your plan (Level 3 = 1.5x, Level 2 = 1x). Downgrade mid-window and the boost recalculates instantly; drop to the free plan and you go hidden until you resubscribe.</li>
+                <li><b style="color:#fff;">Top finishers share the pool</b> - the winners are recorded on-chain and paid by the platform. Completed windows stay listed below with winners and paid status as proof.</li>
+            </ol>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>Past completed competitions</h3>
+            <div id="past-box"><p class="empty">Completed windows will appear here with their winners and paid status.</p></div>
         </section>
     </main>
 
     <script src="/global_header.js"></script>
-    <script src="/gfg-explorer.js"></script>
+    <script src="/universal/competitions/competition-engine.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const statusEl = document.getElementById('comp-status');
-            const badgeEl = document.getElementById('comp-badge');
-            const prizeEl = document.getElementById('comp-prize');
-            const metaEl = document.getElementById('comp-meta');
-            const winnersEl = document.getElementById('comp-winners');
-            const claimRowEl = document.getElementById('comp-claim-row');
-            const receiptEl = document.getElementById('comp-claim-receipt');
-
-            const BADGE_STYLE = { Open: '#f39c12', Funded: '#9b59b6', Settled: '#2ecc71' };
-
-            function short(id, n) {
-                if (!id) return '';
-                n = n || 8;
-                return id.length > 2 * n ? id.slice(0, n) + '…' + id.slice(-n) : id;
-            }
+        document.addEventListener('DOMContentLoaded', function () {
+            var statusEl = document.getElementById('comp-status');
+            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            var short = w => w ? (w.slice(0, 6) + '…') : '—';
+            var STATUS = ['Open', 'Closed', 'Settled', 'Cancelled'];
 
             function myWallet() {
-                return (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())
-                    || (window.currentProfile && window.currentProfile.solana_wallet) || null;
+                try { return window.gfgCompetitions.wallet(); } catch (e) { return null; }
+            }
+
+            function prizePositions(comp) {
+                var shares = (comp.prizeShares || []).slice(0, comp.winnerCount);
+                var total = shares.reduce((a, b) => a + b, 0);
+                return shares.map((s, i) => ({ rank: i + 1, sharePct: total ? +((s / total) * 100).toFixed(1) : 0, usdCents: Math.round((comp.poolUsdCents * s) / (total || 1)) }));
+            }
+
+            function renderComp(c, kind) {
+                var now = Date.now();
+                var liveNow = kind === 'live';
+                var box = liveNow ? document.getElementById('live-box') : document.getElementById('coming-box');
+                var prizes = prizePositions(c);
+                var el = document.createElement('div');
+                el.className = 'game-card';
+                el.style.marginTop = '12px';
+                el.style.border = liveNow ? '1px solid rgba(46,204,113,0.45)' : '1px dashed #2a2a36';
+                var endsIn = Math.max(0, c.endsAt * 1000 - now);
+                var h = Math.floor(endsIn / 3600000), m = Math.floor((endsIn % 3600000) / 60000);
+                el.innerHTML =
+                    '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">' +
+                    '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
+                    '<span style="color:' + (liveNow ? '#2ecc71' : '#9b59b6') + '; font-weight:800;">' + (liveNow ? 'LIVE · ends in ' + h + 'h ' + m + 'm' : 'starts ' + new Date(c.startsAt * 1000).toUTCString().slice(0, 16)) + '</span></div>' +
+                    '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'L' + k).join('/') + ' · ' + c.winnerCount + ' winners</p>' +
+                    '<div class="prize-grid">' + prizes.map(p => '<div class="prize"><b>$' + (p.usdCents / 100).toFixed(2) + '</b><span>#' + p.rank + (p.rank <= 5 ? ' cash' : ' airtime') + '</span></div>').join('') + '</div>' +
+                    (liveNow ? '<div id="enter-' + c.seq + '"></div><div id="board-' + c.seq + '"></div>' : '')
+                ;
+                box.appendChild(el);
+                if (liveNow) { renderEnter(c); loadBoard(c); }
+            }
+
+            function renderEnter(c) {
+                var holder = document.getElementById('enter-' + c.seq);
+                if (!holder) return;
+                var w = myWallet();
+                var btn = '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter now (cost ' + c.entryCost + 'P)</button>';
+                holder.innerHTML = !w
+                    ? '<p class="empty" style="margin-top:12px;">Sign in to enter this competition.</p>'
+                    : btn;
+            }
+            window.__enter = async function (seq) {
+                var c = (window.__comps || []).find(x => x.seq === seq);
+                var holder = document.getElementById('enter-' + seq);
+                holder.innerHTML = '<p class="hidden-note">Entering...</p>';
+                var res = await window.gfgCompetitions.enter(c);
+                holder.innerHTML = res.ok
+                    ? '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>'
+                    : '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">' +
+                        (res.error === 'tier' ? 'Entry needs one of: ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'Level ' + k).join(', ') + ' (Level 3 is ad-free too).' : 'Sign in first.') + '</p>';
+            };
+
+            async function loadBoard(c) {
+                var host = document.getElementById('board-' + c.seq);
+                if (!host) return;
+                try {
+                    var j = await window.gfgCompetitions.board(c.creator, c.seq);
+                    if (!j || !j.board) { host.innerHTML = '<p class="hidden-note">No entries yet.</p>'; return; }
+                    var me = myWallet();
+                    host.innerHTML =
+                        '<p style="font-size:0.78rem; color:#888; margin-top:12px;">Final-Points board (' + (j.autoStopped ? 'window ended' : 'live') + '):</p>' +
+                        '<table><thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th></tr></thead><tbody>' +
+                        j.board.map(b => '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td></tr>').join('') +
+                        (j.hidden && j.hidden.length ? '<tr><td colspan="5" class="hidden-note">Hidden (on the free plan during the window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '') +
+                        '</tbody></table>';
+                } catch (e) { host.innerHTML = '<p class="hidden-note">board error</p>'; }
+            }
+
+            async function renderPast() {
+                try {
+                    var r = await fetch('/api/competitions', { cache: 'no-store' });
+                    var j = await r.json();
+                    var settled = (j.competitions || []).filter(c => c.status === 2);
+                    var box = document.getElementById('past-box');
+                    if (!settled.length) { box.innerHTML = '<p class="empty">Completed windows will appear here with their winners and paid status.</p>'; return; }
+                    box.innerHTML = '';
+                    for (const c of settled) {
+                        var wr = await fetch('/api/competitions?seq=' + c.seq + '&winners=1&creator=' + encodeURIComponent(c.creator), { cache: 'no-store' });
+                        var wj = await wr.json();
+                        var comp = wj.competition || {}; var wins = comp.winners || [];
+                        var card = document.createElement('div');
+                        card.className = 'game-card';
+                        card.style.marginTop = '10px';
+                        card.innerHTML = '<h3>' + esc(c.name) + ' <span style="font-size:0.75rem; color:#888;">· ' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span></h3>' +
+                            (wins.length ? '<table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>Share</th><th>Status</th></tr></thead><tbody>' +
+                                wins.map(x => '<tr><td>#' + x.rank + '</td><td class="mono">' + esc(short(x.player)) + '</td><td>' + x.points + '</td><td>$' + (x.usdCents / 100).toFixed(2) + '</td><td style="color:' + (x.status === 1 ? '#2ecc71' : '#f39c12') + '; font-weight:700;">' + (x.status === 1 ? 'PAID' : 'pending') + '</td></tr>').join('') + '</tbody></table>'
+                                : '<p class="hidden-note">No winners recorded.</p>');
+                        box.appendChild(card);
+                    }
+                } catch (e) { document.getElementById('past-box').innerHTML = '<p class="hidden-note">Could not load.</p>'; }
             }
 
             async function refresh() {
-                let signedIn = false;
-                try {
-                    signedIn = !!(window.getDynamicUser && window.getDynamicUser());
-                } catch (e) { /* ignore */ }
-                if (!signedIn) {
-                    statusEl.textContent = 'Sign in to see the current competition and claim winnings.';
-                    document.getElementById('comp-signin-hint').style.display = 'block';
-                } else {
-                    statusEl.textContent = 'Signed in — checking the competition…';
-                }
-
-                let comp;
-                try {
-                    const res = await fetch('/api/comp');
-                    if (!res.ok) throw new Error('relay returned ' + res.status);
-                    comp = await res.json();
-                } catch (e) {
-                    statusEl.textContent = 'Competition state is unavailable right now (relay offline?).';
-                    return;
-                }
-
-                if (!comp || !comp.state) {
-                    statusEl.textContent = 'No competition is running yet. Check back soon!';
-                    return;
-                }
-                statusEl.textContent = signedIn ? 'Signed in' : 'Sign in to play and win';
-
-                const s = comp.state;
-                badgeEl.textContent = s.state || '—';
-                badgeEl.style.color = BADGE_STYLE[s.state] || '#f39c12';
-
-                prizeEl.textContent = '🏆 ' + (s.prizePool || 0).toLocaleString() + ' pts prize pool';
-                const endsAt = s.endsAt ? new Date(s.endsAt * 1000).toLocaleString() : '—';
-                const entryFee = s.entryFee > 0 ? s.entryFee + ' pts' : 'Free';
-                metaEl.textContent = 'Entry: ' + entryFee + ' · Closes: ' + endsAt
-                    + ' · Comp #' + (s.compId || '—');
-
-                // Winner table (the leaderboard).
-                winnersEl.innerHTML = '';
-                const winners = s.winners || [];
-                const medal = ['🥇', '🥈', '🥉'];
-                if (winners.length) {
-                    const list = document.createElement('ol');
-                    list.style.listStyle = 'none';
-                    list.style.padding = '0';
-                    winners.forEach((w, i) => {
-                        const li = document.createElement('li');
-                        li.style.padding = '8px 0';
-                        li.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
-                        li.innerHTML = (medal[i] || '🏅') + ' <b>' + short(w.winner) + '</b>'
-                            + '<span style="float:right; color:' + (w.claimed ? '#2ecc71' : '#f39c12') + ';">'
-                            + (w.amount || 0).toLocaleString() + ' pts ' + (w.claimed ? '✓ claimed' : '')
-                            + '</span>';
-                        list.appendChild(li);
-                    });
-                    winnersEl.appendChild(list);
-                } else {
-                    winnersEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">No winners settled yet.</p>';
-                }
-
-                // Claim flow: only a settled winner (their wallet in the table)
-                // can claim, gasless via the ER with their session key.
-                claimRowEl.innerHTML = '';
-                receiptEl.innerHTML = '';
-                const myW = myWallet();
-                if (s.state === 'Settled' && myW) {
-                    const myIndex = (winners || []).findIndex(w =>
-                        String(w.winner).toLowerCase() === String(myW).toLowerCase());
-                    if (myIndex !== -1 && !winners[myIndex].claimed) {
-                        const btn = document.createElement('button');
-                        btn.className = 'launch-btn onchain';
-                        btn.textContent = 'Claim my ' + (winners[myIndex].amount || 0).toLocaleString() + ' pts';
-                        btn.onclick = async () => {
-                            btn.disabled = true;
-                            btn.textContent = 'Claiming…';
-                            try {
-                                const magic = window.magicblockDice;
-                                if (!magic || typeof magic.claimComp !== 'function') {
-                                    throw new Error('on-chain claim not available (sign-in or network)');
-                                }
-                                const sig = await magic.claimComp(comp.compPda, myIndex);
-                                receiptEl.innerHTML = '✅ Claimed! Transaction: '
-                                    + (window.gfgExplorer ? window.gfgExplorer.txLink(sig, 'view on-chain') : short(sig));
-                                btn.textContent = 'Claimed ✓';
-                                await refresh();
-                            } catch (e) {
-                                receiptEl.innerHTML = '<span style="color:#e74c3c;">Claim failed: ' + (e.message || e) + '</span>';
-                                btn.disabled = false;
-                                btn.textContent = 'Retry claim';
-                            }
-                        };
-                        claimRowEl.appendChild(btn);
-                    } else if (myIndex !== -1) {
-                        claimRowEl.innerHTML = '<p style="color:#2ecc71; font-size:0.9rem;">You claimed your winnings already 🎉</p>';
-                    }
-                }
+                var comps = await window.gfgCompetitions.refresh();
+                window.__comps = comps;
+                var now = Date.now();
+                var live = comps.filter(c => c.status === 0 && now >= c.startsAt * 1000 && now <= c.endsAt * 1000);
+                var coming = comps.filter(c => c.status === 0 && now < c.startsAt * 1000);
+                document.getElementById('live-box').innerHTML = live.length ? '' : '<p class="empty" style="margin-top:12px;">No competition is live right now. Follow the changelog for the next window.</p>';
+                document.getElementById('coming-box').innerHTML = '';
+                live.forEach(c => renderComp(c, 'live'));
+                coming.forEach(c => renderComp(c, 'coming'));
+                statusEl.textContent = live.length ? live.length + ' competition(s) live.' : 'Live windows appear here when they open.';
+                renderPast();
             }
-
             refresh();
-            // Keep the leaderboard fresh while the page is open.
-            setInterval(refresh, 45000);
-            // Re-check when the user signs in / out on the same page (the
-            // global header is the single sign-in/out source).
-            if (typeof window.addEventListener === 'function') {
-                window.addEventListener('gfg:auth-changed', refresh);
+            setInterval(function () { if (window.gfgCompetitions) { window.gfgCompetitions.refresh().then(renderLiveOnly); } }, 15000);
+            function renderLiveOnly() {
+                var comps = window.__comps || [];
+                var now = Date.now();
+                var live = comps.filter(c => c.status === 0 && now >= c.startsAt * 1000 && now <= c.endsAt * 1000);
+                live.forEach(c => { var host = document.getElementById('board-' + c.seq); if (host) loadBoard(c); });
             }
-            // Dynamic restores a silent session AFTER DOMContentLoaded; a
-            // bounded poll flips the sign-in hint without waiting for the next
-            // 45s interval.
-            let authPoll = 0;
-            (function pollAuthSession() {
-                let found = false;
-                try { found = !!(window.getDynamicUser && window.getDynamicUser()); } catch (e) { /* ignore */ }
-                if (found) { refresh(); return; }
-                if (authPoll++ < 24) setTimeout(pollAuthSession, 600); // ~15s budget
-            })();
         });
     </script>
 </body>
