@@ -1,7 +1,23 @@
 import { defineConfig } from 'vite';
 
+// Google AdSense loader, injected STATICALLY into the <head> of every built
+// HTML page (Adsense's checker requires the script to be in the served HTML
+// between <head></head>, not injected at runtime). One place; applies to every
+// page via Vite's transformIndexHtml.
+const ADSENSE_SCRIPT = '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7686312364288737" crossorigin="anonymous"></script>';
+
 export default defineConfig({
   root: '.',
+  plugins: [
+    {
+      name: 'inject-adsense-head',
+      transformIndexHtml(html) {
+        if (html.indexOf('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js') >= 0) return html;
+        if (html.indexOf('</head>') === -1) return html;
+        return html.replace('</head>', '    ' + ADSENSE_SCRIPT + '\n  </head>');
+      }
+    }
+  ],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

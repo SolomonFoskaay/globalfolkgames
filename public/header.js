@@ -377,9 +377,13 @@
         document.head.appendChild(el);
     }
 
-    // Google AdSense loader, injected into <head> exactly once per page
-    // (deduped by the data-adsense attribute).
+    // Google AdSense loader, injected into <head> exactly once per page. The
+    // script is ALSO injected statically at build time (vite.config.js
+    // transformIndexHtml) so Adsense's checker sees it in the served HTML; this
+    // runtime fallback only covers any page that somehow lacks the static tag,
+    // deduped against BOTH the static tag and a prior injection.
     function ensureAdsenseScript() {
+        if (document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')) return;
         if (document.querySelector('script[data-adsense="1"]')) return;
         const sc = document.createElement('script');
         sc.setAttribute('data-adsense', '1');
