@@ -8,7 +8,7 @@ import { createHash } from 'crypto';
 import { PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
-import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, getDelegationStatus, regionUrlForFqdn } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
 import { addWin, addEntry, hasEntry, listEntries, tallyFor, readTierFor, boostFor } from './competitions-wins.mjs';
 import { PLAN_LADDER } from './plans-config.mjs';
@@ -19,6 +19,9 @@ const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.m
 const PROGRAM = new PublicKey(idl.address || idl.metadata?.address);
 const COMP2_SEED = Buffer.from('gfgcomp2');
 const GFGWIN_SEED = Buffer.from('gfgwin');
+const DELEG_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
+const AS_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57');
+const AS_URL = 'https://devnet-as.magicblock.app/';
 const BASE = baseRpcUrl();
 
 export function compPda(creator, seq) {
@@ -53,23 +56,49 @@ export async function onChainTallies({ creator, seq }) {
   return [];
 }
 
-// Sponsor-signed on-chain win record (same trust model as affiliate/gfgwin).
+// Gasless-ER compliant win record (hard rule: base-layer only for one-time
+// initialize + delegate; every win runs on the ER, zero fees). Same trust model
+// as affiliate/gfgwin.
+function mkWallet(kp) {
+  return { publicKey: kp.publicKey, signTransaction: async (t) => { t.partialSign(kp); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(kp)); return ts; } };
+}
+async function ensureTallyDelegated({ sponsor, program, conn, authority, player, comp, seq, tally }) {
+  const info = await conn.getAccountInfo(tally);
+  if (!info) {
+    const tx = await program.methods.initializeCompetitionTally(new BN(seq))
+      .accounts({ payer: sponsor.publicKey, playerAuthority: player, creator: authority, competition: comp, tally, systemProgram: SystemProgram.programId })
+      .transaction();
+    await send(conn, sponsor, tx);
+  }
+  const st = await getDelegationStatus(conn, tally).catch(() => null);
+  if (!st || !st.isDelegated) {
+    const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), tally.toBytes()], PROGRAM);
+    const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), tally.toBytes()], DELEG_PROGRAM);
+    const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), tally.toBytes()], DELEG_PROGRAM);
+    const tx = await program.methods.delegateCompetitionTally()
+      .accounts({
+        payer: sponsor.publicKey, playerAuthority: player, competition: comp, tally,
+        bufferTally: buffer, delegationRecordTally: record, delegationMetadataTally: metadata,
+        ownerProgram: PROGRAM, delegationProgram: DELEG_PROGRAM, systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts([{ pubkey: AS_VALIDATOR, isSigner: false, isWritable: false }])
+      .transaction();
+    await send(conn, sponsor, tx);
+  }
+  return st && st.fqdn ? regionUrlForFqdn(st.fqdn) : AS_URL;
+}
 export async function recordWin({ creator = null, seq, ts, game, wallet: player }) {
   const { sponsor, conn, program } = await sponsorProgram();
   const authority = creator ? new PublicKey(creator) : sponsor.publicKey;
   const comp = compPda(authority, seq);
   const tally = tallyPda(comp, player);
-  const info = await conn.getAccountInfo(tally);
-  if (!info) {
-    const tx = await program.methods.initializeCompetitionTally(new BN(seq))
-      .accounts({ payer: sponsor.publicKey, playerAuthority: new PublicKey(player), creator: authority, competition: comp, tally, systemProgram: SystemProgram.programId })
-      .transaction();
-    await send(conn, sponsor, tx);
-  }
-  const tx2 = await program.methods.recordCompetitionWin(new BN(seq), new BN(ts), game)
+  const region = await ensureTallyDelegated({ sponsor, program, conn, authority, player: new PublicKey(player), comp, seq, tally });
+  // Gasless ER write (sponsor signs on the ER; zero base-layer per win).
+  const erConn = createConnection(region, 'confirmed');
+  const erProg = new Program(idl, new AnchorProvider(erConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true }));
+  const sig = await erProg.methods.recordCompetitionWin(new BN(seq), new BN(ts), game)
     .accounts({ payer: sponsor.publicKey, playerAuthority: new PublicKey(player), creator: authority, competition: comp, tally })
-    .transaction();
-  const sig = await send(conn, sponsor, tx2);
+    .rpc();
   return { sig: String(sig), tally: tally.toBase58() };
 }
 
