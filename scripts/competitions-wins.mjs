@@ -5,6 +5,7 @@
 // roll sigs, so every row is verifiable via the receipt explorer.
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { PublicKey } from '@solana/web3.js';
+import { baseRpcUrl, createConnection } from '../src/gfg-rpc.js';
 
 const WINS_FILE = new URL('./gfg-comp-wins.json', import.meta.url).pathname;
 const ENTRIES_FILE = new URL('./gfg-comp-entries.json', import.meta.url).pathname;
@@ -54,14 +55,26 @@ export function tallyFor({ compCreator, seq, wallet }) {
 }
 
 // ---- live tier read (has to survive regions like the affiliate reader) ------
-const TIER_REGIONS = ['https://api.devnet.solana.com', 'https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/'];
+const TIER_REGIONS = [baseRpcUrl(), 'https://api.devnet.solana.com', 'https://devnet-as.magicblock.app/', 'https://devnet-eu.magicblock.app/'];
+const tierConn = createConnection(baseRpcUrl(), 'confirmed');
 let tierCache = new Map();
+export function clearTierCache() { tierCache.clear(); }
 export async function readTierFor(wallet) {
   const cached = tierCache.get(wallet);
-  if (cached && Date.now() - cached.at < 30000) return cached.level;
-  let level = 0, until = 0;
+  if (cached && Date.now() - cached.at < 8000) return cached.level;
+  let level = 0, until = 0, found = false;
+  const [pda] = PublicKey.findProgramAddressSync([Buffer.from('gfgprem'), new PublicKey(wallet).toBytes()], new PublicKey('CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ'));
+
+  // 1) Preferred: the same Connection that reads PDAs reliably throughout the codebase.
   try {
-    const [pda] = PublicKey.findProgramAddressSync([Buffer.from('gfgprem'), new PublicKey(wallet).toBytes()], new PublicKey('CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ'));
+    const info = await tierConn.getAccountInfo(pda);
+    if (info && info.data && info.data.length >= 66) {
+      level = info.data[57]; until = Number(info.data.readBigInt64LE(58)); found = true;
+    }
+  } catch (e) { /* fall through */ }
+
+  // 2) Fallback: raw RPC pass over the region registry (aliases other readers).
+  if (!found) {
     for (const url of TIER_REGIONS) {
       try {
         const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getAccountInfo', params: [pda.toBase58(), { encoding: 'base64' }] }) });
@@ -69,11 +82,13 @@ export async function readTierFor(wallet) {
         const v = j && j.result && j.result.value;
         if (!v || !v.data) continue;
         const d = Buffer.from(v.data[0], 'base64');
-        if (d.length >= 66) { level = d[57]; until = Number(d.readBigInt64LE(58)); }
+        if (d.length >= 66) { level = d[57]; until = Number(d.readBigInt64LE(58)); found = true; }
         break;
       } catch (e) { /* next */ }
     }
-  } catch (e) { /* ignore */ }
+  }
+  // A transient miss must NOT cache a fake '0' for 30s.
+  if (!found) { tierCache.delete(wallet); return 0; }
   tierCache.set(wallet, { level, at: Date.now() });
   return (level > 0 && until * 1000 > Date.now()) ? level : 0;
 }
