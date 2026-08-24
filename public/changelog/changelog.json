@@ -688,7 +688,8 @@
         "CONFIG-DRIVEN PLAN LADDER (owner 2026-08-22): more levels are data, never code.",
         "Level 3 (3x) launch spec: actual $20, discounted $10 / N13,500, Nigeria N8,000. Multiplier 3x (100P base win -> 300P at M4 flow-up). 15 lives/day + 300P/day daily reward (M10 ladder free 5/L2 10/L3 15 lives; 25/200/300P daily).",
         "Earn-competition 1.5x FINAL-POINTS boost (R17): for L3-active players the final ranking column = Total Points x 1.5; L2 = x1.0; L1 = excluded from the leaderboard (not removed). Boost re-reads the live subscription at every render and at the final freeze.",
-        "Activation premium-point cost for L3 not yet locked (proposed 10,000P, more than L2's 5,000P). Unit economics: 10,000P = $20 actual / $10 discount at the $0.002/pt base (discounted to match cash)."
+        "Activation premium-point cost for L3 not yet locked (proposed 10,000P, more than L2's 5,000P). Unit economics: 10,000P = $20 actual / $10 discount at the $0.002/pt base (discounted to match cash).",
+        "Ad-free Level 3 (owner 2026-08-22): active Level-3 users never get Monetag ads (tag suppressed sitewide + push service-workers unregistered); Level 1 and Level 2 keep ads so the no-ads upgrade is visible."
       ],
       "status": "in-progress",
       "approved": false,

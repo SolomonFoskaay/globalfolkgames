@@ -58,8 +58,9 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   **Level-2 2x** (5,000P activation; launch discount now $5, Nigeria N5,000,
   regular $10) and **Level-3 3x** (actual $20, discounted $10 / N13,500,
   Nigeria N8,000; 15 lives/day, 300P/day reward, 3x win multiplier, 1.5x earn
-  competition final-points boost; activation premium cost TBD, proposed
-  10,000P). Plans are non-cancellable/non-refundable 30-day on-chain subs
+  competition final-points boost, AND ad-free (Monetag ads suppressed for
+  active Level-3, so Free/L2 carry the ads and the upgrade is visible);
+  activation premium cost TBD, proposed 10,000P). Plans are non-cancellable/non-refundable 30-day on-chain subs
   (no auto-renew); the win multiplier applies at M4 flow-up. Owner-approved
   2026-08-20; the M5 spec in architecture.json is the LAUNCH GUIDE (payment
   pipe, admin credit, receipts/logs, daily reward + lives boosted values,
