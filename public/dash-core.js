@@ -31,33 +31,50 @@
 
     // Staff gate mirrors the changelog admin page (client-side UX gate).
     // Fixed 2026-08-21: wait for Dynamic wallet to restore before checking role,
-    // and cache the result so a slow restore never falsely redirects an admin
-    // 3 times before the 4th stays. Once staff is confirmed, it never redirects again.
+    // and cache the result so a slow restore never falsely redirects an admin.
+    // Fixed 2026-08-23: role resolution no longer depends on changelog/render.js
+    // (getChangelogRole) - several admin pages don't load it, which made the gate
+    // bounce admins. Now falls back to reading roles.json directly. It also never
+    // redirects when the wallet simply hasn't resolved (slow session) - only a
+    // KNOWN non-staff wallet redirects.
     let gateCache = null;
     let gatePending = null;
+    async function isStaffWallet(w) {
+        try {
+            if (window.getChangelogRole) {
+                const r = await window.getChangelogRole();
+                if (r === 'admin' || r === 'moderator') return true;
+            }
+        } catch (e) { /* fall through */ }
+        try {
+            const resp = await fetch('/changelog/roles.json', { cache: 'no-store' });
+            const j = await resp.json();
+            const lists = [].concat(j.admin || [], j.moderator || []);
+            const wl = String(w || '').toLowerCase();
+            if (!wl) return false;
+            return lists.some(x => String(x).toLowerCase() === wl);
+        } catch (e) { return false; }
+    }
     async function gateStaff() {
         if (gateCache === true) return true;
         if (gateCache === false) { window.location.replace('/'); return false; }
         if (gatePending) return gatePending;
         gatePending = (async () => {
-            // Wait up to 5s for the wallet session to restore (Dynamic is async)
-            for (let i = 0; i < 10; i++) {
+            let walletKnown = false;
+            let wallet = null;
+            // Wait up to 10s for the wallet session to restore (Dynamic is async)
+            for (let i = 0; i < 20; i++) {
                 try {
                     const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
                     const p = window.currentProfile && window.currentProfile.solana_wallet ? window.currentProfile.solana_wallet : null;
-                    if (w || p) break;
+                    wallet = w || p || null;
+                    if (wallet) { walletKnown = true; break; }
                 } catch (e) {}
                 await new Promise(r => setTimeout(r, 500));
             }
-            try {
-                if (window.getChangelogRole) {
-                    const role = await window.getChangelogRole();
-                    if (role === 'admin' || role === 'moderator') {
-                        gateCache = true;
-                        return true;
-                    }
-                }
-            } catch (e) { /* fall through */ }
+            if (!walletKnown) return false; // slow session: never bounce a real admin
+            const staff = await isStaffWallet(wallet);
+            if (staff) { gateCache = true; return true; }
             gateCache = false;
             window.location.replace('/');
             return false;

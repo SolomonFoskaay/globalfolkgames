@@ -103,13 +103,11 @@
         ];
     }
 
-    // Admin-only links shown only to staff (admin / moderator wallets).
+    // Admin-only links shown only to staff. The main drawer keeps ONLY the
+    // Dashboard itself; every other admin page is reached from the dashboard's
+    // own menu (dash-nav), so the visitor drawer stays clean.
     const ADMIN_NAV = [
-        { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' },
-        { label: 'Changelog (raw)', href: '/changelog/admin.html', match: 'changelog-admin' },
-        { label: 'Game Economics', href: '/changelog/economics.html', match: 'changelog-economics' },
-        { label: 'Architecture (Modules)', href: '/changelog/architecture.html', match: 'changelog-architecture' },
-        { label: '🎯 Competitions', href: '/dashboard/competitions.html', match: 'dashboard-competitions' }
+        { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' }
     ];
 
     // Resolve the connected wallet the same way the changelog page does.
