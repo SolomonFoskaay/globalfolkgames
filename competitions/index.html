@@ -95,6 +95,66 @@
                 };
             }
 
+            var GAME_NAMES = { 1: 'Ludo', 2: 'Ayo Olopon' };
+            function familyNames(fam) {
+                var out = [];
+                if (fam & 1) out.push('global spendable');
+                if (fam & 4) out.push('premium spendable');
+                if (fam & 2) out.push('local spendable (per game)');
+                return out.join(', ') || 'points';
+            }
+            function currentBalance(fam) {
+                var b = {};
+                try {
+                    var gl = (window.globalLedger && typeof window.globalLedger.get === 'function') ? window.globalLedger.get() : null;
+                    b.global = gl && gl.spendableBalance != null ? Number(gl.spendableBalance) : (gl && gl.checked && gl.checked() ? 0 : null);
+                } catch (e) {}
+                try {
+                    var pp = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
+                    b.premium = pp ? Number(pp.premiumSpendable || 0) : null;
+                } catch (e) {}
+                try {
+                    var lp = (window.localPoints && typeof window.localPoints.get === 'function') ? window.localPoints.get('ludo') : null;
+                    b.local = lp && lp.spendableBalance != null ? Number(lp.spendableBalance) : null;
+                } catch (e) {}
+                var seen = false;
+                var sum = 0;
+                if ((fam & 1) && b.global != null) { sum += b.global; seen = true; }
+                if ((fam & 4) && b.premium != null) { sum += b.premium; seen = true; }
+                if ((fam & 2) && b.local != null) { sum += b.local; seen = true; }
+                return { known: seen, total: sum, by: b };
+            }
+            function renderRequirements(c) {
+                var host = document.getElementById('reqs-' + c.seq);
+                if (!host) return;
+                var ok = '<span style="color:#2ecc71; font-weight:800;">✓</span>';
+                var no = '<span style="color:#e74c3c; font-weight:800;">✗</span>';
+                var lvl = (window.gfgCompetitions && typeof window.gfgCompetitions.currentLevel === 'function') ? window.gfgCompetitions.currentLevel() : 0;
+                var tierList = ([2,3,4,5,6,7].filter(k => c.tierBits & (1 << k))).map(k => 'Level ' + k);
+                var tierMet = lvl > 0 && (c.tierBits & (1 << lvl));
+                var fam = c.entryFamilies || 1;
+                var bal = currentBalance(fam);
+                var ptsMet = bal.known && bal.total >= c.entryCost;
+                var games = (c.games || []).map(g => GAME_NAMES[g] || ('game code ' + g)).join(' / ') || 'any listed game';
+                var rows = [];
+                rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+                    (tierMet ? ok : no) +
+                    '<div style="flex:1;"><b>Plan:</b> needs ' + tierList.join(' or ') + '<br><span style="font-size:0.75rem; color:#888;">' +
+                    (tierMet ? ('You are on Level ' + lvl + '. Good to go.') : ('You are on ' + (lvl > 0 ? 'Level ' + lvl : 'the free Level 1') + '. <a href="/profile/subscription.html" style="color:#f39c12;">Upgrade to a Premium plan</a> to join (Level 3 is ad-free too).')) + '</span></div></div>');
+                rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+                    (ptsMet ? ok : no) +
+                    '<div style="flex:1;"><b>Points:</b> entry needs <b>' + c.entryCost + 'P</b> of ' + familyNames(fam) + '<br><span style="font-size:0.75rem; color:#888;">' +
+                    (bal.known
+                        ? ('Your current balance in that family: <b style="color:' + (ptsMet ? '#2ecc71' : '#e74c3c') + ';">' + bal.total.toLocaleString() + 'P</b>. ' +
+                           (ptsMet ? 'You qualify.' : 'Earn more by winning matches, or get premium points on the <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans page</a>.'))
+                        : 'Checking your on-chain balance...') + '</span></div></div>');
+                rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+                    ok + '<div style="flex:1;"><b>Games:</b> only verified results from <b>' + games + '</b> inside the window count.</div></div>');
+                rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0;">' +
+                    ok + '<div style="flex:1;"><b>Window:</b> results count from <span style="font-size:0.8rem;">' + new Date(c.startsAt * 1000).toLocaleString() + '</span> to <span style="font-size:0.8rem;">' + new Date(c.endsAt * 1000).toLocaleString() + '</span>. Auto-stops at the end.</div></div>');
+                host.innerHTML = rows.join('');
+            }
+
             function prizeSlot(c) {
                 var total = (c.prizeShares || []).reduce((a, b) => a + b, 0) || 1;
                 return (c.prizeShares || []).slice(0, c.winnerCount).map((s, i) => '$' + Math.round(c.poolUsdCents * s / total / 100 * 100) / 100);
@@ -159,11 +219,13 @@
                 var now = Date.now();
                 var h = Math.max(0, Math.floor((c.endsAt * 1000 - now) / 3600000)), m = Math.max(0, Math.floor(((c.endsAt * 1000 - now) % 3600000) / 60000));
                 var isEnded = c.status !== 0 || now >= c.endsAt * 1000;
+                var reqs = '<div id="reqs-' + c.seq + '" style="margin:12px 0 4px;"></div>';
                 var entry = '<div id="enter-' + c.seq + '"></div>';
                 if (mode === 'enter' && !isEnded) {
                     window.__comps = window.__comps || [];
-                    setTimeout(function () { renderEnter(c); }, 0);
+                    setTimeout(function () { renderRequirements(c); renderEnter(c); }, 0);
                 } else if (isEnded) {
+                    reqs = '<div id="reqs-' + c.seq + '"></div>';
                     entry = '<p class="hidden-note">This window has ended (final board shown below).</p>';
                 }
                 var winnersHtml = '';
@@ -176,6 +238,7 @@
                     '<h3>' + esc(c.name) + '</h3>' +
                     '<p style="color:var(--muted); font-size:0.84rem; margin:4px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + (c.status === 0 ? ' · ends in ' + h + 'h ' + m + 'm' : ' · ' + STATUS[c.status]) + '</p>' +
                     '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>' + (i < 5 ? '#' + (i + 1) + ' cash' : '#' + (i + 1) + ' airtime') + '</span></div>'; }).join('') + '</div>' +
+                    reqs +
                     entry +
                     '</div>' +
                     '<div class="game-card" style="margin-top:12px;"><h3>Final board</h3><div id="board-' + c.seq + '"><p class="hidden-note">Loading...</p></div></div>' +
@@ -189,7 +252,7 @@
                 var w = myWallet();
                 holder.innerHTML = !w
                     ? '<p class="empty" style="margin-top:12px;">Sign in to enter this competition.</p>'
-                    : '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter now (cost ' + c.entryCost + 'P)</button>';
+                    : '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter this competition</button>';
             }
             window.__enter = async function (seq) {
                 var c = (window.__comps || []).find(x => x.seq === seq);
@@ -273,6 +336,7 @@
                     route();
                 }
             }
+            window.addEventListener('gfg:auth-changed', function () { if (window.__detailSeq) { var cc = (window.__comps || []).find(x => x.seq === window.__detailSeq); if (cc) renderRequirements(cc); } });
 
             bindEvents();
             refresh();
