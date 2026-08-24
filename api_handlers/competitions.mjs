@@ -1,0 +1,61 @@
+// api_handlers/competitions.mjs — M7 competition admin routes (Vercel).
+// GET ?creator=...&list=1   -> list instances
+// GET ?creator=...&seq=..   -> one instance
+// GET ?creator=...&seq=..&winners=1 -> winner records for the instance
+// POST {action:'create'|'close'|'cancel'|'settle'|'recordWinner'|'markPaid', ...}
+// All writes are sponsor/creator-signed on-chain (authority-gated by the
+// contract). Operator token optional (staff-gated page), matching the other
+// admin endpoints.
+
+import {
+  createCompetition, closeCompetition, cancelCompetition, settleCompetition,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners,
+} from '../scripts/competitions-relay.mjs';
+
+export default async function handler(req, res) {
+  try {
+    if (req.method === 'GET') {
+      const url = new URL(req.url, 'http://localhost');
+      const creator = (url.searchParams.get('creator') || '').trim();
+      const seq = url.searchParams.get('seq');
+      const winners = url.searchParams.get('winners') === '1';
+      if (seq) {
+        const comp = await getCompetition({ creator, seq: Number(seq) });
+        if (!comp) { res.status(404).json({ error: 'competition not found' }); return; }
+        const w = winners ? await getWinners({ creator, seq: Number(seq) }) : undefined;
+        res.status(200).json({ competition: w ? { ...comp, winners: w } : comp });
+        return;
+      }
+      const list = await listCompetitions({ creator: creator || undefined });
+      res.status(200).json({ count: list.length, competitions: list });
+      return;
+    }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'GET or POST only' }); return; }
+    const body = typeof req.body === 'string' && req.body.length ? JSON.parse(req.body) : (req.body || {});
+    const expected = process.env.GFG_OPERATOR_TOKEN;
+    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
+      res.status(401).json({ error: 'unauthorized operator token' });
+      return;
+    }
+    const base = { token: body.token };
+    switch (body.action) {
+      case 'create':
+        return res.status(200).json(await createCompetition({ ...base, seq: Number(body.seq), name: body.name, games: body.games, tierBits: Number(body.tierBits), requireAll: body.requireAll != null ? Number(body.requireAll) : 0, entryCost: Number(body.entryCost), entryFamilies: Number(body.entryFamilies), startsAt: Number(body.startsAt), endsAt: Number(body.endsAt), poolUsdCents: Number(body.poolUsdCents), poolPoints: Number(body.poolPoints), winnerCount: Number(body.winnerCount), prizeShares: (body.prizeShares || []).map(Number), redemption: body.redemption != null ? Number(body.redemption) : 0, payoutMode: body.payoutMode != null ? Number(body.payoutMode) : 0 }));
+      case 'close':
+        return res.status(200).json(await closeCompetition({ ...base, seq: Number(body.seq) }));
+      case 'cancel':
+        return res.status(200).json(await cancelCompetition({ ...base, seq: Number(body.seq) }));
+      case 'settle':
+        return res.status(200).json(await settleCompetition({ ...base, seq: Number(body.seq) }));
+      case 'recordWinner':
+        return res.status(200).json(await recordCompetitionWinner({ ...base, seq: Number(body.seq), rank: Number(body.rank), player: body.player }));
+      case 'markPaid':
+        return res.status(200).json(await markWinnerPaid({ ...base, seq: Number(body.seq), rank: Number(body.rank) }));
+      default:
+        return res.status(400).json({ error: 'unknown action: ' + body.action });
+    }
+  } catch (e) {
+    console.error('competitions error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+}

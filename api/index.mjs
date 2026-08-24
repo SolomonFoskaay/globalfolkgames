@@ -21,8 +21,12 @@ import endpoints from '../api_handlers/endpoints.mjs';
 import backfillGlobal from '../api_handlers/backfill-global.mjs';
 import affiliate from '../api_handlers/affiliate.mjs';
 import signup from '../api_handlers/signup.mjs';
+import competitions from '../api_handlers/competitions.mjs';
+import plans from '../api_handlers/plans.mjs';
 
 const routes = {
+  '/api/competitions': competitions,
+  '/api/plans': plans,
   '/api/delegate': delegate,
   '/api/roll': roll,
   '/api/comp': comp,

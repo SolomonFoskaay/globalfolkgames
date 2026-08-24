@@ -44,6 +44,7 @@ import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
 import bs58 from 'bs58';
 import { registerProfileHandle, resolveHandleToWallet, deriveProfileHandle, isValidProfileHandle, persistHandle, getHandleForWallet } from './handle.mjs';
+import { planPayableUsdCents, AFFILIATE_RATE } from './plans-config.mjs';
 import './load-env.mjs';
 
 export const AFFILIATE_SEED = Buffer.from('gfgref');
@@ -348,22 +349,31 @@ export async function decideAffiliatePair({ affiliate, referral }) {
 }
 
 // Full settle for a list of pairs (used by the monthly settle route / script).
-export async function settleAffiliatePeriod({ period, pairs, usdCentsPerSub = AFFILIATE_PLAN_USD_CENTS }) {
+// Affiliate share = AFFILIATE_RATE (20%) of the referred plan's PAYABLE USD
+// price, read live from the config plan-ladder (owner 2026-08-22). Raising/
+// lowering a plan price (or adding a plan) auto-updates the share - no code.
+// An explicit usdCentsPerSub override (historical admin tests) is still honored
+// and similarly multiplied by AFFILIATE_RATE.
+export async function settleAffiliatePeriod({ period, pairs, usdCentsPerSub = null }) {
   if (!Array.isArray(pairs) || !pairs.length) throw new Error('pairs[] required');
   const out = [];
   for (const p of pairs) {
     if (!p.affiliate || !p.referral) { out.push({ ...p, error: 'missing wallet' }); continue; }
     const d = await decideAffiliatePair({ affiliate: p.affiliate, referral: p.referral });
-    const usdCents = Math.floor(usdCentsPerSub * 0.15);
+    const pairInfo = await readPremium(p.referral).catch(() => ({ level: 0 }));
+    const priceCents = (typeof usdCentsPerSub === 'number' && usdCentsPerSub > 0)
+      ? usdCentsPerSub
+      : planPayableUsdCents(pairInfo.level || 0);
+    const usdCents = Math.floor(priceCents * AFFILIATE_RATE);
     let eligibility = 0;
     if (!d.eligible) {
       eligibility = 2; // forfeited month (inactive affiliate, inactive pair, or referral not paying)
     }
     try {
       const res = await handleRecordAffiliatePeriod({ affiliate: p.affiliate, referral: p.referral, period, usdCents, eligibility });
-      out.push({ ...p, ...d, usdCents, eligibility, sig: res.sig });
+      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility, sig: res.sig });
     } catch (e) {
-      out.push({ ...p, ...d, usdCents, eligibility, error: e.message });
+      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility, error: e.message });
     }
   }
   return out;

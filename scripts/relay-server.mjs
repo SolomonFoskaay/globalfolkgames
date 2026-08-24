@@ -24,6 +24,11 @@ import {
 } from './affiliate-relay.mjs';
 import { getHandleForWallet } from './handle.mjs';
 import { isSignupClaimed } from './affiliate-relay.mjs';
+import {
+  createCompetition, closeCompetition, cancelCompetition, settleCompetition,
+  recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners,
+} from './competitions-relay.mjs';
+import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -402,6 +407,66 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('comp claim error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/competitions') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const b = JSON.parse(body || '{}');
+      const base = { creator: b.creator || null };
+      let result;
+      switch (b.action) {
+        case 'create':
+          result = await createCompetition({ ...base, seq: Number(b.seq), name: b.name, games: b.games, tierBits: Number(b.tierBits), requireAll: b.requireAll != null ? Number(b.requireAll) : 0, entryCost: Number(b.entryCost), entryFamilies: Number(b.entryFamilies), startsAt: Number(b.startsAt), endsAt: Number(b.endsAt), poolUsdCents: Number(b.poolUsdCents), poolPoints: Number(b.poolPoints), winnerCount: Number(b.winnerCount), prizeShares: (b.prizeShares || []).map(Number), redemption: b.redemption != null ? Number(b.redemption) : 0, payoutMode: b.payoutMode != null ? Number(b.payoutMode) : 0 });
+          break;
+        case 'close': result = await closeCompetition({ ...base, seq: Number(b.seq) }); break;
+        case 'cancel': result = await cancelCompetition({ ...base, seq: Number(b.seq) }); break;
+        case 'settle': result = await settleCompetition({ ...base, seq: Number(b.seq) }); break;
+        case 'recordWinner': result = await recordCompetitionWinner({ ...base, seq: Number(b.seq), rank: Number(b.rank), player: b.player }); break;
+        case 'markPaid': result = await markWinnerPaid({ ...base, seq: Number(b.seq), rank: Number(b.rank) }); break;
+        default: throw new Error('unknown action: ' + b.action);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('competitions error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && req.url.startsWith('/api/competitions')) {
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const creator = (url.searchParams.get('creator') || '').trim() || null;
+      const seq = url.searchParams.get('seq');
+      const winners = url.searchParams.get('winners') === '1';
+      if (seq) {
+        const comp = await getCompetition({ creator, seq: Number(seq) });
+        if (!comp) { res.writeHead(404, { 'Content-Type': 'application/json', ...cors }); res.end(JSON.stringify({ error: 'competition not found' })); return; }
+        const w = winners ? await getWinners({ creator, seq: Number(seq) }) : undefined;
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+        res.end(JSON.stringify({ competition: w ? { ...comp, winners: w } : comp }));
+        return;
+      }
+      const list = await listCompetitions({ creator: creator || undefined });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+      res.end(JSON.stringify({ count: list.length, competitions: list }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/plans') {
+    try {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', ...cors });
+      res.end(JSON.stringify({ plans: PLAN_LADDER, affiliateRate: AFFILIATE_RATE, basePointsPerUsdCent: 5 }));
+    } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
     }
