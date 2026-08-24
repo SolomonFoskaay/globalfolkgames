@@ -53,39 +53,50 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   global. Consumes the seam (M2).
 - **M5 — Active Tier subscription + Premium points:** the money + launch engine.
   Premium points live on their own on-chain ledger ([gfgprem, player], buy-only,
-  premium_lifetime + premium_spendable); a single Level-2 2x plan at launch
-  ($10/30 days, launch beta NG N4,000 via Paystack manual bank transfer,
-  non-cancellable/non-refundable) activates a 30-day on-chain sub (no auto-renew)
-  and powers the 2x win multiplier at M4 flow-up. Owner-approved 2026-08-20; the
-  M5 spec in architecture.json is the LAUNCH GUIDE (payment pipe, admin credit,
-  receipts/logs, daily reward + lives boosted values, 12-month affiliate, daily earn
-  campaign).
+  premium_lifetime + premium_spendable). The plan LADDER is CONFIG-DRIVEN
+  (owner 2026-08-22) so more levels are added as data, never code. Launch ships
+  **Level-2 2x** (5,000P activation; launch discount now $5, Nigeria N5,000,
+  regular $10) and **Level-3 3x** (actual $20, discounted $10 / N13,500,
+  Nigeria N8,000; 15 lives/day, 300P/day reward, 3x win multiplier, 1.5x earn
+  competition final-points boost; activation premium cost TBD, proposed
+  10,000P). Plans are non-cancellable/non-refundable 30-day on-chain subs
+  (no auto-renew); the win multiplier applies at M4 flow-up. Owner-approved
+  2026-08-20; the M5 spec in architecture.json is the LAUNCH GUIDE (payment
+  pipe, admin credit, receipts/logs, daily reward + lives boosted values,
+  12-month affiliate, daily earn campaign).
 - **M6 — Point sources:** launch = 500P signup bonus (once per wallet, permanent
-  on-chain fence) + 12-month affiliate (15% of each subscription month a referred
-  player pays, pegged to USD cents on-chain, 15% of $3 = 45c; the referrer must
-  hold an ACTIVE Level-2 sub that month or that month is forfeited, and 2
-  consecutive inactive periods (~60 days) permanently close that pair; manual
-  Naira payout 3-7 days). Giveaway/social deferred. All feed M4b+M4c via kind=1
+  on-chain fence) + 12-month affiliate (20% of each referred plan’s PAYABLE USD price, read
+  live from the config-driven plan ladder so a plan price change auto-updates
+  the share (L2 $5 = $1.00, L3 $10 = $2.00), never fixed to a plan; USD cents
+  on-chain; referrer must hold an ACTIVE qualifying sub that month or that
+  month is forfeited, and 2 consecutive inactive periods (~60 days)
+  permanently close that pair; manual Naira payout 3-7 days). Giveaway/social deferred. All feed M4b+M4c via kind=1
   credits, never M3/M4a. In-progress.
 - **M7 — Competitions:** on-chain CONFIG-DRIVEN earn-competition framework
   (owner-approved 2026-08-22, in-progress). Every competition is an ON-CHAIN
-  INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects:
-  games multi, spendable-family multi global/local/premium, require tier
-  dropdown (L2 now, L3 later is a selection), entry cost, window start/end, USD
-  pool, prize shares, redemption + payout mode). NO web2 db (no Supabase) for
-  the competition lifecycle - rules R12-R16. Launch instance = DAILY LUDO
-  EARN: window-fresh verified-wins leaderboard with AUTO-STOP, $1 pool
-  (N1,500) split 8 ways (500/300/200/100x5 = 500 pts @ $0.002/pt), one
-  entry/account/window, active tier L2 + 500P entry, manual payout, redemption
-  agnostic. On-chain winners via additive [gfgwin, comp, rank] +
+  INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects):
+  allowed subscription levels MULTI-SELECT (L2 + L3 + more, any-of, or
+  all-of combinators), games multi, spendable-family multi, entry cost, window
+  start/end + DURATION dropdown (6h..30d..1m, not fixed 24h), USD pool, prize
+  shares, redemption + payout mode. **FINAL-POINTS RANKING (R17):** winner
+  position = Total Points (in-window) x LIVE tier boost (L3 1.5x / L2 1.0x);
+  the boost is re-read at every render, so a mid-window downgrade to a
+  non-qualifying level hides the player instantly (not removed), and L1 at the
+  final freeze earns no position. NO web2 db (no Supabase) for the competition
+  lifecycle - rules R12-R18. Launch instance = LUDO EARN (72h, was 24h): $2 pool (= 1,000 pts @
+  $0.002/pt) split TEN ways (1st N1,000 / 2nd N600 / 3rd N300 / 4th N200 /
+  5th N150 cash, 6th-10th N100 airtime each = N2,750), and the public
+  PAST-COMPLETED section shows each window’s winners + points/USD share +
+  paid status from on-chain gfgwin. One entry/account/window, any-of {L2,L3}
+  + 500P entry, manual payout, redemption agnostic. On-chain winners via additive [gfgwin, comp, rank] +
   record_competition_winners + mark_winner_paid (approved). Full
   multi-sponsor settlement + escrow stays DEFERRED until M1-M6 stable.
   Consumes the seam (M2). In-progress.
 - **M8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
   The escrow proof-of-life; product build waits behind M1-M4.
 - **M10 — Lives + daily rewards:** the free-play gate (free 5 lives/day, Level-2
-  10/day, GMT+00 reset, consumed ONLY on match completion, never on abandon/reset/
-  disconnect) + daily earn (free 25P/day, Level-2 200P/day, kind=1 credit into M4,
+  10/day, Level-3 15/day, GMT+00 reset, consumed ONLY on match completion, never on abandon/reset/
+  disconnect) + daily earn (free 25P/day, Level-2 200P/day, Level-3 300P/day, kind=1 credit into M4,
   new source_code 14). Ships inside the M5 build window. In-progress.
 
 **HARD RULES (do not regress):**
@@ -268,10 +279,14 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   on-chain. Each game defines its own catalog (like M1's game dropdown); M9
   owns the wallet infrastructure. Gasless grant/equip/revoke via session key,
   sliced reads (dataSlice). Module at public/universal/inventory/.
-- M5: in-progress — Active Tier (Level-2 2x) + Premium points launch engine
-  (single launch beta $3 / Nigeria N4,000 plan, on-chain [gfgprem, player] buy-only ledger, 30-day
-  sub no auto-renew, admin credit flow, 12-month affiliate + daily earn campaign in
-  the same launch bundle). Launch-guide spec lives in M5.
+- M5: in-progress — Active Tier + Premium points launch engine, CONFIG-DRIVEN
+  plan ladder (owner 2026-08-22): Level-2 2x now $5 / Nigeria N5,000 (was
+  $3/N4,000, 5,000P activation unchanged) + NEW Level-3 3x actual $20, discount
+  $10 / N13,500, Nigeria N8,000 (15 lives, 300P daily, 3x wins, 1.5x comp
+  final-points, activation premium TBD ~10,000P), on-chain [gfgprem, player]
+  buy-only ledger, 30-day sub no auto-renew, admin credit flow, 12-month
+  affiliate + daily earn campaign in the same launch bundle. Launch-guide spec
+  lives in M5.
   Booster (M5 v3, live): 72h unlimited-lives for 500P premium spendable ($1,
   base value $0.002 per point, USD rate never Naira) on any
   plan (no multiplier). PremiumPoints layout bumped to v3 (booster_active_until)
@@ -280,16 +295,21 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   swept every live premium ledger (v1/v2 -> v3) and re-pinned to AS. Client:
   magicblockDice.activateBooster (session-key, gasless, region-aware) + M10 lives
   reads boosterActiveUntil -> unlimited while active; card on /profile/upgrade.
-- M6: in-progress — 500P signup bonus (on-chain fence) + 12-month affiliate (15%
-  per referred subscription month, USD cents, active-sub monthly gate + 60-day
-  pair-forfeit, manual Naira 3-7 days). Giveaway/social deferred.
+- M6: in-progress — 500P signup bonus (on-chain fence) + 12-month affiliate
+  (20% of the referred plan’s payable USD price, dynamic from the config plan
+  ladder, active-sub monthly gate + 60-day pair-forfeit, manual Naira
+  3-7 days). Giveaway/social deferred.
 - M7: in-progress — on-chain config-driven earn-competition framework (admin
-  creator UI + on-chain instances, rules R12-R16, no Supabase); launch
-  instance = Daily Ludo Earn ($1/N1,500 pool split 8 ways, window-fresh,
-  AUTO-STOP, gfgwin on-chain winners). Multi-sponsor platform + M8 escrow
-  product deferred.
+  creator UI + on-chain instances, rules R12-R18, no Supabase); launch
+  instance = LUDO EARN (72h, was 24h): $2/N2,750 pool split 10 ways, window-fresh +
+  auto-stop, FINAL-POINTS ranking with live tier boost (L3 1.5x / L2 1.0x,
+  downgrade hides instantly, L1 freeze = no position), multi-select tier
+  requirement any-of {L2,L3,...}, gfgwin on-chain winners + public past-winners
+  paid-status proof, manual payout.
+  Multi-sponsor platform + M8 escrow product deferred.
 - M8: planned (deferred) — sponsor escrow.
-- M10: in-progress — lives + daily rewards gate (ships with M5).
+- M10: in-progress — lives + daily rewards gate (ships with M5; ladder by plan:
+  5/10/15 lives, 25/200/300P daily).
 
 **Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
 (premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
