@@ -90,6 +90,7 @@
             function renderEnter(c) {
                 var holder = document.getElementById('enter-' + c.seq);
                 if (!holder) return;
+                if (window.__enterLock && window.__enterLock[c.seq]) return; // keep the result message
                 var w = myWallet();
                 var btn = '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter now (cost ' + c.entryCost + 'P)</button>';
                 holder.innerHTML = !w
@@ -101,10 +102,17 @@
                 var holder = document.getElementById('enter-' + seq);
                 holder.innerHTML = '<p class="hidden-note">Entering...</p>';
                 var res = await window.gfgCompetitions.enter(c);
-                holder.innerHTML = res.ok
-                    ? '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>'
-                    : '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">' +
-                        (res.error === 'tier' ? 'Entry needs one of: ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'Level ' + k).join(', ') + ' (Level 3 is ad-free too).' : 'Sign in first.') + '</p>';
+                if (res.error === 'signin') {
+                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
+                } else if (res.error === 'tier') {
+                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'Level ' + k).join(', ') + ' (Level 3 is ad-free too).</p>';
+                } else if (res.error === 'insufficient') {
+                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
+                } else {
+                    holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>';
+                }
+                window.__enterLock = window.__enterLock || {};
+                window.__enterLock[seq] = true;
             };
 
             async function loadBoard(c) {

@@ -74,26 +74,26 @@
         if (!tierOk(comp)) return { ok: false, error: 'tier' };
         var ref = 'comp|' + (comp.creator || '') + '|' + comp.seq + '|' + w;
         var fam = comp.entryFamilies || 0;
-        sortFamily: {
-            if (fam & 1 && window.globalLedger && typeof window.globalLedger.spend === 'function') {
-                var s1 = await window.globalLedger.spend(comp.entryCost, 30, ref);
-                if (s1) break sortFamily;
+        var tried = [];
+        var order = [1, 4, 2]; // global, premium, local
+        for (var i = 0; i < order.length; i++) {
+            var bit = order[i];
+            if (!(fam & bit)) continue;
+            tried.push(bit === 1 ? 'global' : bit === 4 ? 'premium' : 'local');
+            var sig = null;
+            try {
+                if (bit === 1 && window.globalLedger && typeof window.globalLedger.spend === 'function') sig = await window.globalLedger.spend(comp.entryCost, 30, ref);
+                else if (bit === 4 && window.premiumPoints && typeof window.premiumPoints.spend === 'function') sig = await window.premiumPoints.spend(comp.entryCost, 30, ref);
+                else if (bit === 2 && window.localPoints && typeof window.localPoints.spend === 'function') sig = await window.localPoints.spend(comp.entryCost, 30, ref);
+            } catch (e) { sig = null; }
+            if (sig) {
+                try {
+                    await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'enter', creator: comp.creator || null, seq: comp.seq, wallet: w }) });
+                } catch (e) { /* relay entry is advisory; the spend itself is on-chain */ }
+                return { ok: true };
             }
-            if (fam & 4 && window.premiumPoints && typeof window.premiumPoints.spend === 'function') {
-                var s2 = await window.premiumPoints.spend(comp.entryCost, 30, ref);
-                if (s2) break sortFamily;
-            }
-            if (fam & 2 && window.localPoints && typeof window.localPoints.spend === 'function') {
-                var s3 = await window.localPoints.spend(comp.entryCost, 30, ref);
-                if (s3) break sortFamily;
-            }
-            return { ok: false, error: 'no eligible spendable family' };
         }
-        try {
-            const r = await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'enter', creator: comp.creator || null, seq: comp.seq, wallet: w }) });
-            const j = await r.json();
-            return { ok: !!(j && (j.entered || j.already)), already: !!(j && j.already) };
-        } catch (e) { return { ok: true, already: false }; }
+        return { ok: false, error: 'insufficient', tried: tried, cost: comp.entryCost };
     }
 
     // Record a finished match to live windows (M2 seam, once).
