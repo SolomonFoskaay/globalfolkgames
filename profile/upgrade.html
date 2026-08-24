@@ -25,17 +25,21 @@
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
-            <h3>Upgrade to Level 2 (2x)</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">If you have 5,000 premium points in your spendable balance, you can upgrade here. This checks on-chain that only premium points count (other points do not count). If you do not have enough, it will tell you to go to the Premium page to get premium points.</p>
+            <h3>Upgrade to a plan</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Pick a plan and activate it with your premium points. This checks on-chain that only premium points count (other points do not count). Not enough? Get premium points on the <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans page</a>.</p>
             <div id="upgrade-action-msg" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></div>
             <div id="upgrade-countdown" style="display:none; font-size:0.9rem; color:#2ecc71; font-weight:700; margin-bottom:8px;"></div>
+            <div id="plan-pick" style="display:flex; gap:8px; margin-bottom:10px;">
+                <button type="button" class="launch-btn onchain" data-plan="2" onclick="window.__pickPlan(this,2)">Level 2 (2x) · 5,000P</button>
+                <button type="button" class="launch-btn" data-plan="3" onclick="window.__pickPlan(this,3)">Level 3 (3x) · 10,000P</button>
+            </div>
             <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 2 (cost 5,000P)</button>
-            <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits you 5,000P, come here, refresh your balance, and tap Upgrade to start your 30-day Level 2 boost.</p>
+            <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits your premium points, come here, refresh, pick a plan and tap Upgrade to start your 30 days.</p>
         </section>
 
         <section id="booster-card" class="game-card" style="border:1px solid #2ecc71;">
             <h3>72h unlimited-lives booster</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Spend 500 premium points ($1 at the standard rate of $0.002 per point, never Naira) for 72 hours (3 days) of unlimited play on any game and any plan, free or Level 2. The countdown starts the moment you tap Activate. It buys time, not points: payout rates stay exactly the same, and it never touches your lifetime balances.</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Spend 500 premium points ($1 at the standard rate of $0.002 per point, never Naira) for 72 hours (3 days) of unlimited play on any game and any plan, free, Level 2 or Level 3. The countdown starts the moment you tap Activate. It buys time, not points: payout rates stay exactly the same, and it never touches your lifetime balances.</p>
             <div style="background:#10241a; border:1px solid rgba(46,204,113,0.35); border-radius:10px; padding:12px 14px; font-size:0.8rem; color:#cde9d6; line-height:1.7; margin-bottom:12px;">
                 <b style="color:#2ecc71;">How to get it (same steps as Premium)</b><br>
                 1. Order it on the <a href="/profile/booster.html" style="color:#2ecc71; font-weight:700;">Unlimited lives sales page</a> (secure payment link, pay $1 or the Nigeria beta price of ₦1,500).<br>
@@ -238,6 +242,18 @@
                 } catch (e) { /* ignore */ }
             })();
 
+            const PLAN_COSTS = { 2: 5000, 3: 10000 };
+            let pick = 2;
+            window.__pickPlan = function (el, lvl) {
+                pick = lvl;
+                document.querySelectorAll('#plan-pick .launch-btn').forEach(function (b) {
+                    b.classList.toggle('onchain', Number(b.dataset.plan) === lvl);
+                });
+                const cost = PLAN_COSTS[lvl];
+                upgradeBtn.textContent = 'Upgrade to Level ' + lvl + ' (cost ' + cost.toLocaleString() + 'P)';
+                actionMsg.innerHTML = '<span style="color:var(--muted);">Selected Level ' + lvl + (lvl === 3 ? ' (3x, ad-free, 1.5x competitions)' : ' (2x)') + ' for ' + cost.toLocaleString() + 'P.</span>';
+            };
+
             upgradeBtn.addEventListener('click', async () => {
                 if (!balanceChecked) {
                     actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 5 minutes), then Upgrade unlocks.</span>';
@@ -254,18 +270,24 @@
                     renderPremiumCard(pp);
                     return;
                 }
-                if (!pp || (pp.premiumSpendable||0) < 5000) {
-                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
+                const costPick = PLAN_COSTS[pick];
+                if (!pp || (pp.premiumSpendable||0) < costPick) {
+                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need ' + costPick.toLocaleString() + ' premium points for Level ' + pick + '. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans</a> to get premium points.</span>';
                     return;
                 }
                 const doUpgrade = async function () {
                     upgradeBtn.disabled = true;
                     upgradeBtn.textContent = 'Upgrading on-chain...';
-                    actionMsg.textContent = 'Upgrading — spending 5,000 premium points on-chain...';
+                    actionMsg.textContent = 'Upgrading — spending ' + PLAN_COSTS[pick].toLocaleString() + ' premium points on-chain...';
                     try {
-                        const sig = await window.premiumPoints.activate();
+                        let sig = null;
+                        if (window.magicblockDice && typeof window.magicblockDice.activateSubscriptionLevel === 'function') {
+                            sig = await window.magicblockDice.activateSubscriptionLevel(pick);
+                        } else if (pick === 2 && window.premiumPoints && typeof window.premiumPoints.activate === 'function') {
+                            sig = await window.premiumPoints.activate();
+                        }
                         if (sig) {
-                            actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level 2 for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
+                            actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level ' + pick + ' for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
                             setTimeout(()=> { if (window.premiumPoints) { const cur = window.premiumPoints.get(); if (cur) renderPremiumCard(cur); } }, 1200);
                         } else {
                             // Either the write is already active on-chain, or it failed.
@@ -275,7 +297,7 @@
                                 const fresh = await window.premiumPoints.fetch();
                                 if (fresh && (fresh.subscriptionLevel||0) > 0 && (fresh.subscriptionActiveUntil||0) > Date.now()) {
                                     renderPremiumCard(fresh);
-                                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are already on Level 2. See the live countdown above (the button is locked until it ends).</span>';
+                                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are already on Level ' + pick + '. See the live countdown above (the button is locked until it ends).</span>';
                                 } else {
                                     const why = window.premiumPoints && window.premiumPoints.lastError ? ' (' + window.premiumPoints.lastError + ')' : '';
                                     throw new Error('Upgrade failed' + why + '. Enough premium points should have been checked on-chain.');
@@ -287,19 +309,19 @@
                     } catch(e) {
                         actionMsg.textContent = 'Upgrade failed: ' + (e.message || e) + (window.premiumPoints && window.premiumPoints.lastError ? ' — ' + window.premiumPoints.lastError : '');
                     } finally {
-                        upgradeBtn.textContent = 'Upgrade to Level 2 (cost 5,000P)';
+                        upgradeBtn.textContent = 'Upgrade to Level ' + pick + ' (cost ' + PLAN_COSTS[pick].toLocaleString() + 'P)';
                     }
                 };
                 // Reconfirm before spending 5,000 premium points (Yes on the left to subscribe).
                 if (window.showConfirmDialog) {
                     window.showConfirmDialog({
-                        title: 'Upgrade to Level 2?',
-                        message: 'Are you sure? This will spend 5,000 premium points to start a 30-day 2x plan (no auto-renew). Once active, the Upgrade button locks until the plan ends.',
+                        title: 'Upgrade to Level ' + pick + '?',
+                        message: 'Are you sure? This will spend ' + PLAN_COSTS[pick].toLocaleString() + ' premium points to start a 30-day Level ' + pick + ' plan (no auto-renew). Once active, the Upgrade button locks until the plan ends.',
                         okText: 'Yes, subscribe',
                         cancelText: 'No, cancel',
                         onOk: doUpgrade,
                     });
-                } else if (window.confirm('Spend 5,000 premium points to activate Level 2 for 30 days?')) {
+                } else if (window.confirm('Spend ' + PLAN_COSTS[pick].toLocaleString() + ' premium points to activate Level ' + pick + ' for 30 days?')) {
                     doUpgrade();
                 }
             });

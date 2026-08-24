@@ -91,6 +91,7 @@
                 <label for="pay-plan">Plan paid for</label>
                 <select id="pay-plan">
                     <option value="2x" selected>Level 2 (2x) — 5,000 premium points</option>
+                    <option value="3x">Level 3 (3x) — 10,000 premium points</option>
                     <option value="booster">72h Unlimited Lives booster — 500 premium points</option>
                 </select>
                 <div class="receipt-hint" id="plan-hint">Pick what you paid for. This page handles every premium-point pack (and any future one).</div>
@@ -131,12 +132,13 @@
             var signedOutBox = document.getElementById('signedout-box');
             var storedKey = 'gfg_premium_payment_draft_v1';
 
-            var PLAN_AMOUNTS = { '2x': 4000, 'booster': 1500 };
+            var PLAN_AMOUNTS = { '2x': 4000, '3x': 8000, 'booster': 1500 };
             var PLAN_NEXT = {
                 '2x': 'Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 2 (2x) boost for 30 days.',
-                'booster': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.'
+                'booster': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.',
+                '3x': 'Our support team verifies the payment and credits your account with <b>10,000 premium points</b>. You then activate your <b>Level 3 (3x)</b> plan on your upgrade page.'
             };
-            var PLAN_HINTS = { '2x': 'Level 2 (2x): 5,000 premium points, ₦4,000 (Nigeria beta) / $3 (global).', 'booster': '72h Unlimited Lives: 500 premium points, ₦1,500 (Nigeria beta) / $1 (global).' };
+            var PLAN_HINTS = { '2x': 'Level 2 (2x): 5,000 premium points, ₦5,000 (Nigeria beta) / $5 (global).', '3x': 'Level 3 (3x): 10,000 premium points, ₦8,000 (Nigeria beta) / $10 (global).', 'booster': '72h Unlimited Lives: 500 premium points, ₦1,500 (Nigeria beta) / $1 (global).' };
             planEl.addEventListener('change', function () {
                 if (PLAN_AMOUNTS[planEl.value]) {
                     amountEl.value = PLAN_AMOUNTS[planEl.value];
