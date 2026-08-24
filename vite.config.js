@@ -28,6 +28,7 @@ export default defineConfig({
         contact: './contact/index.html',
         support: './support/index.html',
         forum: './forum/index.html',
+        privacy: './privacy.html',
         profile: './profile/index.html',
         'profile-points': './profile/points.html',
         'profile-upgrade': './profile/upgrade.html',

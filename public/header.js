@@ -93,6 +93,12 @@
                 items: [
                     { label: 'My Profile', href: '/profile/', match: 'profile' }
                 ]
+            },
+            {
+                heading: 'Legal',
+                items: [
+                    { label: 'Privacy Policy', href: '/privacy/', match: 'privacy' }
+                ]
             }
         ];
     }
@@ -371,6 +377,18 @@
         document.head.appendChild(el);
     }
 
+    // Google AdSense loader, injected into <head> exactly once per page
+    // (deduped by the data-adsense attribute).
+    function ensureAdsenseScript() {
+        if (document.querySelector('script[data-adsense="1"]')) return;
+        const sc = document.createElement('script');
+        sc.setAttribute('data-adsense', '1');
+        sc.async = true;
+        sc.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7686312364288737';
+        sc.setAttribute('crossorigin', 'anonymous');
+        (document.head || document.documentElement).appendChild(sc);
+    }
+
     // Sitewide tier badge: shows the signed-in user's plan in front of the points
     // pill (Level 1 gray, Level 2 · 2x gold). PURE cache read — no RPC on load:
     // it reads window.activeTier.get() which is fed by the two RPC triggers
@@ -416,11 +434,15 @@
         // style.css link so it wins over that link but not over inline styles.
         ensureStyle('/theme.css');
 
-        // Monetag ads gate: the ad tag is decided by public/ad-gate.js (loaded
-        // on every page). L1/L2/anon see the Monetag tag; ACTIVE Level-3 gets
-        // ad-free (tag suppressed + existing push service-workers unregistered),
-        // so "no ads" is an L3 benefit. One place controls the whole site.
+        // Monetag ads gate: paused while Adsense approval is pending (see
+        // ad-gate.js ADS_ENABLED flag - flip it back to restore). Once active,
+        // L1/L2/anon see Monetag; ACTIVE Level-3 is ad-free.
         ensureScript('/ad-gate.js');
+
+        // Google AdSense loader (sitewide <head>). The publisher script itself
+        // serves no ads until an approved ad unit exists; it is the standard
+        // Adsense verification + loader that belongs on every page.
+        ensureAdsenseScript();
 
         // Universal footer: same idea as the header, but for the footer - a
         // single file (public/footer.js) rendered on every page automatically

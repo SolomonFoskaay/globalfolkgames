@@ -62,10 +62,19 @@
         } catch (e) { /* ignore */ }
     }
 
+    // ============================================================
+    // ADS PAUSED FOR ADSENSE APPROVAL (2026-08-23)
+    // The Monetag tags are NOT injected until Adsense approval clears, to avoid
+    // third-party ads interfering with the application. To restore Monetag
+    // later, set ADS_ENABLED back to true (one place, sitewide).
+    // ============================================================
+    var ADS_ENABLED = false;
+
     var tries = 0;
     function decide() {
         tries++;
-        unregisterAdServiceWorkers();
+        unregisterAdServiceWorkers(); // keep clearing any leftover push SW
+        if (!ADS_ENABLED) return;     // paused: do not inject any ad tag
         var t = tier();
         if (t.lvl >= 3 && t.active) return; // Level 3 = ad-free
         // Signed in but premium snapshot not cached yet: wait briefly for it.

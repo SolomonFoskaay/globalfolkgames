@@ -29,6 +29,7 @@
             '<a href="/forum/" style="color:#f39c12; text-decoration:none;">Forum</a>' +
             '<a href="/changelog/" style="color:#9b59b6; text-decoration:none;">What\'s New</a>' +
             '<a href="/games/ludo-lab/" style="color:#2ecc71; text-decoration:none;">Play Ludo</a>' +
+            '<a href="/privacy/" style="color:#f39c12; text-decoration:none;">Privacy Policy</a>' +
             '</div>';
         document.body.appendChild(f);
     }
