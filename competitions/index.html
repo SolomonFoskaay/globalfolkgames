@@ -229,10 +229,6 @@
                     entry = '<p class="hidden-note">This window has ended (final board shown below).</p>';
                 }
                 var winnersHtml = '';
-                if (c.status === 2) {
-                    winnersHtml = '<div id="past-winners-' + c.seq + '"></div>';
-                    loadPastWinners(c);
-                }
                 detailCard.innerHTML =
                     '<div class="game-card" style="border:1px solid rgba(46,204,113,0.45);">' +
                     '<h3>' + esc(c.name) + '</h3>' +
@@ -241,8 +237,7 @@
                     reqs +
                     entry +
                     '</div>' +
-                    '<div class="game-card" style="margin-top:12px;"><h3>Final board</h3><div id="board-' + c.seq + '"><p class="hidden-note">Loading...</p></div></div>' +
-                    winnersHtml;
+                    '<div class="game-card" style="margin-top:12px;"><h3>Leaderboard (Final Points)</h3><div id="board-' + c.seq + '"><p class="hidden-note">Loading...</p></div></div>';
             }
 
             function renderEnter(c) {
@@ -274,14 +269,24 @@
                     var j = await window.gfgCompetitions.board(c.creator, c.seq);
                     if (!j || !j.board) { host.innerHTML = '<p class="hidden-note">No entries yet.</p>'; return; }
                     var me = myWallet();
+                    // For settled windows the SINGLE board also shows each rank's paid status (on-chain gfgwin).
+                    var paidMap = {};
+                    if (c.status === 2) {
+                        try {
+                            var wr = await fetch('/api/competitions?seq=' + c.seq + '&winners=1&creator=' + encodeURIComponent(c.creator), { cache: 'no-store' });
+                            var wj = await wr.json();
+                            ((wj.competition || {}).winners || []).forEach(function (x) { paidMap[x.rank] = x.status; });
+                        } catch (e) {}
+                    }
+                    var head = '<thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th><th>Prize</th>' + (c.status === 2 ? '<th>Status</th>' : '') + '</tr></thead>';
+                    var body = j.board.map(function (b) {
+                        var rate = c.status === 2 ? '<td style="color:' + ((paidMap[b.position] === 1) ? '#2ecc71' : '#f39c12') + ';font-weight:700;">' + ((paidMap[b.position] === 1) ? 'PAID' : 'pending') + '</td>' : '';
+                        return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td>' + rate + '</tr>';
+                    }).join('');
+                    var hiddenRow = j.hidden && j.hidden.length ? '<tr><td colspan="' + (c.status === 2 ? 7 : 6) + '" class="hidden-note">Hidden (free plan during window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '';
                     host.innerHTML =
                         '<p style="font-size:0.75rem; color:#888; margin-bottom:4px;">Ranked by Final Points (' + (j.autoStopped ? 'window ended' : 'live') + '):</p>' +
-                        '<table><thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th><th>Prize</th></tr></thead><tbody>' +
-                        j.board.map(function (b) {
-                            return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td></tr>';
-                        }).join('') +
-                        (j.hidden && j.hidden.length ? '<tr><td colspan="6" class="hidden-note">Hidden (free plan during window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '') +
-                        '</tbody></table>';
+                        '<table>' + head + '<tbody>' + body + hiddenRow + '</tbody></table>';
                 } catch (e) { host.innerHTML = '<p class="hidden-note">board error</p>'; }
             }
 

@@ -24,6 +24,10 @@
     var SOURCE_TO_TAG = { 1: 'ludo', 2: 'ayo_olopon' };
     var subs = [];
     var cache = null; // { competitions: [] }
+    var ENTERED_KEY = 'gfg_comp_entered_v1';
+    function enteredSet() { try { return JSON.parse(localStorage.getItem(ENTERED_KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function markEntered(comp) { try { var m = enteredSet(); m[(comp.creator || '') + ':' + comp.seq] = 1; localStorage.setItem(ENTERED_KEY, JSON.stringify(m)); } catch (e) { /* ignore */ } }
+    function isEntered(comp) { return !!(enteredSet()[(comp.creator || '') + ':' + comp.seq]); }
 
     function wallet() {
         try {
@@ -92,6 +96,7 @@
                 else if (bit === 2 && window.localPoints && typeof window.localPoints.spend === 'function') sig = await window.localPoints.spend(comp.entryCost, 30, ref);
             } catch (e) { sig = null; }
             if (sig) {
+                markEntered(comp); // board counts only users who ENTERED
                 try {
                     await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'enter', creator: comp.creator || null, seq: comp.seq, wallet: w }) });
                 } catch (e) { /* relay entry is advisory; the spend itself is on-chain */ }
@@ -113,7 +118,7 @@
             if (!proofSig) return;
             var ts = Math.floor((env.finishedAt || Date.now()) / 1000);
             var windows = (cache || []).filter(function (c) {
-                return c.status === 0 && (c.games || []).indexOf(gameCode) !== -1 && ts >= c.startsAt && ts <= c.endsAt;
+                return c.status === 0 && (c.games || []).indexOf(gameCode) !== -1 && ts >= c.startsAt && ts <= c.endsAt && isEntered(c);
             });
             windows.forEach(function (c) {
                 // H: relay signs the win ON-CHAIN (durable on serverless; tally [gfgwin, comp, player]).
