@@ -97,7 +97,7 @@
             {
                 heading: 'Legal',
                 items: [
-                    { label: 'Privacy Policy', href: '/privacy/', match: 'privacy' }
+                    { label: 'Privacy Policy', href: '/privacy.html', match: 'privacy' }
                 ]
             }
         ];
