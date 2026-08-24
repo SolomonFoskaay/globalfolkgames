@@ -119,6 +119,7 @@ pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70
 
 // M5 — Active Tier Level-2 2x launch plan (owner-locked 2026-08-20).
 pub const PREMIUM_PLAN_COST: u64 = 5_000; // premium spendable required to activate Level 2
+pub const PREMIUM_PLAN_COST_L3: u64 = 10_000; // premium spendable required to activate Level 3 (owner 2026-08-22)
 pub const SUBSCRIPTION_DAYS: i64 = 30; // active-sub window (no auto-renew)
 pub const BOOSTER_COST: u64 = 500; // $1 / 500P (base rate $0.002 per point, USD - never Naira) for 72h unlimited life
 pub const BOOSTER_HOURS: i64 = 72; // unlimited-life booster window
@@ -924,6 +925,39 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// (M5, plan ladder 2026-08-22) Activates a SPECIFIC plan level from PREMIUM
+    /// spendable: Level-2 2x costs 5,000P, Level-3 3x costs 10,000P (level is an
+    /// arg, so more levels are data/constants, never a new instruction). Sets
+    /// subscription_level = level and active_until = now + 30 days (no auto-
+    /// renew). One active plan at a time. Gasless on the ER. Additive: the
+    /// original activate_subscription (L2 only) stays untouched for existing
+    /// callers.
+    pub fn activate_subscription_level(ctx: Context<ActivateSubscriptionLevelCtx>, level: u8) -> Result<()> {
+        let prem = &mut ctx.accounts.premium_points;
+        require!(prem.version >= 3, PointsError::NeedsUpgrade);
+        let cost = match level {
+            2 => PREMIUM_PLAN_COST,
+            3 => PREMIUM_PLAN_COST_L3,
+            _ => return Err(PointsError::InvalidLevel.into()),
+        };
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            !(prem.subscription_level > 0 && prem.subscription_active_until > now),
+            PointsError::AlreadyActive
+        );
+        require!(prem.premium_spendable >= cost, PointsError::InsufficientPremiumBalance);
+        prem.premium_spendable = prem.premium_spendable
+            .checked_sub(cost)
+            .ok_or(PointsError::InsufficientPremiumBalance)?;
+        prem.subscription_level = level;
+        prem.subscription_active_until = now.checked_add(SUBSCRIPTION_DAYS * DAY_SECS).ok_or(PointsError::Overflow)?;
+        prem.last_spend_reason = 20; // SUB_ACTIVATE
+        prem.last_spend_ref = prem.subscription_active_until as u64;
+        prem.last_spend_ts = now;
+        prem.spend_count = prem.spend_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
     /// (M5) Admin cancels a defective/perpetual subscription. Authority-gated
     /// (only stored admin_authority may call), sets level=0 and active_until=0.
     /// Used from the premium tracker to revoke a sub that escaped expiry.
@@ -1483,6 +1517,19 @@ pub struct SpendPremiumPointsCtx<'info> {
 /// session key signs; the premium PDA must exist + be delegated.
 #[derive(Accounts)]
 pub struct ActivateSubscriptionCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [PREMIUM_SEED, player_authority.key().as_ref()], bump)]
+    pub premium_points: Account<'info, PremiumPoints>,
+}
+
+/// Context for `activate_subscription_level` (M5 plan ladder). Same shape as
+/// ActivateSubscriptionCtx plus the level argument (instruction-bound).
+#[derive(Accounts)]
+#[instruction(level: u8)]
+pub struct ActivateSubscriptionLevelCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: The player's wallet authority (seed basis for the PDA).
@@ -2157,6 +2204,8 @@ pub enum PointsError {
     AlreadyClaimed,
     #[msg("signup bonus already claimed (once per account, forever)")]
     SignupAlreadyClaimed,
+    #[msg("unsupported subscription level (2 or 3 at launch)")]
+    InvalidLevel,
     #[msg("premium points credit requires the admin authority signer")]
     NotAdmin,
     #[msg("premium points credit_ref already used (duplicate credit guard)")]

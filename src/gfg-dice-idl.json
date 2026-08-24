@@ -117,6 +117,68 @@
       "args": []
     },
     {
+      "name": "activate_subscription_level",
+      "docs": [
+        "(M5, plan ladder 2026-08-22) Activates a SPECIFIC plan level from PREMIUM",
+        "spendable: Level-2 2x costs 5,000P, Level-3 3x costs 10,000P (level is an",
+        "arg, so more levels are data/constants, never a new instruction). Sets",
+        "subscription_level = level and active_until = now + 30 days (no auto-",
+        "renew). One active plan at a time. Gasless on the ER. Additive: the",
+        "original activate_subscription (L2 only) stays untouched for existing",
+        "callers."
+      ],
+      "discriminator": [
+        139,
+        138,
+        50,
+        27,
+        250,
+        182,
+        182,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "premium_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "level",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "admin_cancel_subscription",
       "docs": [
         "(M5) Admin cancels a defective/perpetual subscription. Authority-gated",
@@ -3904,41 +3966,46 @@
     },
     {
       "code": 6016,
+      "name": "InvalidLevel",
+      "msg": "unsupported subscription level (2 or 3 at launch)"
+    },
+    {
+      "code": 6017,
       "name": "NotAdmin",
       "msg": "premium points credit requires the admin authority signer"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "DuplicateCreditRef",
       "msg": "premium points credit_ref already used (duplicate credit guard)"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InsufficientPremiumBalance",
       "msg": "insufficient premium spendable balance"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "AlreadyActive",
       "msg": "subscription already active — one plan at a time, re-upgrade only after expiry"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "NeedsUpgrade",
       "msg": "premium account needs upgrade_premium_points (v2 layout) first"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "DuplicateAffiliatePeriod",
       "msg": "affiliate period for this referral already recorded"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "DuplicateHandle",
       "msg": "profile handle already taken"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     }
