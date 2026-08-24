@@ -4,7 +4,7 @@ let selectedStatus = 'current';
 
 // Mock list of campaigns to simulate database records
 const sampleCampaigns = [
-    { level: 1, status: 'current', title: '🇮🇳 Ludo Training Ground', desc: 'Practice and master token pathways against local AI algorithms.' },
+    { level: 1, status: 'current', title: '🇮🇳 Ludo Practice Arena', desc: 'Hone your skills against local computer players and collect points on the board. Level 1 is the free way in.' },
     { level: 2, status: 'current', title: '🇳🇬 Active Daily Airtime Cup', desc: 'Pool active! Top 8 leaderboard winners share N1,500 direct mobile recharges.' },
     { level: 2, status: 'upcoming', title: '🇳🇬 Tomorrow Airtime Sprint', desc: 'Pool lock initializes at 08:00 WAT. Secure your eligibility balance tokens.' },
     { level: 2, status: 'past', title: '🇳🇬 Monday Airtime Opener Results', desc: 'Match completed. Top Winners: Obi_92, Segun_Fx, Crypt_King.' }

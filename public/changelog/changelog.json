@@ -292,11 +292,12 @@
       "title": "Earn competitions",
       "summary": "Compete in daily, weekly and monthly challenges for real reward pools — play to earn, climb the leaderboard, and turn your wins into points that never expire.",
       "details": [
-        "M7 (DEFERRED, planned): competitions re-scoped behind the module guide. Product build now waits until M1 game core + M2 result seam + M3 pure local points + M4 global ledgers are stable for Ludo.",
-        "On-chain work done (kept): Competition escrow PDA (seed gfgcomp) + initialize_comp/fund_comp/close_comp/settle_comp/claim_comp, 30/70 brand rake, gasless claims. Scope C PlayerResult PDA (seed gfgresult) records full 1st..4th finish order.",
-        "M8 escrow proof = brand event rake. M7 product build starts after M1-M4 ship."
+        "M7 (IN-PROGRESS, owner-approved 2026-08-22): on-chain config-driven earn-competition framework locked in architecture.json. Every competition is an ON-CHAIN INSTANCE created via an ADMIN CREATOR UI (dropdowns + multi-selects: games multi, spendable family multi global/local/premium, require tier dropdown (L2 now, L3 later is a selection), entry cost, window start/end, USD pool, prize shares, redemption + payout mode). NO web2 db (no Supabase): instance, winners and paid status live on-chain so sponsors can plug 30/70 + escrow (M8) later (rules R12-R16).",
+        "Launch instance = DAILY LUDO EARN: one entry/account/window, active tier L2, 500P entry global spendable, window-fresh verified-wins leaderboard with AUTO-STOP at window end, $1 pool (N1,500) split 8 ways 500/300/200/100x5 = 500 pts @ $0.002/pt, manual payout, redemption agnostic.",
+        "ON-CHAIN WINNERS (approved): additive [gfgwin, comp, rank] winner records + record_competition_winners + mark_winner_paid on the same program (no live-type seed/layout change; upgrade-safe). Later escrow auto-pay flips the same paid flag.",
+        "Build order (guided by the spec): program instructions -> relay/serverless routes -> universal daily-earn module (M2 seam, window-fresh) -> admin creator + settle/pay page -> public competition page + past-winners paid status -> drawer wiring."
       ],
-      "status": "planned",
+      "status": "in-progress",
       "added": "2026-08-13",
       "approved": true
     },

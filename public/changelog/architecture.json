@@ -8,25 +8,93 @@
       "MAGICBLOCK ER REGION NOTE (2026-08-18): devnet-us.magicblock.app began answering \"-32005 client temporarily banned\", so the project is BANNED on the US ER route (other regions AS/EU healthy). Fix shipped in one sweep: (1) the single US endpoint became a 3-region ER registry + failover + exponential cooldown in src/gfg-rpc.js; (2) the client + relay + probe now resolve each delegated account's ACTUAL hosting region via the Magic Router (getDelegationStatus -> fqdn) and submit/poll THERE, with cross-region rotation only as a fallback; (3) the program gained additive undelegate_points/undelegate_result/undelegate_global_points instructions so points/result/global PDAs can be moved off a flaky region (previously only the dice PDA could), and scripts/migrate-to-as.mjs re-pins any already-delegated PDA to the AS validator (MAS1Dt9q...) sponsor-signed, cap-exempt migration cost. All 13 tracked devnet PDAs now report devnet-as or are pinned to AS on next use. RELAY + DELEGATE CODE RULE: the canonical delegate account key form is the camelCase form the relay uses (bufferGlobalPoints/globalPoints, NOT buffer_global_points) - Anchor's resolver for the #[delegate] helper accounts only reliably matches camelCase; mirror delegate-relay.mjs exactly in any future delegate/migrate code (see the failure this note documents: the first migration pass errored with \"Reached maximum depth for account resolution. Unresolved accounts: bufferGlobalPoints\" from snake_case keys)."
     ],
     "flowChain": [
-      { "from": "M1", "to": "M2", "label": "Game emits result envelope on match finish" },
-      { "from": "M2", "to": "M3", "label": "Seam fans envelope to local points subscriber" },
-      { "from": "M2", "to": "M4", "label": "Seam fans envelope to global ledgers subscriber" },
-      { "from": "M5", "to": "M4", "label": "Tier boost: kind-1 credit into M4b+M4c only (never M4a)" },
-      { "from": "M6", "to": "M4", "label": "Signup/referral/giveaway: kind-1 credit into M4b+M4c only" },
-      { "from": "M2", "to": "M7", "label": "Seam fans envelope to competitions subscriber" },
-      { "from": "M7", "to": "M8", "label": "Comp optionally attaches sponsor escrow" },
-      { "from": "M1", "to": "M9", "label": "Game grants item to player inventory on achievement/win" }
+      {
+        "from": "M1",
+        "to": "M2",
+        "label": "Game emits result envelope on match finish"
+      },
+      {
+        "from": "M2",
+        "to": "M3",
+        "label": "Seam fans envelope to local points subscriber"
+      },
+      {
+        "from": "M2",
+        "to": "M4",
+        "label": "Seam fans envelope to global ledgers subscriber"
+      },
+      {
+        "from": "M5",
+        "to": "M4",
+        "label": "Tier boost: kind-1 credit into M4b+M4c only (never M4a)"
+      },
+      {
+        "from": "M6",
+        "to": "M4",
+        "label": "Signup/referral/giveaway: kind-1 credit into M4b+M4c only"
+      },
+      {
+        "from": "M2",
+        "to": "M7",
+        "label": "Seam fans envelope to competitions subscriber"
+      },
+      {
+        "from": "M7",
+        "to": "M8",
+        "label": "Comp optionally attaches sponsor escrow"
+      },
+      {
+        "from": "M1",
+        "to": "M9",
+        "label": "Game grants item to player inventory on achievement/win"
+      }
     ],
     "modules": [
-      { "id": "M1", "title": "Game core", "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into M2 on match finish." },
-      { "id": "M2", "title": "Result seam", "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to M3/M4/M7." },
-      { "id": "M3", "title": "Local points", "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE — every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE — the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns." },
-      { "id": "M4", "title": "Global ledgers", "what": "Site-wide three ledgers: (a) PURE — sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable." },
-      { "id": "M5", "title": "Active Tier", "what": "Monthly subscription bought from M4c spendable. 2x/3x/4x multiplier on base win points, applied as a SECOND kind-1 credit into M4b+M4c only (M4a pure is never multiplied)." },
-      { "id": "M6", "title": "Point sources", "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch M3 local or M4a pure." },
-      { "id": "M7", "title": "Competitions", "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (M2). Entry from M4c spendable. Deferred until M1-M4 stable." },
-      { "id": "M8", "title": "Sponsor escrow", "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build." },
-      { "id": "M9", "title": "Player inventory", "what": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure." }
+      {
+        "id": "M1",
+        "title": "Game core",
+        "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into M2 on match finish."
+      },
+      {
+        "id": "M2",
+        "title": "Result seam",
+        "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to M3/M4/M7."
+      },
+      {
+        "id": "M3",
+        "title": "Local points",
+        "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE — every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE — the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns."
+      },
+      {
+        "id": "M4",
+        "title": "Global ledgers",
+        "what": "Site-wide three ledgers: (a) PURE — sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable."
+      },
+      {
+        "id": "M5",
+        "title": "Active Tier",
+        "what": "Monthly subscription bought from M4c spendable. 2x/3x/4x multiplier on base win points, applied as a SECOND kind-1 credit into M4b+M4c only (M4a pure is never multiplied)."
+      },
+      {
+        "id": "M6",
+        "title": "Point sources",
+        "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch M3 local or M4a pure."
+      },
+      {
+        "id": "M7",
+        "title": "Competitions",
+        "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (M2). Entry from M4c spendable. Deferred until M1-M4 stable."
+      },
+      {
+        "id": "M8",
+        "title": "Sponsor escrow",
+        "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build."
+      },
+      {
+        "id": "M9",
+        "title": "Player inventory",
+        "what": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure."
+      }
     ],
     "flowDiagram": {
       "label": "Data flow — every arrow is the universal result seam (M2)",
@@ -46,14 +114,54 @@
       "path": "public/universal/",
       "note": "ALL universal (game-agnostic) module code lives here. Never in src/, never in a game folder. Each module has its own subfolder; its README documents the contract; architecture.json holds the spec. Before writing any universal module code, check this tree first.",
       "layout": [
-        { "folder": "result-seam/", "module": "M2", "file": "game-result.js", "desc": "The bus itself. Validates/normalizes the gfg:game-result@1 envelope, fans to subscribers." },
-        { "folder": "points/", "module": "M3", "file": "local-points.js", "desc": "Per-game two-track local ledger (PURE + SPENDABLE). Subscribes to M2, banks verified user-seat wins." },
-        { "folder": "ledgers/", "module": "M4", "file": "global-ledger.js", "desc": "Site-wide three ledgers (PURE + LIFETIME + SPENDABLE). Subscribes to M2, credits kind-0 game wins. M5/M6 drive kind-1 credits here." },
-        { "folder": "subscription/", "module": "M5", "file": "(planned)", "desc": "Active Tier monthly subscription. Drives kind-1 multiplier credits into M4b+M4c only." },
-        { "folder": "point-sources/", "module": "M6", "file": "(planned)", "desc": "Signup bonus, referral, giveaway, social earn. All drive kind-1 credits into M4b+M4c." },
-        { "folder": "competitions/", "module": "M7", "file": "(planned)", "desc": "Earn events + leaderboards. Subscribes to M2, entry from M4c spendable." },
-        { "folder": "escrow/", "module": "M8", "file": "(planned)", "desc": "Optional on-chain sponsor escrow plugin for M7." },
-        { "folder": "inventory/", "module": "M9", "file": "(planned)", "desc": "On-chain player inventory wallet. Per-game item catalogs (skins, sounds, items) stored as media bytes in the account. Gasless grant/equip/revoke." }
+        {
+          "folder": "result-seam/",
+          "module": "M2",
+          "file": "game-result.js",
+          "desc": "The bus itself. Validates/normalizes the gfg:game-result@1 envelope, fans to subscribers."
+        },
+        {
+          "folder": "points/",
+          "module": "M3",
+          "file": "local-points.js",
+          "desc": "Per-game two-track local ledger (PURE + SPENDABLE). Subscribes to M2, banks verified user-seat wins."
+        },
+        {
+          "folder": "ledgers/",
+          "module": "M4",
+          "file": "global-ledger.js",
+          "desc": "Site-wide three ledgers (PURE + LIFETIME + SPENDABLE). Subscribes to M2, credits kind-0 game wins. M5/M6 drive kind-1 credits here."
+        },
+        {
+          "folder": "subscription/",
+          "module": "M5",
+          "file": "(planned)",
+          "desc": "Active Tier monthly subscription. Drives kind-1 multiplier credits into M4b+M4c only."
+        },
+        {
+          "folder": "point-sources/",
+          "module": "M6",
+          "file": "(planned)",
+          "desc": "Signup bonus, referral, giveaway, social earn. All drive kind-1 credits into M4b+M4c."
+        },
+        {
+          "folder": "competitions/",
+          "module": "M7",
+          "file": "(planned)",
+          "desc": "Earn events + leaderboards. Subscribes to M2, entry from M4c spendable."
+        },
+        {
+          "folder": "escrow/",
+          "module": "M8",
+          "file": "(planned)",
+          "desc": "Optional on-chain sponsor escrow plugin for M7."
+        },
+        {
+          "folder": "inventory/",
+          "module": "M9",
+          "file": "(planned)",
+          "desc": "On-chain player inventory wallet. Per-game item catalogs (skins, sounds, items) stored as media bytes in the account. Gasless grant/equip/revoke."
+        }
       ]
     }
   },
@@ -260,7 +368,7 @@
       "id": "M5",
       "title": "Subscription + Premium points (the money + launch engine)",
       "status": "in-progress",
-      "summary": "The consistent-money module: a monthly subscription (Active Tier, single Level-2 2x plan at launch, $10/30 days, launch beta $3 / Nigeria N4,000) bought with PREMIUM points, not global spendable. Premium points are their own on-chain ledger ([gfgprem, player]) acquired ONLY by direct purchase: premium_lifetime (credential, never spent) + premium_spendable (the subscription/special-purchase currency). The subscription powers the 2x win multiplier at M4 flow-up, the boosted daily reward and the bigger lives pool (both in M10). Non-cancellable, non-refundable. This is the LAUNCH GUIDE: every launch-critical piece (payment pipe, admin credit, receipts, 1-year affiliate, daily earn campaign) is specced here.",
+      "summary": "The consistent-money module: a monthly subscription (Active Tier, single Level-2 2x plan at launch, $10/30 days, launch beta $3 / Nigeria N4,000) bought with PREMIUM points, not global spendable. Premium points are their own on-chain ledger ([gfgprem, player]) acquired ONLY by direct purchase: premium_lifetime (credential, never spent) + premium_spendable (the subscription/special-purchase currency). The subscription powers the 2x win multiplier at M4 flow-up, the boosted daily reward and the bigger lives pool (both in M10). Non-cancellable, non-refundable. This is the LAUNCH GUIDE: every launch-critical piece (payment pipe, admin credit, receipts, 12-month affiliate, daily earn campaign) is specced here.",
       "expectedInput": {
         "summary": "What M5 RECEIVES. Locked 2026-08-20 for the launch build.",
         "items": [
@@ -302,7 +410,7 @@
     },
     {
       "id": "M6",
-      "title": "Point-source modules (signup bonus + 1-year affiliate launch marketing; giveaway/social deferred)",
+      "title": "Point-source modules (signup bonus + 12-month affiliate launch marketing; giveaway/social deferred)",
       "status": "in-progress",
       "summary": "The other point sources that feed M4 (lifetime + spendable) but NEVER M3 local. Launch: signup bonus of 500P (so a new user can fund the daily earn-competition entry) and the AFFILIATE program (15% of each referred subscription for up to 12 months, referrer must hold an ACTIVE Level-2 subscription that month, USD-cents on-chain audit ledger, 60-day pair-forfeit rule, manual Naira payout 3-7 days). Giveaway and social-share earn are deferred past launch. All credits are kind=1: M4b + M4c only.",
       "expectedInput": {
@@ -311,7 +419,8 @@
           "FROM SUPABASE/PROFILES: referral relationships (unique code, who invited whom, upgrade events), signup events, payout bank/phone details (filled once, immutable).",
           "FROM ADMIN: manual payout approvals (the 15% affiliate shares + daily-winner payments flow through owner-managed payments).",
           "FROM M5: the referred player's subscription activation/expiry events (triggers the referrer's monthly 15%, gated on the referrer's ACTIVE subscription that month).",
-          "FROM M4: window.globalLedger.credit() to write kind=1 credits into M4b + M4c."]
+          "FROM M4: window.globalLedger.credit() to write kind=1 credits into M4b + M4c."
+        ]
       },
       "expectedOutput": {
         "summary": "What M6 MUST expose. Locked 2026-08-20; affiliate owner-updated 2026-08-21.",
@@ -320,7 +429,8 @@
           "REFERRAL CODE: unique per-user referral code exposed through window.gfgReferral.getCode() and pasted into profile; a shareable auto link.",
           "AFFILIATE CREDIT (15%, 12 months): runway for each SUBSCRIPTION period a referred player pays. Only accrues for months the referrer holds an ACTIVE Level-2 subscription. Accrual pegged to USD cents; the pair closes permanently after 2 consecutive inactive periods. On-chain ledger {month, eligibility, amountUsdCents, status} per affiliate, signed by the relay.",
           "ON-CHAIN AFFILIATE AUDIT (immutable, relay-signed): per-affiliate account/PDA listing months active/inactive, USD amount, status earned/pending/paid/forfeited, and withdrawals, so earnings are provable forever.",
-          "PAYOUT STATE: profile holds bank account + phone (filled once, unchangeable), no same phone across two accounts; the affiliate/payout list shows what the owner owes and is paid manually in Naira within 3-7 days."]
+          "PAYOUT STATE: profile holds bank account + phone (filled once, unchangeable), no same phone across two accounts; the affiliate/payout list shows what the owner owes and is paid manually in Naira within 3-7 days."
+        ]
       },
       "details": [
         "SIGNUP BONUS 500P (locked 2026-08-20): replaces the previous 0. Enough to fund the daily earn-competition entry (which accepts global/local/premium spendable), so a brand-new user can compete from day one. Never touches local (M3) or M4a pure.",
@@ -332,36 +442,36 @@
     },
     {
       "id": "M7",
-      "title": "Competitions (simplest daily earn campaign ships with M5; full game-agnostic platform deferred)",
+      "title": "Competitions (on-chain, config-driven framework + admin creator; launch = Daily Ludo Earn)",
       "status": "in-progress",
-      "summary": "Launch: the simplest earn competition, owner model 2026-08-21. ONE ENTRY PER PLAYER ACCOUNT PER WINDOW (no tickets). Requires an active Level-2 plan + a pluggable/dynamic spendable-requirement list (base 500P), select game Ludo only. WINDSOW-FRESH leaderboard (only verified wins inside the window count; pre/post window points are zero). Daily pool $1-equiv Nigeria N1,500 (1st N500, 2nd N300, 3rd N200, 4th-8th N100 airtime each), price-agnostic USD. Full game-agnostic platform (multi-game, pluggable payout, M8 escrow) stays deferred until M1-M6 stable.",
+      "summary": "COMPETITION FRAMEWORK (owner-approved 2026-08-22). An on-chain, config-driven earn-competition system. Every competition is an ON-CHAIN INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects prefilling this framework’s options); later the same open form is exposed to sponsor projects who pick the framework’s available requirements for their own competitions. NO web2 db (no Supabase): the instance’s identity, requirements, window, pool, winners and paid status live on-chain, so sponsors can later plug 30/70 rake (M8) and escrow without redesign. Launch instance: DAILY LUDO EARN — one entry per account per window, active Level-2 required (level is config), 500P spendable entry from any SELECTED family (global/local/premium — multi-select, one or many), window-fresh verified-wins leaderboard with AUTO-STOP at window end, pool $1 (Nigeria N1,500) split 8 ways 500/300/200/100x5 = 500 pts at the $0.002/pt base, manual payout, redemption agnostic (naira now; points/crypto/merch later). gfgwin on-chain winner records (approved 2026-08-22).",
       "expectedInput": {
-        "summary": "What M7 RECEIVES. Launch version locked 2026-08-20; owner model updated 2026-08-21.",
+        "summary": "What M7 RECEIVES (owner-approved 2026-08-22).",
         "items": [
-          "FROM M2 SEAM: window.onGameResult - the normalized envelope for verified finishes. M7 reads gameId (ludo at launch), player identity, position, and WINDOW TIMESTAMP (only finishes within the active window count).",
-          "FROM M3/M4/M5 (pluggable entry requirements): window.localPoints.spend(), window.globalLedger.spend(), window.premiumPoints.spend() and localPure/global get() for proof gates - the requirement list is a dynamic plugin list so any platform feature can be a gate without touching the core.",
-          "FROM M5: the active-Plan (Level-2) check; only players with an active plan can join a window.",
-          "FROM PROFILE (immutable fields): the player's phone (for airtime) and bank account, filled once, no change, no same phone across two accounts.",
-          "FROM ADMIN: manual cash/airtime payouts (no sponsor, no escrow at launch; price-agnostic USD-cents pool)."
+          "FROM ADMIN CREATOR UI -> create_competition (on-chain instance params). The SAME open form is later exposed to sponsors; each creator is that instance’s authority.",
+          "FROM M2 SEAM: window.onGameResult normalized envelope - M7 filters by the instance’s games[] (multi, any M1 tag), player identity, position, and a WINDOW TIMESTAMP that MUST fall inside [starts_at, ends_at].",
+          "FROM M3/M4/M5 for entry gates: window.localPoints.spend / globalLedger.spend / premiumPoints.spend (any selected family - multi-select), plus M5 active tier read for require_tier (level is config, L2 at launch).",
+          "FROM ADMIN settle/pay: record_competition_winners + mark_winner_paid (payout manual now; escrow auto-pay later flips the same paid flag)."
         ]
       },
       "expectedOutput": {
-        "summary": "What M7 MUST expose. Launch version owner model 2026-08-21.",
+        "summary": "What M7 MUST expose (owner-approved 2026-08-22).",
         "items": [
-          "ONE ENTRY PER ACCOUNT PER WINDOW: a single join marks the player entered for that 24h window; no tickets, no multiple ranks for one account. Requires an active Plan (Level-2 at launch).",
-          "ENTRY/REQUIREMENT PLUGIN LIST (dynamic): e.g. base 500P global spendable deducted + optional extra gates (100P local spendable, local-pure proof, etc.). Each entry deducts from whichever spendable family is required. The list is data, not code, so future features plug in as new requirement types.",
-          "WINDOW-FRESH LEADERBOARD: public daily ranking counts ONLY verified wins whose finish timestamp is inside the window start..end; pre/post window wins are not shown (historical points = 0 for the board). Same account one rank per window.",
-          "PAYOUT (price-agnostic): daily pool $1-equivalent Nigeria N1,500 (1st N500, 2nd N300, 3rd N200, 4th-8th N100 airtime each). Stored in USD cents so payouts can later be stablecoin/embedded-wallet."
+          "ON-CHAIN COMPETITION INSTANCE [gfgcomp2, creator, seq]: name, games (source-code list), require_tier, entry {cost, familyBitSet}, window {start,end}, pool_usd_cents, prize_shares (ordered, sums to pool), redemption (u8), payout_mode (u8), status (open/closed/settled/cancelled).",
+          "WINDOW-FRESH + AUTO-STOP LEADERBOARD: only verified seam wins whose finish is inside [start,end] count; after ends_at the module refuses further input and freezes the board (R16).",
+          "ONE ENTRY PER ACCOUNT PER WINDOW: deterministic ref; same account one rank per window.",
+          "gfgwin ON-CHAIN WINNER RECORDS [gfgwin, comp, rank]: {player, usd_cents, points, status(0=won,1=paid)} via record_competition_winners + mark_winner_paid (approved 2026-08-22, additive).",
+          "PUBLIC COMPETITION PAGES: today’s pool + leaderboard + enter, plus PAST WINDOWS with winners and PAID status.",
+          "CREATOR UI /dashboard/competitions: admin creates as many competitions as needed with dropdowns + multi-selects; everything save writes on-chain. No Supabase used for competitions (R13)."
         ]
       },
       "details": [
-        "LAUNCH SIMPLEST VERSION (owner model 2026-08-21, ships with M5): daily campaign, select game Ludo only (dropdown adds more later). ONE ENTRY PER PLAYER ACCOUNT PER WINDOW, requires active Level-2 plan. Window-fresh leaderboard (only wins inside the window count). Daily pool $1-equiv Nigeria N1,500 (1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each), price-agnostic USD cents.",
-        "ENTRY MECHANICS: base requirement deducted at join, currently 500P from any spendable family (global/local/premium). The requirements list is DYNAMIC/PLUGGABLE: extra gates (e.g. 100P local spendable, or local-pure proof) are data entries, so any platform feature can be added later without changing the competition core.",
-        "FAIRNESS: only wins AFTER the window opens and BEFORE it ends count; 10,000 historical points = 0 on the board until the player wins inside the window. No same-account multiple ranks; separate accounts need their own sub + point payments + in-window grinding.",
-        "SUSTAINABILITY: only active subscribers can join, so the pool is funded by subscription revenue itself (owners 2026-08-21).",
-        "WHY AT LAUNCH: no ads budget; the daily earn campaign + the 12-month affiliate ARE the marketing (owner 2026-08-21).",
-        "PROFILE: phone + bank captured ONCE (immutable, like the referral code), no same phone across two accounts, payouts sent manually by the owner.",
-        "FULL PLATFORM (deferred past launch): multi-game select (one/several/all), pluggable payout (airtime / manual / M8 on-chain escrow / stablecoin), standalone with no sponsor. Product build stays behind M1-M6 stability."
+        "OPEN CREATE FORM (/dashboard/competitions, admin now / sponsors later): fields are dropdowns + multi-selectors prefilled from the framework. Points requirement = MULTI-SELECT (global / local / premium - pick one or many); game(s) = multi-select (Ludo now, any M1 tag later); require tier = dropdown (L2 at launch, L3 in future is just a selection); entry cost = number; window = start/end picker; pool = USD cents; prize shares = ordered amounts summing to the pool; redemption + payout mode = dropdowns. Save -> create_competition on-chain. No server JSON/db (R13).",
+        "FUTURE-PROOF (R12): games[], requirements, tier level, entry, pool, shares, redemption, payout are INSTANCE DATA. A future L3-3x competition, a $25 pool, or a brand competition is a new instance, never a code change.",
+        "AUTO-STOP (R16): the window end is authoritative; the module refuses wins after ends_at and freezes the board.",
+        "ON-CHAIN WINNERS (R15, approved): record_competition_winners + mark_winner_paid are additive instructions on the same program (gfgwin seed, no seed/layout change to live types, upgrade-safe R4 pattern). Later escrow auto-pay sets the same paid flag.",
+        "PRIZE VALUE (R14, owner 2026-08-22): pool is USD cents; $1 = N1,500 at launch = 500 pts ($0.002/point base). Redemption (naira now; points/crypto/merch later) is presentational, adjustable per instance.",
+        "BUILD ORDER (guided by this spec): (1) program: competition-instance + gfgwin additive instructions; (2) relay/serverless create/settle/pay routes; (3) universal daily-earn module (window-fresh, auto-stop, seam); (4) admin creator UI + admin settle/pay page; (5) public competition page + past winners; (6) drawer/landing wiring; (7) launch deck = Daily Ludo Earn instance (games:[ludo], tier 2, entry 500P global, pool $1, shares 500/300/200/100x5)."
       ]
     },
     {
@@ -468,7 +578,12 @@
     "LOCKED PER-GAME SPECS ARE THE BENCHMARK (M1A rule): each game under M1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the M1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes M1 for that game when the build matches A-Z.",
     "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability in ANY module MUST be RPC/region agnostic by construction. New per-player PDA types ship their own undelegate instruction in the same program build (so any account can leave a flaky/banned ER region and be re-pinned); client/relay/probe never hardcode one ER endpoint/region (resolve each account's hosting region from the Magic Router and target it; 3-region registry + failover is the base transport); delegate account maps use the relay's camelCase key form for #[delegate] helper accounts. Survived the 2026-08-18 US-route ban by re-pinning the fleet to AS. A banned region is a re-pin job, never a feature outage.",
     "PREMIUM POINTS (M5) ARE THEIR OWN ECONOMY (locked 2026-08-20): premium_lifetime + premium_spendable live in the [gfgprem, player] PDA, acquired ONLY by direct purchase (admin/sponsor credit), never from gameplay, signup, referral, or giveaway. Premium spendable works wherever global spendable works PLUS places global NEVER can (subscription, lives). Premium never merges into global (M4) or local (M3) and never dilutes M4a pure.",
-    "SUBSCRIPTION STATE IS ON-CHAIN (locked 2026-08-20): subscription_level + active_until live in the premium PDA, never Supabase as truth. No auto-renew: a 30-day window lapses passively. Multiplier stays kind=1 at M4 flow-up only."
+    "SUBSCRIPTION STATE IS ON-CHAIN (locked 2026-08-20): subscription_level + active_until live in the premium PDA, never Supabase as truth. No auto-renew: a 30-day window lapses passively. Multiplier stays kind=1 at M4 flow-up only.",
+    "R12 COMPETITION INSTANCES ARE CONFIG, NOT CODE (owner 2026-08-22): games[], requirements (multi-select spendable families + tier level), entry cost, window, USD pool, prize shares, redemption and payout mode are DATA on an on-chain instance. Changing them = new instance params, never a code rewrite.",
+    "R13 COMPETITIONS ARE ON-CHAIN ONLY (owner 2026-08-22): no web2 db (Supabase) for the competition lifecycle - identity, requirements, window, pool, winners and paid status are on-chain, so sponsors can plug 30/70 rake + escrow (M8) later.",
+    "R14 PRIZES ARE USD/POINTS, REDEMPTION AGNOSTIC (owner 2026-08-22): pool value is USD cents ($1 = N1,500 = 500 pts at the $0.002/pt base, adjustable per instance without rebuild); redemption (naira now; points/crypto/merch later) is presentational only.",
+    "R15 gfgwin WINNER RECORDS ARE ADDITIVE (approved 2026-08-22): [gfgwin, comp, rank] accounts + record_competition_winners + mark_winner_paid as additive instructions on the same program (no seed/layout change to live types; upgrade-safe per R4 / solana-upgrade-safety).",
+    "R16 AUTO-STOP (owner 2026-08-22): an earn competition window REFUSES win input after ends_at; the leaderboard freezes and the ranking is final."
   ],
   "implementationOrder": [
     "1. M1 + M2 + M3 + M4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at M4 flow-up, 3 global ledgers. Test it.",
