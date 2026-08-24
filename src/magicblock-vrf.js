@@ -907,9 +907,35 @@ export async function activateSubscription() {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
+// M5 (plan ladder) — activates a SPECIFIC plan level (2 = 5,000P, 3 = 10,000P)
+// from premium spendable. Same ER/gasless/session-key path as activateSubscription.
+export async function activateSubscriptionLevel(level) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
+
+  const { wallet } = ctx;
+  const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+
+  await ensureDelegated(premiumPda, wallet.publicKey);
+  await waitForErPickup(premiumPda);
+
+  const regionUrl = await regionUrlFor(premiumPda);
+
+  const sig = await withErRetry('activate_subscription_level', async (ctx) => ctx.program.methods
+    .activateSubscriptionLevel(new BN(level))
+    .accounts({
+      premiumPoints: premiumPda,
+      payer: wallet.publicKey,
+      playerAuthority: wallet.publicKey,
+    })
+    .rpc(), { regionUrl });
+
+  return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
+}
+
 // M5 v3 — activates the 72h unlimited-lives booster: deducts BOOSTER_COST
-// (1,500) premium spendable and sets booster_active_until = now + 72h (extends
-// an already-active booster). No win multiplier. Gasless on the ER; the player's
+// premium spendable and sets booster_active_until = now + 72h (extends an
+// already-active booster). No win multiplier. Gasless on the ER; the player's
 // session key signs.
 export async function activateBooster() {
   const ctx = getErProgram();
@@ -1315,6 +1341,12 @@ export function initMagicBlockDice() {
     // spendable, sets a 30-day sub, NO auto-renew). Gasless ER write.
     activateSubscription() {
       return activateSubscription();
+    },
+
+    // M5 (plan ladder) — activates a SPECIFIC plan level (2 = 5,000P,
+    // 3 = 10,000P) from premium spendable. Gasless ER write.
+    activateSubscriptionLevel(level) {
+      return activateSubscriptionLevel(level);
     },
 
     // M5 v3 — activates the 72h unlimited-lives booster (deducts 1,500 premium

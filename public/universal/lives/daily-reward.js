@@ -18,6 +18,7 @@
 
     var FREE_REWARD = 25;
     var PREMIUM_REWARD = 200;
+    var LEVEL3_REWARD = 300; // Level 3 (3x) daily reward (M5 ladder 2026-08-22)
     var DAILY_REASON = 6; // daily_reward reason tag (WIN_* are 1..3, tier_boost is 5)
 
     var store = {};
@@ -89,7 +90,11 @@
     }
 
     function amount() {
-        return isPremiumActive() ? PREMIUM_REWARD : FREE_REWARD;
+        // Plan-ladder ladder (M5, config-driven): free 25 / Level-2 200 / Level-3 300.
+        var l = tierLevel();
+        if (l >= 3) return LEVEL3_REWARD;
+        if (l >= 2) return PREMIUM_REWARD;
+        return FREE_REWARD;
     }
 
     // ---- storage -----------------------------------------------------------

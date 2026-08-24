@@ -24,6 +24,7 @@
 
     var FREE_LIVES = 5;
     var PREMIUM_LIVES = 10;
+    var LEVEL3_LIVES = 15; // Level 3 (3x) lives pool (M5 ladder 2026-08-22)
 
     var store = {};
     try {
@@ -96,7 +97,12 @@
     }
 
     function totalForLevel() {
-        return isPremiumActive() ? PREMIUM_LIVES : FREE_LIVES;
+        // Plan-ladder ladder (M5, config-driven): free 5 / Level-2 10 / Level-3 15.
+        var v = activeView();
+        var lvl = v ? (v.level || 0) : 0;
+        if (lvl >= 3) return LEVEL3_LIVES;
+        if (lvl >= 2) return PREMIUM_LIVES;
+        return FREE_LIVES;
     }
 
     // ---- M5 v3 booster (72h unlimited lives) -------------------------------

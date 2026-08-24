@@ -80,7 +80,7 @@
             const actionMsg = document.getElementById('upgrade-action-msg');
 
             const REFRESH_KEY = 'gfg_upgrade_refresh_lock';
-            const LOCK_MS = 2 * 60 * 1000; // 2 minutes for testing
+            const LOCK_MS = 5 * 60 * 1000; // 5-minute recheck lock (owner 2026-08-23)
 
             function canRefresh() {
                 try {
@@ -95,11 +95,11 @@
                     if (diff < LOCK_MS) {
                         const left = Math.ceil((LOCK_MS - diff)/60000);
                         refreshBtn.disabled = true;
-                        refreshHint.textContent = `Refresh locked — try again in ${left} minute${left!==1?'s':''} (max 6 times per hour to protect the RPC).`;
+                        refreshHint.textContent = `Refresh locked — try again in ${left} minute${left!==1?'s':''} (max 12 times per hour to protect the RPC).`;
                         setTimeout(updateRefreshLock, 60000);
                     } else {
                         refreshBtn.disabled = false;
-                        refreshHint.textContent = 'Ready to refresh (once every 2 minutes).';
+                        refreshHint.textContent = 'Ready to refresh (once every 5 minutes).';
                     }
                 } catch(e) {}
             }
@@ -219,13 +219,28 @@
                     renderPremiumCard(pp);
                     statusEl.textContent = 'Showing cached premium balance — tap Refresh for live on-chain check.';
                 } else {
-                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 2 minutes).';
+                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 5 minutes).';
                 }
             } catch(e) {}
 
+            // FIRST-VISIT AUTO-CHECK (owner 2026-08-23): load the live balance ONCE on
+            // arrival (when no recent check) so the plan/upgrade/booster controls are
+            // ready without knowing you have to tap Refresh. After that, the same
+            // 5-minute lock applies and the button is the only recheck trigger.
+            (function autoCheckOnce() {
+                try {
+                    if (!canRefresh()) return;
+                    const signedIn = !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())
+                        || !!(window.currentUser)
+                        || !!(window.currentProfile && window.currentProfile.solana_wallet);
+                    if (!signedIn) return;
+                    setTimeout(function () { try { refreshBtn.click(); } catch (e) {} }, 450);
+                } catch (e) { /* ignore */ }
+            })();
+
             upgradeBtn.addEventListener('click', async () => {
                 if (!balanceChecked) {
-                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 2 minutes), then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 5 minutes), then Upgrade unlocks.</span>';
                     return;
                 }
                 if (!window.premiumPoints || typeof window.premiumPoints.activate !== 'function') {

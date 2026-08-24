@@ -1293,6 +1293,12 @@ export function initMagicBlockDice() {
       return activateSubscription();
     },
 
+    // M5 (plan ladder) — activates a SPECIFIC plan level (2 = 5,000P,
+    // 3 = 10,000P) from premium spendable. Gasless ER write.
+    activateSubscriptionLevel(level) {
+      return activateSubscriptionLevel(level);
+    },
+
     // M5 — operator-gated PREMIUM credit (staff UI only). The relay calls back
     // with the on-chain ledger after crediting.
     creditPremiumPoints(player, points, creditRef, operatorToken) {
