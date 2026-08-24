@@ -72,7 +72,12 @@
         var w = wallet();
         if (!w) return { ok: false, error: 'signin' };
         if (!tierOk(comp)) return { ok: false, error: 'tier' };
-        var ref = 'comp|' + (comp.creator || '') + '|' + comp.seq + '|' + w;
+        // spend_ref is a u64 on-chain: use a deterministic numeric hash of the
+        // (competition, wallet) pair so it never collides per window/wallet.
+        var refStr = 'comp|' + (comp.creator || '') + '|' + comp.seq + '|' + w;
+        var hv = 0x811c9dc5;
+        for (var qi = 0; qi < refStr.length; qi++) { hv ^= refStr.charCodeAt(qi); hv = Math.imul(hv, 0x01000193) >>> 0; }
+        var ref = (hv % 2147483647) || 1;
         var fam = comp.entryFamilies || 0;
         var tried = [];
         var order = [1, 4, 2]; // global, premium, local

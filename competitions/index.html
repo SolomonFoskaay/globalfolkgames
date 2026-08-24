@@ -7,16 +7,24 @@
     <meta name="description" content="Join optional earn competitions: play within a window, climb the live Final-Points leaderboard and share real reward pools. Winners and payments are recorded on-chain.">
     <link rel="stylesheet" href="/style.css">
     <style>
-        .prize-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:10px; }
+        .tabrow { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
+        .tabrow button { background:#1a1a24; color:#bbb; border:1px solid #2a2a36; border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer; }
+        .tabrow button.active { background:linear-gradient(135deg,#f39c12,#e67e22); color:#000; }
+        .prize-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; margin-top:10px; }
         .prize { background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px; text-align:center; }
-        .prize b { color:#2ecc71; font-size:1.05rem; display:block; }
-        .prize span { font-size:0.72rem; color:#888; }
+        .prize b { color:#2ecc71; font-size:1.02rem; display:block; }
+        .prize span { font-size:0.7rem; color:#888; }
         table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
         th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
         th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
         td.mono { font-family:monospace; word-break:break-all; }
         .you { background:rgba(46,204,113,0.10); }
         .hidden-note { font-size:0.75rem; color:#888; margin-top:6px; }
+        .pager { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; flex-wrap:wrap; }
+        .pager button { background:#1a1a24; color:#bbb; border:1px solid #333; border-radius:8px; padding:7px 12px; cursor:pointer; }
+        .pager button:disabled { opacity:0.4; cursor:default; }
+        .comp-row { cursor:pointer; }
+        .comp-row:hover { background:rgba(255,255,255,0.02); }
     </style>
 </head>
 <body>
@@ -26,22 +34,31 @@
             <p class="auth-hint" id="comp-status" style="margin-top:8px;">Loading competitions...</p>
         </section>
 
-        <div id="live-box"></div>
-        <div id="coming-box"></div>
+        <!-- LIST VIEW -->
+        <div id="list-view">
+            <div class="tabrow" id="tabs">
+                <button data-tab="ongoing" class="active">Ongoing</button>
+                <button data-tab="upcoming">Upcoming</button>
+                <button data-tab="past">Past</button>
+            </div>
+            <div id="list-box"><p class="empty">Loading...</p></div>
+            <div class="pager" id="pager"></div>
+        </div>
+
+        <!-- DETAIL VIEW (per-competition dedicated page: ?seq=&creator=) -->
+        <div id="detail-view" style="display:none;">
+            <button class="launch-btn" style="width:auto; margin-bottom:10px; background:#1a1a24; border:1px solid #333; color:#bbb;" onclick="window.__backToList()">← All competitions</button>
+            <div id="detail-card"></div>
+        </div>
 
         <section class="game-card" style="margin-top:16px;">
             <h3>How it works</h3>
             <ol style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
-                <li><b style="color:#fff;">Enter a window</b> - be on one of the plans the competition allows, and pay the small entry once.</li>
-                <li><b style="color:#fff;">Play inside the window</b> - only verified wins made while it is live count toward the board. The window stops accepting results the moment it ends.</li>
-                <li><b style="color:#fff;">Watch Final Points</b> - your board score is Total Points, boosted live by your plan (Level 3 = 1.5x, Level 2 = 1x). Downgrade mid-window and the boost recalculates instantly; drop to the free plan and you go hidden until you resubscribe.</li>
-                <li><b style="color:#fff;">Top finishers share the pool</b> - the winners are recorded on-chain and paid by the platform. Completed windows stay listed below with winners and paid status as proof.</li>
+                <li><b style="color:#fff;">Enter a window</b> - be on one of the plans the competition allows and pay the small entry once.</li>
+                <li><b style="color:#fff;">Play inside the window</b> - only verified wins made while it is live count. It stops taking results the moment it ends.</li>
+                <li><b style="color:#fff;">Watch Final Points</b> - Total Points boosted live by your plan (Level 3 = 1.5x, Level 2 = 1x). Drop to the free plan and you go hidden until you resubscribe.</li>
+                <li><b style="color:#fff;">Top finishers share the pool</b> - winners are recorded on-chain and paid by the platform; each window's page shows the final board and paid status.</li>
             </ol>
-        </section>
-
-        <section class="game-card" style="margin-top:16px;">
-            <h3>Past completed competitions</h3>
-            <div id="past-box"><p class="empty">Completed windows will appear here with their winners and paid status.</p></div>
         </section>
     </main>
 
@@ -50,67 +67,139 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var statusEl = document.getElementById('comp-status');
+            var listBox = document.getElementById('list-box');
+            var pagerEl = document.getElementById('pager');
+            var tabsBox = document.getElementById('tabs');
+            var listView = document.getElementById('list-view');
+            var detailView = document.getElementById('detail-view');
+            var detailCard = document.getElementById('detail-card');
+
             var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             var short = w => w ? (w.slice(0, 6) + '…') : '—';
             var STATUS = ['Open', 'Closed', 'Settled', 'Cancelled'];
+            var PER_PAGE = 6;
+            var tab = 'ongoing';
+            var page = 1;
+            var LIST_EVERY = 20000;
+            var events = [];
 
-            function myWallet() {
-                try { return window.gfgCompetitions.wallet(); } catch (e) { return null; }
-            }
+            function myWallet() { try { return window.gfgCompetitions.wallet(); } catch (e) { return null; } }
+            function tierNeeds(c) { return ([2,3,4,5,6,7].filter(k => c.tierBits & (1 << k))).map(k => 'L' + k).join('/'); }
 
-            function prizePositions(comp) {
-                var shares = (comp.prizeShares || []).slice(0, comp.winnerCount);
-                var total = shares.reduce((a, b) => a + b, 0);
-                return shares.map((s, i) => ({ rank: i + 1, sharePct: total ? +((s / total) * 100).toFixed(1) : 0, usdCents: Math.round((comp.poolUsdCents * s) / (total || 1)) }));
-            }
-
-            function renderComp(c, kind) {
+            function grouped(comps) {
                 var now = Date.now();
-                var liveNow = kind === 'live';
-                var box = liveNow ? document.getElementById('live-box') : document.getElementById('coming-box');
-                var prizes = prizePositions(c);
-                var el = document.createElement('div');
-                el.className = 'game-card';
-                el.style.marginTop = '12px';
-                el.style.border = liveNow ? '1px solid rgba(46,204,113,0.45)' : '1px dashed #2a2a36';
-                var endsIn = Math.max(0, c.endsAt * 1000 - now);
-                var h = Math.floor(endsIn / 3600000), m = Math.floor((endsIn % 3600000) / 60000);
-                el.innerHTML =
-                    '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">' +
-                    '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
-                    '<span style="color:' + (liveNow ? '#2ecc71' : '#9b59b6') + '; font-weight:800;">' + (liveNow ? 'LIVE · ends in ' + h + 'h ' + m + 'm' : 'starts ' + new Date(c.startsAt * 1000).toUTCString().slice(0, 16)) + '</span></div>' +
-                    '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'L' + k).join('/') + ' · ' + c.winnerCount + ' winners</p>' +
-                    '<div class="prize-grid">' + prizes.map(p => '<div class="prize"><b>$' + (p.usdCents / 100).toFixed(2) + '</b><span>#' + p.rank + (p.rank <= 5 ? ' cash' : ' airtime') + '</span></div>').join('') + '</div>' +
-                    (liveNow ? '<div id="enter-' + c.seq + '"></div><div id="board-' + c.seq + '"></div>' : '')
-                ;
-                box.appendChild(el);
-                if (liveNow) { renderEnter(c); loadBoard(c); }
+                return {
+                    ongoing: comps.filter(c => c.status === 0 && now >= c.startsAt * 1000 && now <= c.endsAt * 1000),
+                    upcoming: comps.filter(c => c.status === 0 && now < c.startsAt * 1000),
+                    past: comps.filter(c => c.status === 2 || c.status === 1 || c.status === 3)
+                };
+            }
+
+            function prizeSlot(c) {
+                var total = (c.prizeShares || []).reduce((a, b) => a + b, 0) || 1;
+                return (c.prizeShares || []).slice(0, c.winnerCount).map((s, i) => '$' + Math.round(c.poolUsdCents * s / total / 100 * 100) / 100);
+            }
+
+            function renderTabs() {
+                var g = grouped(window.__comps || []);
+                [['ongoing', 'Ongoing'], ['upcoming', 'Upcoming'], ['past', 'Past']].forEach(function (pair) {
+                    var btn = tabsBox.querySelector('[data-tab="' + pair[0] + '"]');
+                    if (btn) btn.textContent = pair[1] + ' (' + g[pair[0]].length + ')';
+                });
+            }
+
+            function renderList() {
+                var g = grouped(window.__comps || []);
+                var items = g[tab] || [];
+                var totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+                if (page > totalPages) page = totalPages;
+                var slice = items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+                renderTabs();
+                if (!items.length) {
+                    listBox.innerHTML = '<p class="empty">No ' + tab + ' competitions right now.</p>';
+                    pagerEl.innerHTML = '';
+                    return;
+                }
+                listBox.innerHTML = slice.map(function (c) {
+                    var now = Date.now();
+                    var endsH = Math.max(0, Math.floor((c.endsAt * 1000 - now) / 3600000));
+                    return '<div class="game-card comp-row" style="margin-bottom:10px;" onclick="window.__open(' + c.seq + ')">' +
+                        '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
+                        '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
+                        (tab === 'ongoing' ? '<span style="color:#2ecc71; font-weight:800;">LIVE · ends in ' + endsH + 'h</span>' : tab === 'upcoming' ? '<span style="color:#9b59b6; font-weight:700;">' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span>' : '<span style="color:#888;">' + STATUS[c.status] + '</span>') +
+                        '</div>' +
+                        '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = ' + c.poolPoints + ' pts · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + ' · ' + c.winnerCount + ' winners</p>' +
+                        '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>#' + (i + 1) + '</span></div>'; }).join('') + '</div>' +
+                        '</div>';
+                }).join('');
+                var pagesHtml = '<button onclick="window.__page(page-1)" ' + (page <= 1 ? 'disabled' : '') + '>Prev</button>' +
+                    Array.from({ length: totalPages }, function (_, i) { return i + 1; }).map(function (p) { return '<button onclick="window.__page(' + p + ')" ' + (p === page ? 'style="background:#f39c12;color:#000;"' : '') + '>' + p + '</button>'; }).join('') +
+                    '<button onclick="window.__page(page+1)" ' + (page >= totalPages ? 'disabled' : '') + '>Next</button>';
+                pagerEl.innerHTML = totalPages > 1 ? pagesHtml : '';
+                statusEl.textContent = items.length + ' ' + tab + ' competition(s).';
+            }
+
+            window.__page = function (p) { page = p; renderList(); };
+            window.__backToList = function () { history.replaceState(null, '', '/competitions/'); listView.style.display = ''; detailView.style.display = 'none'; window.__detailSeq = null; renderList(); };
+
+            window.__open = function (seq) {
+                var c = (window.__comps || []).find(x => x.seq === seq);
+                if (!c) return;
+                history.replaceState(null, '', '/competitions/?seq=' + seq + '&creator=' + encodeURIComponent(c.creator));
+                listView.style.display = 'none';
+                detailView.style.display = 'block';
+                window.__detailSeq = seq;
+                window.__comps = window.__comps || [];
+                renderDetail(c, 'enter');
+                loadBoard(c);
+                window.__detailTimer = setInterval(function () { if (!window.__detailSeq) { clearInterval(window.__detailTimer); return; } loadBoard(c); }, 12000);
+            };
+
+            function renderDetail(c, mode) {
+                var now = Date.now();
+                var h = Math.max(0, Math.floor((c.endsAt * 1000 - now) / 3600000)), m = Math.max(0, Math.floor(((c.endsAt * 1000 - now) % 3600000) / 60000));
+                var isEnded = c.status !== 0 || now >= c.endsAt * 1000;
+                var entry = '<div id="enter-' + c.seq + '"></div>';
+                if (mode === 'enter' && !isEnded) {
+                    window.__comps = window.__comps || [];
+                    setTimeout(function () { renderEnter(c); }, 0);
+                } else if (isEnded) {
+                    entry = '<p class="hidden-note">This window has ended (final board shown below).</p>';
+                }
+                var winnersHtml = '';
+                if (c.status === 2) {
+                    winnersHtml = '<div id="past-winners-' + c.seq + '"></div>';
+                    loadPastWinners(c);
+                }
+                detailCard.innerHTML =
+                    '<div class="game-card" style="border:1px solid rgba(46,204,113,0.45);">' +
+                    '<h3>' + esc(c.name) + '</h3>' +
+                    '<p style="color:var(--muted); font-size:0.84rem; margin:4px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + (c.status === 0 ? ' · ends in ' + h + 'h ' + m + 'm' : ' · ' + STATUS[c.status]) + '</p>' +
+                    '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>' + (i < 5 ? '#' + (i + 1) + ' cash' : '#' + (i + 1) + ' airtime') + '</span></div>'; }).join('') + '</div>' +
+                    entry +
+                    '</div>' +
+                    '<div class="game-card" style="margin-top:12px;"><h3>Final board</h3><div id="board-' + c.seq + '"><p class="hidden-note">Loading...</p></div></div>' +
+                    winnersHtml;
             }
 
             function renderEnter(c) {
                 var holder = document.getElementById('enter-' + c.seq);
                 if (!holder) return;
-                if (window.__enterLock && window.__enterLock[c.seq]) return; // keep the result message
+                if (window.__enterLock && window.__enterLock[c.seq]) return;
                 var w = myWallet();
-                var btn = '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter now (cost ' + c.entryCost + 'P)</button>';
                 holder.innerHTML = !w
                     ? '<p class="empty" style="margin-top:12px;">Sign in to enter this competition.</p>'
-                    : btn;
+                    : '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter now (cost ' + c.entryCost + 'P)</button>';
             }
             window.__enter = async function (seq) {
                 var c = (window.__comps || []).find(x => x.seq === seq);
                 var holder = document.getElementById('enter-' + seq);
                 holder.innerHTML = '<p class="hidden-note">Entering...</p>';
                 var res = await window.gfgCompetitions.enter(c);
-                if (res.error === 'signin') {
-                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
-                } else if (res.error === 'tier') {
-                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + [2,3,4,5,6,7].filter(k => c.tierBits & (1 << k)).map(k => 'Level ' + k).join(', ') + ' (Level 3 is ad-free too).</p>';
-                } else if (res.error === 'insufficient') {
-                    holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
-                } else {
-                    holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>';
-                }
+                if (res.error === 'signin') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
+                else if (res.error === 'tier') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + tierNeeds(c) + ' (Level 3 is ad-free too).</p>';
+                else if (res.error === 'insufficient') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
+                else holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>';
                 window.__enterLock = window.__enterLock || {};
                 window.__enterLock[seq] = true;
             };
@@ -123,59 +212,72 @@
                     if (!j || !j.board) { host.innerHTML = '<p class="hidden-note">No entries yet.</p>'; return; }
                     var me = myWallet();
                     host.innerHTML =
-                        '<p style="font-size:0.78rem; color:#888; margin-top:12px;">Final-Points board (' + (j.autoStopped ? 'window ended' : 'live') + '):</p>' +
-                        '<table><thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th></tr></thead><tbody>' +
-                        j.board.map(b => '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td></tr>').join('') +
-                        (j.hidden && j.hidden.length ? '<tr><td colspan="5" class="hidden-note">Hidden (on the free plan during the window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '') +
+                        '<p style="font-size:0.75rem; color:#888; margin-bottom:4px;">Ranked by Final Points (' + (j.autoStopped ? 'window ended' : 'live') + '):</p>' +
+                        '<table><thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th><th>Prize</th></tr></thead><tbody>' +
+                        j.board.map(function (b) {
+                            return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td></tr>';
+                        }).join('') +
+                        (j.hidden && j.hidden.length ? '<tr><td colspan="6" class="hidden-note">Hidden (free plan during window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '') +
                         '</tbody></table>';
                 } catch (e) { host.innerHTML = '<p class="hidden-note">board error</p>'; }
             }
 
-            async function renderPast() {
+            async function loadPastWinners(c) {
+                var host = document.getElementById('past-winners-' + c.seq);
+                if (!host) return;
                 try {
-                    var r = await fetch('/api/competitions', { cache: 'no-store' });
+                    var r = await fetch('/api/competitions?seq=' + c.seq + '&winners=1&creator=' + encodeURIComponent(c.creator), { cache: 'no-store' });
                     var j = await r.json();
-                    var settled = (j.competitions || []).filter(c => c.status === 2);
-                    var box = document.getElementById('past-box');
-                    if (!settled.length) { box.innerHTML = '<p class="empty">Completed windows will appear here with their winners and paid status.</p>'; return; }
-                    box.innerHTML = '';
-                    for (const c of settled) {
-                        var wr = await fetch('/api/competitions?seq=' + c.seq + '&winners=1&creator=' + encodeURIComponent(c.creator), { cache: 'no-store' });
-                        var wj = await wr.json();
-                        var comp = wj.competition || {}; var wins = comp.winners || [];
-                        var card = document.createElement('div');
-                        card.className = 'game-card';
-                        card.style.marginTop = '10px';
-                        card.innerHTML = '<h3>' + esc(c.name) + ' <span style="font-size:0.75rem; color:#888;">· ' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span></h3>' +
-                            (wins.length ? '<table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>Share</th><th>Status</th></tr></thead><tbody>' +
-                                wins.map(x => '<tr><td>#' + x.rank + '</td><td class="mono">' + esc(short(x.player)) + '</td><td>' + x.points + '</td><td>$' + (x.usdCents / 100).toFixed(2) + '</td><td style="color:' + (x.status === 1 ? '#2ecc71' : '#f39c12') + '; font-weight:700;">' + (x.status === 1 ? 'PAID' : 'pending') + '</td></tr>').join('') + '</tbody></table>'
-                                : '<p class="hidden-note">No winners recorded.</p>');
-                        box.appendChild(card);
-                    }
-                } catch (e) { document.getElementById('past-box').innerHTML = '<p class="hidden-note">Could not load.</p>'; }
+                    var comp = j.competition || {}; var wins = comp.winners || [];
+                    host.innerHTML = wins.length
+                        ? '<div class="game-card" style="margin-top:12px;"><h3>Winners (on-chain)</h3><table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>Share</th><th>Status</th></tr></thead><tbody>' +
+                          wins.map(function (x) { return '<tr><td>#' + x.rank + '</td><td class="mono">' + esc(short(x.player)) + '</td><td>' + x.points + '</td><td>$' + (x.usdCents / 100).toFixed(2) + '</td><td style="color:' + (x.status === 1 ? '#2ecc71' : '#f39c12') + '; font-weight:700;">' + (x.status === 1 ? 'PAID' : 'pending') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+                        : '';
+                } catch (e) { host.innerHTML = ''; }
+            }
+
+            function bindEvents() {
+                tabsBox.querySelectorAll('button').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        tab = btn.dataset.tab; page = 1;
+                        tabsBox.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
+                        renderList();
+                    });
+                });
+            }
+
+            function route() {
+                var params = new URLSearchParams(location.search);
+                var seq = params.get('seq');
+                if (seq) {
+                    var c = (window.__comps || []).find(x => String(x.seq) === String(seq));
+                    if (c) { window.__open(c.seq); return; }
+                    // not in cache yet; refresh then open
+                    window.gfgCompetitions.refresh().then(function (comps) { window.__comps = comps; window.__comps = window.__comps || []; var c2 = window.__comps.find(x => String(x.seq) === String(seq)); if (c2) window.__open(c2.seq); });
+                    return;
+                }
+                listView.style.display = '';
+                detailView.style.display = 'none';
+                window.__detailSeq = null;
+                renderList();
             }
 
             async function refresh() {
                 var comps = await window.gfgCompetitions.refresh();
                 window.__comps = comps;
-                var now = Date.now();
-                var live = comps.filter(c => c.status === 0 && now >= c.startsAt * 1000 && now <= c.endsAt * 1000);
-                var coming = comps.filter(c => c.status === 0 && now < c.startsAt * 1000);
-                document.getElementById('live-box').innerHTML = live.length ? '' : '<p class="empty" style="margin-top:12px;">No competition is live right now. Follow the changelog for the next window.</p>';
-                document.getElementById('coming-box').innerHTML = '';
-                live.forEach(c => renderComp(c, 'live'));
-                coming.forEach(c => renderComp(c, 'coming'));
-                statusEl.textContent = live.length ? live.length + ' competition(s) live.' : 'Live windows appear here when they open.';
-                renderPast();
+                renderTabs();
+                if (window.__detailSeq) {
+                    var c = (window.__comps || []).find(x => x.seq === window.__detailSeq);
+                    if (c) { detailCard.innerHTML = ''; renderDetail(c, 'enter'); loadBoard(c); }
+                } else {
+                    route();
+                }
             }
+
+            bindEvents();
             refresh();
-            setInterval(function () { if (window.gfgCompetitions) { window.gfgCompetitions.refresh().then(renderLiveOnly); } }, 15000);
-            function renderLiveOnly() {
-                var comps = window.__comps || [];
-                var now = Date.now();
-                var live = comps.filter(c => c.status === 0 && now >= c.startsAt * 1000 && now <= c.endsAt * 1000);
-                live.forEach(c => { var host = document.getElementById('board-' + c.seq); if (host) loadBoard(c); });
-            }
+            setInterval(refresh, LIST_EVERY);
+            if (typeof window.addEventListener === 'function') window.addEventListener('gfg:auth-changed', function () { window.__comps = null; refresh(); });
         });
     </script>
 </body>
