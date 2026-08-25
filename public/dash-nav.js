@@ -46,7 +46,14 @@
     function render(cfg) {
         cfg = cfg || {};
         const brand = cfg.brand || '📌';
-        const sections = Array.isArray(cfg.sections) ? cfg.sections : [];
+        const sections = Array.isArray(cfg.sections) ? cfg.sections.slice() : [];
+        // Universal Tools section so the launch run sheet is reachable from every
+        // dashboard page's own menu (single place).
+        if (!sections.some(sec => (sec.items || []).some(it => it.key === 'run-sheet'))) {
+            sections.push({ heading: 'Tools', items: [
+                { key: 'run-sheet', label: '🧾 Launch run sheet', href: '/dashboard/run-sheet.md' }
+            ] });
+        }
         const active = cfg.active || '';
         if (document.getElementById('dash-rail')) return; // already rendered
 

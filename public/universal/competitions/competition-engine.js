@@ -99,7 +99,12 @@
                 markEntered(comp); // board counts only users who ENTERED
                 try {
                     await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'enter', creator: comp.creator || null, seq: comp.seq, wallet: w }) });
-                } catch (e) { /* relay entry is advisory; the spend itself is on-chain */ }
+                } catch (e) { /* advisory */ }
+                // create the on-chain tally so the entrant appears on the board
+                // instantly (ranked 0 until they win inside the window).
+                try {
+                    await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'ensure', creator: comp.creator || null, seq: comp.seq, wallet: w }) });
+                } catch (e) { /* advisory */ }
                 return { ok: true };
             }
         }
@@ -131,7 +136,7 @@
     function notify() { subs.slice().forEach(function (cb) { try { cb(cache); } catch (e) {} }); }
 
     window.gfgCompetitions = {
-        refresh, list, active, live, board, enter, subscribe,
+        refresh, list, active, live, board, enter, subscribe, isEntered,
         tierOk, currentLevel, wallet,
         sourceCodeFor: function (tag) { return TAG_TO_SOURCE[tag]; },
         sourceTagFor: function (code) { return SOURCE_TO_TAG[code]; },

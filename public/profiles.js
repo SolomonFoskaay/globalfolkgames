@@ -164,7 +164,11 @@
 
         if (dynamicUser) {
             const profile = await ensureProfile(dynamicUser);
-            const name = (profile?.display_name || profile?.username || 'Player').slice(0, 12);
+            // Identity stays concealed: show the unique GFG-XXXXXX handle (same as
+            // the affiliate identity), never the email or a profile name.
+            let handle = null;
+            try { handle = (window.gfgReferral && typeof window.gfgReferral.handle === 'function') ? window.gfgReferral.handle() : null; } catch (e) {}
+            const name = (handle || profile?.display_name || 'Player').slice(0, 12);
             const tier = (typeof window.getActiveTier === 'function')
                 ? window.getActiveTier()
                 : { tier: 1, mult: 1, label: 'Tier 1' };

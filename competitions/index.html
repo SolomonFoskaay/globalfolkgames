@@ -270,6 +270,11 @@
                 var holder = document.getElementById('enter-' + c.seq);
                 if (!holder) return;
                 if (window.__enterLock && window.__enterLock[c.seq]) return;
+                var joined = window.gfgCompetitions && typeof window.gfgCompetitions.isEntered === 'function' && window.gfgCompetitions.isEntered(c);
+                if (joined) {
+                    holder.innerHTML = '<p style="color:#2ecc71; font-size:0.9rem; margin-top:12px; font-weight:700;">You have joined this competition. Wins inside the window now count for you.</p>';
+                    return;
+                }
                 var w = myWallet();
                 holder.innerHTML = !w
                     ? '<p class="empty" style="margin-top:12px;">Sign in to enter this competition.</p>'
@@ -295,6 +300,8 @@
                     var j = await window.gfgCompetitions.board(c.creator, c.seq);
                     if (!j || !j.board) { host.innerHTML = '<p class="hidden-note">No entries yet.</p>'; return; }
                     var me = myWallet();
+                    window.__boardPage = window.__boardPage || {};
+                    window.__boardSize = window.__boardSize || {};
                     // For settled windows the SINGLE board also shows each rank's paid status (on-chain gfgwin).
                     var paidMap = {};
                     if (c.status === 2) {
@@ -304,18 +311,43 @@
                             ((wj.competition || {}).winners || []).forEach(function (x) { paidMap[x.rank] = x.status; });
                         } catch (e) {}
                     }
+                    var qb = ((document.getElementById('board-q-' + c.seq) || {}).value || '').toString().toLowerCase();
+                    var list = (j.board || []).filter(function (b) {
+                        if (!qb) return true;
+                        return (b.wallet || '').toLowerCase().indexOf(qb) !== -1 || String(b.handle || '').toLowerCase().indexOf(qb) !== -1;
+                    });
+                    window.__boardPage[c.seq] = window.__boardPage[c.seq] || 1;
+                    window.__boardSize[c.seq] = window.__boardSize[c.seq] || 10;
+                    var size = window.__boardSize[c.seq];
+                    var pages = Math.max(1, Math.ceil(list.length / size));
+                    if (window.__boardPage[c.seq] > pages) window.__boardPage[c.seq] = pages;
+                    var pg = window.__boardPage[c.seq];
+                    var slice = list.slice((pg - 1) * size, pg * size);
                     var head = '<thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th><th>Prize</th>' + (c.status === 2 ? '<th>Status</th>' : '') + '</tr></thead>';
-                    var body = j.board.map(function (b) {
+                    var body = slice.map(function (b) {
                         var rate = c.status === 2 ? '<td style="color:' + ((paidMap[b.position] === 1) ? '#2ecc71' : '#f39c12') + ';font-weight:700;">' + ((paidMap[b.position] === 1) ? 'PAID' : 'pending') + '</td>' : '';
-                        return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(short(b.wallet)) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td>' + rate + '</tr>';
+                        var label = b.handle || short(b.wallet);
+                        return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(label) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td>' + rate + '</tr>';
                     }).join('');
                     var hiddenRow = j.hidden && j.hidden.length ? '<tr><td colspan="' + (c.status === 2 ? 7 : 6) + '" class="hidden-note">Hidden (free plan during window): ' + j.hidden.map(h => short(h.wallet)).join(', ') + '</td></tr>' : '';
+                    var tool = '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">' +
+                        '<input id="board-q-' + c.seq + '" placeholder="Search participant (handle or wallet)..." style="flex:1; min-width:140px; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.8rem;">' +
+                        '<select id="board-size-' + c.seq + '" style="padding:8px; border-radius:8px; background:#1a1a24; color:#fff; border:1px solid rgba(255,255,255,0.12);"><option value="10">10 / page</option><option value="20">20 / page</option><option value="50">50 / page</option><option value="100">100 / page</option></select>' +
+                        '</div>' +
+                        '<div style="display:flex; gap:6px; align-items:center; margin-top:8px;">' +
+                        '<button class="launch-btn" style="padding:6px 12px; background:#1a1a24; border:1px solid #333; color:#bbb;" onclick="window.__bpage(' + c.seq + ',' + (pg - 1) + ')">Prev</button><span style="font-size:0.75rem; color:#888;">' + pg + ' / ' + pages + ' (' + list.length + ' shown)</span>' +
+                        '<button class="launch-btn" style="padding:6px 12px; background:#1a1a24; border:1px solid #333; color:#bbb;" onclick="window.__bpage(' + c.seq + ',' + (pg + 1) + ')">Next</button></div>';
                     host.innerHTML =
                         '<p style="font-size:0.75rem; color:#888; margin-bottom:4px;">Ranked by Final Points (' + (j.autoStopped ? 'window ended' : 'live') + '):</p>' +
-                        '<table>' + head + '<tbody>' + body + hiddenRow + '</tbody></table>';
+                        '<table>' + head + '<tbody>' + body + hiddenRow + '</tbody></table>' + tool;
+                    var qIn = document.getElementById('board-q-' + c.seq);
+                    if (qIn) qIn.oninput = function () { window.__boardPage[c.seq] = 1; loadBoard(c); };
+                    var sIn = document.getElementById('board-size-' + c.seq);
+                    if (sIn) { sIn.value = String(size); sIn.onchange = function () { window.__boardSize[c.seq] = Number(sIn.value); window.__boardPage[c.seq] = 1; loadBoard(c); }; }
                 } catch (e) { host.innerHTML = '<p class="hidden-note">board error</p>'; }
             }
 
+            window.__bpage = function (seq, p) { if (p < 1) return; window.__boardPage = window.__boardPage || {}; window.__boardPage[seq] = p; var cc = (window.__comps || []).find(x => x.seq === seq); if (cc) loadBoard(cc); };
             async function loadPastWinners(c) {
                 var host = document.getElementById('past-winners-' + c.seq);
                 if (!host) return;

@@ -12,6 +12,7 @@ import { baseRpcUrl, createConnection, sendMagicTx, getDelegationStatus, regionU
 import { loadSponsor } from './delegate-relay.mjs';
 import { addWin, addEntry, hasEntry, listEntries, tallyFor, readTierFor, boostFor } from './competitions-wins.mjs';
 import { PLAN_LADDER } from './plans-config.mjs';
+import { getHandleForWallet } from './handle.mjs';
 import bs58 from 'bs58';
 import './load-env.mjs';
 
@@ -87,6 +88,15 @@ async function ensureTallyDelegated({ sponsor, program, conn, authority, player,
   }
   return st && st.fqdn ? regionUrlForFqdn(st.fqdn) : AS_URL;
 }
+export async function ensureTally({ creator = null, seq, wallet: player }) {
+  const { sponsor, conn, program } = await sponsorProgram();
+  const authority = creator ? new PublicKey(creator) : sponsor.publicKey;
+  const comp = compPda(authority, seq);
+  const tally = tallyPda(comp, player);
+  const region = await ensureTallyDelegated({ sponsor, program, conn, authority, player: new PublicKey(player), comp, seq, tally });
+  return { tally: tally.toBase58(), region };
+}
+
 export async function recordWin({ creator = null, seq, ts, game, wallet: player }) {
   const { sponsor, conn, program } = await sponsorProgram();
   const authority = creator ? new PublicKey(creator) : sponsor.publicKey;
@@ -297,7 +307,9 @@ export async function getBoard({ creator, seq }) {
     const level = await readTierFor(wallet);
     const boost = boostFor(level, comp, planBoosts());
     const finalPoints = boost != null ? totalPoints * boost : null; // null = hidden (L1 / non-qualifying)
-    rows.push({ wallet, totalPoints, level: level || 1, boost, finalPoints, hidden: boost == null });
+    let handle = null;
+    try { handle = getHandleForWallet ? getHandleForWallet(wallet) : null; } catch (e) { /* best-effort */ }
+    rows.push({ wallet, handle, totalPoints, level: level || 1, boost, finalPoints, hidden: boost == null });
   }
   const visible = rows.filter(r => !r.hidden).sort((a, b) => (b.finalPoints - a.finalPoints) || (a.wallet < b.wallet ? -1 : 1));
   const hidden = rows.filter(r => r.hidden);

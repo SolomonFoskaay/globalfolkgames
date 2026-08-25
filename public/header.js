@@ -480,7 +480,9 @@
         // globalLedger, so pages that don't explicitly load them would otherwise
         // sit on a permanent loading state / zero. Loading the module scripts
         // here when absent makes the pill always reflect the real balances.
-        ['/universal/points/local-points.js', '/universal/ledgers/global-ledger.js', '/universal/subscription/premium-ledger.js', '/universal/lives/lives.js', '/universal/lives/daily-reward.js'].forEach(function (src) {
+        ['/universal/identity/handle.js', '/universal/point-sources/referral.js', '/universal/points/local-points.js', '/universal/ledgers/global-ledger.js', '/universal/subscription/premium-ledger.js', '/universal/lives/lives.js', '/universal/lives/daily-reward.js'].forEach(function (src) {
+            if (!window.deriveProfileHandle && src.indexOf('handle.js') >= 0) ensureScript(src);
+            if (!window.gfgReferral && src.indexOf('referral.js') >= 0) ensureScript(src);
             if (!window.localPoints && src.indexOf('local-points') >= 0) ensureScript(src);
             if (!window.globalLedger && src.indexOf('global-ledger') >= 0) ensureScript(src);
             if (!window.premiumPoints && src.indexOf('premium-ledger') >= 0) ensureScript(src);

@@ -7,7 +7,7 @@
 // contract). Operator token optional (staff-gated page), matching the other
 // admin endpoints.
 
-import {
+import { ensureTally,
   createCompetition, closeCompetition, cancelCompetition, settleCompetition,
   recordCompetitionWinner, markWinnerPaid, getCompetition, listCompetitions, getWinners, getBoard, recordWin,
 } from '../scripts/competitions-relay.mjs';
@@ -45,6 +45,8 @@ export default async function handler(req, res) {
     }
     const base = { token: body.token, creator: body.creator || null };
     switch (body.action) {
+      case 'ensure':
+        return res.status(200).json(await ensureTally({ creator: base.creator, seq: Number(body.seq), wallet: body.wallet }));
       case 'record':
         return res.status(200).json(await recordWin({ creator: base.creator, seq: Number(body.seq), ts: Number(body.ts), game: Number(body.game), wallet: body.wallet }));
       case 'win':
