@@ -151,7 +151,7 @@
             <div id="gfg-drawer-scrim" class="gfg-drawer-scrim"></div>
             <aside id="gfg-drawer" class="gfg-drawer" aria-hidden="true">
                 <div class="gfg-drawer-head">
-                    <span class="gfg-brand">🌍 GlobalFolkGames</span>
+                    <span class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> GlobalFolkGames <span class="gfg-beta">Beta</span></span>
                     <button id="gfg-drawer-close" class="gfg-drawer-close" aria-label="Close menu">×</button>
                 </div>
                 <nav class="gfg-drawer-nav" id="gfg-drawer-nav">
@@ -247,7 +247,7 @@
         const headerHTML = `
             <header class="gfg-header">
                 <div class="gfg-header-left">
-                    <a href="/" class="gfg-brand">🌍 GlobalFolkGames</a>
+                    <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> GlobalFolkGames <span class="gfg-beta">Beta</span></a>
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
@@ -378,6 +378,24 @@
         document.head.appendChild(el);
     }
 
+    function ensureFavicon() {
+        if (document.querySelector('link[rel="icon"]')) return;
+        const l = document.createElement('link');
+        l.rel = 'icon';
+        l.type = 'image/png';
+        l.href = '/media/logo.png';
+        document.head.appendChild(l);
+    }
+    // Brand background: the site logo design, kept at aspect ratio (object-fit
+    // contain - never stretched), behind all content (z-index -2, below the theme orbs).
+    function ensureBrandBackground() {
+        if (document.getElementById('gfg-brand-bg')) return;
+        const d = document.createElement('div');
+        d.id = 'gfg-brand-bg';
+        d.className = 'gfg-brand-bg';
+        d.innerHTML = '<img src="/media/background.jpg" alt="" aria-hidden="true">';
+        document.body.appendChild(d);
+    }
     // Google AdSense loader, injected into <head> exactly once per page. The
     // script is ALSO injected statically at build time (vite.config.js
     // transformIndexHtml) so Adsense's checker sees it in the served HTML; this
@@ -438,6 +456,8 @@
         // an inline <style> keep it; theme.css loads right after the shared
         // style.css link so it wins over that link but not over inline styles.
         ensureStyle('/theme.css');
+        ensureFavicon();
+        ensureBrandBackground();
 
         // Monetag ads gate: paused while Adsense approval is pending (see
         // ad-gate.js ADS_ENABLED flag - flip it back to restore). Once active,

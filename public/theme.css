@@ -83,3 +83,46 @@ body::after {
 .game-card, .onboarding-billboard, header.menu-trigger, .dash-rail-content {
   position: relative;
 }
+
+/* Brand logo in the header (small round mark). */
+.gfg-logo {
+  height: 26px;
+  width: 26px;
+  border-radius: 8px;
+  object-fit: cover;
+  vertical-align: -7px;
+  margin-right: 6px;
+}
+
+/* Beta launch badge in the header brand. */
+.gfg-beta {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  background: rgba(243, 156, 18, 0.18);
+  border: 1px solid rgba(243, 156, 18, 0.55);
+  color: #f39c12;
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+
+/* Brand background layer: the site logo design, contain (never stretched),
+   behind all content, below the theme orbs. */
+.gfg-brand-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0.45;
+}
+.gfg-brand-bg img {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+}

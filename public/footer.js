@@ -21,7 +21,7 @@
             'border-top:1px solid rgba(255,255,255,0.08); text-align:center; color:#ddd;');
         f.innerHTML =
             '<div style="font-size:0.95rem; font-weight:800; color:#fff; letter-spacing:0.02em;">GlobalFolkGames</div>' +
-            '<div style="margin-top:4px; font-size:0.72rem; color:#bbb;">\u00A9 2026 - Till Date \u00B7 Preserving native games on-chain</div>' +
+            '<div style="margin-top:4px; font-size:0.72rem; color:#bbb;">\u00A9 2026 - Till Date \u00B7 Preserving native games on-chain \u00B7 <span style="color:#f39c12; font-weight:800;">Beta</span></div>' +
             '<div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:0.78rem;">' +
             '<a href="/about/" style="color:#f39c12; text-decoration:none;">About</a>' +
             '<a href="/support/" style="color:#f39c12; text-decoration:none;">Support</a>' +
