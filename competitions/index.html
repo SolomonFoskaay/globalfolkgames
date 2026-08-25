@@ -167,8 +167,11 @@
             }
 
             function prizeSlot(c) {
-                var total = (c.prizeShares || []).reduce((a, b) => a + b, 0) || 1;
-                return (c.prizeShares || []).slice(0, c.winnerCount).map((s, i) => '$' + Math.round(c.poolUsdCents * s / total / 100 * 100) / 100);
+                var shares = (c.prizeShares || []).slice(0, c.winnerCount);
+                var total = shares.reduce((a, b) => a + b, 0) || 1;
+                // New comps store percentages (<=100); legacy stored absolute units.
+                var isPct = shares.length && shares[0] <= 100;
+                return shares.map((s, i) => (isPct ? '$' + (c.poolUsdCents / 100 * s).toFixed(2) : '$' + Math.round(c.poolUsdCents * s / total / 100 * 100) / 100));
             }
 
             function renderTabs() {
@@ -255,11 +258,16 @@
                     entry = '<p class="hidden-note">This window has ended (final board shown below).</p>';
                 }
                 var winnersHtml = '';
+                var redLbl = c.redLabel || 'Redeemable';
+                var redAmt = Number(c.redAmount) || c.poolUsdCents;
+                function redeemable(v){ return ((redAmt * v) / 100).toFixed(2) + ' ' + redLbl; }
                 detailCard.innerHTML =
                     '<div class="game-card" style="border:1px solid rgba(46,204,113,0.45);">' +
                     '<h3>' + esc(c.name) + '</h3>' +
+                    (c.desc ? '<p style="color:var(--muted); font-size:0.84rem; line-height:1.6;">' + esc(c.desc) + '</p>' : '') +
                     '<p style="color:var(--muted); font-size:0.84rem; margin:4px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + (c.status === 0 ? ' · ends in ' + h + 'h ' + m + 'm' : ' · ' + STATUS[c.status]) + '</p>' +
-                    '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>' + (i < 5 ? '#' + (i + 1) + ' cash' : '#' + (i + 1) + ' airtime') + '</span></div>'; }).join('') + '</div>' +
+                    '<div style="font-size:0.78rem; color:#888; margin-top:8px;">Redeemable (' + esc(redLbl) + '): pool ' + (redAmt).toFixed(0) + ' ' + esc(redLbl) + '</div>' +
+                    '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { var pct = (c.prizeShares[i] || 0); return '<div class="prize"><b style="color:#2ecc71;">' + v + '</b><span>#' + (i + 1) + '</span><span style="display:block; margin-top:2px; color:#f39c12;">' + redeemable(pct) + '</span></div>'; }).join('') + '</div>' +
                     reqs +
                     entry +
                     '</div>' +

@@ -82,30 +82,43 @@
                     </select>
                 </div>
             </div>
-            <label>Prize shares (per rank, in Naira beta units - pool splits proportionally)</label>
-            <div id="shares-box">
-                <div class="share-row">1st <input id="sh0" type="number" value="1000"></div>
-                <div class="share-row">2nd <input id="sh1" type="number" value="600"></div>
-                <div class="share-row">3rd <input id="sh2" type="number" value="300"></div>
-                <div class="share-row">4th <input id="sh3" type="number" value="200"></div>
-                <div class="share-row">5th <input id="sh4" type="number" value="150"></div>
-                <div class="share-row">6th <input id="sh5" type="number" value="100"></div>
-                <div class="share-row">7th <input id="sh6" type="number" value="100"></div>
-                <div class="share-row">8th <input id="sh7" type="number" value="100"></div>
-                <div class="share-row">9th <input id="sh8" type="number" value="100"></div>
-                <div class="share-row">10th <input id="sh9" type="number" value="100"></div>
-            </div>
-            <div class="hint" id="shares-sum"></div>
             <div class="grid2">
                 <div>
-                    <label>Redemption</label>
-                    <select id="c-red"><option value="0">Naira (cash + airtime)</option><option value="1">Points</option><option value="2">Crypto</option><option value="3">Merch</option></select>
+                    <label>Prize pool ($)</label>
+                    <input id="c-pool" type="number" step="0.25" min="0.25" value="2">
+                </div>
+                <div>
+                    <label>Pool in points (auto from $)</label>
+                    <input id="c-pool-pts" type="number" min="1" value="1000" readonly style="color:#999;">
+                </div>
+            </div>
+            <div class="grid2">
+                <div>
+                    <label>Number of winners (type any number)</label>
+                    <input id="c-wincount" type="number" min="1" max="16" value="10">
+                </div>
+                <div>
+                    <label>Total redeemable value (offline) e.g. 2750</label>
+                    <input id="c-redeem-amount" type="number" value="2750" min="0">
+                </div>
+            </div>
+            <div class="grid2">
+                <div>
+                    <label>Redeemable label (symbol/name)</label>
+                    <input id="c-redeem-label" value="Naira" placeholder="Naira, N, USDT, SOL, BTC, Merch, Tickets...">
                 </div>
                 <div>
                     <label>Payout mode</label>
                     <select id="c-pay"><option value="0">Manual</option><option value="1" disabled>Escrow (later)</option></select>
                 </div>
             </div>
+            <div>
+                <label>Short description (shown on the competition)</label>
+                <input id="c-desc" maxlength="160" value="Do you know how to play the native game Ludo? Compete, show your experience and win a share of the prize pool.">
+            </div>
+            <label>Prize split - editable percentages (auto = USD + points + redeemable)</label>
+            <div id="shares-box"></div>
+            <div class="hint" id="shares-sum"></div>
             <button class="btn-success" id="btn-create">Create on-chain</button>
             <div class="hint" id="create-msg"></div>
         </div>
@@ -171,23 +184,89 @@
             const DUR_MS = { '6h':6*3600, '12h':12*3600, '24h':24*3600, '2d':2*86400, '3d':3*86400, '4d':4*86400, '5d':5*86400, '6d':6*86400, '7d':7*86400, '8d':8*86400, '9d':9*86400, '10d':10*86400, '15d':15*86400, '30d':30*86400, '1w':7*86400, '2w':14*86400, '3w':21*86400, '4w':28*86400, '1m':30*86400 };
             const nowS = () => Math.floor(Date.now() / 1000);
 
-            function sharesList() {
-                const out = [];
-                for (let i = 0; i < 10; i++) {
-                    const el = $('sh' + i);
-                    if (el) out.push(Number(el.value) || 0);
+            // ---- DYNAMIC PRIZE ENGINE (owner 2026-08-24) ----
+            // winner count -> auto-created percentage boxes (equal by default);
+            // editing a % re-splits the rest equally; USD/Points/Redeemable auto-update.
+            const MAXW = 16; // MUST equal the on-chain MAX_WINNERS cap
+            function clampCount(v){ var n = Number(v)||0; if (n < 1) n = 1; if (n > MAXW) n = MAXW; return n; }
+            const ORD = ['st','nd','rd','th'];
+            function ord(i){ const n=i+1; return n+ORD[Math.min(n-1,3)];
+                // fix 11/12/13
+            }
+            function ordLabel(i){ const n=i+1; return n+(((n%100>10&&n%100<14)||(n%10>3)||n%10===0)?'th':((n%10===1)?'st':(n%10===2)?'nd':'rd')); }
+
+            function pctInput(i){ return 'winc-' + i + '-pct'; }
+            function sharesList(){
+                const n = Math.max(0, Number($('c-wincount').value)||0);
+                const out=[];
+                for(let i=0;i<n && i<MAXW;i++){ out.push(Number(($(pctInput(i))||{}).value)||0); }
+                return out;
+            }
+            function renderShares(){
+                var rawC = Number($('c-wincount').value)||0;
+                if (rawC > MAXW) {
+                    $('shares-sum').textContent = 'The on-chain program supports up to ' + MAXW + ' winners. Please enter between 1 and ' + MAXW + '.';
+                    $('c-wincount').value = MAXW;
                 }
-                return out.filter(v => v > 0);
+                const n = clampCount($('c-wincount').value);
+                $('c-wincount').max = String(MAXW);
+                const eq = parseFloat((100/n).toFixed(2));
+                let html = '<table style="width:100%;"><thead><tr><th>Prize</th><th>Editable %</th><th>USD</th><th>Points</th><th>Redeemable</th></tr></thead><tbody>';
+                for(let i=0;i<n;i++){
+                    // preserve an edited percentage if present
+                    const prev = $('shares-box') ? (($(pctInput(i))||{}).value) : null;
+                    const val = i<n && prev ? parseFloat(prev) : eq;
+                    html += '<tr><td>'+ordLabel(i)+'</td>' +
+                        '<td><input id="'+pctInput(i)+'" type="number" step="0.01" min="0.01" value="'+val+'" style="width:74px;" data-i="'+i+'"></td>' +
+                        '<td id="winc-'+i+'-usd"></td><td id="winc-'+i+'-pts"></td><td id="winc-'+i+'-red" style="color:#f39c12; font-weight:800;"></td></tr>';
+                }
+                html += '</tbody></table>';
+                const box=$('shares-box'); box.innerHTML=html;
+                Array.from(box.querySelectorAll('input')).forEach(function(inp){
+                    inp.addEventListener('input', function(){
+                        // rebalance: keep this one, spread the rest equally
+                        const pct = parseFloat(inp.value)||0;
+                        const n2 = sharesList().length;
+                        // re-read current values
+                        let vals=[]; for(let k=0;k<n2;k++){ vals.push(parseFloat(($(pctInput(k))||{}).value)||0); }
+                        const idx=Number(inp.dataset.i);
+                        const others = n2-1;
+                        if(others>0){ const rest = Math.max(0, 100-pct); const each = parseFloat((rest/others).toFixed(2)); for(let k=0;k<n2;k++){ if(k!==idx){ vals[k]=each; const el=$(pctInput(k)); if(el){ el.value=each; } } } }
+                        vals[idx]=pct;
+                        renderLive(vals);
+                    });
+                    inp.addEventListener('change', function(){
+                        inp.value = parseFloat(inp.value||0).toFixed(2);
+                    });
+                });
+                updateRedeemHeader();
+                renderLive(sharesList());
             }
-            function updateShares() {
-                const list = sharesList();
-                const sum = list.reduce((a, b) => a + b, 0);
-                $('shares-sum').textContent = list.length + ' winner(s) · total share units ' + sum.toLocaleString();
-                $('c-pool-pts').value = Number($('c-pool').value) * 500;
+            function updateRedeemHeader(){
+                const n=Math.max(1, Number($('c-wincount').value)||1);
+                const lbl=$('c-redeem-label').value||'Redeemable';
+                Array.from(document.querySelectorAll('#shares-box thead th')).forEach(function(th){ if(th && th.textContent==='Redeemable') th.textContent='Redeemable ('+lbl+')'; });
             }
-            $('c-pool').addEventListener('input', updateShares);
-            for (let i = 0; i < 10; i++) { const el = $('sh' + i); if (el) el.addEventListener('input', updateShares); }
-            updateShares();
+            function renderLive(pcts){
+                const n=pcts.length; const poolUsd=Number($('c-pool').value)||0; const pts=poolUsd*500;
+                const sum=pcts.reduce((a,b)=>a+b,0)||0;
+                const redTotal=Number($('c-redeem-amount').value)||0;
+                for(let i=0;i<n;i++){
+                    const pct=pcts[i]||0;
+                    const usd=(poolUsd*pct/100); const pp=(pts*pct/100);
+                    const red=(redTotal*pct/100);
+                    const ue=$('winc-'+i+'-usd'); if(ue) ue.innerHTML='$'+usd.toFixed(2);
+                    const pe=$('winc-'+i+'-pts'); if(pe) pe.textContent=pp.toFixed(1)+'P';
+                    const re=$('winc-'+i+'-red'); if(re) re.textContent=red.toFixed(2)+' '+($('c-redeem-label').value||'');
+                }
+                $('c-pool-pts').value = Math.round(pts);
+                $('shares-sum').textContent = n+' winner(s) · total % '+sum.toFixed(2)+' · pool $'+poolUsd.toFixed(2)+' = '+Math.round(pts)+' pts';
+            }
+            $('c-pool').addEventListener('input', function(){ $('c-pool-pts').value = Math.round((Number($('c-pool').value)||0)*500); renderShares(); });
+            $('c-wincount').addEventListener('input', function(){ renderShares(); });
+            $('c-redeem-amount').addEventListener('input', function(){ renderLive(sharesList()); });
+            $('c-redeem-label').addEventListener('input', function(){ updateRedeemHeader(); renderLive(sharesList()); });
+            renderShares();
 
             async function post(body) {
                 const r = await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -200,6 +279,11 @@
                 const shares = sharesList();
                 const seq = Number($('c-seq').value);
                 const poolUsd = Number($('c-pool').value);
+                const nc = Number($('c-wincount').value)||0;
+                if (nc < 1 || nc > MAXW) { $('create-msg').textContent = 'Winner count must be between 1 and ' + MAXW + '. The on-chain competition can handle at most ' + MAXW + ' winners.'; return; }
+                if (!shares.length || shares.some(v => !(v > 0))) { $('create-msg').textContent = 'Prize percentages must all be positive.'; return; }
+                const sumPct = shares.reduce((a, b) => a + b, 0);
+                if (Math.abs(sumPct - 100) > 0.5) { $('create-msg').textContent = 'Percentages must total ~100 (currently ' + sumPct.toFixed(2) + '%). Adjust the prize split.'; return; }
                 const tierBits = (($('t2').checked ? 4 : 0) | ($('t3').checked ? 8 : 0));
                 let fam = 0;
                 if ($('fam-global').checked) fam |= 1;
@@ -212,7 +296,7 @@
                 const endS = startS + DUR_MS[$('c-dur').value];
                 $('create-msg').textContent = 'Creating on-chain...';
                 try {
-                    const res = await post({ action: 'create', seq, name: $('c-name').value.trim() || 'Ludo Earn', games: $('g-ludo').checked ? [1] : [], tierBits, requireAll: 0, entryCost: Number($('c-entry').value || 500), entryFamilies: fam, startsAt: startS, endsAt: endS, poolUsdCents: Math.round(poolUsd * 100), poolPoints: Math.round(poolUsd * 500), winnerCount: shares.length, prizeShares: shares, redemption: Number($('c-red').value), payoutMode: Number($('c-pay').value) });
+                    const res = await post({ action: 'create', seq, name: $('c-name').value.trim() || 'Ludo Earn', games: $('g-ludo').checked ? [1] : [], tierBits, requireAll: 0, entryCost: Number($('c-entry').value || 500), entryFamilies: fam, startsAt: startS, endsAt: endS, poolUsdCents: Math.round(poolUsd * 100), poolPoints: Math.round(poolUsd * 500), winnerCount: shares.length, prizeShares: shares, pool: Math.round(poolUsd*100), desc: $('c-desc').value.trim(), redLabel: $('c-redeem-label').value.trim() || 'Redeemable', redAmount: Math.round(Number($('c-redeem-amount').value)||0), redemption: 0, payoutMode: Number($('c-pay').value) });
                     $('create-msg').innerHTML = 'Created! <span class="chip warn">' + esc(res.pda) + '</span> sig ' + esc(String(res.sig).slice(0, 12)) + '… · window 72h style start→end ' + new Date(startS * 1000).toISOString() + ' → ' + new Date(endS * 1000).toISOString();
                     $('c-seq').value = seq + 1;
                     loadList();

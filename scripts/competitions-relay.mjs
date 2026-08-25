@@ -21,6 +21,20 @@ const PROGRAM = new PublicKey(idl.address || idl.metadata?.address);
 const COMP2_SEED = Buffer.from('gfgcomp2');
 const GFGWIN_SEED = Buffer.from('gfgwin');
 const DELEG_PROGRAM = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
+import { readFileSync as _readFS, writeFileSync as _writeFS, existsSync as _existsFS } from 'fs';
+const META_FILE = new URL('./gfg-comp-meta.json', import.meta.url).pathname;
+export function saveCompMeta(creator, seq, meta) {
+  try {
+    let m = {}; if (_existsFS(META_FILE)) { try { m = JSON.parse(_readFS(META_FILE, 'utf8')) || {}; } catch (e) { m = {}; } }
+    m[creator + ':' + seq] = meta;
+    _writeFS(META_FILE, JSON.stringify(m));
+  } catch (e) { /* fail-open */ }
+}
+export function getCompMeta(creator, seq) {
+  try { if (_existsFS(META_FILE)) { const m = JSON.parse(_readFS(META_FILE, 'utf8')) || {}; return m[creator + ':' + seq] || {}; } } catch (e) {}
+  return {};
+}
+
 const AS_VALIDATOR = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57');
 const AS_URL = 'https://devnet-as.magicblock.app/';
 const BASE = baseRpcUrl();
@@ -146,6 +160,9 @@ export async function createCompetition({ creator = null, seq, name, games, tier
     redemption, payoutMode,
   ).accounts({ payer: sponsor.publicKey, competition: pda, systemProgram: SystemProgram.programId }).transaction();
   const sig = await send(conn, sponsor, tx);
+  if (arguments[0] && (arguments[0].desc || arguments[0].redLabel || arguments[0].redAmount)) {
+    saveCompMeta(authority.toBase58(), seq, { desc: arguments[0].desc, redLabel: arguments[0].redLabel, redAmount: arguments[0].redAmount, pool: arguments[0].pool });
+  }
   return { sig: String(sig), pda: pda.toBase58() };
 }
 
@@ -243,7 +260,7 @@ export async function getCompetition({ creator, seq }) {
   const pda = compPda(creator, seq);
   const info = await conn.getAccountInfo(pda);
   if (!info || !info.data) return null;
-  return { pda: pda.toBase58(), ...decodeCompetition(info.data) };
+  return { pda: pda.toBase58(), ...decodeCompetition(info.data), ...getCompMeta(creator, seq) };
 }
 
 export async function listCompetitions({ creator } = {}) {
@@ -314,5 +331,5 @@ export async function getBoard({ creator, seq }) {
   const visible = rows.filter(r => !r.hidden).sort((a, b) => (b.finalPoints - a.finalPoints) || (a.wallet < b.wallet ? -1 : 1));
   const hidden = rows.filter(r => r.hidden);
   visible.forEach((r, i) => { r.position = i + 1; r.prizePosition = (i < comp.winnerCount) ? i + 1 : null; });
-  return { seq, name: comp.name, status: comp.status, startsAt: comp.startsAt, endsAt: comp.endsAt, endsAtMs: comp.endsAt * 1000, autoStopped: now >= comp.endsAt * 1000, poolUsdCents: comp.poolUsdCents, poolPoints: comp.poolPoints, winnerCount: comp.winnerCount, prizeShares: comp.prizeShares, board: visible, hidden };
+  return { seq, name: comp.name, status: comp.status, startsAt: comp.startsAt, endsAt: comp.endsAt, endsAtMs: comp.endsAt * 1000, autoStopped: now >= comp.endsAt * 1000, poolUsdCents: comp.poolUsdCents, poolPoints: comp.poolPoints, winnerCount: comp.winnerCount, prizeShares: comp.prizeShares, desc: comp.desc, redLabel: comp.redLabel, redAmount: comp.redAmount, board: visible, hidden };
 }

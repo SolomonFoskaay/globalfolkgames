@@ -435,7 +435,7 @@ const server = createServer(async (req, res) => {
           result = { entered: true };
           break;
         case 'create':
-          result = await createCompetition({ ...base, seq: Number(b.seq), name: b.name, games: b.games, tierBits: Number(b.tierBits), requireAll: b.requireAll != null ? Number(b.requireAll) : 0, entryCost: Number(b.entryCost), entryFamilies: Number(b.entryFamilies), startsAt: Number(b.startsAt), endsAt: Number(b.endsAt), poolUsdCents: Number(b.poolUsdCents), poolPoints: Number(b.poolPoints), winnerCount: Number(b.winnerCount), prizeShares: (b.prizeShares || []).map(Number), redemption: b.redemption != null ? Number(b.redemption) : 0, payoutMode: b.payoutMode != null ? Number(b.payoutMode) : 0 });
+          result = await createCompetition({ ...base, seq: Number(b.seq), name: b.name, games: b.games, tierBits: Number(b.tierBits), requireAll: b.requireAll != null ? Number(b.requireAll) : 0, entryCost: Number(b.entryCost), entryFamilies: Number(b.entryFamilies), startsAt: Number(b.startsAt), endsAt: Number(b.endsAt), poolUsdCents: Number(b.poolUsdCents), poolPoints: Number(b.poolPoints), winnerCount: Number(b.winnerCount), prizeShares: (b.prizeShares || []).map(Number), redemption: b.redemption != null ? Number(b.redemption) : 0, payoutMode: b.payoutMode != null ? Number(b.payoutMode) : 0, desc: b.desc || '', redLabel: b.redLabel || '', redAmount: Number(b.redAmount) || 0, pool: Number(b.pool) || 0 });
           break;
         case 'close': result = await closeCompetition({ ...base, seq: Number(b.seq) }); break;
         case 'cancel': result = await cancelCompetition({ ...base, seq: Number(b.seq) }); break;
