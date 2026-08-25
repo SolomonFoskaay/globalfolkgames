@@ -41,6 +41,7 @@ export default defineConfig({
         'changelog-architecture-m9': './changelog/architecture-m9.html',
         competitions: './competitions/index.html',
         games: './games/index.html',
+        game: './games/game.html',
         countries: './countries/index.html',
         about: './about/index.html',
         contact: './contact/index.html',

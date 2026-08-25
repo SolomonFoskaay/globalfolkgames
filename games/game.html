@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="mobile-container">
+        <section class="onboarding-billboard">
+            <h2 id="game-title">Loading game...</h2>
+            <p class="auth-hint" id="game-origin" style="margin-top:8px;"></p>
+        </section>
+        <div class="game-card" id="game-body"><p class="empty">Loading...</p></div>
+        <section class="game-card" style="margin-top:14px;">
+            <h3>How to play</h3>
+            <p id="game-howto" style="color:var(--muted); font-size:0.86rem; line-height:1.7;">The rules and tips for this game will live here. A video guide will be embedded on this page too.</p>
+            <div id="game-video" style="margin-top:10px;"><p class="hidden-note">(Video guide coming soon - the code below can render a YouTube or Rumble embed.)</p></div>
+        </section>
+        <section class="game-card" style="margin-top:14px;">
+            <h3>Play &amp; compete</h3>
+            <div id="game-cta"></div>
+        </section>
+        <p style="margin-top:16px; text-align:center;"><a href="/games/" style="color:#f39c12; font-size:0.86rem;">Back to all games</a></p>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            var params = new URLSearchParams(location.search);
+            var slug = params.get('g') || 'ludo';
+            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            var r = await fetch('/games/data.json', { cache: 'no-store' });
+            var j = await r.json();
+            var g = (j.games || []).find(x => x.slug === slug);
+            if (!g) { document.getElementById('game-body').innerHTML = '<p class="empty">Game not found.</p>'; return; }
+            document.title = g.name + ' | GlobalFolkGames';
+            document.getElementById('game-title').textContent = g.emoji + ' ' + g.name;
+            document.getElementById('game-origin').textContent = (g.origins || []).map(o => o.flag + ' ' + o.country).join('  ·  ') + '  ·  ' + (g.status === 'live' ? 'Available now' : 'Coming soon');
+            document.getElementById('game-body').innerHTML =
+                '<h3>About this game</h3><p style="color:var(--muted); font-size:0.86rem; line-height:1.7;">' + esc(g.history) + '</p>';
+            document.getElementById('game-cta').innerHTML = g.status === 'live'
+                ? '<a class="launch-btn onchain" style="width:100%; text-align:center; text-decoration:none;" href="' + esc(g.play || '/games/') + '">Play now</a>'
+                : '<p style="color:#888; font-size:0.85rem;">This native game is being readied. The arena opens soon.</p>';
+        });
+    </script>
+</body>
+</html>

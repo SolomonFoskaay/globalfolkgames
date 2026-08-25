@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Games by Country | GlobalFolkGames</title>
-    <meta name="description" content="Native games by country: see whose classics are on the platform now and which folk games are coming next from around the world.">
+    <meta name="description" content="Native games by country: see whose classics are on the platform and which folk games are next, ranked by the biggest native-gamer audiences.">
     <link rel="stylesheet" href="/style.css">
     <style>
         .searchbar { width:100%; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.9rem; box-sizing:border-box; }
@@ -13,16 +13,17 @@
         .ccard { background:#1a1a24; border:1px solid #2a2a36; border-radius:12px; padding:14px; }
         .ccard .flag { font-size:2rem; }
         .ccard h3 { margin:6px 0 2px; }
-        .ccard .tag { display:inline-block; font-size:0.72rem; border-radius:999px; padding:3px 9px; margin:4px 6px 0 0; }
-        .tag.play { background:rgba(46,204,113,0.18); color:#2ecc71; border:1px solid rgba(46,204,113,0.4); cursor:pointer; text-decoration:none; }
-        .tag.soon { background:rgba(255,255,255,0.06); color:#888; border:1px dashed #333; }
+        .ccard .stats { font-size:0.78rem; color:#f39c12; margin:2px 0 8px; }
+        .ccard .tag { display:inline-block; font-size:0.74rem; border-radius:999px; padding:4px 10px; margin:4px 6px 0 0; cursor:pointer; text-decoration:none; }
+        .tag.play { background:rgba(46,204,113,0.18); color:#2ecc71; border:1px solid rgba(46,204,113,0.4); }
+        .tag.soon { background:rgba(255,255,255,0.06); color:#bbb; border:1px solid #333; }
     </style>
 </head>
 <body>
-    <main class="mobile-container dash-rail-content">
+    <main class="mobile-container">
         <section class="onboarding-billboard">
             <h2>🌍 Native games by country</h2>
-            <p class="auth-hint" style="margin-top:8px;">How good are you at your native games? Join ongoing competitions, prove your experience, and share rewards. Every country has games worth keeping.</p>
+            <p class="auth-hint" style="margin-top:8px;">How good are you at your native games? Join ongoing competitions, prove your experience and share rewards. We focus first on the countries with the biggest native-gamer audiences.</p>
         </section>
 
         <section class="game-card">
@@ -34,28 +35,45 @@
 
     <script src="/global_header.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', async function () {
+            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            var COUNTRY_MAP = { china: 'China', india: 'India', 'united states': 'United States', brazil: 'Brazil', indonesia: 'Indonesia', japan: 'Japan', germany: 'Germany', 'south korea': 'South Korea', 'united kingdom': 'United Kingdom', france: 'France', nigeria: 'Nigeria', egypt: 'Egypt', 'south africa': 'South Africa' };
+            var r = await fetch('/games/data.json', { cache: 'no-store' });
+            var data = (await r.json()).games || [];
+            function find(slug) { return data.find(g => g.slug === slug); }
             var COUNTRIES = [
-                { flag: '🇮🇳', country: 'India', games: [{ name: 'Ludo', live: true, href: '/games/ludo-lab/' }, { name: 'Snakes and Ladders', live: false }, { name: 'Pachisi', live: false }] },
-                { flag: '🇳🇬', country: 'Nigeria', games: [{ name: 'Ayo Olopon', live: false }] },
-                { flag: '🇧🇷', country: 'Brazil', games: [{ name: 'Capoeira game', live: false }, { name: 'Dama (checkers)', live: false }] },
-                { flag: '🇮🇹', country: 'Italy', games: [{ name: 'Mora', live: false }] },
-                { flag: '🇪🇸', country: 'Spain', games: [{ name: 'Mus', live: false }] },
-                { flag: '🇯🇵', country: 'Japan', games: [{ name: 'Shogi', live: false }] }
+                { flag: '🇨🇳', country: 'China', stats: '~728M gamers', games: ['mahjong', 'weiqi', 'xiangqi'] },
+                { flag: '🇮🇳', country: 'India', stats: '~500-560M gamers', games: ['pachisi', 'carrom', 'kabaddi'] },
+                { flag: '🇺🇸', country: 'United States', stats: '~215-224M gamers', games: ['monopoly', 'scrabble', 'cornhole'] },
+                { flag: '🇧🇷', country: 'Brazil', stats: '~80-95M gamers', games: ['jogo-do-bicho', 'truco', 'futevolei'] },
+                { flag: '🇮🇩', country: 'Indonesia', stats: '~75-85M gamers', games: ['congklak', 'gobak-sodor', 'bola-bekel'] },
+                { flag: '🇯🇵', country: 'Japan', stats: '~73M gamers', games: ['shogi', 'hanafuda', 'sugoroku'] },
+                { flag: '🇩🇪', country: 'Germany', stats: '~56M gamers', games: ['mensch', 'skat', 'catan'] },
+                { flag: '🇰🇷', country: 'South Korea', stats: '~42M gamers', games: ['yut-nori', 'go-stop', 'janggi'] },
+                { flag: '🇬🇧', country: 'United Kingdom', stats: '~41M gamers', games: ['royal-ludo', 'pub-darts', 'cribbage'] },
+                { flag: '🇫🇷', country: 'France', stats: '~40M gamers', games: ['petanque', 'belote', 'jeu-de-loie'] },
+                { flag: '🇳🇬', country: 'Nigeria', stats: '~100M gamers', games: ['ayo-olopon', 'nigerian-drafts', 'whon'] },
+                { flag: '🇪🇬', country: 'Egypt', stats: '~40-50M gamers', games: ['senet', 'tawla', 'mehen'] },
+                { flag: '🇿🇦', country: 'South Africa', stats: '~25-30M gamers', games: ['morabaraba', 'diketo', 'nshuva'] }
             ];
             var grid = document.getElementById('country-grid');
-            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             function render(q) {
                 q = (q || '').toLowerCase();
-                var list = COUNTRIES.filter(c => !q || (c.country + ' ' + c.games.map(g => g.name).join(' ')).toLowerCase().indexOf(q) !== -1);
-                grid.innerHTML = list.map(c =>
-                    '<div class="ccard">' +
-                    '<span class="flag">' + c.flag + '</span><h3>' + esc(c.country) + '</h3>' +
-                    '<div>' + c.games.map(g =>
-                        g.live
-                            ? '<a class="tag play" href="' + esc(g.href) + '">' + esc(g.name) + ' · play</a>'
-                            : '<span class="tag soon">' + esc(g.name) + ' · soon</span>').join('') + '</div>' +
-                    '</div>').join('') || '<p class="empty">No match for that search.</p>';
+                var list = COUNTRIES.filter(function (c) {
+                    if (!q) return true;
+                    return (c.country + ' ' + c.games.map(slug => (find(slug) || { name: '' }).name).join(' ')).toLowerCase().indexOf(q) !== -1;
+                });
+                grid.innerHTML = list.map(function (c) {
+                    var games = c.games.map(function (slug) {
+                        var g = find(slug) || { name: slug, status: 'soon' };
+                        var cls = g.status === 'live' ? 'play' : 'soon';
+                        var lbl = g.status === 'live' ? (g.name + ' · play') : (g.name + ' · soon');
+                        if (slug === 'pachisi' || slug === 'ludo') { cls = 'play'; lbl = 'Ludo · play'; }
+                        return '<a class="tag ' + cls + '" href="/games/game.html?g=' + encodeURIComponent(slug) + '">' + esc(lbl) + '</a>';
+                    }).join('');
+                    return '<div class="ccard"><span class="flag">' + c.flag + '</span><h3>' + esc(c.country) + '</h3>' +
+                        '<div class="stats">' + esc(c.stats) + '</div><div>' + games + '</div></div>';
+                }).join('') || '<p class="empty">No match for that search.</p>';
             }
             document.getElementById('country-search').addEventListener('input', function () { render(this.value); });
             render('');
