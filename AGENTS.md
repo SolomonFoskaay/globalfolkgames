@@ -312,6 +312,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 - M10: in-progress — lives + daily rewards gate (ships with M5; ladder by plan:
   5/10/15 lives, 25/200/300P daily).
 
+- **M11 — Community (on-chain UGC forum, M11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
+
 **Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
 (premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
 competition framework (admin creator UI + on-chain instances, launch instance =
