@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Games | GlobalFolkGames</title>
+    <meta name="description" content="Browse the world's native games: play available classics like Ludo, and follow the folk games coming from every country.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .searchbar { width:100%; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.9rem; box-sizing:border-box; }
+        .game-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+        @media(min-width:640px){ .game-grid{ grid-template-columns:1fr 1fr 1fr 1fr; } }
+        .tile { background:#1a1a24; border:1px solid #2a2a36; border-radius:12px; padding:14px 12px; text-align:center; }
+        .tile.live { border-color:rgba(46,204,113,0.45); }
+        .tile .icon { font-size:2rem; }
+        .tile h3 { margin:8px 0 2px; }
+        .tile .orig { font-size:0.72rem; color:#888; }
+        .tile .badge { display:inline-block; margin-top:8px; font-size:0.72rem; border-radius:999px; padding:4px 10px; }
+        .badge.play { background:rgba(46,204,113,0.18); color:#2ecc71; border:1px solid rgba(46,204,113,0.4); }
+        .badge.soon { background:rgba(255,255,255,0.06); color:#888; border:1px dashed #333; }
+    </style>
+</head>
+<body>
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>🎮 Native games from around the world</h2>
+            <p class="auth-hint" style="margin-top:8px;">How good are you at your native games? Play the classics, and more folk games are joining from every country.</p>
+        </section>
+
+        <section class="game-card">
+            <input id="game-search" class="searchbar" placeholder="Search games..." autocomplete="off">
+            <div class="game-grid" id="game-grid"></div>
+            <p class="auth-hint" style="margin-top:10px;">Playing one seems fine? <a href="/countries/" style="color:#f39c12;">Explore games by country</a> or <a href="/competitions/" style="color:#f39c12;">join a competition</a>.</p>
+        </section>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var GAMES = [
+                { name: 'Ludo', icon: '🎲', origin: '🇮🇳 India (Pachisi)', desc: 'The race game everyone knows, loved across Nigeria and the world.', live: true, href: '/games/ludo-lab/' },
+                { name: 'Ayo Olopon', icon: '🫘', origin: '🇳🇬 Nigeria', desc: 'The beloved seed-and-hole game.', live: false },
+                { name: 'Snakes and Ladders', icon: '🐍', origin: '🇮🇳 India', desc: 'The classic board of ups and downs.', live: false },
+                { name: 'Cards (52 deck)', icon: '🃏', origin: '🌍 World', desc: 'Classic card play, coming soon.', live: false },
+                { name: 'Scrabble', icon: '🔤', origin: '🌍 World', desc: 'Word tiles against the clock.', live: false },
+                { name: 'Monopoly', icon: '🏠', origin: '🌍 World', desc: 'The property classic.', live: false },
+                { name: 'Uno', icon: '🌈', origin: '🌍 World', desc: 'The colour card game.', live: false }
+            ];
+            var grid = document.getElementById('game-grid');
+            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            function render(q) {
+                var list = GAMES.filter(g => g.name.toLowerCase().indexOf((q || '').toLowerCase()) !== -1);
+                grid.innerHTML = list.map(g =>
+                    '<div class="tile ' + (g.live ? 'live' : '') + '">' +
+                    '<div class="icon">' + g.icon + '</div>' +
+                    '<h3>' + esc(g.name) + '</h3>' +
+                    '<div class="orig">' + esc(g.origin) + '</div>' +
+                    '<div style="font-size:0.75rem; color:#888; margin-top:4px;">' + esc(g.desc) + '</div>' +
+                    (g.live
+                        ? '<a class="badge play" style="text-decoration:none; display:inline-block;" href="' + esc(g.href) + '">Play now</a>'
+                        : '<span class="badge soon">Coming soon</span>') +
+                    '</div>').join('') || '<p class="empty">No game matches that search.</p>';
+            }
+            document.getElementById('game-search').addEventListener('input', function () { render(this.value); });
+            render('');
+        });
+    </script>
+</body>
+</html>

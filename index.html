@@ -22,28 +22,44 @@
             <p>Play traditional local games from across the world, accumulate lifetime milestone points, and unlock daily &amp; weekly competitions with real reward pools.</p>
         </section>
 
-        <!-- Level Tabs -->
-        <nav class="level-tabs-scroll">
-            <button class="tab-btn active" data-level="1">L1: Level 1</button>
-            <button class="tab-btn" data-level="2">L2: Daily</button>
-            <button class="tab-btn" data-level="3">L3: Weekly</button>
-            <button class="tab-btn" data-level="4">L4: BiWeekly</button>
-            <button class="tab-btn" data-level="5">L5: Monthly</button>
+        <!-- PLATFORM TABS: Games / Countries / Competition -->
+        <nav class="level-tabs-scroll" style="justify-content:center; margin-top:16px;">
+            <a class="tab-btn active" href="/games/">Games</a>
+            <a class="tab-btn" href="/countries/">Countries</a>
+            <a class="tab-btn" href="/competitions/">Competition</a>
         </nav>
 
-        <!-- Campaign Filters -->
-        <div class="campaign-status-tabs">
-            <button class="sub-tab-btn active" data-status="current">Active Now</button>
-            <button class="sub-tab-btn" data-status="upcoming">Upcoming</button>
-            <button class="sub-tab-btn" data-status="past">Past Results</button>
-        </div>
-
-        <!-- Campaign Cards -->
-        <section id="campaign-display-box" class="content-viewport">
-            <!-- filled by main.js -->
+        <!-- PROMO: the platform's invitation -->
+        <section class="game-card" style="border:1px solid rgba(243,156,18,0.35); margin-top:14px;">
+            <h3>How good are you at your native games?</h3>
+            <p style="color:var(--muted); font-size:0.9rem; line-height:1.7; margin:6px 0 0;">Step up to the games your parents and grandparents played, join ongoing competitions, prove your experience on a verifiable board, and share the rewards when you place. New windows open often, and every one runs on provably fair records.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <a href="/games/" class="launch-btn onchain" style="text-align:center; text-decoration:none;">Explore games</a>
+                <a href="/countries/" class="launch-btn" style="text-align:center; text-decoration:none; background:#1a1a24; border:1px solid #333; color:#ddd;">Games by country</a>
+                <a href="/competitions/" class="launch-btn" style="text-align:center; text-decoration:none; background:#1a1a24; border:1px solid #333; color:#ddd;">Join a competition</a>
+            </div>
         </section>
 
-        <!-- ===== THE ORIGINAL TOP ENDS HERE; EXPANSION BELOW ===== -->
+        <!-- PREVIEWS: initial display linking into each full hub -->
+        <section class="dash-grid" style="margin-top:14px;">
+            <div class="game-card">
+                <h3>🎮 Games</h3>
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Classic folk games from around the world, played true to their origins. Start with Ludo, with more native games on the way.</p>
+                <a href="/games/" class="launch-btn" style="text-align:center; text-decoration:none; background:#1a1a24; border:1px solid #333; color:#ddd;">Browse games</a>
+            </div>
+            <div class="game-card">
+                <h3>🌍 Countries</h3>
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Every country has games worth keeping. See whose native games are here and which are coming next.</p>
+                <a href="/countries/" class="launch-btn" style="text-align:center; text-decoration:none; background:#1a1a24; border:1px solid #333; color:#ddd;">Explore countries</a>
+            </div>
+            <div class="game-card">
+                <h3>🏆 Competition</h3>
+                <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Optional windows with real reward pools. Play inside the window, climb the Final-Points board, and the top finishers share the pot.</p>
+                <a href="/competitions/" class="launch-btn" style="text-align:center; text-decoration:none; background:#1a1a24; border:1px solid #333; color:#ddd;">See competitions</a>
+            </div>
+        </section>
+
+                <!-- ===== THE ORIGINAL TOP ENDS HERE; EXPANSION BELOW ===== -->
 
         <!-- ABOUT / USP -->
         <section class="game-card" style="margin-top:16px;">
@@ -117,6 +133,5 @@
 
     <!-- Scripts – order is important -->
     <script src="/global_header.js"></script>
-    <script src="/main.js"></script>
 </body>
 </html>

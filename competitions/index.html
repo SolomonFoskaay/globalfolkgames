@@ -36,6 +36,17 @@
 
         <!-- LIST VIEW -->
         <div id="list-view">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                <input id="comp-search" style="flex:1; min-width:160px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem;" placeholder="Search by name or date (month/year)..." autocomplete="off">
+                <select id="comp-month" style="padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:#1a1a24; color:#fff;">
+                    <option value="">Month</option>
+                    <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+                    <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                </select>
+                <select id="comp-year" style="padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:#1a1a24; color:#fff;">
+                    <option value="">Year</option><option value="2026">2026</option>
+                </select>
+            </div>
             <div class="tabrow" id="tabs">
                 <button data-tab="ongoing" class="active">Ongoing</button>
                 <button data-tab="upcoming">Upcoming</button>
@@ -168,9 +179,24 @@
                 });
             }
 
+            function activeFilters() {
+                var q = (document.getElementById('comp-search') ? document.getElementById('comp-search').value : '') || '';
+                var mo = Number(document.getElementById('comp-month') ? document.getElementById('comp-month').value : '') || 0;
+                var yr = Number(document.getElementById('comp-year') ? document.getElementById('comp-year').value : '') || 0;
+                return function (c) {
+                    if (q && (c.name || '').toLowerCase().indexOf(q.toLowerCase()) === -1) return false;
+                    if (mo || yr) {
+                        var d = new Date(c.startsAt * 1000);
+                        if (mo && d.getUTCMonth() + 1 !== mo) return false;
+                        if (yr && d.getUTCFullYear() !== yr) return false;
+                    }
+                    return true;
+                };
+            }
             function renderList() {
                 var g = grouped(window.__comps || []);
-                var items = g[tab] || [];
+                var match = activeFilters();
+                var items = (g[tab] || []).filter(match);
                 var totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
                 if (page > totalPages) page = totalPages;
                 var slice = items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -342,6 +368,11 @@
                 }
             }
             window.addEventListener('gfg:auth-changed', function () { if (window.__detailSeq) { var cc = (window.__comps || []).find(x => x.seq === window.__detailSeq); if (cc) renderRequirements(cc); } });
+
+            ['comp-search', 'comp-month', 'comp-year'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', function () { page = 1; renderList(); });
+            });
 
             bindEvents();
             refresh();

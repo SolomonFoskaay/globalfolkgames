@@ -40,6 +40,8 @@ export default defineConfig({
         'changelog-architecture-m8': './changelog/architecture-m8.html',
         'changelog-architecture-m9': './changelog/architecture-m9.html',
         competitions: './competitions/index.html',
+        games: './games/index.html',
+        countries: './countries/index.html',
         about: './about/index.html',
         contact: './contact/index.html',
         support: './support/index.html',

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Games by Country | GlobalFolkGames</title>
+    <meta name="description" content="Native games by country: see whose classics are on the platform now and which folk games are coming next from around the world.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .searchbar { width:100%; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.9rem; box-sizing:border-box; }
+        .country-grid { display:grid; grid-template-columns:1fr; gap:12px; margin-top:12px; }
+        @media(min-width:640px){ .country-grid{ grid-template-columns:1fr 1fr; } }
+        .ccard { background:#1a1a24; border:1px solid #2a2a36; border-radius:12px; padding:14px; }
+        .ccard .flag { font-size:2rem; }
+        .ccard h3 { margin:6px 0 2px; }
+        .ccard .tag { display:inline-block; font-size:0.72rem; border-radius:999px; padding:3px 9px; margin:4px 6px 0 0; }
+        .tag.play { background:rgba(46,204,113,0.18); color:#2ecc71; border:1px solid rgba(46,204,113,0.4); cursor:pointer; text-decoration:none; }
+        .tag.soon { background:rgba(255,255,255,0.06); color:#888; border:1px dashed #333; }
+    </style>
+</head>
+<body>
+    <main class="mobile-container dash-rail-content">
+        <section class="onboarding-billboard">
+            <h2>🌍 Native games by country</h2>
+            <p class="auth-hint" style="margin-top:8px;">How good are you at your native games? Join ongoing competitions, prove your experience, and share rewards. Every country has games worth keeping.</p>
+        </section>
+
+        <section class="game-card">
+            <input id="country-search" class="searchbar" placeholder="Search by country or game..." autocomplete="off">
+            <div class="country-grid" id="country-grid"></div>
+            <p class="auth-hint" style="margin-top:10px;">Looking to play rather than browse? <a href="/games/" style="color:#f39c12;">Browse the games</a> or <a href="/competitions/" style="color:#f39c12;">join a competition</a>.</p>
+        </section>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var COUNTRIES = [
+                { flag: '🇮🇳', country: 'India', games: [{ name: 'Ludo', live: true, href: '/games/ludo-lab/' }, { name: 'Snakes and Ladders', live: false }, { name: 'Pachisi', live: false }] },
+                { flag: '🇳🇬', country: 'Nigeria', games: [{ name: 'Ayo Olopon', live: false }] },
+                { flag: '🇧🇷', country: 'Brazil', games: [{ name: 'Capoeira game', live: false }, { name: 'Dama (checkers)', live: false }] },
+                { flag: '🇮🇹', country: 'Italy', games: [{ name: 'Mora', live: false }] },
+                { flag: '🇪🇸', country: 'Spain', games: [{ name: 'Mus', live: false }] },
+                { flag: '🇯🇵', country: 'Japan', games: [{ name: 'Shogi', live: false }] }
+            ];
+            var grid = document.getElementById('country-grid');
+            var esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            function render(q) {
+                q = (q || '').toLowerCase();
+                var list = COUNTRIES.filter(c => !q || (c.country + ' ' + c.games.map(g => g.name).join(' ')).toLowerCase().indexOf(q) !== -1);
+                grid.innerHTML = list.map(c =>
+                    '<div class="ccard">' +
+                    '<span class="flag">' + c.flag + '</span><h3>' + esc(c.country) + '</h3>' +
+                    '<div>' + c.games.map(g =>
+                        g.live
+                            ? '<a class="tag play" href="' + esc(g.href) + '">' + esc(g.name) + ' · play</a>'
+                            : '<span class="tag soon">' + esc(g.name) + ' · soon</span>').join('') + '</div>' +
+                    '</div>').join('') || '<p class="empty">No match for that search.</p>';
+            }
+            document.getElementById('country-search').addEventListener('input', function () { render(this.value); });
+            render('');
+        });
+    </script>
+</body>
+</html>
