@@ -565,7 +565,7 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { handler: agmHandler } = await import('../api_handlers/agm.mjs');
+      const { default: agmHandler } = await import('../api_handlers/agm.mjs');
       const captured = { status: 200, json: null };
       const fakeRes = {
         setHeader: () => {},

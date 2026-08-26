@@ -52,31 +52,17 @@
     // ---------- Menu items ----------
     // Essential links every visitor needs; admin-only items are shown when the
     // connected wallet is staff.
-    // The Ludo label/flag comes from the central games registry so the origin
-    // stays correct in one place as more games ship.
-    let gameRegistry = null;
-    function loadGameRegistry() {
-        return fetch('/games/registry.json', { cache: 'no-store' })
-            .then(res => (res.ok ? res.json() : null))
-            .then(data => { gameRegistry = data; })
-            .catch(() => { gameRegistry = null; });
-    }
-    function ludoNavLabel() {
-        const g = gameRegistry && gameRegistry.games
-            ? gameRegistry.games.find(x => x.id === 'ludo')
-            : null;
-        if (g && g.origin && g.origin.flag) return `${g.origin.flag} ${g.name}`;
-        return '🇮🇳 Ludo';
-    }
+    // The Games menu item points at /games/; the central games registry is no
+    // longer needed for nav labels (the single "Games" entry is static).
     function NAV_SECTIONS() {
         return [
             {
                 heading: 'Play',
                 items: [
-                    { label: ludoNavLabel(), href: '/games/ludo-lab/', match: 'ludo' },
                     { label: '🎮 Games', href: '/games/', match: 'games' },
                     { label: '🌍 Countries', href: '/countries/', match: 'countries' },
                     { label: '🏆 Competition', href: '/competitions/', match: 'competitions' },
+                    { label: '🤝 AGM Arena (earn)', href: '/agm/', match: 'agm' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]
             },
@@ -506,7 +492,6 @@
         if (!window.pointsStore) ensureScript('/universal/points/points-store.js');
         if (!window.gfgCompetitions) ensureScript('/universal/competitions/competition-engine.js');
         renderHeader(options || {});
-        loadGameRegistry(); // keeps nav labels in sync with the games registry
         // Tier badge: read the cache only; update when the premium module refreshes.
         setTimeout(updateActiveTierBadge, 0);
         try {
