@@ -105,16 +105,17 @@ Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM
 
 ---
 
-## Arc 2.0 MODULE MAP & SLICE NAMING (LOCKED — owner clarity 2026-08-25)
+## Arc 2.0 MODULE MAP & SLICE NAMING (LOCKED — owner 2026-08-25)
+> RULE: each module numbers its OWN slices starting at 'a' (arc2m1a, arc2m1b, ...; arc2m7a, arc2m7b, ...). A module never continues another module's letters. Builds can hop modules in any order that fits (arc2m1a -> arc2m7a -> arc2m7b -> arc2m1b) but the per-module alphabet is always clear.
 Slice labels are always `arc2m<N><slice>` so it is ALWAYS obvious which module a build belongs to.
 
 | Slice | Module (v2) | Owns |
 |---|---|---|
-| arc2m1d ✅ | M1 Game core | multiplayer Solo/Multiplayer, on-chain board + move commit, per-game rules profiles (registry) |
-| arc2m7e ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
-| arc2m7f ⏳ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
-| arc2m7g ⏳ | M7 AGM | P2C computer bank + anti-farm caps |
-| arc2m1xg | M1 Game core | per-game timeouts integration on the board |
+| arc2m1a ✅ | M1 Game core | multiplayer Solo/Multiplayer, on-chain board + move commit, per-game rules profiles (registry) |
+| arc2m7a ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
+| arc2m7b ✅ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
+| arc2m7c ⏳ | M7 AGM | P2C computer bank + anti-farm caps |
+| arc2m1b | M1 Game core | per-game timeouts integration on the board |
 
 M7 keeps the existing v1 modules untouched: M2 seam, M3/M4 points, M5 plans, M6 affiliate (now auto 20/80), M10 lives/daily, M11 community. Good the old earn-competition M7 is RETIRED; the slot reopens as the AGM module.
 

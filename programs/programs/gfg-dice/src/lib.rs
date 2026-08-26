@@ -1338,7 +1338,7 @@ pub mod gfg_dice {
     }
 
 
-    // ===== Arc2 M1 item D: on-chain match board (owner-approved 2026-08-25) =====
+    // ===== arc2m1a: on-chain match board (owner-approved 2026-08-25) =====
     // Additive multiplayer record: start_match locks a board with participants +
     // stake + clocks; commit_move records hashed move checkpoints with turn caps;
     // finish_match writes the winner + time. Solo/free play is untouched.
@@ -1424,7 +1424,7 @@ pub mod gfg_dice {
         Ok(())
     }
 
-    // ===== Arc2 M1 item E: standalone AGM order book (game-agnostic) =====
+    // ===== arc2m7a: standalone AGM order book (game-agnostic) =====
     pub fn post_agm_order(
         ctx: Context<PostAgmOrderCtx>,
         game: u8,
@@ -2605,7 +2605,7 @@ pub struct AgmOrder {
     pub created_at: i64,
 }
 
-/// Arc2 M7F: settlement of a filled order. Reads the stake/seats at lock and
+/// arc2m7b: settlement of a filled order. Reads the stake/seats at lock and
 /// computes the flat-10% fee + 90% winner payout (recorded on-chain; actual
 /// token move happens in the payout rail or embedded-wallet credit).
 #[account]
