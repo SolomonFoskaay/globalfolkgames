@@ -3347,6 +3347,152 @@
       ]
     },
     {
+      "name": "p2c_fund",
+      "discriminator": [
+        10,
+        77,
+        34,
+        8,
+        82,
+        146,
+        9,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bank",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  50,
+                  99
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "amount_usd_cents",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "p2c_settle",
+      "discriminator": [
+        75,
+        219,
+        201,
+        174,
+        154,
+        73,
+        47,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bank",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  50,
+                  99
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "computer_seat",
+          "type": "u8"
+        },
+        {
+          "name": "computer_won",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "post_agm_order",
       "discriminator": [
         56,
@@ -5309,6 +5455,19 @@
       ]
     },
     {
+      "name": "P2cBank",
+      "discriminator": [
+        151,
+        197,
+        233,
+        80,
+        188,
+        120,
+        188,
+        2
+      ]
+    },
+    {
       "name": "PlayerDice",
       "discriminator": [
         251,
@@ -5749,7 +5908,7 @@
     {
       "name": "AgmSettlement",
       "docs": [
-        "Arc2 M7F: settlement of a filled order. Reads the stake/seats at lock and",
+        "arc2m7b: settlement of a filled order. Reads the stake/seats at lock and",
         "computes the flat-10% fee + 90% winner payout (recorded on-chain; actual",
         "token move happens in the payout rail or embedded-wallet credit)."
       ],
@@ -5791,6 +5950,10 @@
           {
             "name": "settled_at",
             "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
           }
         ]
       }
@@ -6169,6 +6332,66 @@
           },
           {
             "name": "winner_seat",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "P2cBank",
+      "docs": [
+        "Arc2 M7C: the platform P2C bank - capital pool + per-day anti-farm guards.",
+        "Computers fill unmatched seats only (small stakes, $1-$10). One account per game."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "balance_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "day_started_at",
+            "type": "i64"
+          },
+          {
+            "name": "day_net_usd_cents",
+            "type": "i64"
+          },
+          {
+            "name": "day_loss_cap_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "day_wins",
+            "type": "u32"
+          },
+          {
+            "name": "day_losses",
+            "type": "u32"
+          },
+          {
+            "name": "total_wins",
+            "type": "u64"
+          },
+          {
+            "name": "total_losses",
+            "type": "u64"
+          },
+          {
+            "name": "trades",
+            "type": "u64"
+          },
+          {
+            "name": "status",
             "type": "u8"
           }
         ]

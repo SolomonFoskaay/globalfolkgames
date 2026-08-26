@@ -120,6 +120,11 @@ pub const MAX_MP: usize = 8;                      // max human seats per earn ma
 pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M7: standalone AGM order
 pub const AGM_SETTLE_SEED: &[u8] = b"gfgagms";        // Arc2 M7F: settlement (pot/fee/payout)
 pub const AGM_FEE_BPS: u64 = 1000;                    // flat 10% of the pot (locked)
+pub const P2C_SEED: &[u8] = b"gfgp2c";            // Arc2 M7C: P2C bank capital + anti-farm caps
+pub const P2C_DAY_SECS: i64 = 86_400;             // GMT day bucket for the daily net-loss cap
+pub const P2C_MIN_STAKE_USD_CENTS: u64 = 100;     // $1  - computers only fill small-stake seats
+pub const P2C_MAX_STAKE_USD_CENTS: u64 = 1_000;   // $10
+pub const P2C_DAY_LOSS_CAP_USD_CENTS: u64 = 2_000; // bank pauses for the day on $-20 net loss
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1488,6 +1493,7 @@ pub mod gfg_dice {
         st.winner_seat = winner_seat;
         st.payout_usd_cents = pot.checked_sub(fee).ok_or(PointsError::Overflow)?;
         st.settled_at = Clock::get()?.unix_timestamp;
+        st.status = 0; // recorded, not yet applied to the P2C bank
         ctx.accounts.order.status = 1; // LOCKED (escrow committed after matching)
         Ok(())
     }
@@ -1499,6 +1505,69 @@ pub mod gfg_dice {
         let o = &mut ctx.accounts.order;
         require!(o.status == 1, PointsError::NotOpen); // must have been locked (escrow committed)
         o.status = 1; // FILLED (final)
+        Ok(())
+    }
+
+    // ===== Arc2 M7C: P2C bank funding + per-day settle with anti-farm caps =====
+    // p2c_fund: permissionless capital add (house tops the pool; anyone may - harmless).
+    pub fn p2c_fund(ctx: Context<P2cBankCtx>, game: u8, amount_usd_cents: u64) -> Result<()> {
+        ctx.accounts.bank.balance_usd_cents = ctx.accounts.bank
+            .balance_usd_cents
+            .checked_add(amount_usd_cents)
+            .ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    // p2c_settle: applies ONE computer-seat result of a locked order to the bank.
+    //   computer seat wins -> bank  +(payout - stake)   (its 90% payout less its stake)
+    //   computer seat loses -> bank -(stake)            (loses its stake to the human)
+    // Enforces the small-stake band ($1-$10), day rollover, and pauses the bank for
+    // the day if the net-loss cap is reached. Idempotent per settlement (status 0 -> 1).
+    pub fn p2c_settle(
+        ctx: Context<P2cSettleCtx>,
+        game: u8,
+        order_id: u64,
+        computer_seat: u8,
+        computer_won: bool,
+    ) -> Result<()> {
+        require!(ctx.accounts.settlement.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.settlement.status == 0, PointsError::AlreadyClaimed);
+        let st = &ctx.accounts.settlement;
+        require!(computer_seat < st.seats, PointsError::RankOutOfRange);
+        let stake = st.pot_usd_cents / (st.seats as u64);
+        require!(stake >= P2C_MIN_STAKE_USD_CENTS && stake <= P2C_MAX_STAKE_USD_CENTS,
+            PointsError::InvalidCompetition); // computers only fill small-stake seats
+        let bank = &mut ctx.accounts.bank;
+        // roll the day bucket
+        let now = Clock::get()?.unix_timestamp;
+        if now - bank.day_started_at >= P2C_DAY_SECS {
+            bank.day_net_usd_cents = 0;
+            bank.day_wins = 0;
+            bank.day_losses = 0;
+            bank.status = 0;
+            bank.day_started_at = now;
+        }
+        let net: i64 = if computer_won {
+            (st.payout_usd_cents.saturating_sub(stake)) as i64
+        } else {
+            -(stake as i64)
+        };
+        if net >= 0 {
+            bank.balance_usd_cents = bank.balance_usd_cents.checked_add(net as u64)
+                .ok_or(PointsError::Overflow)?;
+            bank.day_wins += 1;
+            bank.total_wins += 1;
+        } else {
+            bank.balance_usd_cents = bank.balance_usd_cents.saturating_sub((-net) as u64);
+            bank.day_losses += 1;
+            bank.total_losses += 1;
+        }
+        bank.trades += 1;
+        bank.day_net_usd_cents = bank.day_net_usd_cents.checked_add(net).ok_or(PointsError::Overflow)?;
+        if bank.day_net_usd_cents < -(bank.day_loss_cap_usd_cents as i64) {
+            bank.status = 1; // paused for the day
+        }
+        ctx.accounts.settlement.status = 1; // applied to the bank exactly once
         Ok(())
     }
 
@@ -1973,6 +2042,42 @@ pub struct LockAgmMatchCtx<'info> {
         seeds = [AGM_SETTLE_SEED, &order_id.to_le_bytes()],
         bump
     )]
+    pub settlement: Account<'info, AgmSettlement>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `p2c_fund` (bank account, init-if-needed per game).
+#[derive(Accounts)]
+#[instruction(game: u8)]
+pub struct P2cBankCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + std::mem::size_of::<P2cBank>(),
+        seeds = [P2C_SEED, &game.to_le_bytes()],
+        bump
+    )]
+    pub bank: Account<'info, P2cBank>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `p2c_settle` (applies one computer-seat result to the bank).
+#[derive(Accounts)]
+#[instruction(game: u8, order_id: u64, computer_seat: u8, computer_won: bool)]
+pub struct P2cSettleCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + std::mem::size_of::<P2cBank>(),
+        seeds = [P2C_SEED, &game.to_le_bytes()],
+        bump
+    )]
+    pub bank: Account<'info, P2cBank>,
+    #[account(mut, seeds = [AGM_SETTLE_SEED, &order_id.to_le_bytes()], bump)]
     pub settlement: Account<'info, AgmSettlement>,
     pub system_program: Program<'info, System>,
 }
@@ -2619,6 +2724,25 @@ pub struct AgmSettlement {
     pub winner_seat: u8,
     pub payout_usd_cents: u64,  // pot * 90% (single winner takes all)
     pub settled_at: i64,
+    pub status: u8,             // 0 recorded/locked, 1 bank-applied (P2C once guard)
+}
+
+/// Arc2 M7C: the platform P2C bank - capital pool + per-day anti-farm guards.
+/// Computers fill unmatched seats only (small stakes, $1-$10). One account per game.
+#[account]
+pub struct P2cBank {
+    pub version: u8,
+    pub game: u8,
+    pub balance_usd_cents: u64,   // live bank capital
+    pub day_started_at: i64,      // ripples to the next GMT-day bucket on use
+    pub day_net_usd_cents: i64,   // signed: computer wins add, computer losses subtract
+    pub day_loss_cap_usd_cents: u64,
+    pub day_wins: u32,
+    pub day_losses: u32,
+    pub total_wins: u64,
+    pub total_losses: u64,        // lifetime skill-truth loss counter
+    pub trades: u64,
+    pub status: u8,               // 0 open, 1 paused for the day (net-loss cap hit)
 }
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
