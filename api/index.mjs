@@ -23,10 +23,12 @@ import affiliate from '../api_handlers/affiliate.mjs';
 import signup from '../api_handlers/signup.mjs';
 import competitions from '../api_handlers/competitions.mjs';
 import plans from '../api_handlers/plans.mjs';
+import agm from '../api_handlers/agm.mjs';
 
 const routes = {
   '/api/competitions': competitions,
   '/api/plans': plans,
+  '/api/agm': agm,
   '/api/delegate': delegate,
   '/api/roll': roll,
   '/api/comp': comp,

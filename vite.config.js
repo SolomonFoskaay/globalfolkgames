@@ -40,6 +40,7 @@ export default defineConfig({
         'changelog-architecture-m7': './changelog/architecture-m7.html',
         'changelog-architecture-m8': './changelog/architecture-m8.html',
         'changelog-architecture-m9': './changelog/architecture-m9.html',
+        agm: './agm/index.html',
         competitions: './competitions/index.html',
         games: './games/index.html',
         game: './games/game.html',

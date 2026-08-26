@@ -20,15 +20,16 @@ async function send(tx) { tx.feePayer = sponsor.publicKey; const sig = await sen
 
 const GAME = 1;
 const OID = 920003;
+const MAKER = Keypair.generate();
 const TAKER = Keypair.generate();
 const orderPda = PublicKey.findProgramAddressSync([AGM, Buffer.from([GAME]), new BN(OID).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 const settlePda = PublicKey.findProgramAddressSync([AGMS, new BN(OID).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 
-await send(await prog.methods.postAgmOrder(GAME, new BN(OID), new BN(500), 2).accounts({ payer: sponsor.publicKey, order: orderPda, systemProgram: SystemProgram.programId }).transaction());
+await send(await prog.methods.postAgmOrder(GAME, new BN(OID), new BN(500), 2, MAKER.publicKey).accounts({ payer: sponsor.publicKey, order: orderPda, systemProgram: SystemProgram.programId }).transaction());
 // match with taker (sponsor pays fee, both sign like the E smoke)
 const tw = { publicKey: TAKER.publicKey, signTransaction: async (t) => { t.partialSign(TAKER); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(TAKER)); return ts; } };
 const progT = new Program(idl, new AnchorProvider(conn, tw, { commitment: 'confirmed', skipPreflight: true }));
-const t1 = await progT.methods.matchAgmOrder(GAME, new BN(OID)).accounts({ signer: TAKER.publicKey, order: orderPda }).transaction();
+const t1 = await progT.methods.matchAgmOrder(GAME, new BN(OID), TAKER.publicKey).accounts({ signer: TAKER.publicKey, order: orderPda }).transaction();
 t1.feePayer = sponsor.publicKey;
 const s1 = await sendMagicTx(conn, t1, [sponsor, TAKER], { skipPreflight: true });
 await conn.confirmTransaction({ signature: s1 }, 'confirmed');

@@ -559,6 +559,29 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  // Arc2 AGM lobby route (delegates to the shared handler module; body passed
+  // through as an object so the handler's own JSON parse sees a string).
+  if (req.url === '/api/agm') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { handler: agmHandler } = await import('../api_handlers/agm.mjs');
+      const captured = { status: 200, json: null };
+      const fakeRes = {
+        setHeader: () => {},
+        status: (c) => { captured.status = c; return { json: (o) => { captured.json = o; } }; },
+        json: (o) => { captured.json = o; },
+      };
+      const fakeReq = { method: req.method, url: req.url, [Symbol.asyncIterator]: () => (function* () { yield body; })() };
+      await agmHandler(fakeReq, fakeRes);
+      res.writeHead(captured.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors });
+      res.end(JSON.stringify(captured.json));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
   res.writeHead(404, cors);
   res.end();
 });

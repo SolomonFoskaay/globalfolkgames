@@ -1438,19 +1438,23 @@ pub mod gfg_dice {
         order_id: u64,
         stake_usd_cents: u64,
         seats: u8,
+        maker: Pubkey,
     ) -> Result<()> {
         require!(game > 0, PointsError::InvalidCompetition);
         require!(stake_usd_cents > 0, PointsError::InvalidCompetition);
         require!(seats >= 2 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
+        // Maker is passed explicitly so the sponsor relay can place an order on
+        // behalf of the AUTHENTICATED wallet (the payer only funds rent).
+        require!(maker != ctx.accounts.payer.key(), PointsError::InvalidCompetition); // relay-only maker override
         let o = &mut ctx.accounts.order;
         o.version = 1u8;
         o.order_id = order_id;
         o.game = game;
-        o.maker = ctx.accounts.payer.key();
+        o.maker = maker;
         o.stake_usd_cents = stake_usd_cents;
         o.seats = seats;
         o.status = 0u8;
-        o.taker = ctx.accounts.payer.key();
+        o.taker = maker; // placeholder until matched
         o.created_at = Clock::get()?.unix_timestamp;
         Ok(())
     }
@@ -1464,12 +1468,12 @@ pub mod gfg_dice {
         Ok(())
     }
 
-    pub fn match_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
+    pub fn match_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64, taker: Pubkey) -> Result<()> {
         require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
         let o = &mut ctx.accounts.order;
-        require!(ctx.accounts.signer.key() != o.maker, PointsError::InvalidCompetition);
+        require!(taker != o.maker, PointsError::InvalidCompetition); // same wallet cannot self-match
         require!(o.status == 0, PointsError::NotOpen);
-        o.taker = ctx.accounts.signer.key();
+        o.taker = taker;
         o.status = 2;
         Ok(())
     }

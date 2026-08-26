@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGM Arena - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background:#0f0f13; }
+        .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
+        .hint { font-size:0.8rem; color:#888; line-height:1.5; }
+        label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
+        input, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
+        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+        .btn-primary { background:#f87818; color:#000; margin-top:8px; }
+        .btn-success { background:#2ecc71; color:#000; }
+        .btn-danger { background:#e74c3c; color:#fff; }
+        .btn-ghost { background:#1a1a24; color:#bbb; border:1px solid #333; }
+        .btn-sm { padding:6px 10px; font-size:0.75rem; }
+        .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+        .row > div { flex:1; min-width:130px; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#7838f8; }
+        .bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:6px 0 12px; font-size:0.8rem; color:#ccc; }
+        .bar b { color:#f87818; }
+        .log { background:#0a0a10; border:1px solid #222; border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; color:#9fe8a8; max-height:220px; overflow:auto; white-space:pre-wrap; }
+        .locked { color:#2ecc71; font-weight:700; }
+        .open { color:#f87818; font-weight:700; }
+        .matched { color:#7838f8; font-weight:700; }
+        .howto { background:rgba(243,156,18,0.06); border:1px solid rgba(243,156,18,0.3); }
+        .howto li { margin:4px 0; font-size:0.8rem; color:#cbb; line-height:1.5; }
+        .step { font-weight:700; color:#f87818; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1 style="font-size:1.3rem;margin:0 0 4px;">AGM Arena (Arc 2.0 earn lobby)</h1>
+    <p class="hint" style="margin:0 0 12px;">Post an order, match it, lock the pot, settle at the 10% flat fee. Every write is relay/sponsor signed on your behalf. Orders come from a live on-chain registry; statuses are read from Solana, never from a database.</p>
+
+    <div class="card howto">
+        <h3>How it works (with the numbers from our devnet tests)</h3>
+        <ol>
+            <li><span class="step">Post:</span> pick a game (Ludo = 1), a stake ($5), and seats (2). This writes your ticket on-chain.</li>
+            <li><span class="step">Match:</span> another wallet (or the test taker) accepts. Your wallet can never accept its own ticket.</li>
+            <li><span class="step">Lock:</span> the pot is fixed. 2 seats x $5 = a $10 pot, $1 fee (10%), winner gets $9.</li>
+            <li><span class="step">Settle:</span> finalizes the order so the wallet rail can pay the winner.</li>
+        </ol>
+        <p class="hint">The P2C panel below handles the computer bank: fund it, then apply a computer-seat result to a locked settlement (computer win +payout-stake, loss -stake). The bank pauses for the day if it loses $20+.</p>
+    </div>
+
+    <div class="bar">
+        <span>Wallet: <b id="wallet">not signed in</b></span>
+        <span>Program: <b id="program">...</b></span>
+    </div>
+
+    <div class="row">
+        <div class="card" style="flex:1; min-width:320px;">
+            <h3>Post an order</h3>
+            <label>Game</label>
+            <select id="f_game"><option value="1">Ludo (1)</option></select>
+            <label>Stake (USD)</label>
+            <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
+            <label>Seats</label>
+            <select id="f_seats"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
+            <button class="btn-primary" onclick="postOrder()">Post order (on-chain)</button>
+        </div>
+        <div class="card" style="flex:1; min-width:320px;">
+            <h3>P2C computer bank (game 1)</h3>
+            <div class="hint" id="bankInfo">Loading bank...</div>
+            <div class="row">
+                <div><label>Fund amount ($)</label><input id="fundAmt" type="number" value="1000"></div>
+            </div>
+            <button class="btn-ghost" onclick="p2cFund()">Fund bank</button>
+            <div class="row">
+                <div><label>Order id</label><input id="p2cOid" type="number" placeholder="locked order id"></div>
+                <div><label>Computer seat</label><input id="p2cSeat" type="number" value="0"></div>
+                <div><label>Won?</label><select id="p2cWon"><option value="false">Lost</option><option value="true">Won</option></select></div>
+            </div>
+            <button class="btn-ghost" onclick="p2cSettle()">Apply computer result</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Open orders (lobby)</h3>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button class="btn-ghost" onclick="loadOrders()">Refresh</button>
+            <span class="hint" id="lobbyCount"></span>
+        </div>
+        <table>
+            <thead><tr><th>Order</th><th>Game</th><th>Stake</th><th>Seats</th><th>Maker</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="ordersBody"><tr><td colspan="7" style="text-align:center;color:#888;">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>Action log</h3>
+        <div class="log" id="log"></div>
+    </div>
+</div>
+
+<script src="/global_header.js"></script>
+<script>
+    const $ = (id) => document.getElementById(id);
+    function log(msg) { const el = $('log'); el.textContent = new Date().toISOString().slice(11,19) + ' ' + msg + '\n' + el.textContent; }
+    let wallet = null;
+
+    async function signInState() {
+        try { wallet = (await window.getDynamicSolanaWallet && await window.getDynamicSolanaWallet()) || null; } catch (e) { wallet = null; }
+        $('wallet').textContent = wallet ? wallet.toBase58() : 'not signed in';
+    }
+
+    async function apiGet() { const r = await fetch('/api/agm'); return r.json(); }
+    async function apiPost(o) { const r = await fetch('/api/agm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o) }); return r.json(); }
+
+    function statusHtml(s) {
+        if (s === 0) return '<span class="open">OPEN</span>';
+        if (s === 1) return '<span class="locked">LOCKED</span>';
+        if (s === 2) return '<span class="matched">MATCHED</span>';
+        if (s === 3) return '<span>cancelled</span>';
+        if (s === 4) return '<span>settled</span>';
+        return '<span>' + s + '</span>';
+    }
+
+    async function postOrder() {
+        if (!wallet) { log('ERROR: sign in first'); return; }
+        log('posting order (maker = ' + wallet.toBase58().slice(0,8) + '...)');
+        try {
+            const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet.toBase58() });
+            log('OK order #' + r.orderId + ' -> ' + r.pda.slice(0,12) + '... status ' + r.order.status);
+            loadOrders(); loadBank();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+
+    async function matchOrder(oid) {
+        try {
+            log('matching #' + oid + ' with a guest taker wallet (generated by the relay)');
+            const r = await apiPost({ action: 'match', game: 1, orderId: oid, taker: 'guest' });
+            log('OK #' + oid + ' matched, status ' + r.order.status);
+            loadOrders();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+    async function lockOrder(oid) {
+        try {
+            const winner = prompt('Winner seat (0..seats-1)?', '0');
+            const r = await apiPost({ action: 'lock', game: 1, orderId: oid, winnerSeat: Number(winner) });
+            log('OK #' + oid + ' locked (pot fixed, 10% fee goes to house)');
+            loadOrders(); loadBank();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+    async function settleOrder(oid) {
+        try {
+            const r = await apiPost({ action: 'settle', game: 1, orderId: oid });
+            log('OK #' + oid + ' settled, status ' + r.order.status);
+            loadOrders();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+    async function cancelOrder(oid) {
+        try {
+            const r = await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: wallet ? wallet.toBase58() : '' });
+            log('OK #' + oid + ' cancelled');
+            loadOrders();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+
+    async function loadOrders() {
+        try {
+            const r = await apiGet();
+            $('lobbyCount').textContent = r.count + ' order(s)';
+            const body = $('ordersBody');
+            if (!r.orders || !r.orders.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No orders yet. Post one above.</td></tr>'; return; }
+            body.innerHTML = r.orders.map((o) => {
+                const actions = [];
+                if (o.status === 0) actions.push('<button class="btn-sm btn-success" onclick="matchOrder(' + o.order_id + ')">Match</button>', '<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>');
+                if (o.status === 2) actions.push('<button class="btn-sm btn-primary" onclick="lockOrder(' + o.order_id + ')">Lock</button>');
+                if (o.status === 1) actions.push('<button class="btn-sm btn-ghost" onclick="settleOrder(' + o.order_id + ')">Settle</button>');
+                return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (o.stake_usd_cents / 100) + '</td><td>' + o.seats + '</td><td class="mono">' + (o.maker || '').slice(0,10) + '...</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
+            }).join('');
+        } catch (e) { $('ordersBody').innerHTML = '<tr><td colspan="7" style="color:#e74c3c;">error: ' + e.message + '</td></tr>'; }
+    }
+
+    async function loadBank() {
+        try {
+            const r = await apiPost({ action: 'bank', game: 1 });
+            const b = r.bank;
+            if (!b) { $('bankInfo').textContent = 'No P2C bank yet for game 1 (fund it once).'; return; }
+            const n = (x) => Number(x);
+            $('bankInfo').innerHTML = 'Balance: <b>$' + (n(b.balanceUsdCents)/100) + '</b>&nbsp; Day net: $' + (n(b.dayNetUsdCents)/100) + '&nbsp; Status: ' + (b.status === 0 ? 'open' : '<b style="color:#e74c3c">paused</b>') + '<br>Trades: ' + n(b.trades) + ' (W ' + b.dayWins + ' / L ' + b.dayLosses + ' today)&nbsp; Lifetime W ' + n(b.totalWins) + ' / L ' + n(b.totalLosses);
+        } catch (e) { $('bankInfo').textContent = 'bank error: ' + e.message; }
+    }
+    async function p2cFund() {
+        try { const r = await apiPost({ action: 'p2c-fund', game: 1, amountUsdCents: Number($('fundAmt').value) * 100 }); log('OK bank funded'); loadBank(); } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+    async function p2cSettle() {
+        try {
+            const r = await apiPost({ action: 'p2c-settle', game: 1, orderId: Number($('p2cOid').value), computerSeat: Number($('p2cSeat').value), computerWon: $('p2cWon').value === 'true' });
+            log('OK computer result applied to order #' + $('p2cOid').value);
+            loadBank();
+        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        $('program').textContent = 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWrBu8wgAuJ';
+        await signInState();
+        document.addEventListener('gfg:auth-changed', signInState);
+        loadOrders(); loadBank();
+    });
+</script>
+</body>
+</html>

@@ -34,11 +34,12 @@ const oids = [_s + 1, _s + 2];
 
 async function runCase(oid, winnerSeat) {
   const ord = await order(oid), stl = await settle(oid);
-  await send(prog.methods.postAgmOrder(GAME, new BN(oid), new BN(500), 2).accounts({ payer: sponsor.publicKey, order: ord, systemProgram: SystemProgram.programId }).transaction());
+  const maker = Keypair.generate().publicKey;
+  await send(prog.methods.postAgmOrder(GAME, new BN(oid), new BN(500), 2, maker).accounts({ payer: sponsor.publicKey, order: ord, systemProgram: SystemProgram.programId }).transaction());
   const taker = Keypair.generate();
   const tw = { publicKey: taker.publicKey, signTransaction: async (t) => { t.partialSign(taker); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(taker)); return ts; } };
   const progT = new Program(idl, new AnchorProvider(conn, tw, { commitment: 'confirmed', skipPreflight: true }));
-  const t1 = await progT.methods.matchAgmOrder(GAME, new BN(oid)).accounts({ signer: taker.publicKey, order: ord }).transaction();
+  const t1 = await progT.methods.matchAgmOrder(GAME, new BN(oid), taker.publicKey).accounts({ signer: taker.publicKey, order: ord }).transaction();
   t1.feePayer = sponsor.publicKey;
   const s1 = await sendMagicTx(conn, t1, [sponsor, taker], { skipPreflight: true });
   await conn.confirmTransaction({ signature: s1 }, 'confirmed');

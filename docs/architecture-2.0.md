@@ -130,3 +130,25 @@ M7 keeps the existing v1 modules untouched: M2 seam, M3/M4 points, M5 plans, M6 
 - **expectedOutput:** on-chain order lifecycle (open/matched/locked/cancelled); escrow lock; settle outputs `potUsdCents`, `feeUsdCents` (10%), `winnerSeat`, `payoutUsdCents` (90%); game-agnostic - any game plugs in by picking a gameId from the registry.
 
 Build policy: any capability that is shared across games (matchmaking, escrow, fees, identity, payments) lives in a UNIVERSAL module (M7 AGM here), never inside a game. If a slice doesn't fit its module's inputs/outputs, the ARCHITECTURE changes first, then the build follows (never the reverse).
+
+### HOW IT WORKS IN PLAIN WORDS (read this first, then the technical deltas above)
+
+Think of the earn arena like a small bank with a betting window. This is the whole arc in one story, using the REAL numbers our devnet tests produced.
+
+**1. Posting an order (arc2m7a).** You "write a ticket": your game (Ludo), your stake ($5), and how many seats. The ticket is stored on Solana, not on our server. Test result: a ticket gets an owner line, a stake line, a seat count, and a status line that starts at "open".
+
+**2. Matching (arc2m7a).** Another player (or the computer bank) says "I take this ticket". Now both sides are locked in at $5 each. Test result: the same wallet CANNOT take its own ticket, the taker must be a different wallet.
+
+**3. Lock + settle (arc2m7b).** When the match finishes, the pot is split:
+- Pot = stake x seats. Two humans at $5 each = a $10 pot.
+- House fee = 10% of the pot = $1.
+- Winner gets the rest = $9 (90% of the pot).
+Real test numbers on-chain: pot $10, fee $1, payout $9, winner seat 0. One number for every game, everywhere, so players always see the same math.
+
+**4. The computer bank (arc2m7c).** To make sure matches always fill, the platform keeps a computer ("the bank") that takes empty seats, but only on small stakes ($1-$10) and with guard rails. Real test on devnet: we put $1000 in the bank, the computer lost a $5 seat (-$5) then won a $5 seat (+$4, because the winning computer gets its $9 payout minus the $5 it staked). Net for the day: a $1 loss on 2 trades. If the bank ever loses $20 or more in one GMT day it stops taking seats until the day turns over. That is the anti-meltdown switch.
+
+**5. Turn clocks (arc2m1b).** Every seat gets a timer so nobody can stall a match forever. Real test: a seat with a 2-second turn stopped moving, got 3 timeout strikes, and was FORFEITED. Its attempt to claim the win was rejected, and the healthy seat finished and won. Solo play never uses these clocks, so free casual games stay exactly as they are today.
+
+**6. The board (arc2m1a).** Moves are committed on-chain as hashes, so the whole match can be replayed and proven. The board knows money and seats; the game decides the rules. This is why a future game (Monopoly, Ayo Olopon) plugs in by picking a gameId, not by being rewritten.
+
+In short: tickets (orders) -> match -> play on a provable board with timers -> lock the pot -> cut the 10% fee -> pay the 90% winner. Every step is on Solana, gasless for the player, and testable on devnet before any real money is involved.
