@@ -115,6 +115,8 @@ pub const COMP2_SEED: &[u8] = b"gfgcomp2";        // M7 competition instance [gf
 pub const GFGWIN_SEED: &[u8] = b"gfgwin";         // M7 winner record [gfgwin, comp, rank]
 pub const MAX_GAMES: usize = 4;
 pub const MAX_WINNERS: usize = 16;
+pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board
+pub const MAX_MP: usize = 8;                      // max human seats per earn match
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1332,6 +1334,93 @@ pub mod gfg_dice {
         Ok(())
     }
 
+
+    // ===== Arc2 M1 item D: on-chain match board (owner-approved 2026-08-25) =====
+    // Additive multiplayer record: start_match locks a board with participants +
+    // stake + clocks; commit_move records hashed move checkpoints with turn caps;
+    // finish_match writes the winner + time. Solo/free play is untouched.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_match(
+        ctx: Context<StartMatchCtx>,
+        game: u8,
+        match_ref: u64,
+        players: Vec<Pubkey>,
+        seats: u8,
+        stake_usd_cents: u64,
+        turn_secs: u64,
+        max_match_secs: u64,
+    ) -> Result<()> {
+        require!(players.len() >= 2 && players.len() <= MAX_MP, PointsError::InvalidCompetition);
+        require!(seats >= players.len() as u8 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
+        require!(game > 0, PointsError::InvalidCompetition);
+        require!(stake_usd_cents > 0, PointsError::InvalidCompetition);
+        require!(turn_secs > 0 && max_match_secs > 0, PointsError::InvalidCompetition);
+        let b = &mut ctx.accounts.board;
+        b.version = 1u8;
+        b.game = game;
+        b.match_ref = match_ref;
+        b.status = 0u8;
+        let mut ps = [ctx.accounts.payer.key(); MAX_MP];
+        for (i, p) in players.iter().enumerate() { ps[i] = *p; }
+        b.players = ps;
+        b.player_count = players.len() as u8;
+        b.seats = seats;
+        b.stake_usd_cents = stake_usd_cents;
+        b.seat_pot_usd_cents = stake_usd_cents.checked_mul(seats as u64).ok_or(PointsError::Overflow)?;
+        b.turn_secs = turn_secs;
+        b.max_match_secs = max_match_secs;
+        b.started_at = Clock::get()?.unix_timestamp;
+        b.last_turn_ts = [0i64; MAX_MP];
+        b.move_count = 0;
+        b.last_move_commit = [0u8; 32];
+        b.finished_at = 0;
+        b.winner_seat = 255;
+        Ok(())
+    }
+
+    pub fn begin_match(ctx: Context<BeginMatchCtx>, game: u8, match_ref: u64) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 0, PointsError::NotOpen);
+        b.status = 1;
+        b.started_at = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
+    /// Commit one hashed move from a seat (gasless on the ER). Caps the turn:
+    /// if a seat exceeds its turn_secs, any other seat may take over the next
+    /// move (no stalling); max_match_secs is enforced at finish.
+    pub fn commit_move(
+        ctx: Context<CommitMoveCtx>,
+        game: u8,
+        match_ref: u64,
+        seat: u8,
+        move_commit: [u8; 32],
+    ) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 1, PointsError::NotOpen);
+        require!(seat < b.player_count, PointsError::RankOutOfRange);
+        b.last_move_commit = move_commit;
+        b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        b.last_turn_ts[seat as usize] = now;
+        Ok(())
+    }
+
+    pub fn finish_match(ctx: Context<FinishMatchCtx>, game: u8, match_ref: u64, winner_seat: u8) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 1, PointsError::NotOpen);
+        require!(winner_seat < b.player_count, PointsError::RankOutOfRange);
+        require!(now - b.started_at <= b.max_match_secs as i64, PointsError::StillRunning); // time cap
+        b.status = 2;
+        b.winner_seat = winner_seat;
+        b.finished_at = now;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1711,6 +1800,54 @@ pub struct MarkWinnerPaidCtx<'info> {
     pub competition: Account<'info, CompetitionInstance>,
     #[account(mut, seeds = [GFGWIN_SEED, competition.key().as_ref(), &[rank]], bump)]
     pub winner: Account<'info, WinnerRecord>,
+}
+
+/// Context for `start_match` (Arc2 M1 D). Board seed [gfgboard, game, match_ref].
+/// game + match_ref are instruction args; the creator (lobby/payer) is the gate.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64, players: Vec<Pubkey>, seats: u8, stake_usd_cents: u64, turn_secs: u64, max_match_secs: u64)]
+pub struct StartMatchCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<MatchBoard>(),
+        seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+        bump
+    )]
+    pub board: Account<'info, MatchBoard>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `begin_match`.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct BeginMatchCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `commit_move`.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64, seat: u8, move_commit: [u8; 32])]
+pub struct CommitMoveCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `finish_match`.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64, winner_seat: u8)]
+pub struct FinishMatchCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
 }
 
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
@@ -2298,6 +2435,31 @@ pub struct CompetitionTally {
     pub wins: u64,
     pub first_ts: i64,
     pub last_ts: i64,
+}
+
+/// Arc2 M1 (item D): on-chain match board for MULTIPLAYER (earn) matches.
+/// Commit-hashed move checkpoints + turn/max clocks + finish winner, so any
+/// earn game's match is provable and replayable. Additive; no effect on any
+/// existing account layout.
+#[account]
+pub struct MatchBoard {
+    pub version: u8,             // 1 = current
+    pub game: u8,                // M1 source_code (1 = ludo, ...)
+    pub match_ref: u64,          // lobby-generated unique id
+    pub status: u8,              // 0 locked (awaiting players), 1 in_progress, 2 finished
+    pub players: [Pubkey; MAX_MP],
+    pub player_count: u8,        // how many HUMAN wallets are in
+    pub seats: u8,               // total seats (humans + computer fill)
+    pub stake_usd_cents: u64,    // each side's stake
+    pub seat_pot_usd_cents: u64, // pot = stake * seats  (flat 10% fee at finish)
+    pub turn_secs: u64,
+    pub max_match_secs: u64,
+    pub started_at: i64,
+    pub last_turn_ts: [i64; MAX_MP],
+    pub move_count: u64,
+    pub last_move_commit: [u8; 32],
+    pub finished_at: i64,
+    pub winner_seat: u8,         // 0..player_count-1, 255 = none yet
 }
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium

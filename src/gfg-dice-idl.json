@@ -233,6 +233,65 @@
       "args": []
     },
     {
+      "name": "begin_match",
+      "discriminator": [
+        30,
+        230,
+        183,
+        200,
+        11,
+        146,
+        125,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "callback_roll_dice",
       "docs": [
         "Called by the VRF program (oracle-verified) with the randomness."
@@ -768,6 +827,83 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "commit_move",
+      "docs": [
+        "Commit one hashed move from a seat (gasless on the ER). Caps the turn:",
+        "if a seat exceeds its turn_secs, any other seat may take over the next",
+        "move (no stalling); max_match_secs is enforced at finish."
+      ],
+      "discriminator": [
+        27,
+        16,
+        69,
+        212,
+        175,
+        110,
+        123,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        },
+        {
+          "name": "move_commit",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "create_competition",
@@ -2178,6 +2314,69 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "finish_match",
+      "discriminator": [
+        65,
+        193,
+        5,
+        71,
+        16,
+        64,
+        11,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "winner_seat",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "fund_comp",
@@ -4148,6 +4347,91 @@
       ]
     },
     {
+      "name": "start_match",
+      "discriminator": [
+        100,
+        246,
+        223,
+        181,
+        176,
+        101,
+        255,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "players",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "seats",
+          "type": "u8"
+        },
+        {
+          "name": "stake_usd_cents",
+          "type": "u64"
+        },
+        {
+          "name": "turn_secs",
+          "type": "u64"
+        },
+        {
+          "name": "max_match_secs",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "undelegate",
       "docs": [
         "Commits the latest state and returns the PDA to this program (runs on ER)."
@@ -4654,6 +4938,19 @@
         136,
         77,
         63
+      ]
+    },
+    {
+      "name": "MatchBoard",
+      "discriminator": [
+        141,
+        110,
+        138,
+        155,
+        216,
+        122,
+        244,
+        55
       ]
     },
     {
@@ -5323,6 +5620,103 @@
           {
             "name": "spend_count",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchBoard",
+      "docs": [
+        "Arc2 M1 (item D): on-chain match board for MULTIPLAYER (earn) matches.",
+        "Commit-hashed move checkpoints + turn/max clocks + finish winner, so any",
+        "earn game's match is provable and replayable. Additive; no effect on any",
+        "existing account layout."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "players",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "player_count",
+            "type": "u8"
+          },
+          {
+            "name": "seats",
+            "type": "u8"
+          },
+          {
+            "name": "stake_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "seat_pot_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "turn_secs",
+            "type": "u64"
+          },
+          {
+            "name": "max_match_secs",
+            "type": "u64"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_turn_ts",
+            "type": {
+              "array": [
+                "i64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "move_count",
+            "type": "u64"
+          },
+          {
+            "name": "last_move_commit",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finished_at",
+            "type": "i64"
+          },
+          {
+            "name": "winner_seat",
+            "type": "u8"
           }
         ]
       }

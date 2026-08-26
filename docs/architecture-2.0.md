@@ -75,7 +75,8 @@ M1-M11 seams & universal folders, GFG-handle identity, ER-gassless-first, base-l
 Finalize these six and the doc becomes the build guide; we start the M1 v2 rebuild (multiplayer + AGM seams) from there.
 ---
 
-## M1 v2 MODULE SPEC (draft for approval - will become the build contract)
+## M1 v2 MODULE SPEC (APPROVED BY OWNER 2026-08-25 - the build contract)
+> Build order locked in this turn: (1) on-chain board + move commit [ITEM D] -> (2) AGM lobby + P2P match lock -> (3) clocks/timeouts -> (4) P2C bank binding -> (5) settle/fee. Flat 10% pot fee. Modes = Solo (free, unchanged) vs Multiplayer (N human wallets, earn-capable); one game build serves both; per-game seat capacity dynamic. Solo/non-earn play must never regress.
 
 ### Summary
 M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 result seam, but the game core now also supports 3 play modes: **Solo** (vs computer, free, points only), **Multiplayer** (AGM-matched real players; match-code for private games), **P2C** (AGM-matched computer, earn). Deterministic moves are committed on-chain (board snapshot checkpoints + move hashes; full board replay on chain for earn games where affordable, ER permitting). Turn-clock + match-time are enforced. Identity = GFG handle (never name/email/wallet).
