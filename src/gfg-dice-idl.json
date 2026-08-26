@@ -3038,6 +3038,95 @@
       "args": []
     },
     {
+      "name": "lock_agm_match",
+      "discriminator": [
+        194,
+        214,
+        188,
+        64,
+        44,
+        250,
+        1,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "winner_seat",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "mark_winner_paid",
       "discriminator": [
         21,
@@ -4170,6 +4259,63 @@
       ]
     },
     {
+      "name": "settle_agm_match",
+      "discriminator": [
+        76,
+        63,
+        58,
+        66,
+        207,
+        56,
+        54,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "settle_comp",
       "docs": [
         "Program logic splits a funded pool: 70% to the winners bucket (split",
@@ -5085,6 +5231,19 @@
       ]
     },
     {
+      "name": "AgmSettlement",
+      "discriminator": [
+        217,
+        147,
+        46,
+        222,
+        26,
+        191,
+        223,
+        4
+      ]
+    },
+    {
       "name": "Competition",
       "discriminator": [
         193,
@@ -5582,6 +5741,55 @@
           },
           {
             "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgmSettlement",
+      "docs": [
+        "Arc2 M7F: settlement of a filled order. Reads the stake/seats at lock and",
+        "computes the flat-10% fee + 90% winner payout (recorded on-chain; actual",
+        "token move happens in the payout rail or embedded-wallet credit)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "pot_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "fee_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "seats",
+            "type": "u8"
+          },
+          {
+            "name": "winner_seat",
+            "type": "u8"
+          },
+          {
+            "name": "payout_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
             "type": "i64"
           }
         ]

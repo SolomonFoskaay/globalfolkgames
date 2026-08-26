@@ -117,7 +117,9 @@ pub const MAX_GAMES: usize = 4;
 pub const MAX_WINNERS: usize = 16;
 pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board
 pub const MAX_MP: usize = 8;                      // max human seats per earn match
-pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M1 E: standalone AGM order
+pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M7: standalone AGM order
+pub const AGM_SETTLE_SEED: &[u8] = b"gfgagms";        // Arc2 M7F: settlement (pot/fee/payout)
+pub const AGM_FEE_BPS: u64 = 1000;                    // flat 10% of the pot (locked)
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1465,6 +1467,41 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ===== Arc2 M7F: lock + settle a matched AGM order =====
+    // lock_agm_match: any party may call once the order is MATCHED (status 2);
+    // writes the settlement snapshot from the order's stake/seats (fee = 10% pot)
+    // and marks the order LOCKED (status 1).
+    pub fn lock_agm_match(ctx: Context<LockAgmMatchCtx>, game: u8, order_id: u64, winner_seat: u8) -> Result<()> {
+        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
+        let o = &ctx.accounts.order;
+        require!(o.status == 2, PointsError::NotOpen);
+        require!(winner_seat < o.seats, PointsError::RankOutOfRange);
+        let pot = o.stake_usd_cents.checked_mul(o.seats as u64).ok_or(PointsError::Overflow)?;
+        let fee = (pot * AGM_FEE_BPS) / 10_000;
+        let st = &mut ctx.accounts.settlement;
+        st.version = 1u8;
+        st.order_id = order_id;
+        st.game = o.game;
+        st.pot_usd_cents = pot;
+        st.fee_usd_cents = fee;
+        st.seats = o.seats;
+        st.winner_seat = winner_seat;
+        st.payout_usd_cents = pot.checked_sub(fee).ok_or(PointsError::Overflow)?;
+        st.settled_at = Clock::get()?.unix_timestamp;
+        ctx.accounts.order.status = 1; // LOCKED (escrow committed after matching)
+        Ok(())
+    }
+
+    // settle_agm_match: finalizes the order once the board (M1) has finished.
+    // finished, so the wallet/escrow rail can pay the 90% winner.
+    pub fn settle_agm_match(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
+        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
+        let o = &mut ctx.accounts.order;
+        require!(o.status == 1, PointsError::NotOpen); // must have been locked (escrow committed)
+        o.status = 1; // FILLED (final)
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1919,6 +1956,25 @@ pub struct AgmOrderSeqCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()], bump)]
     pub order: Account<'info, AgmOrder>,
+}
+
+/// Context for `lock_agm_match` (creates the settlement snapshot).
+#[derive(Accounts)]
+#[instruction(game: u8, order_id: u64, winner_seat: u8)]
+pub struct LockAgmMatchCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()], bump)]
+    pub order: Account<'info, AgmOrder>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + std::mem::size_of::<AgmSettlement>(),
+        seeds = [AGM_SETTLE_SEED, &order_id.to_le_bytes()],
+        bump
+    )]
+    pub settlement: Account<'info, AgmSettlement>,
+    pub system_program: Program<'info, System>,
 }
 
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
@@ -2547,6 +2603,22 @@ pub struct AgmOrder {
     pub status: u8,              // 0 open, 1 filled(locked by escrow later), 2 matched, 3 cancelled
     pub taker: Pubkey,           // zero until matched
     pub created_at: i64,
+}
+
+/// Arc2 M7F: settlement of a filled order. Reads the stake/seats at lock and
+/// computes the flat-10% fee + 90% winner payout (recorded on-chain; actual
+/// token move happens in the payout rail or embedded-wallet credit).
+#[account]
+pub struct AgmSettlement {
+    pub version: u8,
+    pub order_id: u64,
+    pub game: u8,
+    pub pot_usd_cents: u64,
+    pub fee_usd_cents: u64,     // pot * 10%
+    pub seats: u8,
+    pub winner_seat: u8,
+    pub payout_usd_cents: u64,  // pot * 90% (single winner takes all)
+    pub settled_at: i64,
 }
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
