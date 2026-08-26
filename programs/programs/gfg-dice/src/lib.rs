@@ -1509,8 +1509,10 @@ pub mod gfg_dice {
     }
 
     // ===== Arc2 M7C: P2C bank funding + per-day settle with anti-farm caps =====
-    // p2c_fund: permissionless capital add (house tops the pool; anyone may - harmless).
+    // init_fresh: a zeroed (freshly init_if_needed) bank gets its real defaults,
+    // so the day-loss cap / game / day bucket are never 0 when first used. Idempotent.
     pub fn p2c_fund(ctx: Context<P2cBankCtx>, game: u8, amount_usd_cents: u64) -> Result<()> {
+        p2c_bank_init_fresh(&mut ctx.accounts.bank, game)?;
         ctx.accounts.bank.balance_usd_cents = ctx.accounts.bank
             .balance_usd_cents
             .checked_add(amount_usd_cents)
@@ -1538,6 +1540,7 @@ pub mod gfg_dice {
         require!(stake >= P2C_MIN_STAKE_USD_CENTS && stake <= P2C_MAX_STAKE_USD_CENTS,
             PointsError::InvalidCompetition); // computers only fill small-stake seats
         let bank = &mut ctx.accounts.bank;
+        p2c_bank_init_fresh(bank, game)?;
         // roll the day bucket
         let now = Clock::get()?.unix_timestamp;
         if now - bank.day_started_at >= P2C_DAY_SECS {
@@ -2044,6 +2047,18 @@ pub struct LockAgmMatchCtx<'info> {
     )]
     pub settlement: Account<'info, AgmSettlement>,
     pub system_program: Program<'info, System>,
+}
+
+fn p2c_bank_init_fresh(bank: &mut Account<'_, P2cBank>, game: u8) -> Result<()> {
+    if bank.version != 0 {
+        return Ok(());
+    }
+    bank.version = 1u8;
+    bank.game = game;
+    bank.day_started_at = Clock::get()?.unix_timestamp;
+    bank.day_loss_cap_usd_cents = P2C_DAY_LOSS_CAP_USD_CENTS;
+    bank.status = 0u8;
+    Ok(())
 }
 
 /// Context for `p2c_fund` (bank account, init-if-needed per game).

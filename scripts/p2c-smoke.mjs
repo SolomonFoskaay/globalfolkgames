@@ -17,7 +17,7 @@ const wallet = { publicKey: sponsor.publicKey, signTransaction: async (t) => { t
 const conn = createConnection(baseRpcUrl(), 'confirmed');
 const prog = new Program(idl, new AnchorProvider(conn, wallet, { commitment: 'confirmed', skipPreflight: true }));
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-async function send(p) { p.feePayer = sponsor.publicKey; const sig = await sendMagicTx(conn, await p.transaction(), [sponsor], { skipPreflight: true }); await conn.confirmTransaction({ signature: sig }, 'confirmed'); return sig; }
+async function send(tx) { if (tx && typeof tx.then === 'function') tx = await tx; tx.feePayer = sponsor.publicKey; const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true }); await conn.confirmTransaction({ signature: sig }, 'confirmed'); return sig; }
 
 const GAME = 1;
 const bankPda = PublicKey.findProgramAddressSync([P2C, Buffer.from([GAME])], PROGRAM)[0];
@@ -27,6 +27,10 @@ const settle = (oid) => PublicKey.findProgramAddressSync([AGMS, new BN(oid).toAr
 // fund the bank with $1,000
 await send(prog.methods.p2cFund(GAME, new BN(100_000)).accounts({ signer: sponsor.publicKey, bank: bankPda, systemProgram: SystemProgram.programId }).transaction());
 console.log('bank funded $1000');
+
+// stage each case with a fresh order id so re-runs never collide
+let _s = Date.now() % 100000;
+const oids = [_s + 1, _s + 2];
 
 async function runCase(oid, winnerSeat) {
   const ord = await order(oid), stl = await settle(oid);
@@ -45,24 +49,19 @@ async function runCase(oid, winnerSeat) {
   await send(prog.methods.p2cSettle(GAME, new BN(oid), 0, computerWon).accounts({ signer: sponsor.publicKey, bank: bankPda, settlement: stl, systemProgram: SystemProgram.programId }).transaction());
 }
 
-await runCase(920011, 1); // computer seat 0 loses -> bank net -500
-await runCase(920012, 0); // computer seat 0 wins  -> bank net +400 (payout 900 - stake 500)
+const before = await prog.account.p2cBank.fetch(bankPda);
+await runCase(oids[0], 1); // computer seat 0 loses -> bank net -500
+await runCase(oids[1], 0); // computer seat 0 wins  -> bank net +400 (payout 900 - stake 500)
 await sleep(2500);
 
-const bd = (await conn.getAccountInfo(bankPda)).data;
-const bank = {
-  game: bd[9],
-  balanceUsdCents: Number(bd.readBigUInt64LE(10)),
-  dayNet: Number(bd.readBigInt64LE(18)),
-  dayLossCap: Number(bd.readBigUInt64LE(26)),
-  dayWins: bd.readUInt32LE(34),
-  dayLosses: bd.readUInt32LE(38),
-  totalWins: Number(bd.readBigUInt64LE(42)),
-  totalLosses: Number(bd.readBigUInt64LE(50)),
-  trades: Number(bd.readBigUInt64LE(58)),
-  status: bd[66],
-};
-console.log('P2C BANK:', JSON.stringify(bank));
-const pass = bank.balanceUsdCents === 100_000 - 500 + 400 && bank.dayNet === -100 && bank.dayWins === 1 && bank.dayLosses === 1 && bank.trades === 2 && bank.status === 0;
+const bank = await prog.account.p2cBank.fetch(bankPda);
+const n = (x) => Number(x);
+const pass = n(bank.balanceUsdCents) - n(before.balanceUsdCents) === -100
+  && n(bank.dayNetUsdCents) - n(before.dayNetUsdCents) === -100
+  && bank.dayWins - before.dayWins === 1
+  && bank.dayLosses - before.dayLosses === 1
+  && n(bank.trades) - n(before.trades) === 2
+  && bank.status === 0;
+console.log('P2C BANK:', JSON.stringify(bank, (k, v) => (v && v.type === 'BN') ? v.toString() : v));
 console.log('P2C BANK PASS (fund $1000, -500 loss, +400 win, dayNet -100):', pass ? 'YES' : 'NO');
 process.exit(0);
