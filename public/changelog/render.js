@@ -327,39 +327,53 @@
     setInterval(startPoller, POLL_MS);
   }
 
-  // Admin gate: bounce non-staff to the homepage. Runs after a short auth
-  // settle window (mirrors profiles.js). Staff = admin or moderator.
+  // Admin gate: staff only (admin/moderator). Fixed 2026-08-24: waits up to 10s
+  // for the wallet to restore and NEVER redirects on an unresolved wallet (a slow
+  // session used to bounce real admins). Only a positively-confirmed non-staff
+  // wallet redirects home.
   async function requireStaff() {
     const roles = await loadRoles();
-    const wallet = currentWallet();
-
-    // Give Dynamic/Supabase a moment to restore the session if it exists.
-    if (!wallet && window.refreshAuthHeader) {
-      try { await window.refreshAuthHeader(); } catch (e) { /* ignore */ }
-      const w2 = currentWallet();
-      if (w2) return handleStaffCheck(w2, roles);
-    }
 
     function handleStaffCheck(w, r) {
       const role = roleForWallet(w, r);
-      if (RANK[role] >= RANK.moderator) return role;
-      // Bounce non-staff.
-      window.location.replace('/');
-      return null;
+      const badge = qs('#changelog-role');
+      if (badge && w) badge.textContent = typeof role === 'string' ? w.slice(0, 4) + '…' + w.slice(-4) + ' · ' + role : '';
+      return (role && RANK[role] >= RANK.moderator) ? role : null;
+    }
+
+    let wallet = currentWallet();
+    for (let i = 0; i < 20; i++) {
+      if (wallet) break;
+      await new Promise(r => setTimeout(r, 500));
+      wallet = currentWallet();
+    }
+    // Give the header a chance to hydrate the wallet from a restored session.
+    if (!wallet && window.refreshAuthHeader) {
+      try { await window.refreshAuthHeader(); } catch (e) { /* ignore */ }
+      wallet = currentWallet();
     }
 
     const role = handleStaffCheck(wallet, roles);
-    // Post-resolve: after auth fully settles, re-verify once in case the first
-    // pass raced a slow wallet load.
-    setTimeout(async () => {
-      const w = currentWallet();
-      if (w) {
-        const finalRole = roleForWallet(w, roles);
-        const badge = qs('#changelog-role');
-        if (badge) badge.textContent = w.slice(0, 4) + '…' + w.slice(-4) + ' · ' + finalRole;
+    if (wallet) {
+      // Known wallet: bounce only if it is genuinely not staff.
+      if (!(role && RANK[role] >= RANK.moderator)) {
+        window.location.replace('/');
+        return null;
       }
-    }, 2500);
-    return role;
+      // Post-verify once after full settle to refresh the badge.
+      setTimeout(() => {
+        const w = currentWallet();
+        if (w) { const fr = roleForWallet(w, roles); const b = qs('#changelog-role'); if (b) b.textContent = w.slice(0, 4) + '…' + w.slice(-4) + ' · ' + (typeof fr === 'string' ? fr : 'guest'); }
+      }, 2500);
+      return role;
+    }
+    // Wallet never resolved this load: keep the page (no bounce); re-check later.
+    setTimeout(() => {
+      const w = currentWallet();
+      if (w && roleForWallet(w, roles)) { window.location.reload(); }
+      else if (w && !roleForWallet(w, roles)) { window.location.replace('/'); }
+    }, 4000);
+    return null;
   }
 
   // Non-bouncing role lookup for the public page (shows the staff link).

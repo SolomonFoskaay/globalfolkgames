@@ -130,8 +130,8 @@ body::after {
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  background: rgba(243, 156, 18, 0.18);
-  border: 1px solid rgba(243, 156, 18, 0.55);
+  background: rgba(248, 120, 24, 0.18);
+  border: 1px solid rgba(248, 120, 24, 0.55);
   color: #f87818;
   border-radius: 999px;
   padding: 1px 7px;
@@ -141,3 +141,9 @@ body::after {
 
 /* Back-to-top arrow (injected sitewide, slim, idle-hidden). */
 #gfg-backtop { box-shadow:0 4px 12px rgba(0,0,0,0.35); }
+
+/* Branded site title: Global (orange), Folk (purple), Games (orange). */
+.gfg-brand { color: #fff; text-decoration: none; font-weight: 800; }
+.gfg-brand:visited { color: #fff; }
+.brand-orange { color: #f87818 !important; }   /* logo orange */
+.brand-purple { color: #7838f8 !important; }   /* logo purple */

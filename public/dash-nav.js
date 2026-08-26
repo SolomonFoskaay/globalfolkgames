@@ -49,6 +49,12 @@
         const sections = Array.isArray(cfg.sections) ? cfg.sections.slice() : [];
         // Universal Tools section so the launch run sheet is reachable from every
         // dashboard page's own menu (single place).
+        if (!sections.some(sec => (sec.items || []).some(it => it.href === '/changelog/architecture-v2.html'))) {
+            sections.push({ heading: 'Architecture', items: [
+                { key: 'arch-v1', label: '📐 Architecture 1.0', href: '/changelog/architecture.html' },
+                { key: 'arch-v2', label: '🚀 Architecture 2.0', href: '/changelog/architecture-v2.html' }
+            ] });
+        }
         if (!sections.some(sec => (sec.items || []).some(it => it.key === 'run-sheet'))) {
             sections.push({ heading: 'Tools', items: [
                 { key: 'run-sheet', label: '🧾 Launch run sheet', href: '/dashboard/run-sheet.md' }
