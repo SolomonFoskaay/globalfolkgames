@@ -116,8 +116,12 @@ Slice labels are always `arc2m<N><slice>` so it is ALWAYS obvious which module a
 | arc2m1a ✅ | M1 Game core | multiplayer Solo/Multiplayer, on-chain board + move commit, per-game rules profiles (registry) |
 | arc2m7a ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
 | arc2m7b ✅ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
-| arc2m7c ⏳ | M7 AGM | P2C computer bank + anti-farm caps |
-| arc2m1b | M1 Game core | per-game timeouts integration on the board |
+| arc2m7c ✅ | M7 AGM | P2C computer bank + anti-farm caps |
+| arc2m1b ✅ | M1 Game core | per-game timeouts: per-seat clocks, timeout->forfeit, finish_forfeit |
+
+> **arc2m7c (built, deployed, smoke PASS):** `P2cBank` account per game ([gfgp2c, game]): capital pool, GMT day bucket, signed day-net, day-loss cap (default $20) pauses the bank for the day, win/loss/trades counters. `p2c_fund` top-up (init_fresh seeds real defaults on a zeroed bank), `p2c_settle` applies one computer-seat result from a locked settlement exactly once (AgmSettlement.status 0->1) with the $1-$10 small-stake band enforced on-chain. Net math = computer win `+(payout - stake)`, computer loss `-stake` (2-seat $5: win +$4, loss -$5, EV as spec). Smoke: fund $1000, lose $5, win $4 -> dayNet -$1, trades 2, bank open.
+
+> **arc2m1b (built, deployed, smoke PASS):** `MatchClock` account per match ([gfgclock, game, match_ref]) keeps the board game-agnostic: per-seat deadlines snapshotted from the board's turn_secs. `start_match_clocks` inits (only this may create - an empty clock cannot forfeit), `touch_seat_clock` resets a seat's deadline after a legal move, `timeout_seat` is permissionless anti-stall (records a stall, resets the window, at timeout_cap=3 marks the seat FORFEITED), `finish_forfeit` lets a healthy seat finalize the board when another seat forfeited (the forfeited seat can never claim the win). Solo boards never create a clock, so the free path is untouched.
 
 M7 keeps the existing v1 modules untouched: M2 seam, M3/M4 points, M5 plans, M6 affiliate (now auto 20/80), M10 lives/daily, M11 community. Good the old earn-competition M7 is RETIRED; the slot reopens as the AGM module.
 
