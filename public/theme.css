@@ -25,11 +25,20 @@ html, body {
 
 body {
   background:
+    /* small drifting "planets" (CSS only - no extra assets, never stretches) */
+    radial-gradient(11px 11px at 16% 20%, rgba(45, 212, 191, 0.85), transparent 60%),
+    radial-gradient(6px 6px at 30% 58%, rgba(243, 156, 18, 0.9), transparent 60%),
+    radial-gradient(15px 15px at 68% 14%, rgba(155, 89, 182, 0.95), transparent 60%),
+    radial-gradient(9px 9px at 84% 46%, rgba(45, 212, 191, 0.8), transparent 60%),
+    radial-gradient(13px 13px at 60% 84%, rgba(244, 114, 182, 0.9), transparent 60%),
+    radial-gradient(7px 7px at 10% 82%, rgba(255, 215, 0, 0.85), transparent 60%),
+    /* existing soft nebula orbs */
     radial-gradient(1100px 620px at 14% -12%, rgba(243, 156, 18, 0.30), transparent 55%),
     radial-gradient(900px 680px at 90% 4%, rgba(244, 114, 182, 0.24), transparent 55%),
     radial-gradient(1000px 700px at 46% 118%, rgba(45, 212, 191, 0.22), transparent 60%),
     radial-gradient(1200px 900px at 50% 50%, rgba(124, 108, 246, 0.18), transparent 70%),
-    linear-gradient(168deg, #141031 0%, #1e1440 42%, #2b1250 70%, #180f33 100%);
+    /* deeper, richer base */
+    linear-gradient(168deg, #120f2b 0%, #1b1240 42%, #281150 70%, #150e31 100%);
   background-attachment: fixed;
   background-blend-mode: normal;
 }
@@ -110,21 +119,30 @@ body::after {
 }
 
 /* Brand background layer: the site logo design, contain (never stretched),
-   behind all content, below the theme orbs. */
+   behind all content, below the theme orbs. Gently fades in and out on a loop
+   so you can compare the photo backdrop against the pure CSS galaxy - set
+   opacity to a fixed value (or remove the animation) to keep one permanently. */
 .gfg-brand-bg {
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  opacity: 0.45;
+  opacity: 0;
+  animation: gfg-bg-cycle 18s ease-in-out infinite;
 }
 .gfg-brand-bg img {
   width: 100vw;
   height: 100vh;
   object-fit: contain;
+}
+@keyframes gfg-bg-cycle {
+  0%, 8%   { opacity: 0; }
+  30%      { opacity: 0.42; }
+  45%      { opacity: 0.42; }
+  70%, 100%{ opacity: 0; }
 }
 /* Branded site title: Global (orange) Folk (purple) Games (orange), everywhere. */
 .gfg-brand { color:#fff; text-decoration:none; font-weight:800; }
