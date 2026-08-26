@@ -667,6 +667,7 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
   server issues a nonce, the client signs it with the Dynamic wallet, the server
   verifies the recovered pubkey against a SERVER-side staff list, and only then
   serves staff data. Never trust the client's wallet claim.
+- **Content & file protection (HARD RULE, baked in 2026-08-25, see .opencode/rules/content-protection.md):** never rewrite/wipe a whole existing file; `architecture.json`, `changelog.json` and any source-of-truth content files must be edited surgically, MUST assert their top-level keys survive before writing back, and existing content/modules/entries are never removed without the owner's explicit approval. No silent file deletes or `git add -A` over unverified protected diffs.
 - **Never advertise live weaknesses:** security/anti-exploit work is never put
   in client-served data at all — no flag, no filter, no hidden bytes. It is
   tracked only in `docs/changelog/security-queue.md` (private git, never

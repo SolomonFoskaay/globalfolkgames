@@ -11,7 +11,8 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 
 ## 1. M1 v2 — Game core with multiplayer
 - Rebuild M1 around **multiplayer** while keeping the M2 result seam: every game emits `publishGameResult` exactly as today.
-- Modes (per game): Solo (vs computer, free, points only), P2P (2-4 real players via match code or random), and Earn modes below.
+- Modes (per game): **Solo** (you vs computer/human seats, free, points only) and **Multiplayer** (abbreviated 2mp, 3mp, 4mp... = the number of HUMAN wallets in the match, earn-capable). There are NOT two versions of a game: the single game build powers both - Solo just has no money+AGM attached. Per-game seat capacity is dynamic (Ludo supports 2-seat or 4-seat; Monopoly 5-8 seats; etc.), so '2p/4p' (seat count within Ludo) is never confused with 'mp' (how many humans).
+- Earn fill rules: an earn match fills 2..N human wallets via AGM; if not enough humans accept within the window, the remaining SEATS get a labelled (Computer) seat only when the mode is P2C-allowed (player can reject).
 - Deterministic game logic + **on-chain board/move state** for any match that involves value (could be heavy; we ship move-hashes + committed board snapshots at checkpoints; final settlement on-chain). Confirm with MagicBlock ER limits during build (see §9).
 - Turn clocks + match time caps enforced by the program/time service (§4).
 
@@ -19,13 +20,16 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 - **P2C (platform computer, CEX-like "bank"):** the platform funds a pool of computer seats so matches always have a counterpart. Opponents are always labelled `(Computer)` vs `(Human)` with skill band; players accept/reject. Platform publishes the reward formula and takes its fee from the finished pool.
 - **P2P (player vs player):** the **Automated Game Matcher (AGM, invented by Solomon Foskaay)** matches open orders. Player posts an order ($1..$1,000 stake), AGM matches a counterpart (2-way; N-way up to 20 for tournaments), both approve (profile/rating visible, reject allowed), escrow locks both stakes, game runs, the published split pays winners. AGM matches only; money is player-to-player.
 - **Leverage (prop-style):** player posts collateral; the bank extends X multiples on a declared **stop-loss floor**; auto stop is executed on-chain. Player can only lose their collateral; the platform's exposure is capped by the risk floor and a per-round fee. Phase-2 (needs banker accounting + on-chain stop execution).
-- **Liquidity honesty (research, from your ORIGINAL insight):** community contributors to the P2C bank can earn fee-share + calibrated win-share, but real irreversible losses are possible. Mitigations we will build, in order:
-  1. Platform-funded P2C bank **first** (small stakes, own-loss cap) to gather live win/loss data before letting anyone else contribute;
-  2. Loss-protection reserve paid from platform fees (floor protects contributor principal, platform absorbs tail loss);
-  3. Bounded exposure caps per contributor/day;
-  4. Staggered settlement + withdrawal cooldown;
-  5. No rigged computers: difficulty bands set transparently from on-chain history.
-- Fees: 5–20% sliding by stake; Premium plans stay as the separate comfort/gas subscription (lives, points, ad-free, booster, bigger daily).
+- **P2C break-even that does NOT need cheating (owner question, honest answer):** the platform charges 10% of the POT (not of one side). For a 2-side match each side stakes S, pot = 2S, winner gets 1.8S, the loser gets 0. If the platform is the computer side:
+  * computer wins  -> platform collects 0.8S profit (its 0.8S share over its stake).
+  * computer loses -> platform loses S (its stake).
+  EV per match = S x (1.8w - 0.8), where w = computer win rate. Break-even is w ≈ 44.4%. So the computer only needs to win roughly 45%+ of matches for the platform to break even - and any skill band above that is profit. Players mastering and beating a mid computer (say 40-45% win rate) is FINE: the house isn't losing at 44%. Mitigations we will build, in order:
+  1. **Flat 10% pot fee** pays the house first (this is the core anti-loss lever - no manipulation needed).
+  2. **P2C begets P2P:** computers fill seats when no human counterpart exists, at capped low stakes; P2P is the primary and it is fee-only revenue with NO house exposure.
+  3. **Daily/maximum loss cap** on the computer bank (e.g., pause funding for the day if net loss hits X) on top of stake caps per match - tail risk bounded.
+  4. Difficulty bands set transparently from on-chain history; computer strength is loud and visible, never rigged per-hand.
+  5. Community liquidity is PHASE-2 (later), after live data proves the bank EV, and only with the loss-protection floor + caps from §1.
+- Fees: FLAT 10% of each finished pot for every earn match, all modes, all games (one number everywhere, printed up front). Premium plans stay as the separate comfort/gas subscription (lives, points, ad-free, booster, bigger daily).
 
 ## 3. Match rules / anti-abuse (all earn modes)
 - Max match time: 30 min (2p) / 45 min (3p) / 60 min (4p+), per-game override.
@@ -76,7 +80,7 @@ Finalize these six and the doc becomes the build guide; we start the M1 v2 rebui
 ## M1 v2 MODULE SPEC (draft for approval - will become the build contract)
 
 ### Summary
-M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 result seam, but the game core now also supports 3 play modes: **Solo** (vs computer, free, points only), **P2P** (match-code or AGM-matched real players), **P2C** (AGM-matched computer, earn). Deterministic moves are committed on-chain (board snapshot checkpoints + move hashes; full board replay on chain for earn games where affordable, ER permitting). Turn-clock + match-time are enforced. Identity = GFG handle (never name/email/wallet).
+M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 result seam, but the game core now also supports 3 play modes: **Solo** (vs computer, free, points only), **Multiplayer** (AGM-matched real players; match-code for private games), **P2C** (AGM-matched computer, earn). Deterministic moves are committed on-chain (board snapshot checkpoints + move hashes; full board replay on chain for earn games where affordable, ER permitting). Turn-clock + match-time are enforced. Identity = GFG handle (never name/email/wallet).
 
 ### expectedInput (what M1 v2 receives)
 - FROM M2 SEAM: the normalized `gfg:game-result@1` envelope (seat/actor/position, proof sig, finishedAt) - unchanged, games keep emitting it.

@@ -5,6 +5,7 @@
     ".opencode/rules/solana-upgrade-safety.md",
     ".opencode/rules/security-leak-scan.md",
     ".opencode/rules/content-style-guide.md",
-    ".opencode/rules/env-access.md"
+    ".opencode/rules/env-access.md",
+    ".opencode/rules/content-protection.md"
   ]
 }
