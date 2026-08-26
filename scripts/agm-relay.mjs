@@ -6,7 +6,7 @@ import './load-env.mjs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
-import { baseRpcUrl, createConnection, sendMagicTx } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
@@ -80,40 +80,77 @@ async function readBank(game) {
 
 function sign(extra) { return { publicKey: extra.publicKey, signTransaction: async (t) => { t.partialSign(extra); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(extra)); return ts; } }; }
 
-// Reads a wallet's SOL + stablecoin balances (devnet mints). Matches are run in
-// a single stablecoin: same coin in, same coin out, no conversion ever.
-const USDC_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-const USDG_DEVNET = '6YtmBGgjbPn7cNT9cMLm9XLYvUnrXsHQt7HSDzKdTurJ'; // USDG has no widely-used devnet mint yet
+// Reads a wallet's SOL + stablecoin balances. Matches are run in a single
+// stablecoin: same coin in, same coin out, no conversion ever. Reads ALL the
+// wallet's token accounts (no mint filter, so an unknown mint can never break
+// the read) and maps known mints to their symbol. Unknown/absent = 0.
+const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // devnet USDC (Circle faucet)
+const USDT_MINT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'; // USDT (same SPL id on devnet)
+const USDG_MINT = '6YtmBGgjbPn7cNT9cMLm9XLYvUnrXsHQt7HSDzKdTurJ'; // USDG (no devnet liquidity yet)
 export async function walletBalances(walletAddr) {
   try {
     const pub = new PublicKey(walletAddr);
     const lamports = await conn.getBalance(pub).catch(() => null);
-    const usdc = await tokenBalance(pub, USDC_DEVNET);
-    let usdg = null;
-    try { usdg = await tokenBalance(pub, USDG_DEVNET); } catch (e) { usdg = null; }
+    const accounts = await allTokenAccounts(pub);
+    let usdc = 0, usdt = 0, usdg = 0;
+    for (const acct of accounts) {
+      const mint = acct.mint;
+      const amt = acct.amount;
+      if (mint === USDC_MINT) usdc += amt;
+      else if (mint === USDT_MINT) usdt += amt;
+      else if (mint === USDG_MINT) usdg += amt;
+    }
     return {
       sol: lamports != null ? lamports / 1e9 : null,
-      usdc: usdc != null ? usdc : 0,
-      usdg: usdg != null && usdg > 0 ? usdg : 0,
+      usdc,
+      usdt,
+      usdg,
     };
   } catch (e) {
-    return { sol: null, usdc: null, usdg: null, error: e.message };
+    // never silent: the page must show WHY the balance couldn't be read
+    return { sol: null, usdc: null, usdt: null, usdg: null, error: e.message };
   }
 }
-async function tokenBalance(pub, mint) {
+async function allTokenAccounts(pub) {
+  let lastErr = null;
+  let tried = 0;
+  for (const rpc of RPC_CANDIDATES()) {
+    tried += 1;
+    try {
+      const ac = new AbortController();
+      const to = setTimeout(() => ac.abort(), 8000);
+      let res;
+      try {
+        res = await fetch(rpc, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner', params: [pub.toBase58(), { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }] }),
+          signal: ac.signal,
+        }).then(r => r.json());
+      } finally { clearTimeout(to); }
+      if (res && res.error) { lastErr = new Error(res.error.message || JSON.stringify(res.error)); continue; }
+      const arr = (res && res.result && res.result.value) || [];
+      const out = [];
+      for (const a of arr) {
+        const p = a.account && a.account.data && a.account.data.parsed && a.account.data.parsed.info;
+        if (!p || !p.mint || !p.tokenAmount) continue;
+        out.push({ mint: p.mint, amount: Number(p.tokenAmount.uiAmount || 0) });
+      }
+      return out;
+    } catch (e) { lastErr = e; }
+  }
+  throw new Error('token balance RPC failed (' + tried + ' tries): ' + (lastErr && lastErr.message ? lastErr.message : 'unknown'));
+}
+function RPC_CANDIDATES() {
+  const out = [];
+  // The env RPC (Alchemy, GFG_DEVNET_RPC) is the fast, reliable worker for
+  // token-account reads - try it first when present, then the base/standard
+  // devnet endpoints as fallback.
+  if (process.env.GFG_DEVNET_RPC) out.push(process.env.GFG_DEVNET_RPC);
   try {
-    const res = await fetch(baseRpcUrl(), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner', params: [pub.toBase58(), { mint }, { encoding: 'jsonParsed' }] }),
-    }).then(r => r.json());
-    const arr = (res && res.result && res.result.value) || [];
-    let total = 0;
-    for (const a of arr) {
-      const amt = a.account && a.account.data && a.account.data.parsed && a.account.data.parsed.info && a.account.data.parsed.info.tokenAmount;
-      if (amt) total += Number(amt.uiAmount || 0);
-    }
-    return total;
-  } catch (e) { return 0; }
+    for (const e of baseRpcEndpoints()) { if (!out.includes(e)) out.push(e); }
+  } catch (e) {}
+  if (!out.includes('https://api.devnet.solana.com')) out.push('https://api.devnet.solana.com');
+  return out;
 }
 
 // ---- actions (relay sponsor signs; maker/taker = the authenticated wallet) ----

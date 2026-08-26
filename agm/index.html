@@ -86,7 +86,8 @@
                 <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
                 <label>Players</label>
                 <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
-                <button class="btn-primary" onclick="postOrder()">Post my match (on-chain)</button>
+                <button class="btn-primary" id="postBtn" onclick="postOrder()">Post my match (on-chain)</button>
+                <p id="postErr" style="display:none; font-size:0.78rem; color:#e74c3c; margin:8px 0 0; line-height:1.5;"></p>
                 <p class="mini">When someone takes your match, the winner's share is locked and settled on-chain. The platform share is shown on each open match.</p>
             </div>
             <div class="card" style="flex:1; min-width:320px;">
@@ -219,38 +220,69 @@
         return '<span>' + s + '</span>';
     }
 
-    // Matches run in ONE coin: USDC. Available USDC appears under the Prize level
-    // dropdown and in the balance card. Devnet coins are test funds.
+    // Balances card shows ALL coins you hold; under the Prize level only USDC
+    // matters (that is the one match coin), so you can see if you can cover a
+    // level before you post.
+    let usdcBalance = null;
+    const fmt = (v) => '$' + Number(v).toFixed(2);
     async function loadBalance() {
         const ci = $('coinsInfo'); if (!ci) return;
-        if (!wallet) { ci.textContent = 'Your USDC balance appears once your session is ready.'; return; }
-        ci.innerHTML = '<span class="hint">Reading your USDC balance...</span>';
+        if (!wallet) { ci.textContent = 'Your balances appear once your session is ready.'; return; }
+        ci.innerHTML = '<span class="hint">Reading your balances...</span>';
         try {
             const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store' });
             const j = await r.json();
-            if (j.error) { ci.innerHTML = '<span class="hint">Balance look-up unavailable (' + j.error + ').</span>'; return; }
-            const usdc = Number(j.usdc != null ? j.usdc : 0);
-            const fmt = (v) => '$' + v.toFixed(2);
-            const zero = usdc <= 0;
-            ci.innerHTML = (zero
-                ? '<span class="hint">You have <b>0.00 USDC</b> available on devnet. Top up in your <a href="/profile/" style="color:#f87818;">profile</a>, then come back.</span>'
-                : 'Available USDC: <b>' + fmt(usdc) + '</b> <span class="hint">(devnet test coin · all matches are USDC only)</span>');
+            if (j.error) { usdcBalance = null; ci.innerHTML = '<span class="hint">Balance look-up failed: ' + (j.error || 'unknowerr') + '</span>'; return; }
+            const sol = Number(j.sol != null ? j.sol : 0);
+            usdcBalance = Number(j.usdc != null ? j.usdc : 0);
+            const usdt = Number(j.usdt != null ? j.usdt : 0);
+            const usdg = Number(j.usdg != null ? j.usdg : 0);
+            ci.innerHTML = 'SOL ' + sol.toFixed(2) + ' &nbsp;·&nbsp; USDC <b>' + usdcBalance.toFixed(2) + '</b> &nbsp;·&nbsp; USDT ' + usdt.toFixed(2) + ' &nbsp;·&nbsp; USDG ' + usdg.toFixed(2) + ' <span class="hint">(devnet test coins)</span>';
+            // Under the Prize level: the one coin that funds a match.
             const bd = $('balDisplay');
             if (bd) {
                 bd.style.display = '';
-                bd.innerHTML = '<span style="font-size:0.76rem;color:#2ecc71;">Available: <b>' + (zero ? '$0.00' : fmt(usdc)) + '</b> USDC</span>';
+                bd.innerHTML = '<span style="font-size:0.76rem;color:' + (usdcBalance >= Number($('f_stake').value) ? '#2ecc71' : '#e74c3c') + ';">USDC available: <b>' + usdcBalance.toFixed(2) + '</b> of the level you pick below</span>';
             }
-        } catch (e) { ci.innerHTML = '<span class="hint">Balance look-up unavailable (' + (e.message || 'err') + ').</span>'; }
+            refreshStakeGuard();
+        } catch (e) { usdcBalance = null; ci.innerHTML = '<span class="hint">Balance look-up failed: ' + (e.message || 'err') + '</span>'; }
+    }
+
+    // Live guard: if the chosen prize level costs more USDC than you hold, the
+    // button stays disabled with a clear reason (never silent).
+    function prizeUsdc() { return Number($('f_stake').value) || 0; }
+    function refreshStakeGuard() {
+        const btn = $('postBtn');
+        const err = $('postErr');
+        if (!btn || !err) return;
+        if (!wallet) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Sign in to post a match.'; err.style.display = 'block'; return; }
+        if (usdcBalance == null) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Checking your USDC balance...'; err.style.display = 'block'; return; }
+        if (prizeUsdc() > usdcBalance) {
+            btn.setAttribute('disabled', 'disabled');
+            err.textContent = 'Not enough USDC: this level costs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.';
+            err.style.display = 'block';
+        } else {
+            btn.removeAttribute('disabled');
+            err.style.display = 'none';
+        }
     }
 
     async function postOrder() {
+        const btn = $('postBtn'), err = $('postErr');
         if (!wallet) { log('Please sign in first'); return; }
+        if (usdcBalance != null && prizeUsdc() > usdcBalance) { err.textContent = 'Still not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').'; err.style.display = 'block'; return; }
+        if (btn) btn.setAttribute('disabled', 'disabled');
         log('Posting your match (you are the maker)...');
         try {
             const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet });
+            if (r && r.error) { log('Error: ' + r.error); if (btn) btn.removeAttribute('disabled'); return; }
             log('OK match #' + r.orderId + ' is now OPEN on-chain (ref ' + r.pda.slice(0, 10) + '...).');
-            loadOrders();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
+            if (btn) btn.removeAttribute('disabled');
+            loadBalance(); loadOrders();
+        } catch (e) {
+            log('Error: ' + (e.message || e.error));
+            if (btn) btn.removeAttribute('disabled');
+        }
     }
 
     // Take a match: THIS signed-in wallet commits as the taker (self-match is
@@ -315,6 +347,10 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
         $('program').textContent = 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWrBu8wgAuJ';
+        ['f_stake', 'f_seats', 'f_game'].forEach(id => {
+            const el = $(id);
+            if (el) el.addEventListener('change', refreshStakeGuard);
+        });
         await signInState();
         document.addEventListener('gfg:auth-changed', signInState);
     });
