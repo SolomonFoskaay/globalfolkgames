@@ -91,3 +91,11 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 
 ### Dependencies/order
 Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM lobby + P2P match lock; (3) clocks/timeouts; (4) P2C bank binding; (5) settle/fee. Solo/non-earn play keeps working with zero changes (existing seams).
+
+---
+
+## M6 v2 AFFILIATE (automated instant payout — owner 2026-08-25)
+- Replace the manual monthly settle with an **atomic on-chain split at payment time**: when a paying upgrade/subscription/booster purchase finalizes, the program credits **80% to the platform wallet** and **20% to the referrer's embedded wallet instantly** (premium points/ledger), all in one transaction. No manual worker, no monthly batch, no admin payout step.
+- Referral pairs are already recorded on-chain at signup (affiliate module present, M6). Only the payment seat for the referred first-paid purchase triggers the split; subsequent paying months keep splitting the same way (they are still "this purchase pays the referrer").
+- If no referrer: 100% to the platform wallet. Non-refundable policy stays and is shown.
+- Fees journey: pay → split (80 platform / 20 referrer) → buyer's premium points credited (existing 5,000/10,000/500P flow) → Upgrade page completes activation.
