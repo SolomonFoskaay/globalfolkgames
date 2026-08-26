@@ -28,6 +28,7 @@
             <button class="tab-btn" data-panel="countries">Countries</button>
             <button class="tab-btn" data-panel="competitions">Earn Competitions</button>
         </nav>
+        <p class="swipe-hint" style="font-size:0.7rem; color:#666; text-align:center; margin:6px 0 0;">Swipe left or right to move between them.</p>
 
         <div id="home-panels">
             <div class="game-card home-panel" data-show="games">
@@ -117,13 +118,24 @@
                 tabs.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-panel') === name); });
             }
             tabs.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-panel')); }); });
-            // Swipe the three home tabs left/right like the Earn page.
+            // Swipe the three home tabs left/right like the Earn page (whole panel area).
             (function () {
-                var cont = document.getElementById('home-tabs');
-                var sx = 0, dx = 0, tracking = false;
-                cont.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; dx = 0; tracking = true; }, { passive: true });
-                cont.addEventListener('touchmove', function (e) { if (tracking) dx = e.touches[0].clientX - sx; }, { passive: true });
+                var cont = document.getElementById('home-panels');
+                if (!cont) return;
+                var sx = 0, dx = 0, sy = 0, tracking = false;
+                cont.addEventListener('touchstart', function (e) { var t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; tracking = true; }, { passive: true });
+                cont.addEventListener('touchmove', function (e) { if (!tracking) return; var t = e.touches[0]; dx = t.clientX - sx; }, { passive: true });
                 cont.addEventListener('touchend', function () {
+                    if (!tracking) return; tracking = false;
+                    if (Math.abs(dx) < 50) return;
+                    var i = tabNames.indexOf(active);
+                    var j = Math.min(tabNames.length - 1, Math.max(0, i + (dx < 0 ? 1 : -1)));
+                    if (j !== i) show(tabNames[j]);
+                }, { passive: true });
+                var tb = document.getElementById('home-tabs');
+                tb.addEventListener('touchstart', function (e) { var t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; tracking = true; }, { passive: true });
+                tb.addEventListener('touchmove', function (e) { if (!tracking) return; var t = e.touches[0]; dx = t.clientX - sx; }, { passive: true });
+                tb.addEventListener('touchend', function () {
                     if (!tracking) return; tracking = false;
                     if (Math.abs(dx) < 50) return;
                     var i = tabNames.indexOf(active);

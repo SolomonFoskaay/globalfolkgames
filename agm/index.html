@@ -82,6 +82,7 @@
                 <select id="f_game"><option value="1">Ludo</option></select>
                 <label>Prize level (USD per player)</label>
                 <div class="bal" id="balDisplay" style="display:none;"></div>
+                <p class="mini" id="coinLine" style="margin:2px 0 0;">Matches use one coin only: <b>USDC</b>. Top up in your profile first, then pick a level you can cover.</p>
                 <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
                 <label>Players</label>
                 <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
@@ -91,14 +92,13 @@
             <div class="card" style="flex:1; min-width:320px;">
                 <h3>Take a match (the other side)</h3>
                 <p class="mini">An open match on the <b>Open matches</b> tab is waiting for someone to take it. Taking it commits you as the opponent, and the winner's share is locked for you both. You can never take your own match, and you only ever pay with the same coin the maker used, so the deal is always fair and single-currency.</p>
-                <div class="mini" style="margin-top:8px;">Matches with a <b>(Computer backer)</b> tag are filled by the platform's own pool when no human is ready, so a match is never left waiting. That pool is managed by the team and players never fund it.</div>
-                <p class="mini" style="margin-top:8px;"><a href="/dashboard/agm.html" style="color:#f87818;">Staff</a> manage the backer pool from the dashboard; it is never shown to players.</p>
+                <div class="mini" style="margin-top:8px;">Matches with a <b>(Computer backer)</b> tag are filled by the platform's own pool when no human is ready, so a match is never left waiting.</div>
             </div>
         </div>
         <div class="card" style="margin-top:12px;">
             <h3>Your balance &amp; the coin in use</h3>
-            <p class="hint">Your available balance for these matches is shown below. We run each match in a single stablecoin, so the amount you see is the amount you stake and the amount the winner gets back, with no hidden conversion at the end. If you hold multiple types, you can top up or convert in your profile before you post.</p>
-            <div id="coinsInfo" style="margin-top:8px;"><span class="hint">Reading your balances...</span></div>
+            <p class="hint">All matches on the arena run in one coin: <b>USDC</b>. The amount you see is the amount you post and the amount the winner receives, with no conversion at the end. Your available USDC is shown below so you can pick a prize level you can cover.</p>
+            <div id="coinsInfo" style="margin-top:8px;"><span class="hint">Reading your balance...</span></div>
         </div>
     </div>
 
@@ -127,8 +127,11 @@
     </div>
 
     <div class="card glossary">
-        <h3>Words you will see</h3>
+        <h3>Good to know</h3>
         <p class="hint">
+            Gasless and quiet: posting, taking, locking and settling are all signed
+            for you automatically, so there are no wallet pop-ups and nothing to pay
+            for network fees. Same for the games themselves.<br><br>
             <b>AGM</b> = Automated Game Matchmaking, the system that opens, takes and settles matches.<br>
             <b>P2P</b> = Player vs Player, both seats are real humans.<br>
             <b>P2C</b> = Player vs Computer, a computer seat fills the match so no one waits.<br>
@@ -182,17 +185,25 @@
         return a.slice(0, 4) + '…' + a.slice(-4);
     }
     async function signInState() {
+        // Dynamic restores the wallet asynchronously after page load, so poll
+        // up to ~10s like the dashboard gate does, then keep listening.
         wallet = null;
-        // Dynamic returns a base58 STRING; also honour a restored profile wallet.
-        try { const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null; wallet = w || null; } catch (e) {}
-        if (!wallet && window.currentProfile && window.currentProfile.solana_wallet) wallet = window.currentProfile.solana_wallet;
+        const deadline = Date.now() + 10000;
+        while (Date.now() < deadline) {
+            try {
+                const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null;
+                if (w) { wallet = w; break; }
+            } catch (e) {}
+            if (window.currentProfile && window.currentProfile.solana_wallet) { wallet = window.currentProfile.solana_wallet; break; }
+            await new Promise(r => setTimeout(r, 400));
+        }
         const el = $('wallet');
         if (wallet) {
             el.innerHTML = maskAddr(wallet) + ' <button class="btn-link" style="background:none;border:none;color:#f87818;cursor:pointer;padding:0;font-size:0.72rem;" onclick="window.location.href=\'/profile/\'" title="View my profile">(view profile)</button>';
             loadBalance();
         } else {
-            el.textContent = 'not signed in';
-            const ci = $('coinsInfo'); if (ci) ci.textContent = 'Sign in to see your balance.';
+            el.textContent = 'Session still restoring... tap Sign in and come back.';
+            const ci = $('coinsInfo'); if (ci) ci.textContent = 'Balance appears once your session is ready.';
         }
     }
 
@@ -208,23 +219,27 @@
         return '<span>' + s + '</span>';
     }
 
-    // Solana native + stablecoin balances. The match coin is a single stablecoin
-    // (USDC line is the live standard we read; USDG is Solana-promoted and shown
-    // when the wallet actually holds it). No conversion ever happens in a match:
-    // same coin in, same coin out.
+    // Matches run in ONE coin: USDC. Available USDC appears under the Prize level
+    // dropdown and in the balance card. Devnet coins are test funds.
     async function loadBalance() {
         const ci = $('coinsInfo'); if (!ci) return;
-        if (!wallet) { ci.textContent = 'Sign in to see your balance.'; return; }
-        ci.innerHTML = '<span class="hint">Loading your balances (devnet)...</span>';
+        if (!wallet) { ci.textContent = 'Your USDC balance appears once your session is ready.'; return; }
+        ci.innerHTML = '<span class="hint">Reading your USDC balance...</span>';
         try {
             const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store' });
             const j = await r.json();
-            let html = '';
-            const rows = [];
-            if (j.sol != null) rows.push('<b>SOL</b> ' + Number(j.sol).toFixed(4));
-            if (j.usdc != null) rows.push('<b>USDC</b> ' + Number(j.usdc).toFixed(2));
-            if (j.usdg != null && Number(j.usdg) > 0) rows.push('<b>USDG</b> ' + Number(j.usdg).toFixed(2));
-            ci.innerHTML = rows.length ? rows.join(' &nbsp;·&nbsp; ') : '<span class="hint">No balances found yet. You can top up from your <a href="/profile/" style="color:#f87818;">profile</a> before posting a match.</span>';
+            if (j.error) { ci.innerHTML = '<span class="hint">Balance look-up unavailable (' + j.error + ').</span>'; return; }
+            const usdc = Number(j.usdc != null ? j.usdc : 0);
+            const fmt = (v) => '$' + v.toFixed(2);
+            const zero = usdc <= 0;
+            ci.innerHTML = (zero
+                ? '<span class="hint">You have <b>0.00 USDC</b> available on devnet. Top up in your <a href="/profile/" style="color:#f87818;">profile</a>, then come back.</span>'
+                : 'Available USDC: <b>' + fmt(usdc) + '</b> <span class="hint">(devnet test coin · all matches are USDC only)</span>');
+            const bd = $('balDisplay');
+            if (bd) {
+                bd.style.display = '';
+                bd.innerHTML = '<span style="font-size:0.76rem;color:#2ecc71;">Available: <b>' + (zero ? '$0.00' : fmt(usdc)) + '</b> USDC</span>';
+            }
         } catch (e) { ci.innerHTML = '<span class="hint">Balance look-up unavailable (' + (e.message || 'err') + ').</span>'; }
     }
 
