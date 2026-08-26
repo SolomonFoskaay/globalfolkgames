@@ -9,6 +9,14 @@ export default async function handler(req, res) {
   const url = new URL(req.url || '', `http://localhost:${process.env.PORT || 8787}`);
   res.setHeader('Cache-Control', 'no-store');
   try {
+    if (req.method === 'GET' && url.pathname === '/api/agm/balances') {
+      const wallet = url.searchParams.get('wallet');
+      if (!wallet) { res.status(400).json({ error: 'wallet param required' }); return; }
+      const { walletBalances } = await import('../scripts/agm-relay.mjs');
+      const b = await walletBalances(wallet);
+      res.status(200).json(b);
+      return;
+    }
     if (req.method === 'GET') {
       const game = url.searchParams.get('game');
       const orderId = url.searchParams.get('orderId');

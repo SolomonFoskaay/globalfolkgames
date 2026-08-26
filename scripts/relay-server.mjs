@@ -561,7 +561,7 @@ const server = createServer(async (req, res) => {
   }
   // Arc2 AGM lobby route (delegates to the shared handler module; body passed
   // through as an object so the handler's own JSON parse sees a string).
-  if (req.url === '/api/agm') {
+  if (req.url === '/api/agm' || (req.url || '').startsWith('/api/agm/')) {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {

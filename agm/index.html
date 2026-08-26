@@ -47,7 +47,7 @@
 <body>
 <div class="wrap">
     <h1 style="font-size:1.3rem;margin:0 0 4px;">Earn Competition (AGM)</h1>
-    <p class="hint" style="margin:0 0 12px;"><b>AGM</b> means <b>Arena Game Matchmaking</b>: a first-of-its-kind idea for games, invented by the founder of GlobalFolkGames, Solomon Foskaay. It borrows the best of the trading world (CEX and DEX) and turns a gameplay match into something the players can open, take, and settle, just like a token or an NFT. The point is simple: native gamers show their prowess against players worldwide, and the winner of each match earns a share of the competition pot. Every step is recorded on a chain you can check.</p>
+    <p class="hint" style="margin:0 0 12px;"><b>AGM</b> means <b>Automated Game Matchmaking</b>: a first-of-its-kind idea for games, invented by the founder of GlobalFolkGames, Solomon Foskaay. It borrows the best of the trading world (CEX and DEX) and turns a gameplay match into something the players can open, take, and settle, just like a token or an NFT. The point is simple: native gamers show their prowess against players worldwide, and the winner of each match earns a share of the competition pot. Every step is recorded on a chain you can check.</p>
 
     <div class="bar">
         <span>Wallet: <b id="wallet">not signed in</b></span>
@@ -77,32 +77,28 @@
         <div class="row">
             <div class="card" style="flex:1; min-width:320px;">
                 <h3>Post a match</h3>
-                <p class="mini">This is you opening a match for other players to take. You are the match-maker.</p>
+                <p class="mini">This is you opening a match for other players to take. You are the maker.</p>
                 <label>Game</label>
                 <select id="f_game"><option value="1">Ludo</option></select>
                 <label>Prize level (USD per player)</label>
+                <div class="bal" id="balDisplay" style="display:none;"></div>
                 <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
                 <label>Players</label>
                 <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
                 <button class="btn-primary" onclick="postOrder()">Post my match (on-chain)</button>
-                <p class="mini">When someone takes your match, the winner's share is locked and settled on-chain. The platform's small opening fee is shown on the open order list.</p>
+                <p class="mini">When someone takes your match, the winner's share is locked and settled on-chain. The platform share is shown on each open match.</p>
             </div>
             <div class="card" style="flex:1; min-width:320px;">
-                <h3>Computer backer (P2C pool)</h3>
-                <p class="mini"><b>P2C</b> means <b>Player vs Computer</b>. When no human is free to take your match, the platform steps in with a computer seat so the game never waits. The computer uses ONE shared pool across every game, so the funds are never split thin.</p>
-                <div class="hint" id="bankInfo">Loading shared pool...</div>
-                <div class="row">
-                    <div><label>Order id</label><input id="p2cOid" type="number" placeholder="locked order id"></div>
-                    <div><label>Computer seat</label><input id="p2cSeat" type="number" value="0"></div>
-                    <div><label>Computer result</label><select id="p2cWon"><option value="false">Lost</option><option value="true">Won</option></select></div>
-                </div>
-                <button class="btn-ghost" onclick="p2cSettle()">Apply computer result</button>
-                <p class="mini">For the platform staff: fund the shared pool below. Players never fund the pool, that is our backer job, and it stays honest because results are on-chain.</p>
-                <div class="row">
-                    <div><label>Fund amount ($)</label><input id="fundAmt" type="number" value="1000"></div>
-                </div>
-                <button class="btn-ghost" onclick="p2cFund()">Fund shared pool (staff)</button>
+                <h3>Take a match (the other side)</h3>
+                <p class="mini">An open match on the <b>Open matches</b> tab is waiting for someone to take it. Taking it commits you as the opponent, and the winner's share is locked for you both. You can never take your own match, and you only ever pay with the same coin the maker used, so the deal is always fair and single-currency.</p>
+                <div class="mini" style="margin-top:8px;">Matches with a <b>(Computer backer)</b> tag are filled by the platform's own pool when no human is ready, so a match is never left waiting. That pool is managed by the team and players never fund it.</div>
+                <p class="mini" style="margin-top:8px;"><a href="/dashboard/agm.html" style="color:#f87818;">Staff</a> manage the backer pool from the dashboard; it is never shown to players.</p>
             </div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+            <h3>Your balance &amp; the coin in use</h3>
+            <p class="hint">Your available balance for these matches is shown below. We run each match in a single stablecoin, so the amount you see is the amount you stake and the amount the winner gets back, with no hidden conversion at the end. If you hold multiple types, you can top up or convert in your profile before you post.</p>
+            <div id="coinsInfo" style="margin-top:8px;"><span class="hint">Reading your balances...</span></div>
         </div>
     </div>
 
@@ -133,7 +129,7 @@
     <div class="card glossary">
         <h3>Words you will see</h3>
         <p class="hint">
-            <b>AGM</b> = Arena Game Matchmaking, the system that opens, takes and settles matches.<br>
+            <b>AGM</b> = Automated Game Matchmaking, the system that opens, takes and settles matches.<br>
             <b>P2P</b> = Player vs Player, both seats are real humans.<br>
             <b>P2C</b> = Player vs Computer, a computer seat fills the match so no one waits.<br>
             <b>Pot</b> = the prize pool: every player's prize level added together.<br>
@@ -179,11 +175,25 @@
 
     // ===== helpers =====
     function log(msg) { const el = $('log'); el.textContent = new Date().toISOString().slice(11, 19) + ' ' + msg + '\n' + el.textContent; try { el.scrollTop = 0; } catch (e) {} }
-    let wallet = null;
+    let wallet = null; // string address (getDynamicSolanaWallet returns a string, NOT a Pubkey)
 
+    function maskAddr(a) {
+        if (!a) return 'not signed in';
+        return a.slice(0, 4) + '…' + a.slice(-4);
+    }
     async function signInState() {
-        try { wallet = (await window.getDynamicSolanaWallet && await window.getDynamicSolanaWallet()) || null; } catch (e) { wallet = null; }
-        $('wallet').textContent = wallet ? wallet.toBase58() : 'not signed in';
+        wallet = null;
+        // Dynamic returns a base58 STRING; also honour a restored profile wallet.
+        try { const w = window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null; wallet = w || null; } catch (e) {}
+        if (!wallet && window.currentProfile && window.currentProfile.solana_wallet) wallet = window.currentProfile.solana_wallet;
+        const el = $('wallet');
+        if (wallet) {
+            el.innerHTML = maskAddr(wallet) + ' <button class="btn-link" style="background:none;border:none;color:#f87818;cursor:pointer;padding:0;font-size:0.72rem;" onclick="window.location.href=\'/profile/\'" title="View my profile">(view profile)</button>';
+            loadBalance();
+        } else {
+            el.textContent = 'not signed in';
+            const ci = $('coinsInfo'); if (ci) ci.textContent = 'Sign in to see your balance.';
+        }
     }
 
     async function apiGet() { const r = await fetch('/api/agm'); return r.json(); }
@@ -198,21 +208,45 @@
         return '<span>' + s + '</span>';
     }
 
+    // Solana native + stablecoin balances. The match coin is a single stablecoin
+    // (USDC line is the live standard we read; USDG is Solana-promoted and shown
+    // when the wallet actually holds it). No conversion ever happens in a match:
+    // same coin in, same coin out.
+    async function loadBalance() {
+        const ci = $('coinsInfo'); if (!ci) return;
+        if (!wallet) { ci.textContent = 'Sign in to see your balance.'; return; }
+        ci.innerHTML = '<span class="hint">Loading your balances (devnet)...</span>';
+        try {
+            const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store' });
+            const j = await r.json();
+            let html = '';
+            const rows = [];
+            if (j.sol != null) rows.push('<b>SOL</b> ' + Number(j.sol).toFixed(4));
+            if (j.usdc != null) rows.push('<b>USDC</b> ' + Number(j.usdc).toFixed(2));
+            if (j.usdg != null && Number(j.usdg) > 0) rows.push('<b>USDG</b> ' + Number(j.usdg).toFixed(2));
+            ci.innerHTML = rows.length ? rows.join(' &nbsp;·&nbsp; ') : '<span class="hint">No balances found yet. You can top up from your <a href="/profile/" style="color:#f87818;">profile</a> before posting a match.</span>';
+        } catch (e) { ci.innerHTML = '<span class="hint">Balance look-up unavailable (' + (e.message || 'err') + ').</span>'; }
+    }
+
     async function postOrder() {
         if (!wallet) { log('Please sign in first'); return; }
         log('Posting your match (you are the maker)...');
         try {
-            const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet.toBase58() });
+            const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet });
             log('OK match #' + r.orderId + ' is now OPEN on-chain (ref ' + r.pda.slice(0, 10) + '...).');
-            loadOrders(); loadBank();
+            loadOrders();
         } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
 
+    // Take a match: THIS signed-in wallet commits as the taker (self-match is
+    // blocked on-chain). The maker's coin is the match coin; you pay in the same
+    // stablecoin, no conversion.
     async function matchOrder(oid) {
+        if (!wallet) { log('Please sign in first to take a match.'); return; }
         try {
-            log('Taking match #' + oid + ' with a backer taker...');
-            const r = await apiPost({ action: 'match', game: 1, orderId: oid, taker: 'guest' });
-            log('OK match #' + oid + ' is now MATCHED (both sides committed).');
+            log('Taking match #' + oid + ' with your wallet (' + maskAddr(wallet) + ')...');
+            const r = await apiPost({ action: 'match', game: 1, orderId: oid, taker: wallet });
+            log('OK match #' + oid + ' is now MATCHED. You are committed as the taker.');
             loadOrders();
         } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
@@ -222,7 +256,7 @@
             if (winner === null) { log('Cancelled lock.'); return; }
             const r = await apiPost({ action: 'lock', game: 1, orderId: oid, winnerSeat: Number(winner) });
             log('OK match #' + oid + ' locked, winner seat ' + winner + ' recorded; pot frozen on-chain.');
-            loadOrders(); loadBank();
+            loadOrders();
         } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
     async function settleOrder(oid) {
@@ -234,7 +268,7 @@
     }
     async function cancelOrder(oid) {
         try {
-            const r = await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: wallet ? wallet.toBase58() : '' });
+            const r = await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: wallet || '' });
             log('OK match #' + oid + ' cancelled.');
             loadOrders();
         } catch (e) { log('Error: ' + (e.message || e.error)); }
@@ -247,43 +281,27 @@
             const body = $('ordersBody');
             if (!r.orders || !r.orders.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No matches yet. Post one on the Home tab.</td></tr>'; return; }
             body.innerHTML = r.orders.map((o) => {
-                const pot = (Number(o.stake_usd_cents) || 0) * (o.seats || 2);
-                const fee = (pot * 0.1);
+                const seats = Math.max(2, Number(o.seats) || 2);
+                const pot = (Number(o.stake_usd_cents) || 0) * seats;
+                // Split depends on the match size: heads-up shares, more players = more winners.
+                const winnerShare = seats === 2 ? Math.round(pot * 0.9) : Math.round(pot * 0.8);
+                const platformShare = pot - winnerShare;
                 const actions = [];
                 if (o.status === 0) actions.push('<button class="btn-sm btn-success" onclick="matchOrder(' + o.order_id + ')">Take</button>', '<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>');
                 if (o.status === 2) actions.push('<button class="btn-sm btn-primary" onclick="lockOrder(' + o.order_id + ')">Play &amp; lock</button>');
                 if (o.status === 1) actions.push('<button class="btn-sm btn-ghost" onclick="settleOrder(' + o.order_id + ')">Settle</button>');
-                const desc = '(pot $' + (pot / 100) + ', winner ' + ((pot - fee) / 100).toFixed(2) + ', platform ' + (fee / 100).toFixed(2) + ')';
-                return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (Number(o.stake_usd_cents) / 100) + '<br><span class="hint">' + desc + '</span></td><td>' + o.seats + '</td><td class="mono">' + (o.maker || '').slice(0, 10) + '...</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
+                const desc = seats === 2
+                    ? '(winner gets ' + (winnerShare / 100).toFixed(2) + ', platform ' + (platformShare / 100).toFixed(2) + ')'
+                    : '(' + seats + ' players, ' + (winnerShare / 100).toFixed(2) + ' split among the winners, ' + (platformShare / 100).toFixed(2) + ' platform)';
+                return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (Number(o.stake_usd_cents) / 100).toFixed(2) + '<br><span class="hint">' + desc + '</span></td><td>' + seats + '</td><td class="mono">' + maskAddr(o.maker || '') + '</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
             }).join('');
         } catch (e) { $('ordersBody').innerHTML = '<tr><td colspan="7" style="color:#e74c3c;">error: ' + e.message + '</td></tr>'; }
-    }
-
-    const n = (x) => Number(x);
-    async function loadBank() {
-        try {
-            const r = await apiPost({ action: 'bank', game: 1 });
-            const b = r.bank;
-            if (!b) { $('bankInfo').textContent = 'Shared pool not opened yet (staff funds it once).'; return; }
-            $('bankInfo').innerHTML = 'Shared pool: <b>$' + (n(b.balanceUsdCents) / 100).toFixed(2) + '</b> &nbsp;Today: $' + (n(b.dayNetUsdCents) / 100).toFixed(2) + ' &nbsp;Status: ' + (b.status === 0 ? 'open' : '<b style="color:#e74c3c">paused until tomorrow</b>') + '<br>Trades: ' + n(b.trades) + ' (W ' + n(b.totalWins) + ' / L ' + n(b.totalLosses) + ' lifetime)';
-        } catch (e) { $('bankInfo').textContent = 'pool error: ' + e.message; }
-    }
-    async function p2cFund() {
-        try { const r = await apiPost({ action: 'p2c-fund', game: 1, amountUsdCents: Number($('fundAmt').value) * 100 }); log('OK shared pool funded +$' + $('fundAmt').value); loadBank(); } catch (e) { log('Error: ' + (e.message || e.error)); }
-    }
-    async function p2cSettle() {
-        try {
-            const r = await apiPost({ action: 'p2c-settle', game: 1, orderId: Number($('p2cOid').value), computerSeat: Number($('p2cSeat').value), computerWon: $('p2cWon').value === 'true' });
-            log('OK computer result applied to match #' + $('p2cOid').value + ' (shared pool updated).');
-            loadBank();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
         $('program').textContent = 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWrBu8wgAuJ';
         await signInState();
         document.addEventListener('gfg:auth-changed', signInState);
-        loadBank();
     });
 </script>
 </body>

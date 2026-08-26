@@ -80,6 +80,42 @@ async function readBank(game) {
 
 function sign(extra) { return { publicKey: extra.publicKey, signTransaction: async (t) => { t.partialSign(extra); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(extra)); return ts; } }; }
 
+// Reads a wallet's SOL + stablecoin balances (devnet mints). Matches are run in
+// a single stablecoin: same coin in, same coin out, no conversion ever.
+const USDC_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+const USDG_DEVNET = '6YtmBGgjbPn7cNT9cMLm9XLYvUnrXsHQt7HSDzKdTurJ'; // USDG has no widely-used devnet mint yet
+export async function walletBalances(walletAddr) {
+  try {
+    const pub = new PublicKey(walletAddr);
+    const lamports = await conn.getBalance(pub).catch(() => null);
+    const usdc = await tokenBalance(pub, USDC_DEVNET);
+    let usdg = null;
+    try { usdg = await tokenBalance(pub, USDG_DEVNET); } catch (e) { usdg = null; }
+    return {
+      sol: lamports != null ? lamports / 1e9 : null,
+      usdc: usdc != null ? usdc : 0,
+      usdg: usdg != null && usdg > 0 ? usdg : 0,
+    };
+  } catch (e) {
+    return { sol: null, usdc: null, usdg: null, error: e.message };
+  }
+}
+async function tokenBalance(pub, mint) {
+  try {
+    const res = await fetch(baseRpcUrl(), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner', params: [pub.toBase58(), { mint }, { encoding: 'jsonParsed' }] }),
+    }).then(r => r.json());
+    const arr = (res && res.result && res.result.value) || [];
+    let total = 0;
+    for (const a of arr) {
+      const amt = a.account && a.account.data && a.account.data.parsed && a.account.data.parsed.info && a.account.data.parsed.info.tokenAmount;
+      if (amt) total += Number(amt.uiAmount || 0);
+    }
+    return total;
+  } catch (e) { return 0; }
+}
+
 // ---- actions (relay sponsor signs; maker/taker = the authenticated wallet) ----
 export async function agmPost({ game, stakeUsdCents, seats, maker }) {
   const orderId = nextOrderId();

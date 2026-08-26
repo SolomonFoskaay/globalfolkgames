@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earn Competitions (AGM) - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        body { background:#0f0f13; }
+        .page { max-width:1080px; margin:0 auto; padding:24px 16px 60px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
+        .hint { font-size:0.8rem; color:#888; line-height:1.5; }
+        label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
+        input, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
+        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+        .btn-primary { background:#f87818; color:#000; margin-top:8px; }
+        .btn-ghost { background:#1a1a24; color:#bbb; border:1px solid #333; }
+        .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+        .row > div { flex:1; min-width:130px; }
+        .log { background:#0a0a10; border:1px solid #222; border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; color:#9fe8a8; max-height:260px; overflow:auto; white-space:pre-wrap; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#7838f8; }
+        .open { color:#f87818; font-weight:700; }
+        .matched { color:#7838f8; font-weight:700; }
+        .locked { color:#2ecc71; font-weight:700; }
+        .staff-note { background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.25); border-radius:8px; padding:12px 16px; font-size:0.8rem; color:#ccc; line-height:1.6; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Earn Competitions (AGM) - staff console</h1>
+        <p class="hint" style="margin:0 0 12px;">AGM = Automated Game Matchmaking, the Open/Matched/Locked/Settled match order book for player-to-player earn play. This console manages the platform side only (the P2C backer pool and live orders). Players use the public page at /agm/.</p>
+
+        <div class="staff-note" id="staffNote">Checking staff access...</div>
+
+        <div class="card">
+            <h3>P2C backer pool (ONE shared pool across every game)</h3>
+            <p class="hint"><b>P2C = Player vs Computer.</b> When no human is free to take a player's open match, the platform steps in with a computer seat using this single shared pool, so funds are never split thin per game. Pool math: computer win adds (payout minus its stake), computer loss subtracts its stake. A $20 net loss in one GMT day pauses the pool until the day turns over (anti-meltdown).</p>
+            <div class="hint" id="bankInfo" style="margin:10px 0;">Loading shared pool...</div>
+            <div class="row">
+                <div style="min-width:200px;"><label>Fund the pool by ($)</label><input id="fundAmt" type="number" value="1000"></div>
+            </div>
+            <button class="btn-primary" onclick="p2cFund()">Fund shared pool</button>
+            <div class="row">
+                <div><label>Order id (must be LOCKED)</label><input id="p2cOid" type="number" placeholder="e.g. 900003"></div>
+                <div><label>Computer seat</label><input id="p2cSeat" type="number" value="0"></div>
+                <div><label>Computer result</label><select id="p2cWon"><option value="false">Lost</option><option value="true">Won</option></select></div>
+            </div>
+            <button class="btn-ghost" onclick="p2cSettle()">Apply computer result (settle against pool)</button>
+            <div class="log" id="log" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>Live open matches on-chain</h3>
+            <div style="display:flex; gap:8px; margin-bottom:8px;"><button class="btn-ghost" onclick="loadOrders()">Refresh</button><span class="hint" id="count"></span></div>
+            <table>
+                <thead><tr><th>Match</th><th>Game</th><th>Prize</th><th>Players</th><th>Maker</th><th>Taker</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="ordersBody"><tr><td colspan="8" style="text-align:center;color:#888;">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const n = (x) => Number(x);
+        function log(m) { const el = $('log'); el.textContent = new Date().toISOString().slice(11,19) + ' ' + m + '\n' + el.textContent; }
+        async function apiPost(o) { const r = await fetch('/api/agm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o) }); return r.json(); }
+        async function apiGet() { const r = await fetch('/api/agm'); return r.json(); }
+
+        function statusHtml(s) { if (s === 0) return '<span class="open">OPEN</span>'; if (s === 1) return '<span class="locked">LOCKED</span>'; if (s === 2) return '<span class="matched">MATCHED</span>'; if (s === 3) return 'cancelled'; if (s === 4) return 'settled'; return String(s); }
+
+        async function loadBank() {
+            try {
+                const r = await apiPost({ action: 'bank', game: 1 });
+                const b = r.bank;
+                if (!b) { $('bankInfo').textContent = 'Shared pool not opened yet. Fund it once to create it.'; return; }
+                $('bankInfo').innerHTML = 'Balance: <b>$' + (n(b.balanceUsdCents)/100).toFixed(2) + '</b> | Today net: $' + (n(b.dayNetUsdCents)/100).toFixed(2) + ' | Status: ' + (b.status === 0 ? 'open' : '<b style="color:#e74c3c">Paused until tomorrow</b>') + ' | Day cap: $' + (n(b.dayLossCapUsdCents)/100) + '<br>Trades: ' + n(b.trades) + ' | Lifetime wins: ' + n(b.totalWins) + ' | Lifetime losses: ' + n(b.totalLosses);
+            } catch (e) { $('bankInfo').textContent = 'pool error: ' + e.message; }
+        }
+        async function p2cFund() {
+            try { const r = await apiPost({ action: 'p2c-fund', game: 1, amountUsdCents: n($('fundAmt').value) * 100 }); log('OK shared pool funded +$' + $('fundAmt').value); loadBank(); } catch (e) { log('Error: ' + (e.message || e.error)); }
+        }
+        async function p2cSettle() {
+            try {
+                await apiPost({ action: 'p2c-settle', game: 1, orderId: n($('p2cOid').value), computerSeat: n($('p2cSeat').value), computerWon: $('p2cWon').value === 'true' });
+                log('OK computer result applied to order #' + $('p2cOid').value);
+                loadBank(); loadOrders();
+            } catch (e) { log('Error: ' + (e.message || e.error)); }
+        }
+
+        async function loadOrders() {
+            try {
+                const r = await apiGet();
+                $('count').textContent = r.count + ' order(s)';
+                const body = $('ordersBody');
+                if (!r.orders || !r.orders.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;">No orders yet.</td></tr>'; return; }
+                body.innerHTML = r.orders.map((o) => {
+                    const actions = [];
+                    if (o.status === 0) actions.push('<button class="btn-ghost" onclick="cancelOrder(' + o.order_id + ')">Cancel (admin)</button>');
+                    if (o.status === 2) actions.push('<button class="btn-ghost" onclick="forceLock(' + o.order_id + ')">Force lock</button>');
+                    if (o.status === 1) actions.push('<button class="btn-ghost" onclick="forceSettle(' + o.order_id + ')">Force settle</button>');
+                    return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (n(o.stake_usd_cents)/100) + '</td><td>' + o.seats + '</td><td class="mono">' + (o.maker||'').slice(0,10) + '...</td><td class="mono">' + (o.taker||'').slice(0,10) + '...</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
+                }).join('');
+            } catch (e) { $('ordersBody').innerHTML = '<tr><td colspan="8" style="color:#e74c3c;">error: ' + e.message + '</td></tr>'; }
+        }
+        async function cancelOrder(oid) { try { await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: 'admin' }); log('OK #' + oid + ' cancelled'); loadOrders(); } catch (e) { log('Error: ' + (e.message || e.error)); } }
+        async function forceLock(oid) { try { await apiPost({ action: 'lock', game: 1, orderId: oid, winnerSeat: 0 }); log('OK #' + oid + ' locked'); loadOrders(); loadBank(); } catch (e) { log('Error: ' + (e.message || e.error)); } }
+        async function forceSettle(oid) { try { await apiPost({ action: 'settle', game: 1, orderId: oid }); log('OK #' + oid + ' settled'); loadOrders(); } catch (e) { log('Error: ' + (e.message || e.error)); } }
+
+        (async function init() {
+            if (!window.DashCore) { document.getElementById('staffNote').textContent = 'Staff-only page. If you are staff, reload after the header loads.'; return; }
+            const staff = await window.DashCore.gateStaff().catch(() => false);
+            if (!staff) { document.getElementById('staffNote').textContent = 'This page is only for GlobalFolkGames staff. You do not have access.'; return; }
+            document.getElementById('staffNote').style.display = 'none';
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Earn (AGM)',
+                active: 'agm',
+                sections: [
+                    { heading: 'Overview', items: [ { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' } ]},
+                    { heading: 'Earn (AGM)', items: [ { key: 'agm', label: '🎯 AGM console', href: '/dashboard/agm.html' } ]},
+                ]
+            });
+            loadBank(); loadOrders();
+        })();
+    </script>
+</body>
+</html>

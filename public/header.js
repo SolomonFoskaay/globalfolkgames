@@ -61,8 +61,8 @@
                 items: [
                     { label: '🎮 Games', href: '/games/', match: 'games' },
                     { label: '🌍 Countries', href: '/countries/', match: 'countries' },
-                    { label: '🏆 Earn Competition', href: '/competitions/', match: 'competitions' },
-                    { label: '🤝 AGM Arena (earn)', href: '/agm/', match: 'agm' },
+                    { label: '🏆 Earn Competitions', href: '/competitions/', match: 'competitions' },
+                    { label: '🤝 Earn Competitions (AGM)', href: '/agm/', match: 'agm' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]
             },
@@ -95,7 +95,8 @@
     // Dashboard itself; every other admin page is reached from the dashboard's
     // own menu (dash-nav), so the visitor drawer stays clean.
     const ADMIN_NAV = [
-        { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' }
+        { label: '🛡 Dashboard', href: '/dashboard/', match: 'dashboard' },
+        { label: '🎯 Earn (AGM)', href: '/dashboard/agm.html', match: 'agm-admin' }
     ];
 
     // Resolve the connected wallet the same way the changelog page does.
