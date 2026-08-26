@@ -120,7 +120,8 @@ pub const MAX_MP: usize = 8;                      // max human seats per earn ma
 pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M7: standalone AGM order
 pub const AGM_SETTLE_SEED: &[u8] = b"gfgagms";        // Arc2 M7F: settlement (pot/fee/payout)
 pub const AGM_FEE_BPS: u64 = 1000;                    // flat 10% of the pot (locked)
-pub const P2C_SEED: &[u8] = b"gfgp2c";            // Arc2 M7C: P2C bank capital + anti-farm caps
+pub const P2C_SEED: &[u8] = b"gfgp2c";            // legacy per-game P2C seed (kept, unused by new code)
+pub const P2C_GLOBAL_SEED: &[u8] = b"gfgp2cbank";    // Arc2 M7C: ONE shared cross-game pool (no per-game split)
 pub const CLOCK_SEED: &[u8] = b"gfgclock";          // Arc2 M1B: per-seat turn clocks + forfeits
 pub const DEFAULT_TIMEOUT_CAP: u8 = 3;              // timeout_seat triggers foreclosure at 3 stalls
 pub const P2C_DAY_SECS: i64 = 86_400;             // GMT day bucket for the daily net-loss cap
@@ -2203,7 +2204,7 @@ pub struct P2cBankCtx<'info> {
         init_if_needed,
         payer = signer,
         space = 8 + std::mem::size_of::<P2cBank>(),
-        seeds = [P2C_SEED, &game.to_le_bytes()],
+        seeds = [P2C_GLOBAL_SEED],
         bump
     )]
     pub bank: Account<'info, P2cBank>,
@@ -2220,7 +2221,7 @@ pub struct P2cSettleCtx<'info> {
         init_if_needed,
         payer = signer,
         space = 8 + std::mem::size_of::<P2cBank>(),
-        seeds = [P2C_SEED, &game.to_le_bytes()],
+        seeds = [P2C_GLOBAL_SEED],
         bump
     )]
     pub bank: Account<'info, P2cBank>,
@@ -2893,8 +2894,9 @@ pub struct AgmSettlement {
     pub status: u8,             // 0 recorded/locked, 1 bank-applied (P2C once guard)
 }
 
-/// Arc2 M7C: the platform P2C bank - capital pool + per-day anti-farm guards.
-/// Computers fill unmatched seats only (small stakes, $1-$10). One account per game.
+/// Arc2 M7C: the platform P2C bank - ONE shared capital pool for ALL games
+/// (no per-game split, so liquidity is never fractured). Computers fill
+/// unmatched seats only (small stakes, $1-$10); per-day anti-farm guards.
 #[account]
 pub struct P2cBank {
     pub version: u8,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGM Arena - GlobalFolkGames</title>
+    <title>Earn Competition (AGM) - GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <style>
         body { background:#0f0f13; }
@@ -27,85 +27,158 @@
         td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#7838f8; }
         .bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:6px 0 12px; font-size:0.8rem; color:#ccc; }
         .bar b { color:#f87818; }
-        .log { background:#0a0a10; border:1px solid #222; border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; color:#9fe8a8; max-height:220px; overflow:auto; white-space:pre-wrap; }
+        .log { background:#0a0a10; border:1px solid #222; border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; color:#9fe8a8; max-height:300px; overflow:auto; white-space:pre-wrap; }
         .locked { color:#2ecc71; font-weight:700; }
         .open { color:#f87818; font-weight:700; }
         .matched { color:#7838f8; font-weight:700; }
-        .howto { background:rgba(243,156,18,0.06); border:1px solid rgba(243,156,18,0.3); }
-        .howto li { margin:4px 0; font-size:0.8rem; color:#cbb; line-height:1.5; }
-        .step { font-weight:700; color:#f87818; }
+        .intro { background:rgba(155,89,182,0.08); border:1px solid rgba(155,89,182,0.35); }
+        /* ===== tabs ===== */
+        .tabs { display:flex; gap:8px; margin:14px 0 12px; overflow-x:auto; }
+        .tab { flex:1; min-width:0; padding:10px 6px; border:1px solid #2a2a36; background:#1a1a24; color:#bbb; border-radius:10px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; text-align:center; transition:all .15s; }
+        .tab.active { background:#f87818; border-color:#f87818; color:#000; }
+        .tab.hidden { display:none; }
+        .pane { animation:fadein .2s ease; }
+        @keyframes fadein { from { opacity:0; transform:translateX(6px); } to { opacity:1; transform:none; } }
+        .swipe-hint { font-size:0.7rem; color:#555; text-align:center; margin:0 0 8px; }
+        .mini { font-size:0.72rem; color:#666; line-height:1.4; margin:4px 0 0; }
+        .glossary b { color:#f87818; }
     </style>
 </head>
 <body>
 <div class="wrap">
-    <h1 style="font-size:1.3rem;margin:0 0 4px;">AGM Arena (Arc 2.0 earn lobby)</h1>
-    <p class="hint" style="margin:0 0 12px;">Post an order, match it, lock the pot, settle at the 10% flat fee. Every write is relay/sponsor signed on your behalf. Orders come from a live on-chain registry; statuses are read from Solana, never from a database.</p>
-
-    <div class="card howto">
-        <h3>How it works (with the numbers from our devnet tests)</h3>
-        <ol>
-            <li><span class="step">Post:</span> pick a game (Ludo = 1), a stake ($5), and seats (2). This writes your ticket on-chain.</li>
-            <li><span class="step">Match:</span> another wallet (or the test taker) accepts. Your wallet can never accept its own ticket.</li>
-            <li><span class="step">Lock:</span> the pot is fixed. 2 seats x $5 = a $10 pot, $1 fee (10%), winner gets $9.</li>
-            <li><span class="step">Settle:</span> finalizes the order so the wallet rail can pay the winner.</li>
-        </ol>
-        <p class="hint">The P2C panel below handles the computer bank: fund it, then apply a computer-seat result to a locked settlement (computer win +payout-stake, loss -stake). The bank pauses for the day if it loses $20+.</p>
-    </div>
+    <h1 style="font-size:1.3rem;margin:0 0 4px;">Earn Competition (AGM)</h1>
+    <p class="hint" style="margin:0 0 12px;"><b>AGM</b> means <b>Arena Game Matchmaking</b>: a first-of-its-kind idea for games, invented by the founder of GlobalFolkGames, Solomon Foskaay. It borrows the best of the trading world (CEX and DEX) and turns a gameplay match into something the players can open, take, and settle, just like a token or an NFT. The point is simple: native gamers show their prowess against players worldwide, and the winner of each match earns a share of the competition pot. Every step is recorded on a chain you can check.</p>
 
     <div class="bar">
         <span>Wallet: <b id="wallet">not signed in</b></span>
         <span>Program: <b id="program">...</b></span>
     </div>
 
-    <div class="row">
-        <div class="card" style="flex:1; min-width:320px;">
-            <h3>Post an order</h3>
-            <label>Game</label>
-            <select id="f_game"><option value="1">Ludo (1)</option></select>
-            <label>Stake (USD)</label>
-            <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
-            <label>Seats</label>
-            <select id="f_seats"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
-            <button class="btn-primary" onclick="postOrder()">Post order (on-chain)</button>
+    <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="home">Home</button>
+        <button class="tab" data-tab="orders">Open orders</button>
+        <button class="tab" data-tab="log">Action records</button>
+    </div>
+    <p class="swipe-hint">Swipe left or right to move between Home, Open orders and Action records.</p>
+
+    <!-- ===== TAB 1: HOME ===== -->
+    <div class="pane" id="pane-home">
+        <div class="card intro">
+            <h3>How it works (the plain version)</h3>
+            <ol class="howto">
+                <li><span class="step">Post a match:</span> pick your game and the prize level. This writes your open match on-chain, so it is public and provable.</li>
+                <li><span class="step">Take a match:</span> another player (or the computer backer) accepts your open match. You can never accept your own match.</li>
+                <li><span class="step">Play:</span> two players, one winner. The prize pool is locked the moment the match is taken.</li>
+                <li><span class="step">Settle:</span> the winner's share is finalized on-chain and ready to be paid out.</li>
+            </ol>
+            <p class="hint">The share split is shown clearly on each match before you take it. There is no hidden maths, and the platform share is printed up front so anyone can see it.</p>
         </div>
-        <div class="card" style="flex:1; min-width:320px;">
-            <h3>P2C computer bank (game 1)</h3>
-            <div class="hint" id="bankInfo">Loading bank...</div>
-            <div class="row">
-                <div><label>Fund amount ($)</label><input id="fundAmt" type="number" value="1000"></div>
+
+        <div class="row">
+            <div class="card" style="flex:1; min-width:320px;">
+                <h3>Post a match</h3>
+                <p class="mini">This is you opening a match for other players to take. You are the match-maker.</p>
+                <label>Game</label>
+                <select id="f_game"><option value="1">Ludo</option></select>
+                <label>Prize level (USD per player)</label>
+                <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
+                <label>Players</label>
+                <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
+                <button class="btn-primary" onclick="postOrder()">Post my match (on-chain)</button>
+                <p class="mini">When someone takes your match, the winner's share is locked and settled on-chain. The platform's small opening fee is shown on the open order list.</p>
             </div>
-            <button class="btn-ghost" onclick="p2cFund()">Fund bank</button>
-            <div class="row">
-                <div><label>Order id</label><input id="p2cOid" type="number" placeholder="locked order id"></div>
-                <div><label>Computer seat</label><input id="p2cSeat" type="number" value="0"></div>
-                <div><label>Won?</label><select id="p2cWon"><option value="false">Lost</option><option value="true">Won</option></select></div>
+            <div class="card" style="flex:1; min-width:320px;">
+                <h3>Computer backer (P2C pool)</h3>
+                <p class="mini"><b>P2C</b> means <b>Player vs Computer</b>. When no human is free to take your match, the platform steps in with a computer seat so the game never waits. The computer uses ONE shared pool across every game, so the funds are never split thin.</p>
+                <div class="hint" id="bankInfo">Loading shared pool...</div>
+                <div class="row">
+                    <div><label>Order id</label><input id="p2cOid" type="number" placeholder="locked order id"></div>
+                    <div><label>Computer seat</label><input id="p2cSeat" type="number" value="0"></div>
+                    <div><label>Computer result</label><select id="p2cWon"><option value="false">Lost</option><option value="true">Won</option></select></div>
+                </div>
+                <button class="btn-ghost" onclick="p2cSettle()">Apply computer result</button>
+                <p class="mini">For the platform staff: fund the shared pool below. Players never fund the pool, that is our backer job, and it stays honest because results are on-chain.</p>
+                <div class="row">
+                    <div><label>Fund amount ($)</label><input id="fundAmt" type="number" value="1000"></div>
+                </div>
+                <button class="btn-ghost" onclick="p2cFund()">Fund shared pool (staff)</button>
             </div>
-            <button class="btn-ghost" onclick="p2cSettle()">Apply computer result</button>
         </div>
     </div>
 
-    <div class="card">
-        <h3>Open orders (lobby)</h3>
-        <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <button class="btn-ghost" onclick="loadOrders()">Refresh</button>
-            <span class="hint" id="lobbyCount"></span>
+    <!-- ===== TAB 2: OPEN ORDERS ===== -->
+    <div class="pane" id="pane-orders" style="display:none;">
+        <div class="card">
+            <h3>Open matches</h3>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <button class="btn-ghost" onclick="loadOrders()">Refresh</button>
+                <span class="hint" id="lobbyCount"></span>
+            </div>
+            <table>
+                <thead><tr><th>Match</th><th>Game</th><th>Prize</th><th>Players</th><th>Opened by</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="ordersBody"><tr><td colspan="7" style="text-align:center;color:#888;">Loading...</td></tr></tbody>
+            </table>
         </div>
-        <table>
-            <thead><tr><th>Order</th><th>Game</th><th>Stake</th><th>Seats</th><th>Maker</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="ordersBody"><tr><td colspan="7" style="text-align:center;color:#888;">Loading...</td></tr></tbody>
-        </table>
     </div>
 
-    <div class="card">
-        <h3>Action log</h3>
-        <div class="log" id="log"></div>
+    <!-- ===== TAB 3: ACTION RECORDS ===== -->
+    <div class="pane" id="pane-log" style="display:none;">
+        <div class="card">
+            <h3>Action records</h3>
+            <p class="hint">Every write you trigger on this page appears here with its result. Each one is signed on-chain.</p>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <div class="card glossary">
+        <h3>Words you will see</h3>
+        <p class="hint">
+            <b>AGM</b> = Arena Game Matchmaking, the system that opens, takes and settles matches.<br>
+            <b>P2P</b> = Player vs Player, both seats are real humans.<br>
+            <b>P2C</b> = Player vs Computer, a computer seat fills the match so no one waits.<br>
+            <b>Pot</b> = the prize pool: every player's prize level added together.<br>
+            <b>Open / Locked / Settled</b> = an open match is waiting for a taker; locked means two players are committed; settled means the winner is finalized.
+        </p>
     </div>
 </div>
 
 <script src="/global_header.js"></script>
 <script>
     const $ = (id) => document.getElementById(id);
-    function log(msg) { const el = $('log'); el.textContent = new Date().toISOString().slice(11,19) + ' ' + msg + '\n' + el.textContent; }
+    const PANES = ['home', 'orders', 'log'];
+    let activeTab = 'home';
+
+    // ===== tabs: click + swipe left/right =====
+    function showTab(name) {
+        activeTab = name;
+        document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+        PANES.forEach((p) => { $('pane-' + p).style.display = (p === name) ? '' : 'none'; });
+        if (name === 'orders') loadOrders();
+        if (name === 'log') log('Opened Action records.');
+    }
+    function nextTab(dir) { // dir: 1 = right (next), -1 = left (prev)
+        const i = PANES.indexOf(activeTab);
+        const j = Math.min(PANES.length - 1, Math.max(0, i + dir));
+        if (j !== i) showTab(PANES[j]);
+    }
+    document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    (function () {
+        const cont = document.querySelector('.wrap');
+        let sx = 0, dx = 0, sy = 0, tracking = false;
+        cont.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; tracking = true; }, { passive: true });
+        cont.addEventListener('touchmove', (e) => { if (!tracking) return; const t = e.touches[0]; dx = t.clientX - sx; }, { passive: true });
+        cont.addEventListener('touchend', () => {
+            if (!tracking) return;
+            tracking = false;
+            const horiz = Math.abs(dx);
+            if (horiz < 50) return; // too small a swipe
+            if (dx < 0) nextTab(1);      // swipe left -> next
+            else nextTab(-1);             // swipe right -> previous
+        }, { passive: true });
+    })();
+
+    // ===== helpers =====
+    function log(msg) { const el = $('log'); el.textContent = new Date().toISOString().slice(11, 19) + ' ' + msg + '\n' + el.textContent; try { el.scrollTop = 0; } catch (e) {} }
     let wallet = null;
 
     async function signInState() {
@@ -126,87 +199,91 @@
     }
 
     async function postOrder() {
-        if (!wallet) { log('ERROR: sign in first'); return; }
-        log('posting order (maker = ' + wallet.toBase58().slice(0,8) + '...)');
+        if (!wallet) { log('Please sign in first'); return; }
+        log('Posting your match (you are the maker)...');
         try {
             const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet.toBase58() });
-            log('OK order #' + r.orderId + ' -> ' + r.pda.slice(0,12) + '... status ' + r.order.status);
+            log('OK match #' + r.orderId + ' is now OPEN on-chain (ref ' + r.pda.slice(0, 10) + '...).');
             loadOrders(); loadBank();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
 
     async function matchOrder(oid) {
         try {
-            log('matching #' + oid + ' with a guest taker wallet (generated by the relay)');
+            log('Taking match #' + oid + ' with a backer taker...');
             const r = await apiPost({ action: 'match', game: 1, orderId: oid, taker: 'guest' });
-            log('OK #' + oid + ' matched, status ' + r.order.status);
+            log('OK match #' + oid + ' is now MATCHED (both sides committed).');
             loadOrders();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
     async function lockOrder(oid) {
         try {
-            const winner = prompt('Winner seat (0..seats-1)?', '0');
+            const winner = prompt('Winner seat (the player who won this match; 0 = first player on the order)', '0');
+            if (winner === null) { log('Cancelled lock.'); return; }
             const r = await apiPost({ action: 'lock', game: 1, orderId: oid, winnerSeat: Number(winner) });
-            log('OK #' + oid + ' locked (pot fixed, 10% fee goes to house)');
+            log('OK match #' + oid + ' locked, winner seat ' + winner + ' recorded; pot frozen on-chain.');
             loadOrders(); loadBank();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
     async function settleOrder(oid) {
         try {
             const r = await apiPost({ action: 'settle', game: 1, orderId: oid });
-            log('OK #' + oid + ' settled, status ' + r.order.status);
+            log('OK match #' + oid + ' settled on-chain (status ' + r.order.status + ').');
             loadOrders();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
     async function cancelOrder(oid) {
         try {
             const r = await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: wallet ? wallet.toBase58() : '' });
-            log('OK #' + oid + ' cancelled');
+            log('OK match #' + oid + ' cancelled.');
             loadOrders();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
 
     async function loadOrders() {
         try {
             const r = await apiGet();
-            $('lobbyCount').textContent = r.count + ' order(s)';
+            $('lobbyCount').textContent = r.count + ' open match(es)';
             const body = $('ordersBody');
-            if (!r.orders || !r.orders.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No orders yet. Post one above.</td></tr>'; return; }
+            if (!r.orders || !r.orders.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No matches yet. Post one on the Home tab.</td></tr>'; return; }
             body.innerHTML = r.orders.map((o) => {
+                const pot = (Number(o.stake_usd_cents) || 0) * (o.seats || 2);
+                const fee = (pot * 0.1);
                 const actions = [];
-                if (o.status === 0) actions.push('<button class="btn-sm btn-success" onclick="matchOrder(' + o.order_id + ')">Match</button>', '<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>');
-                if (o.status === 2) actions.push('<button class="btn-sm btn-primary" onclick="lockOrder(' + o.order_id + ')">Lock</button>');
+                if (o.status === 0) actions.push('<button class="btn-sm btn-success" onclick="matchOrder(' + o.order_id + ')">Take</button>', '<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>');
+                if (o.status === 2) actions.push('<button class="btn-sm btn-primary" onclick="lockOrder(' + o.order_id + ')">Play &amp; lock</button>');
                 if (o.status === 1) actions.push('<button class="btn-sm btn-ghost" onclick="settleOrder(' + o.order_id + ')">Settle</button>');
-                return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (o.stake_usd_cents / 100) + '</td><td>' + o.seats + '</td><td class="mono">' + (o.maker || '').slice(0,10) + '...</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
+                const desc = '(pot $' + (pot / 100) + ', winner ' + ((pot - fee) / 100).toFixed(2) + ', platform ' + (fee / 100).toFixed(2) + ')';
+                return '<tr><td>' + o.order_id + '</td><td>' + o.game + '</td><td>$' + (Number(o.stake_usd_cents) / 100) + '<br><span class="hint">' + desc + '</span></td><td>' + o.seats + '</td><td class="mono">' + (o.maker || '').slice(0, 10) + '...</td><td>' + statusHtml(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
             }).join('');
         } catch (e) { $('ordersBody').innerHTML = '<tr><td colspan="7" style="color:#e74c3c;">error: ' + e.message + '</td></tr>'; }
     }
 
+    const n = (x) => Number(x);
     async function loadBank() {
         try {
             const r = await apiPost({ action: 'bank', game: 1 });
             const b = r.bank;
-            if (!b) { $('bankInfo').textContent = 'No P2C bank yet for game 1 (fund it once).'; return; }
-            const n = (x) => Number(x);
-            $('bankInfo').innerHTML = 'Balance: <b>$' + (n(b.balanceUsdCents)/100) + '</b>&nbsp; Day net: $' + (n(b.dayNetUsdCents)/100) + '&nbsp; Status: ' + (b.status === 0 ? 'open' : '<b style="color:#e74c3c">paused</b>') + '<br>Trades: ' + n(b.trades) + ' (W ' + b.dayWins + ' / L ' + b.dayLosses + ' today)&nbsp; Lifetime W ' + n(b.totalWins) + ' / L ' + n(b.totalLosses);
-        } catch (e) { $('bankInfo').textContent = 'bank error: ' + e.message; }
+            if (!b) { $('bankInfo').textContent = 'Shared pool not opened yet (staff funds it once).'; return; }
+            $('bankInfo').innerHTML = 'Shared pool: <b>$' + (n(b.balanceUsdCents) / 100).toFixed(2) + '</b> &nbsp;Today: $' + (n(b.dayNetUsdCents) / 100).toFixed(2) + ' &nbsp;Status: ' + (b.status === 0 ? 'open' : '<b style="color:#e74c3c">paused until tomorrow</b>') + '<br>Trades: ' + n(b.trades) + ' (W ' + n(b.totalWins) + ' / L ' + n(b.totalLosses) + ' lifetime)';
+        } catch (e) { $('bankInfo').textContent = 'pool error: ' + e.message; }
     }
     async function p2cFund() {
-        try { const r = await apiPost({ action: 'p2c-fund', game: 1, amountUsdCents: Number($('fundAmt').value) * 100 }); log('OK bank funded'); loadBank(); } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        try { const r = await apiPost({ action: 'p2c-fund', game: 1, amountUsdCents: Number($('fundAmt').value) * 100 }); log('OK shared pool funded +$' + $('fundAmt').value); loadBank(); } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
     async function p2cSettle() {
         try {
             const r = await apiPost({ action: 'p2c-settle', game: 1, orderId: Number($('p2cOid').value), computerSeat: Number($('p2cSeat').value), computerWon: $('p2cWon').value === 'true' });
-            log('OK computer result applied to order #' + $('p2cOid').value);
+            log('OK computer result applied to match #' + $('p2cOid').value + ' (shared pool updated).');
             loadBank();
-        } catch (e) { log('ERROR: ' + (e.message || e.error)); }
+        } catch (e) { log('Error: ' + (e.message || e.error)); }
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
         $('program').textContent = 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWrBu8wgAuJ';
         await signInState();
         document.addEventListener('gfg:auth-changed', signInState);
-        loadOrders(); loadBank();
+        loadBank();
     });
 </script>
 </body>

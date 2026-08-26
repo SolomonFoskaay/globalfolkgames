@@ -11,7 +11,7 @@ const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.m
 const PROGRAM = new PublicKey(idl.address);
 const AGM = Buffer.from('gfgagm');
 const AGMS = Buffer.from('gfgagms');
-const P2C = Buffer.from('gfgp2c');
+const P2C_GLOBAL = Buffer.from('gfgp2cbank');
 const sponsor = loadSponsor();
 const wallet = { publicKey: sponsor.publicKey, signTransaction: async (t) => { t.partialSign(sponsor); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(sponsor)); return ts; } };
 const conn = createConnection(baseRpcUrl(), 'confirmed');
@@ -20,7 +20,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function send(tx) { if (tx && typeof tx.then === 'function') tx = await tx; tx.feePayer = sponsor.publicKey; const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true }); await conn.confirmTransaction({ signature: sig }, 'confirmed'); return sig; }
 
 const GAME = 1;
-const bankPda = PublicKey.findProgramAddressSync([P2C, Buffer.from([GAME])], PROGRAM)[0];
+const bankPda = PublicKey.findProgramAddressSync([P2C_GLOBAL], PROGRAM)[0];
 const order = async (oid) => PublicKey.findProgramAddressSync([AGM, Buffer.from([GAME]), new BN(oid).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 const settle = (oid) => PublicKey.findProgramAddressSync([AGMS, new BN(oid).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 

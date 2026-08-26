@@ -61,7 +61,7 @@
                 items: [
                     { label: '🎮 Games', href: '/games/', match: 'games' },
                     { label: '🌍 Countries', href: '/countries/', match: 'countries' },
-                    { label: '🏆 Competition', href: '/competitions/', match: 'competitions' },
+                    { label: '🏆 Earn Competition', href: '/competitions/', match: 'competitions' },
                     { label: '🤝 AGM Arena (earn)', href: '/agm/', match: 'agm' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]

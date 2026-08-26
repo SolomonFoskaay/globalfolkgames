@@ -14,7 +14,7 @@ const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.m
 const PROGRAM = new PublicKey(idl.address);
 const AGM = Buffer.from('gfgagm');
 const AGMS = Buffer.from('gfgagms');
-const P2C = Buffer.from('gfgp2c');
+const P2C_GLOBAL = Buffer.from('gfgp2cbank'); // ONE shared pool across every game
 const REG_FILE = new URL('./.gfg-agm-registry.json', import.meta.url).pathname;
 
 const sponsor = loadSponsor();
@@ -28,8 +28,8 @@ export function orderPda(game, orderId) {
 export function settlementPda(orderId) {
   return PublicKey.findProgramAddressSync([AGMS, new BN(orderId).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 }
-export function bankPda(game) {
-  return PublicKey.findProgramAddressSync([P2C, Buffer.from([game])], PROGRAM)[0];
+export function bankPda(_gameIgnored) {
+  return PublicKey.findProgramAddressSync([P2C_GLOBAL], PROGRAM)[0]; // shared: all games use the same pool
 }
 
 // Durable registry so the lobby can list open orders across reloads. On Vercel
