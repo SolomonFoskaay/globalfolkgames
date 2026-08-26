@@ -3473,12 +3473,12 @@
                   103,
                   112,
                   50,
-                  99
+                  99,
+                  98,
+                  97,
+                  110,
+                  107
                 ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
               }
             ]
           }
@@ -3530,12 +3530,12 @@
                   103,
                   112,
                   50,
-                  99
+                  99,
+                  98,
+                  97,
+                  110,
+                  107
                 ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
               }
             ]
           }
@@ -6796,8 +6796,9 @@
     {
       "name": "P2cBank",
       "docs": [
-        "Arc2 M7C: the platform P2C bank - capital pool + per-day anti-farm guards.",
-        "Computers fill unmatched seats only (small stakes, $1-$10). One account per game."
+        "Arc2 M7C: the platform P2C bank - ONE shared capital pool for ALL games",
+        "(no per-game split, so liquidity is never fractured). Computers fill",
+        "unmatched seats only (small stakes, $1-$10); per-day anti-farm guards."
       ],
       "type": {
         "kind": "struct",
