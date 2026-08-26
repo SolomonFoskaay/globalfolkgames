@@ -126,3 +126,11 @@ body::after {
   height: 100vh;
   object-fit: contain;
 }
+/* Branded site title: Global (orange) Folk (purple) Games (orange), everywhere. */
+.gfg-brand { color:#fff; text-decoration:none; font-weight:800; }
+.gfg-brand:visited { color:#fff; }
+.brand-orange { color:#f39c12; }
+.brand-purple { color:#9b59b6; }
+
+/* Back-to-top arrow (injected sitewide, slim, idle-hidden). */
+#gfg-backtop { box-shadow:0 4px 12px rgba(0,0,0,0.35); }

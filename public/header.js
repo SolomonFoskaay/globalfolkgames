@@ -151,7 +151,7 @@
             <div id="gfg-drawer-scrim" class="gfg-drawer-scrim"></div>
             <aside id="gfg-drawer" class="gfg-drawer" aria-hidden="true">
                 <div class="gfg-drawer-head">
-                    <span class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> GlobalFolkGames <span class="gfg-beta">Beta</span></span>
+                    <span class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span> <span class="gfg-beta">Beta</span></span>
                     <button id="gfg-drawer-close" class="gfg-drawer-close" aria-label="Close menu">×</button>
                 </div>
                 <nav class="gfg-drawer-nav" id="gfg-drawer-nav">
@@ -247,7 +247,7 @@
         const headerHTML = `
             <header class="gfg-header">
                 <div class="gfg-header-left">
-                    <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> GlobalFolkGames <span class="gfg-beta">Beta</span></a>
+                    <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span> <span class="gfg-beta">Beta</span></a>
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
@@ -378,6 +378,25 @@
         document.head.appendChild(el);
     }
 
+    function ensureBackToTop() {
+        if (document.getElementById('gfg-backtop')) return;
+        const b = document.createElement('button');
+        b.id = 'gfg-backtop';
+        b.setAttribute('aria-label', 'Back to top');
+        b.innerHTML = '\u2191';
+        b.style.cssText = 'position:fixed; right:14px; bottom:14px; z-index:9500; width:42px; height:42px; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(243,156,18,0.9); color:#000; font-size:1.1rem; font-weight:900; cursor:pointer; opacity:0; transform:translateY(6px); transition:opacity .25s, transform .25s; pointer-events:none;';
+        b.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        document.body.appendChild(b);
+        let shown = false, hideTimer = null;
+        function show(){ if (shown) return; shown = true; b.style.opacity = '1'; b.style.transform = 'translateY(0)'; b.style.pointerEvents = 'auto'; }
+        function hide(){ shown = false; b.style.opacity = '0'; b.style.transform = 'translateY(6px)'; b.style.pointerEvents = 'none'; }
+        function onScroll(){
+            if (window.scrollY > 320) { show(); if (hideTimer) clearTimeout(hideTimer); hideTimer = setTimeout(hide, 3200); }
+            else hide();
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+    }
     function ensureFavicon() {
         if (document.querySelector('link[rel="icon"]')) return;
         const l = document.createElement('link');
@@ -457,6 +476,7 @@
         // style.css link so it wins over that link but not over inline styles.
         ensureStyle('/theme.css');
         ensureFavicon();
+        ensureBackToTop();
         ensureBrandBackground();
 
         // Monetag ads gate: paused while Adsense approval is pending (see

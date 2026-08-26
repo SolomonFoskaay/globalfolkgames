@@ -254,6 +254,26 @@
 </script>
 
     <!-- Ludo lab scripts (duplicate arena build) -->
+    <script>
+    // Booster countdown on the game page: shows 0d:7h:48m while unlimited lives
+    // are active, ticking every second from the on-chain boosterActiveUntil.
+    (function () {
+        var el = document.getElementById('lives-booster-timer');
+        setInterval(function () {
+            try {
+                var pp = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
+                var until = Number(pp && pp.boosterActiveUntil ? pp.boosterActiveUntil : 0);
+                var diff = until - Date.now();
+                if (diff > 0) {
+                    var d = Math.floor(diff / 86400000);
+                    var h = Math.floor((diff % 86400000) / 3600000);
+                    var m = Math.floor((diff % 3600000) / 60000);
+                    if (el) { el.textContent = '♾ ' + d + 'd:' + h + 'h:' + m + 'm left'; el.style.display = 'inline-block'; }
+                } else if (el) { el.style.display = 'none'; }
+            } catch (e) { if (el) el.style.display = 'none'; }
+        }, 1000);
+    })();
+    </script>
     <script src="/games/ludo-lab/board.js"></script>
     <script src="/games/ludo-lab/physics.js"></script>
     <script src="/games/ludo-lab/mechanics/state/persistence.js"></script>
