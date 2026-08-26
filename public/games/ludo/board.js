@@ -95,7 +95,7 @@ function drawBigYard(startCol, startRow, colorName) {
 
             // Position number under the crown
             ctx.font = `bold ${CELL_SIZE * 0.9}px system-ui`;
-            ctx.fillStyle = rank === 1 ? '#f39c12' : '#333';
+            ctx.fillStyle = rank === 1 ? '#f87818' : '#333';
             ctx.fillText(rank + (rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'), centerX, centerY + CELL_SIZE * 1.1);
         }
     }

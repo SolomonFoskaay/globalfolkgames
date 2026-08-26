@@ -37,8 +37,8 @@
             const text = label || short(sig);
             const fm = window.gfgExplorer.txUrl(sig);
             const off = FALLBACK_TX + sig + FALLBACK_CLUSTER;
-            return `<a href="${fm}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;text-decoration:underline;word-break:break-all;">${text} 🔗</a> ` +
-                   `<a href="${off}" target="_blank" rel="noopener noreferrer" style="color:#9b59b6;text-decoration:underline;font-size:0.8em;">(alt)</a>`;
+            return `<a href="${fm}" target="_blank" rel="noopener noreferrer" style="color:#f87818;text-decoration:underline;word-break:break-all;">${text} 🔗</a> ` +
+                   `<a href="${off}" target="_blank" rel="noopener noreferrer" style="color:#7838f8;text-decoration:underline;font-size:0.8em;">(alt)</a>`;
         },
 
         // Clickable account/wallet link (SolanaFM primary + alt).
@@ -48,7 +48,7 @@
             const fm = window.gfgExplorer.accountUrl(addr);
             const off = 'https://explorer.solana.com/address/' + addr + FALLBACK_CLUSTER;
             return `<a href="${fm}" target="_blank" rel="noopener noreferrer" style="color:#9bd4ff;text-decoration:underline;word-break:break-all;">${text} 🔗</a> ` +
-                   `<a href="${off}" target="_blank" rel="noopener noreferrer" style="color:#9b59b6;text-decoration:underline;font-size:0.8em;">(alt)</a>`;
+                   `<a href="${off}" target="_blank" rel="noopener noreferrer" style="color:#7838f8;text-decoration:underline;font-size:0.8em;">(alt)</a>`;
         },
     };
 })();

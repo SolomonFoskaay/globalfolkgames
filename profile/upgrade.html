@@ -16,7 +16,7 @@
 
         <div class="dash-grid">
 
-        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+        <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
             <h3>Your premium balance — direct on-chain check</h3>
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 2 minutes (max 30 times per hour). Tap Refresh to check.</p>
             <div id="upgrade-ledger"><p class="empty">Tap Refresh to load your live premium balance.</p></div>
@@ -24,9 +24,9 @@
             <p id="refresh-hint" style="color:var(--muted); font-size:0.75rem; margin-top:6px; text-align:center;"></p>
         </section>
 
-        <section class="game-card" style="border:1px solid var(--accent, #f39c12);">
+        <section class="game-card" style="border:1px solid var(--accent, #f87818);">
             <h3>Upgrade to a plan</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Pick a plan and activate it with your premium points. This checks on-chain that only premium points count (other points do not count). Not enough? Get premium points on the <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans page</a>.</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Pick a plan and activate it with your premium points. This checks on-chain that only premium points count (other points do not count). Not enough? Get premium points on the <a href="/profile/subscription.html" style="color:#f87818;">Premium plans page</a>.</p>
             <div id="upgrade-action-msg" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></div>
             <div id="upgrade-countdown" style="display:none; font-size:0.9rem; color:#2ecc71; font-weight:700; margin-bottom:8px;"></div>
             <div id="plan-pick" style="display:flex; gap:8px; margin-bottom:10px;">
@@ -132,17 +132,17 @@
                 activeUntil = until;
                 const days = until > Date.now() ? Math.ceil((until - Date.now())/86400000) : 0;
                 const active = lvl>0 && days>0;
-                const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl}</span>` : (lvl>0 ? '<span style="color:#e67e22;">Expired</span>' : '<span style="color:#888;">No active subscription</span>');
+                const status = active ? `<span style="color:#2ecc71;">Active Level ${lvl}</span>` : (lvl>0 ? '<span style="color:#e86818;">Expired</span>' : '<span style="color:#888;">No active subscription</span>');
                 ledgerEl.innerHTML = `
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
                         <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
                             <div style="font-size:0.75rem;color:#888;">Lifetime</div>
-                            <div style="font-size:1.2rem;color:#f39c12;font-weight:800;">${life}</div>
+                            <div style="font-size:1.2rem;color:#f87818;font-weight:800;">${life}</div>
                             <div style="font-size:0.7rem;color:#888;">never spent</div>
                         </div>
                         <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
                             <div style="font-size:0.75rem;color:#888;">Spendable</div>
-                            <div style="font-size:1.2rem;color:#9b59b6;font-weight:800;">${spend}</div>
+                            <div style="font-size:1.2rem;color:#7838f8;font-weight:800;">${spend}</div>
                             <div style="font-size:0.7rem;color:#888;">buys Level 2</div>
                         </div>
                     </div>
@@ -159,13 +159,13 @@
                 } else if (!balanceChecked) {
                     // Must do a fresh balance check first (unlocks after tapping Refresh).
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#f39c12;">Tap <b>Refresh</b> above (once every 2 minutes) to check your balance, then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f87818;">Tap <b>Refresh</b> above (once every 2 minutes) to check your balance, then Upgrade unlocks.</span>';
                 } else if ((ledger.premiumSpendable||0) >= 5000) {
                     upgradeBtn.disabled = false;
                     actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have 5,000P. Tap Upgrade to start your 30-day Level 2 boost.</span>';
                 } else {
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need 5,000 premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a> to get premium points.</span>';
+                    actionMsg.innerHTML = '<span style="color:#e86818;">You need 5,000 premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> to get premium points.</span>';
                 }
                 tickCountdown();
                 if (ledger.premiumLifetime != null) {
@@ -256,7 +256,7 @@
 
             upgradeBtn.addEventListener('click', async () => {
                 if (!balanceChecked) {
-                    actionMsg.innerHTML = '<span style="color:#f39c12;">First tap <b>Refresh</b> to check your live balance (once every 5 minutes), then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f87818;">First tap <b>Refresh</b> to check your live balance (once every 5 minutes), then Upgrade unlocks.</span>';
                     return;
                 }
                 if (!window.premiumPoints || typeof window.premiumPoints.activate !== 'function') {
@@ -272,7 +272,7 @@
                 }
                 const costPick = PLAN_COSTS[pick];
                 if (!pp || (pp.premiumSpendable||0) < costPick) {
-                    actionMsg.innerHTML = '<span style="color:#e67e22;">You need ' + costPick.toLocaleString() + ' premium points for Level ' + pick + '. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans</a> to get premium points.</span>';
+                    actionMsg.innerHTML = '<span style="color:#e86818;">You need ' + costPick.toLocaleString() + ' premium points for Level ' + pick + '. Your spendable is ' + (pp?pp.premiumSpendable||0:0) + '. Go to <a href="/profile/subscription.html" style="color:#f87818;">Premium plans</a> to get premium points.</span>';
                     return;
                 }
                 const doUpgrade = async function () {
@@ -361,7 +361,7 @@
                     const has = v.pp ? Number(v.pp.premiumSpendable || 0) : 0;
                     if (boosterStatus) boosterStatus.innerHTML = has >= BOOSTER_COST
                         ? 'You have ' + has.toLocaleString() + 'P premium spendable. One tap activates 72h of unlimited lives, no multiplier.'
-                        : '<span style="color:#e67e22;">You need 500P premium points ($1, base rate $0.002 per point). Your spendable is ' + has.toLocaleString() + 'P. Get premium points on <a href="/profile/subscription.html" style="color:#f39c12;">Premium subscription</a>.</span>';
+                        : '<span style="color:#e86818;">You need 500P premium points ($1, base rate $0.002 per point). Your spendable is ' + has.toLocaleString() + 'P. Get premium points on <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a>.</span>';
                     if (boosterBtn) { boosterBtn.textContent = 'Activate 72h booster (cost 500P)'; boosterBtn.style.background = ''; boosterBtn.disabled = has < BOOSTER_COST; }
                 }
             }

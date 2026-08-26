@@ -18,8 +18,8 @@
             padding:10px 20px; border-radius:8px; border:none; cursor:pointer;
             font-weight:600; font-size:0.9rem;
         }
-        .recovery-search .search-btn { background:#f39c12; color:#000; }
-        .recovery-search .search-btn:hover { background:#e67e22; }
+        .recovery-search .search-btn { background:#f87818; color:#000; }
+        .recovery-search .search-btn:hover { background:#e86818; }
         .recovery-search .refresh-btn { background:rgba(255,255,255,0.08); color:#ccc; border:1px solid rgba(255,255,255,0.12); }
         .recovery-search .refresh-btn:hover { background:rgba(255,255,255,0.12); }
         .recovery-note {
@@ -27,15 +27,15 @@
             border-radius:8px; padding:12px 16px; margin-bottom:16px;
             font-size:0.82rem; color:#ccc; line-height:1.6;
         }
-        .recovery-note b { color:#f39c12; }
+        .recovery-note b { color:#f87818; }
         .recovery-card {
             background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
             border-radius:10px; padding:16px; margin-bottom:12px;
         }
-        .recovery-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .recovery-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
         .recovery-card .label { color:var(--muted,#888); font-size:0.8rem; }
         .recovery-card .value { color:#fff; font-weight:600; }
-        .recovery-card .mono { font-family:monospace; font-size:0.8rem; color:#9b59b6; word-break:break-all; }
+        .recovery-card .mono { font-family:monospace; font-size:0.8rem; color:#7838f8; word-break:break-all; }
         .recovery-row {
             display:flex; justify-content:space-between; align-items:center;
             padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);
@@ -47,22 +47,22 @@
             font-size:0.75rem; font-weight:600;
         }
         .badge-ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
-        .badge-warn { background:rgba(243,156,18,0.15); color:#f39c12; }
+        .badge-warn { background:rgba(243,156,18,0.15); color:#f87818; }
         .badge-bad { background:rgba(231,76,60,0.15); color:#e74c3c; }
-        .badge-info { background:rgba(155,89,182,0.15); color:#9b59b6; }
+        .badge-info { background:rgba(155,89,182,0.15); color:#7838f8; }
         .gap-banner {
             padding:14px 18px; border-radius:10px; margin-bottom:12px;
             font-weight:600; font-size:0.95rem; display:flex; justify-content:space-between;
             align-items:center; flex-wrap:wrap; gap:8px;
         }
         .gap-ok { background:rgba(46,204,113,0.1); border:1px solid rgba(46,204,113,0.25); color:#2ecc71; }
-        .gap-found { background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.25); color:#f39c12; }
+        .gap-found { background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.25); color:#f87818; }
         .backfill-btn {
             padding:8px 16px; border-radius:6px; border:none; cursor:pointer;
             font-weight:600; font-size:0.85rem;
         }
-        .backfill-btn.primary { background:#f39c12; color:#000; }
-        .backfill-btn.primary:hover { background:#e67e22; }
+        .backfill-btn.primary { background:#f87818; color:#000; }
+        .backfill-btn.primary:hover { background:#e86818; }
         .backfill-btn:disabled { opacity:0.4; cursor:not-allowed; }
         .backfill-btn.success { background:#2ecc71; color:#000; }
         .backfill-msg { font-size:0.8rem; margin-top:6px; }
@@ -74,7 +74,7 @@
             border-radius:8px; padding:12px 16px; margin-top:16px;
             font-size:0.8rem; color:#bbb; line-height:1.6;
         }
-        .support-note b { color:#9b59b6; }
+        .support-note b { color:#7838f8; }
         .support-note ul { margin:6px 0 0 16px; padding:0; }
         .support-note li { margin-bottom:4px; }
         @media (max-width:600px) {
@@ -105,8 +105,8 @@
 
         <div class="recovery-note" style="background:rgba(155,89,182,0.06);border-color:rgba(155,89,182,0.2);">
             <b>The three global ledgers (M4):</b><br>
-            <b style="color:#f39c12;">Pure (unspendable)</b> - only verified local game wins, never diluted by bonuses or multipliers.<br>
-            <b style="color:#9b59b6;">Lifetime (unspendable)</b> - every point ever earned from any source (game wins, signup bonus, tier multiplier, referral, etc.).<br>
+            <b style="color:#f87818;">Pure (unspendable)</b> - only verified local game wins, never diluted by bonuses or multipliers.<br>
+            <b style="color:#7838f8;">Lifetime (unspendable)</b> - every point ever earned from any source (game wins, signup bonus, tier multiplier, referral, etc.).<br>
             <b style="color:#2ecc71;">Spendable</b> - the site-wide balance shown in the header; goes up with earnings and down with spends.<br>
             A verified win credits all three at once. This tool only syncs that verified win amount.
         </div>
@@ -628,8 +628,8 @@
                             <span class="label" style="margin-left:8px;">${fmtNum(g.awardCount)} win${g.awardCount !== 1 ? 's' : ''}</span>
                         </div>
                         <div style="text-align:right;">
-                            <span class="value" style="color:#f39c12;">${fmtNum(g.pure)}</span> <span class="label">pure</span>
-                            <span class="value" style="color:#9b59b6;margin-left:8px;">${fmtNum(g.spendable)}</span> <span class="label">spendable</span>
+                            <span class="value" style="color:#f87818;">${fmtNum(g.pure)}</span> <span class="label">pure</span>
+                            <span class="value" style="color:#7838f8;margin-left:8px;">${fmtNum(g.spendable)}</span> <span class="label">spendable</span>
                         </div>
                     </div>
                     <div class="recovery-row">
@@ -646,8 +646,8 @@
             if (!m4Data) {
                 html += '<div class="empty-state">No M4 global ledger found. Player has no global record yet.</div>';
             } else {
-                html += `<div class="recovery-row"><span class="label">Pure (unspendable)</span><span class="value" style="color:#f39c12;">${fmtNum(m4Data.pure)}</span></div>
-                <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#9b59b6;">${fmtNum(m4Data.lifetime)}</span></div>
+                html += `<div class="recovery-row"><span class="label">Pure (unspendable)</span><span class="value" style="color:#f87818;">${fmtNum(m4Data.pure)}</span></div>
+                <div class="recovery-row"><span class="label">Lifetime (unspendable)</span><span class="value" style="color:#7838f8;">${fmtNum(m4Data.lifetime)}</span></div>
                 <div class="recovery-row"><span class="label">Spendable</span><span class="value" style="color:#2ecc71;">${fmtNum(m4Data.spendable)}</span></div>
                 <div class="recovery-row"><span class="label">Award count</span><span class="value">${m4Data.awardCount}</span></div>
                 <div class="recovery-row"><span class="label">Last points</span><span class="value">+${fmtNum(m4Data.lastPoints)} from ${sourceLabel(m4Data.lastSource)} (${reasonLabel(m4Data.lastReason)})</span></div>

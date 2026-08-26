@@ -82,7 +82,7 @@
   }
 
   function pill(text, tone) {
-    var color = ({ ok: '#2ecc71', warn: '#f39c12', bad: '#e74c3c', idle: '#9b59b6' })[tone] || '#9b59b6';
+    var color = ({ ok: '#2ecc71', warn: '#f87818', bad: '#e74c3c', idle: '#7838f8' })[tone] || '#7838f8';
     return '<div class="v-pill" style="color:' + color + ';">' + esc(text) + '</div>';
   }
 

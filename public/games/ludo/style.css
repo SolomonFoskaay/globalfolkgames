@@ -54,7 +54,7 @@ body {
     text-align: center;
     background: var(--danger, #e74c3c);
     color: #fff;
-    border: 2px solid #f39c12;
+    border: 2px solid #f87818;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
 
@@ -62,7 +62,7 @@ body {
 #ludo-log {
     font-size: 0.85rem;
     font-weight: bold;
-    color: #f39c12;
+    color: #f87818;
     text-align: center;
     width: 94vw;
     max-width: 550px;
@@ -133,7 +133,7 @@ body {
     white-space: nowrap;
 }
 
-#pauseBtn { background: #e67e22; }
+#pauseBtn { background: #e86818; }
 #pauseBtn.paused-state { background: #2ecc71; }
 
 #resetBtn { 
@@ -225,7 +225,7 @@ canvas {
     align-items: center;
     gap: 6px;
     font-weight: 700;
-    color: #f39c12;
+    color: #f87818;
     font-size: 0.95rem;
 }
 
@@ -238,7 +238,7 @@ canvas {
 .ludo-origin-line {
     padding: 6px 14px;
     font-size: 0.78rem;
-    color: #9b59b6;
+    color: #7838f8;
     background: #14141c;
     border-bottom: 1px solid #2c2c3a;
     line-height: 1.4;
@@ -246,7 +246,7 @@ canvas {
 
 .ludo-local-points {
     background: #2a2a3a;
-    color: #9b59b6;
+    color: #7838f8;
     font-size: 0.8rem;
     font-weight: 600;
     padding: 4px 10px;

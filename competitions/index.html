@@ -9,14 +9,14 @@
     <style>
         .tabrow { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
         .tabrow button { background:#1a1a24; color:#bbb; border:1px solid #2a2a36; border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer; }
-        .tabrow button.active { background:linear-gradient(135deg,#f39c12,#e67e22); color:#000; }
+        .tabrow button.active { background:linear-gradient(135deg,#f87818,#e86818); color:#000; }
         .prize-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; margin-top:10px; }
         .prize { background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:10px; text-align:center; }
         .prize b { color:#2ecc71; font-size:1.02rem; display:block; }
         .prize span { font-size:0.7rem; color:#888; }
         table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
         th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
-        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
         td.mono { font-family:monospace; word-break:break-all; }
         .you { background:rgba(46,204,113,0.10); }
         .hidden-note { font-size:0.75rem; color:#888; margin-top:6px; }
@@ -151,13 +151,13 @@
                 rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
                     (tierMet ? ok : no) +
                     '<div style="flex:1;"><b>Plan:</b> needs ' + tierList.join(' or ') + '<br><span style="font-size:0.75rem; color:#888;">' +
-                    (tierMet ? ('You are on Level ' + lvl + '. Good to go.') : ('You are on ' + (lvl > 0 ? 'Level ' + lvl : 'the free Level 1') + '. <a href="/profile/subscription.html" style="color:#f39c12;">Upgrade to a Premium plan</a> to join (Level 3 is ad-free too).')) + '</span></div></div>');
+                    (tierMet ? ('You are on Level ' + lvl + '. Good to go.') : ('You are on ' + (lvl > 0 ? 'Level ' + lvl : 'the free Level 1') + '. <a href="/profile/subscription.html" style="color:#f87818;">Upgrade to a Premium plan</a> to join (Level 3 is ad-free too).')) + '</span></div></div>');
                 rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
                     (ptsMet ? ok : no) +
                     '<div style="flex:1;"><b>Points:</b> entry needs <b>' + c.entryCost + 'P</b> of ' + familyNames(fam) + '<br><span style="font-size:0.75rem; color:#888;">' +
                     (bal.known
                         ? ('Your current balance in that family: <b style="color:' + (ptsMet ? '#2ecc71' : '#e74c3c') + ';">' + bal.total.toLocaleString() + 'P</b>. ' +
-                           (ptsMet ? 'You qualify.' : 'Earn more by winning matches, or get premium points on the <a href="/profile/subscription.html" style="color:#f39c12;">Premium plans page</a>.'))
+                           (ptsMet ? 'You qualify.' : 'Earn more by winning matches, or get premium points on the <a href="/profile/subscription.html" style="color:#f87818;">Premium plans page</a>.'))
                         : 'Checking your on-chain balance...') + '</span></div></div>');
                 rows.push('<div style="display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
                     ok + '<div style="flex:1;"><b>Games:</b> only verified results from <b>' + games + '</b> inside the window count.</div></div>');
@@ -215,14 +215,14 @@
                     return '<div class="game-card comp-row" style="margin-bottom:10px;" onclick="window.__open(' + c.seq + ')">' +
                         '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
                         '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
-                        (tab === 'ongoing' ? '<span style="color:#2ecc71; font-weight:800;">LIVE · ends in ' + endsH + 'h</span>' : tab === 'upcoming' ? '<span style="color:#9b59b6; font-weight:700;">' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span>' : '<span style="color:#888;">' + STATUS[c.status] + '</span>') +
+                        (tab === 'ongoing' ? '<span style="color:#2ecc71; font-weight:800;">LIVE · ends in ' + endsH + 'h</span>' : tab === 'upcoming' ? '<span style="color:#7838f8; font-weight:700;">' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span>' : '<span style="color:#888;">' + STATUS[c.status] + '</span>') +
                         '</div>' +
-                        '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = ' + c.poolPoints + ' pts · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + ' · ' + c.winnerCount + ' winners</p>' +
+                        '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f87818;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = ' + c.poolPoints + ' pts · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + ' · ' + c.winnerCount + ' winners</p>' +
                         '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>#' + (i + 1) + '</span></div>'; }).join('') + '</div>' +
                         '</div>';
                 }).join('');
                 var pagesHtml = '<button onclick="window.__page(page-1)" ' + (page <= 1 ? 'disabled' : '') + '>Prev</button>' +
-                    Array.from({ length: totalPages }, function (_, i) { return i + 1; }).map(function (p) { return '<button onclick="window.__page(' + p + ')" ' + (p === page ? 'style="background:#f39c12;color:#000;"' : '') + '>' + p + '</button>'; }).join('') +
+                    Array.from({ length: totalPages }, function (_, i) { return i + 1; }).map(function (p) { return '<button onclick="window.__page(' + p + ')" ' + (p === page ? 'style="background:#f87818;color:#000;"' : '') + '>' + p + '</button>'; }).join('') +
                     '<button onclick="window.__page(page+1)" ' + (page >= totalPages ? 'disabled' : '') + '>Next</button>';
                 pagerEl.innerHTML = totalPages > 1 ? pagesHtml : '';
                 statusEl.textContent = items.length + ' ' + tab + ' competition(s).';
@@ -265,9 +265,9 @@
                     '<div class="game-card" style="border:1px solid rgba(46,204,113,0.45);">' +
                     '<h3>' + esc(c.name) + '</h3>' +
                     (c.desc ? '<p style="color:var(--muted); font-size:0.84rem; line-height:1.6;">' + esc(c.desc) + '</p>' : '') +
-                    '<p style="color:var(--muted); font-size:0.84rem; margin:4px 0 0;">Pool <b style="color:#f39c12;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + (c.status === 0 ? ' · ends in ' + h + 'h ' + m + 'm' : ' · ' + STATUS[c.status]) + '</p>' +
+                    '<p style="color:var(--muted); font-size:0.84rem; margin:4px 0 0;">Pool <b style="color:#f87818;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = <b style="color:#2ecc71;">' + c.poolPoints + ' pts</b> · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + (c.status === 0 ? ' · ends in ' + h + 'h ' + m + 'm' : ' · ' + STATUS[c.status]) + '</p>' +
                     '<div style="font-size:0.78rem; color:#888; margin-top:8px;">Redeemable (' + esc(redLbl) + '): pool ' + (redAmt).toFixed(0) + ' ' + esc(redLbl) + '</div>' +
-                    '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { var pct = (c.prizeShares[i] || 0); return '<div class="prize"><b style="color:#2ecc71;">' + v + '</b><span>#' + (i + 1) + '</span><span style="display:block; margin-top:2px; color:#f39c12;">' + redeemable(pct) + '</span></div>'; }).join('') + '</div>' +
+                    '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { var pct = (c.prizeShares[i] || 0); return '<div class="prize"><b style="color:#2ecc71;">' + v + '</b><span>#' + (i + 1) + '</span><span style="display:block; margin-top:2px; color:#f87818;">' + redeemable(pct) + '</span></div>'; }).join('') + '</div>' +
                     reqs +
                     entry +
                     '</div>' +
@@ -293,9 +293,9 @@
                 var holder = document.getElementById('enter-' + seq);
                 holder.innerHTML = '<p class="hidden-note">Entering...</p>';
                 var res = await window.gfgCompetitions.enter(c);
-                if (res.error === 'signin') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
-                else if (res.error === 'tier') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + tierNeeds(c) + ' (Level 3 is ad-free too).</p>';
-                else if (res.error === 'insufficient') holder.innerHTML = '<p style="color:#e67e22; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
+                if (res.error === 'signin') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
+                else if (res.error === 'tier') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + tierNeeds(c) + ' (Level 3 is ad-free too).</p>';
+                else if (res.error === 'insufficient') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
                 else holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>';
                 window.__enterLock = window.__enterLock || {};
                 window.__enterLock[seq] = true;
@@ -333,7 +333,7 @@
                     var slice = list.slice((pg - 1) * size, pg * size);
                     var head = '<thead><tr><th>Pos</th><th>Player</th><th>Lvl</th><th>Total</th><th>Final</th><th>Prize</th>' + (c.status === 2 ? '<th>Status</th>' : '') + '</tr></thead>';
                     var body = slice.map(function (b) {
-                        var rate = c.status === 2 ? '<td style="color:' + ((paidMap[b.position] === 1) ? '#2ecc71' : '#f39c12') + ';font-weight:700;">' + ((paidMap[b.position] === 1) ? 'PAID' : 'pending') + '</td>' : '';
+                        var rate = c.status === 2 ? '<td style="color:' + ((paidMap[b.position] === 1) ? '#2ecc71' : '#f87818') + ';font-weight:700;">' + ((paidMap[b.position] === 1) ? 'PAID' : 'pending') + '</td>' : '';
                         var label = b.handle || short(b.wallet);
                         return '<tr' + (me && b.wallet === me ? ' class="you"' : '') + '><td><b>' + b.position + '</b></td><td class="mono">' + esc(label) + '</td><td>L' + (b.level || 1) + '</td><td>' + b.totalPoints + '</td><td><b style="color:#2ecc71;">' + b.finalPoints + '</b></td><td>' + (b.prizePosition ? '#' + b.prizePosition : '—') + '</td>' + rate + '</tr>';
                     }).join('');
@@ -365,7 +365,7 @@
                     var comp = j.competition || {}; var wins = comp.winners || [];
                     host.innerHTML = wins.length
                         ? '<div class="game-card" style="margin-top:12px;"><h3>Winners (on-chain)</h3><table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>Share</th><th>Status</th></tr></thead><tbody>' +
-                          wins.map(function (x) { return '<tr><td>#' + x.rank + '</td><td class="mono">' + esc(short(x.player)) + '</td><td>' + x.points + '</td><td>$' + (x.usdCents / 100).toFixed(2) + '</td><td style="color:' + (x.status === 1 ? '#2ecc71' : '#f39c12') + '; font-weight:700;">' + (x.status === 1 ? 'PAID' : 'pending') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+                          wins.map(function (x) { return '<tr><td>#' + x.rank + '</td><td class="mono">' + esc(short(x.player)) + '</td><td>' + x.points + '</td><td>$' + (x.usdCents / 100).toFixed(2) + '</td><td style="color:' + (x.status === 1 ? '#2ecc71' : '#f87818') + '; font-weight:700;">' + (x.status === 1 ? 'PAID' : 'pending') + '</td></tr>'; }).join('') + '</tbody></table></div>'
                         : '';
                 } catch (e) { host.innerHTML = ''; }
             }

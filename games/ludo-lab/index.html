@@ -90,7 +90,7 @@
                 <!-- Rearranged Mobile Action Dashboard Row Grid -->
                 <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
                     <!-- 1. Dice Button First -->
-                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f39c12; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f87818; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
 
                     <!-- 2. Start Match / Match Active Button Second -->
                     <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Start Arena Match</button>
@@ -103,21 +103,21 @@
             <div id="persistent-scores" style="display: flex; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #aaa; background: #151515; padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid #222; box-sizing: border-box;">
                 <div>Dice One: <span id="val-d1" style="color: #fff;">-</span></div>
                 <div>Dice Two: <span id="val-d2" style="color: #fff;">-</span></div>
-                <div style="color: #f39c12; font-weight: bold;"><span id="val-total">Total: -</span></div>
+                <div style="color: #f87818; font-weight: bold;"><span id="val-total">Total: -</span></div>
             </div>
 
             <!-- M3 local points (module-driven slots, filled by /universal/points/local-points.js) -->
             <div id="local-points-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(155,89,182,0.08); border: 1px solid rgba(155,89,182,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; box-sizing: border-box;">
-                <div title="Lifetime wins in Ludo (never spent)">Pure: <span data-local-points-pure style="color:#f39c12;">0</span></div>
-                <div title="Spendable split for Ludo in-game items">Spendable: <span data-local-points-spendable style="color:#9b59b6;">0</span></div>
+                <div title="Lifetime wins in Ludo (never spent)">Pure: <span data-local-points-pure style="color:#f87818;">0</span></div>
+                <div title="Spendable split for Ludo in-game items">Spendable: <span data-local-points-spendable style="color:#7838f8;">0</span></div>
                 <div title="Last award banked on-chain">Last: <span data-local-points-last style="color:#2ecc71;">—</span></div>
             </div>
 
             <!-- M10 lives + daily reward (module-driven slots, filled by /universal/lives/lives.js + daily-reward.js) -->
             <div id="lives-reward-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; align-items: center; box-sizing: border-box;">
                 <div title="Free-play lives today (refill at midnight GMT)">Lives: <span data-lives-left style="color:#2ecc71;">–</span>/<span data-lives-total style="color:#2ecc71;">–</span></div>
-                <div title="Daily reward for today (claim once)">Daily: <span data-daily-amount style="color:#f39c12;">–</span>P <span data-daily-claimed style="color:#9b59b6;">–</span></div>
-                <button id="claimDailyBtn" style="background: #f39c12; color: #000; border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Claim daily</button>
+                <div title="Daily reward for today (claim once)">Daily: <span data-daily-amount style="color:#f87818;">–</span>P <span data-daily-claimed style="color:#7838f8;">–</span></div>
+                <button id="claimDailyBtn" style="background: #f87818; color: #000; border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Claim daily</button>
             </div>
             <div id="daily-claim-msg" style="display:none; margin-top:6px; font-size:0.78rem; text-align:center; padding:4px 8px; border-radius:8px; width:100%; box-sizing:border-box;"></div>
 
@@ -149,7 +149,7 @@
             <div id="result-ceremony-list" class="ceremony-list"></div>
             <div id="result-ceremony-proof" class="ceremony-proof"></div>
             <div id="result-ceremony-points" class="ceremony-points" style="display:none; margin-top:8px; text-align:center; font-size:0.9rem; font-weight:bold; color:#2ecc71;"></div>
-            <div id="result-ceremony-global" class="ceremony-points" style="display:none; margin-top:6px; text-align:center; font-size:0.85rem; font-weight:600; color:#f39c12;"></div>
+            <div id="result-ceremony-global" class="ceremony-points" style="display:none; margin-top:6px; text-align:center; font-size:0.85rem; font-weight:600; color:#f87818;"></div>
             <div class="confirm-action-row">
                 <button id="play-again-btn" class="confirm-modal-btn" style="background:#2ecc71;" onclick="playAgainAfterCeremony()">Play Again</button>
                 <button id="ceremony-end-btn" class="confirm-modal-btn" onclick="endMatchAbandon()">End Match</button>
@@ -164,12 +164,12 @@
     <div id="lives-blocked-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,15,19,0.92); z-index:12000; align-items:center; justify-content:center; text-align:center; padding:20px;">
         <div style="background:#1a1a24; border:1px solid rgba(243,156,18,0.5); border-radius:16px; padding:24px 18px; max-width:340px; width:100%; box-sizing:border-box;">
             <div style="font-size:2.2rem;">⏰</div>
-            <h2 style="color:#f39c12; margin:8px 0 6px;">No lives left today</h2>
-            <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">double lives</b>, <b style="color:#2ecc71;">double win points</b>, and a <b style="color:#f39c12;">bigger daily reward</b>.</p>
-            <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f39c12; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
+            <h2 style="color:#f87818; margin:8px 0 6px;">No lives left today</h2>
+            <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">double lives</b>, <b style="color:#2ecc71;">double win points</b>, and a <b style="color:#f87818;">bigger daily reward</b>.</p>
+            <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f87818; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
             <div style="margin-top:8px; font-size:0.8rem; color:#bbb; line-height:1.5;">Or get <b style="color:#2ecc71;">UNLIMITED lives for 72 hours</b> for $1 (500 premium points), no subscription needed.</div>
             <button id="lives-go-booster" onclick="window.location.href='/profile/booster.html'" style="width:100%; background:#2ecc71; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; margin-top:8px;">Get 72h unlimited lives ($1 / 500P)</button>
-            <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) in <span id="lives-reset-countdown" style="color:#f39c12; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
+            <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) in <span id="lives-reset-countdown" style="color:#f87818; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
         </div>
     </div>
 

@@ -10,32 +10,32 @@
         body { background:#0f0f13; }
         .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
         .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
-        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
         .hint { font-size:0.78rem; color:#888; line-height:1.5; }
         label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
         input, select { width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.9rem; box-sizing:border-box; }
         input::placeholder { color:#888; }
         input[readonly] { background:rgba(155,89,182,0.08); color:#bbb; }
         button { border-radius:8px; border:none; cursor:pointer; font-weight:700; }
-        .btn-primary { background:#f39c12; color:#000; padding:12px 18px; margin-top:12px; }
+        .btn-primary { background:#f87818; color:#000; padding:12px 18px; margin-top:12px; }
         .btn-success { background:#2ecc71; color:#000; padding:7px 12px; font-size:0.78rem; }
         .btn-danger { background:#e74c3c; color:#fff; padding:7px 12px; font-size:0.78rem; }
         .btn-secondary { background:#1a1a24; color:#bbb; border:1px solid #333; padding:8px 12px; font-size:0.8rem; }
         .btn-primary:disabled, .btn-success:disabled, .btn-danger:disabled { opacity:0.4; cursor:not-allowed; }
         .seg-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0; }
         .seg { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:12px; text-align:center; }
-        .seg .n { font-size:1.4rem; font-weight:800; color:#f39c12; }
-        .seg.new .n { color:#2ecc71; } .seg.mid .n { color:#3498db; } .seg.ending .n { color:#e67e22; }
+        .seg .n { font-size:1.4rem; font-weight:800; color:#f87818; }
+        .seg.new .n { color:#2ecc71; } .seg.mid .n { color:#3498db; } .seg.ending .n { color:#e86818; }
         .seg.beyond .n { color:#e74c3c; } .seg.ended .n { color:#888; }
         .seg .l { font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; }
         table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
         th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
-        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
-        td.mono { font-family:monospace; color:#9b59b6; word-break:break-all; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; color:#7838f8; word-break:break-all; }
         .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.68rem; font-weight:700; }
         .badge-new { background:rgba(46,204,113,0.15); color:#2ecc71; }
         .badge-mid { background:rgba(52,152,219,0.15); color:#3498db; }
-        .badge-ending { background:rgba(230,126,34,0.15); color:#e67e22; }
+        .badge-ending { background:rgba(230,126,34,0.15); color:#e86818; }
         .badge-beyond { background:rgba(231,76,60,0.18); color:#e74c3c; }
         .badge-ended { background:rgba(255,255,255,0.08); color:#999; }
         .note { background:rgba(155,89,182,0.06); border:1px solid rgba(155,89,182,0.18); border-radius:8px; padding:10px 12px; font-size:0.8rem; color:#bbb; line-height:1.5; margin:12px 0; }
@@ -48,7 +48,7 @@
 <body>
     <div class="wrap">
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Subscribers</h1>
-        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 12px;">Admin: credit premium points after a verified payment (on-chain, gasless), then track every subscriber below — auto-loaded from the same Dynamic account list, no manual typing. Upgrade requires 5,000 premium spendable; downgrade revokes an active or beyond-30-day sub. Point value is <b style="color:#f39c12;">$0.002 per point (USD, never Naira)</b>, so $1 = 500 points, $2 = 1,000 points, $10 = 5,000 points. Credit the USD-equivalent amount of the payment received.</p>
+        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 12px;">Admin: credit premium points after a verified payment (on-chain, gasless), then track every subscriber below — auto-loaded from the same Dynamic account list, no manual typing. Upgrade requires 5,000 premium spendable; downgrade revokes an active or beyond-30-day sub. Point value is <b style="color:#f87818;">$0.002 per point (USD, never Naira)</b>, so $1 = 500 points, $2 = 1,000 points, $10 = 5,000 points. Credit the USD-equivalent amount of the payment received.</p>
 
         <!-- Credit card -->
         <div class="card">
@@ -59,7 +59,7 @@
                 <input type="text" id="user-search" placeholder="Search all registered accounts..." autocomplete="off">
                 <label>Account</label>
                 <select id="user-select" size="4" style="height:110px;"><option value="">Loading registered accounts...</option></select>
-                <div class="hint"><span id="user-count" style="color:#f39c12;"></span></div>
+                <div class="hint"><span id="user-count" style="color:#f87818;"></span></div>
             </div>
             <div>
                 <label>Wallet address (auto-filled)</label>
@@ -109,7 +109,7 @@
         <div id="action-cards" style="display:none;">
             <div class="card" style="border-color:rgba(155,89,182,0.35);">
                 <h3>Selected subscriber</h3>
-                <div class="hint">Wallet: <span id="sel-wallet" class="mono" style="color:#f39c12;">-</span> · <span id="sel-email" style="color:#bbb;"></span></div>
+                <div class="hint">Wallet: <span id="sel-wallet" class="mono" style="color:#f87818;">-</span> · <span id="sel-email" style="color:#bbb;"></span></div>
                 <div id="sel-ledger" style="margin-top:8px;"></div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
                     <button id="btn-upgrade" class="btn-success" disabled>Upgrade to Level 2 (5,000P)</button>
@@ -301,8 +301,8 @@
                 $selWallet.textContent=wallet; $selEmail.textContent=row.email?' ('+row.email+')':'';
                 const until=row.subscriptionActiveUntil||0, days=until>Date.now()?Math.ceil((until-Date.now())/86400000):0, active=(row.subscriptionLevel||0)>0&&days>0;
                 $selLedger.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                    <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Lifetime</div><div style="font-size:1.05rem;color:#f39c12;font-weight:700;">${fmt(row.premiumLifetime)}</div></div>
-                    <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Spendable</div><div style="font-size:1.05rem;color:#9b59b6;font-weight:700;">${fmt(row.premiumSpendable)}</div></div></div>
+                    <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Lifetime</div><div style="font-size:1.05rem;color:#f87818;font-weight:700;">${fmt(row.premiumLifetime)}</div></div>
+                    <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Spendable</div><div style="font-size:1.05rem;color:#7838f8;font-weight:700;">${fmt(row.premiumSpendable)}</div></div></div>
                     <p class="hint" style="margin-top:6px;">Level ${row.subscriptionLevel||0} · ${active?`Active ${days}d left`:'(not active)'} · last credit ${row.lastCreditPoints?`+${fmt(row.lastCreditPoints)}P ref ${esc(row.lastCreditRef)}`: '—'} · traceable by ref.</p>`;
                 $btnUpgrade.disabled=!((row.premiumSpendable||0)>=5000 && !active);
                 $btnCancel.disabled=!active;

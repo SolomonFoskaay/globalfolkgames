@@ -19,24 +19,24 @@
         .prem-form select { background:#1a1a24; }
         .prem-form button {
             padding:12px 20px; border-radius:8px; border:none; cursor:pointer;
-            font-weight:600; font-size:0.9rem; background:#f39c12; color:#000;
+            font-weight:600; font-size:0.9rem; background:#f87818; color:#000;
         }
-        .prem-form button:hover { background:#e67e22; }
+        .prem-form button:hover { background:#e86818; }
         .prem-form button:disabled { opacity:0.4; cursor:not-allowed; }
         .prem-note {
             background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2);
             border-radius:8px; padding:12px 16px; margin-bottom:16px;
             font-size:0.82rem; color:#ccc; line-height:1.6;
         }
-        .prem-note b { color:#f39c12; }
+        .prem-note b { color:#f87818; }
         .prem-card {
             background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
             border-radius:10px; padding:16px; margin-bottom:12px;
         }
-        .prem-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .prem-card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
         .prem-card .label { color:var(--muted,#888); font-size:0.8rem; }
         .prem-card .value { color:#fff; font-weight:600; }
-        .prem-card .mono { font-family:monospace; font-size:0.8rem; color:#9b59b6; word-break:break-all; }
+        .prem-card .mono { font-family:monospace; font-size:0.8rem; color:#7838f8; word-break:break-all; }
         .prem-row {
             display:flex; justify-content:space-between; align-items:center;
             padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);
@@ -48,7 +48,7 @@
             font-size:0.75rem; font-weight:600;
         }
         .badge-ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
-        .badge-info { background:rgba(155,89,182,0.15); color:#9b59b6; }
+        .badge-info { background:rgba(155,89,182,0.15); color:#7838f8; }
         .empty-state { color:#888; font-size:0.85rem; text-align:center; padding:24px; }
         .ledger-grid {
             display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px;
@@ -59,8 +59,8 @@
         }
         .ledger-cell .l { color:#888; font-size:0.75rem; }
         .ledger-cell .v { color:#fff; font-size:1.05rem; font-weight:700; }
-        .ledger-cell .v.orange { color:#f39c12; }
-        .ledger-cell .v.purple { color:#9b59b6; }
+        .ledger-cell .v.orange { color:#f87818; }
+        .ledger-cell .v.purple { color:#7838f8; }
         .prev-credits {
             margin-top:8px; font-size:0.8rem; color:#bbb;
         }
@@ -77,7 +77,7 @@
     <main style="max-width:780px;margin:0 auto;padding:80px 16px 40px;">
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Points Credit (M5)</h1>
         <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 16px;">
-            Credit the on-chain PREMIUM points ledger (<b style="color:#f39c12;">[gfgprem, player]</b>, buy-only)
+            Credit the on-chain PREMIUM points ledger (<b style="color:#f87818;">[gfgprem, player]</b>, buy-only)
             after a VERIFIED manual payment. Runs gasless on the MagicBlock ER (sponsor signs, user never pays).
         </p>
 
@@ -91,7 +91,7 @@
                 <select id="user-select" size="4" style="margin-top:6px; height:110px;">
                     <option value="">Loading users from Dynamic...</option>
                 </select>
-                <div class="hint">Pick to auto-fill the wallet below and avoid typos. List is from Dynamic (source of truth). <span id="user-count" style="color:#f39c12;"></span></div>
+                <div class="hint">Pick to auto-fill the wallet below and avoid typos. List is from Dynamic (source of truth). <span id="user-count" style="color:#f87818;"></span></div>
             </div>
 
             <div>
@@ -286,7 +286,7 @@
                         return;
                     }
                     $history.innerHTML = rows.slice(0, 10).map(r =>
-                        `<li><b style="color:#f39c12;">${fmtNum(r.points)}</b> premium → ${esc(r.player.slice(0, 8))}…${esc(r.player.slice(-8))} · ref ${esc(r.creditRef)} · ${esc(r.sig ? r.sig.slice(0, 16) + '…' : 'no sig')} · ${esc(new Date(r.ts || Date.now()).toLocaleString())}</li>`
+                        `<li><b style="color:#f87818;">${fmtNum(r.points)}</b> premium → ${esc(r.player.slice(0, 8))}…${esc(r.player.slice(-8))} · ref ${esc(r.creditRef)} · ${esc(r.sig ? r.sig.slice(0, 16) + '…' : 'no sig')} · ${esc(new Date(r.ts || Date.now()).toLocaleString())}</li>`
                     ).join('');
                 } catch(e) {}
             }
@@ -364,7 +364,7 @@
                             <div class="prem-row"><span class="label">Gasless</span><span class="value">${data.gasless ? 'yes (ER)' : 'no (base first-time)'}</span></div>
                             <div class="prem-row"><span class="label">Signature</span><span class="mono">${esc(data.sig)}</span></div>
                             <div style="margin-top:8px;">
-                                <a href="https://explorer.solana.com/tx/${esc(data.sig)}?cluster=devnet" target="_blank" rel="noreferrer" style="color:#f39c12;font-size:0.85rem;">View on Solana explorer</a>
+                                <a href="https://explorer.solana.com/tx/${esc(data.sig)}?cluster=devnet" target="_blank" rel="noreferrer" style="color:#f87818;font-size:0.85rem;">View on Solana explorer</a>
                             </div>
                         </div>
                         <div class="prem-card">

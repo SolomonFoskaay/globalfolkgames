@@ -405,16 +405,6 @@
         l.href = '/media/logo.png';
         document.head.appendChild(l);
     }
-    // Brand background: the site logo design, kept at aspect ratio (object-fit
-    // contain - never stretched), behind all content (z-index -2, below the theme orbs).
-    function ensureBrandBackground() {
-        if (document.getElementById('gfg-brand-bg')) return;
-        const d = document.createElement('div');
-        d.id = 'gfg-brand-bg';
-        d.className = 'gfg-brand-bg';
-        d.innerHTML = '<img src="/media/background.jpg" alt="" aria-hidden="true">';
-        document.body.appendChild(d);
-    }
     // Google AdSense loader, injected into <head> exactly once per page. The
     // script is ALSO injected statically at build time (vite.config.js
     // transformIndexHtml) so Adsense's checker sees it in the served HTML; this
@@ -446,7 +436,7 @@
             el.textContent = 'L' + tier.level + ' · ' + (tier.level === 2 ? '2x' : tier.level + 'x');
             el.style.background = 'rgba(243,156,18,0.18)';
             el.style.border = '1px solid rgba(243,156,18,0.6)';
-            el.style.color = '#f39c12';
+            el.style.color = '#f87818';
             el.style.display = 'inline-block';
         } else {
             el.textContent = 'L1';
@@ -477,7 +467,6 @@
         ensureStyle('/theme.css');
         ensureFavicon();
         ensureBackToTop();
-        ensureBrandBackground();
 
         // Monetag ads gate: paused while Adsense approval is pending (see
         // ad-gate.js ADS_ENABLED flag - flip it back to restore). Once active,

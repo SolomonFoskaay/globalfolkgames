@@ -37,7 +37,7 @@
                 const when = t.created_at ? '<span style="color:#666;font-size:0.75rem;"> ' + esc(t.created_at.slice(0, 16).replace('T', ' ')) + '</span>' : '';
                 const link = window.gfgExplorer ? window.gfgExplorer.txLink(t.match_id) : esc(t.match_id);
                 return `<div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <div style="font-weight:600;">${game} · ${reason}${t.points ? ' <span style="color:#f39c12;">(+' + esc(t.points) + ' pts)</span>' : ''}</div>
+                    <div style="font-weight:600;">${game} · ${reason}${t.points ? ' <span style="color:#f87818;">(+' + esc(t.points) + ' pts)</span>' : ''}</div>
                     <div style="margin-top:4px;">${link}${when}</div>
                     <div style="color:#555;font-size:0.72rem; word-break:break-all; margin-top:2px;">${esc(t.match_id)}</div>
                 </div>`;
@@ -74,11 +74,11 @@
         el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Lifetime points (pure)</span>
-                    <b style="color:#f39c12; font-size:1.15rem;">${ledger.pureLifetime}</b>
+                    <b style="color:#f87818; font-size:1.15rem;">${ledger.pureLifetime}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Spendable points</span>
-                    <b style="color:#9b59b6;">${ledger.spendableBalance}</b>
+                    <b style="color:#7838f8;">${ledger.spendableBalance}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Rewards recorded</span>
@@ -173,11 +173,11 @@
         el.innerHTML = `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Pure (unspendable, never multiplied)</span>
-                    <b style="color:#f39c12;font-size:1.15rem;">${fmt(ledger.pureLifetime)}</b>
+                    <b style="color:#f87818;font-size:1.15rem;">${fmt(ledger.pureLifetime)}</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Lifetime (unspendable, all sources)</span>
-                    <b style="color:#9b59b6;">${fmt(ledger.lifetime)}</b>
+                    <b style="color:#7838f8;">${fmt(ledger.lifetime)}</b>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Spendable</span>
@@ -262,11 +262,11 @@
         el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Lifetime premium (never spent)</span>
-                    <b style="color:#f39c12; font-size:1.15rem;">${(ledger.premiumLifetime||0).toLocaleString()}</b>
+                    <b style="color:#f87818; font-size:1.15rem;">${(ledger.premiumLifetime||0).toLocaleString()}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Spendable premium</span>
-                    <b style="color:#9b59b6;">${(ledger.premiumSpendable||0).toLocaleString()}</b>
+                    <b style="color:#7838f8;">${(ledger.premiumSpendable||0).toLocaleString()}</b>
                 </div>
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <span style="color:var(--muted);">Subscription</span>
@@ -319,7 +319,7 @@
         try {
             const fetched = await magic.fetchPremiumPointsPdaFor(typeof wallet === 'string' ? wallet : wallet.address || wallet);
             if (!fetched) {
-                el.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f39c12;">Go Premium</a></p>';
+                el.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f87818;">Go Premium</a></p>';
                 return null;
             }
             renderPremiumLedgerCard(el, fetched);

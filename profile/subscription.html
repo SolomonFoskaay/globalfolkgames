@@ -6,7 +6,7 @@
     <title>Premium Plans | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <style>
-        .beta-badge { display:inline-block; background: linear-gradient(135deg,#f39c12,#e67e22); color:#000; font-weight:800; font-size:0.72rem; letter-spacing:0.06em; padding:4px 10px; border-radius:999px; margin-bottom:10px; }
+        .beta-badge { display:inline-block; background: linear-gradient(135deg,#f87818,#e86818); color:#000; font-weight:800; font-size:0.72rem; letter-spacing:0.06em; padding:4px 10px; border-radius:999px; margin-bottom:10px; }
         .plan-card { border-radius:14px; padding:16px; border:1px solid #2a2a36; background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); }
         .plan-card.hot { border-color:rgba(155,89,182,0.55); background:linear-gradient(180deg, rgba(155,89,182,0.12), rgba(255,255,255,0.01)); }
         .plan-card.pop { border-color:rgba(243,156,18,0.55); background:linear-gradient(180deg, rgba(243,156,18,0.10), rgba(255,255,255,0.01)); }
@@ -19,7 +19,7 @@
         .cta { display:block; width:100%; margin-top:14px; text-align:center; text-decoration:none; }
         .compare { width:100%; border-collapse:collapse; margin:10px 0 6px; font-size:0.82rem; }
         .compare th, .compare td { border:1px solid #2a2a36; padding:8px 10px; text-align:left; }
-        .compare th { background:#1a1a24; color:#f39c12; font-size:0.74rem; text-transform:uppercase; }
+        .compare th { background:#1a1a24; color:#f87818; font-size:0.74rem; text-transform:uppercase; }
         .compare td:first-child { color:#bbb; }
         .fine { font-size:0.76rem; color:#888; line-height:1.6; margin-top:10px; }
         .fine b { color:#bbb; }
@@ -55,20 +55,20 @@
         <section class="game-card" style="margin-top:16px;">
             <h3>How to get a plan</h3>
             <ol style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
-                <li>Tap <b style="color:#f39c12;">Pay</b> under your plan and complete the secure payment.</li>
+                <li>Tap <b style="color:#f87818;">Pay</b> under your plan and complete the secure payment.</li>
                 <li>You are redirected to the confirmation page - pick the same plan you paid for and send the receipt to support.</li>
                 <li>Support verifies within 24 hours and credits your premium points on-chain.</li>
-                <li>Go to your <a href="/profile/upgrade.html" style="color:#f39c12;">Upgrade page</a>, refresh, and tap <b>Activate</b> to start your 30 days.</li>
+                <li>Go to your <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>, refresh, and tap <b>Activate</b> to start your 30 days.</li>
             </ol>
             <p class="fine">No auto-renew and non-refundable. Nothing charges again unless you choose it.</p>
         </section>
 
         <section class="game-card" style="margin-top:16px;">
             <h3>Common questions</h3>
-            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Why do Level 2 and Level 3 differ in price?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">Level 3 is the bigger boost: triple win points, the highest daily reward and lives, ad-free, and a 1.5x competition final-score multiplier. Level 2 is the lighter 2x step up.</p></details>
-            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Is this the price forever?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">The launch beta discount is limited time. The regular price shows struck through on each plan. When the beta ends, the discount is removed.</p></details>
-            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f39c12; font-weight:700;">Can I switch plans?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">You run one plan at a time for its 30 days, then choose what to activate next - no auto-renew, so you are never charged on autopilot.</p></details>
-            <p style="margin-top:14px;"><a href="/privacy.html" style="color:#f39c12; font-size:0.84rem;">Privacy Policy</a> · <a href="/support/" style="color:#f39c12; font-size:0.84rem;">Support</a></p>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Why do Level 2 and Level 3 differ in price?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">Level 3 is the bigger boost: triple win points, the highest daily reward and lives, ad-free, and a 1.5x competition final-score multiplier. Level 2 is the lighter 2x step up.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Is this the price forever?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">The launch beta discount is limited time. The regular price shows struck through on each plan. When the beta ends, the discount is removed.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Can I switch plans?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">You run one plan at a time for its 30 days, then choose what to activate next - no auto-renew, so you are never charged on autopilot.</p></details>
+            <p style="margin-top:14px;"><a href="/privacy.html" style="color:#f87818; font-size:0.84rem;">Privacy Policy</a> · <a href="/support/" style="color:#f87818; font-size:0.84rem;">Support</a></p>
         </section>
     </main>
 
@@ -110,7 +110,7 @@
                     var hot = lvl === 3;
                     box.innerHTML +=
                         '<div class="plan-card ' + (hot ? 'hot' : 'pop') + '" style="flex:1; min-width:270px;">' +
-                        (hot ? '<span style="color:#9b59b6; font-weight:800; font-size:0.72rem; letter-spacing:0.05em;">BEST VALUE</span>' : '') +
+                        (hot ? '<span style="color:#7838f8; font-weight:800; font-size:0.72rem; letter-spacing:0.05em;">BEST VALUE</span>' : '') +
                         '<h3 style="margin:4px 0 2px;">Level ' + lvl + ' (' + (lvl === 2 ? '2x' : '3x') + ')</h3>' +
                         '<div style="font-size:0.78rem; color:#bbb;">' + p.name + '</div>' +
                         '<div class="price-now">$' + usd + ' <small>/ 30 days</small></div>' +
@@ -155,7 +155,7 @@
                 var active = lvl > 0 && until > Date.now();
                 host.innerHTML = '<section class="game-card" style="margin-top:16px;">' +
                     (active
-                        ? '<h3>Your active plan: Level ' + lvl + '</h3><p style="color:var(--muted); font-size:0.84rem;">Active until ' + new Date(until).toLocaleString() + '. Manage or re-check it on your <a href="/profile/upgrade.html" style="color:#f39c12;">Upgrade page</a>.</p>'
+                        ? '<h3>Your active plan: Level ' + lvl + '</h3><p style="color:var(--muted); font-size:0.84rem;">Active until ' + new Date(until).toLocaleString() + '. Manage or re-check it on your <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>.</p>'
                         : '<h3>No active plan</h3><p style="color:var(--muted); font-size:0.84rem;">Pick a plan above to get started. Level 1 (free) is always there to play at the base rate.</p>') +
                     '</section>';
                 statusEl.innerHTML = active ? '<span style="color:#2ecc71;">Active Level ' + lvl + ' detected.</span>' : 'Pick a plan to unlock bigger rewards.';

@@ -28,7 +28,7 @@
             <p id="ref-msg" style="color:var(--muted); font-size:0.78rem; margin-top:8px;"></p>
         </section>
 
-        <section class="game-card" style="border:1px solid var(--accent-purple, #9b59b6);">
+        <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
             <h3>Your earnings (on-chain)</h3>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
                 <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px; text-align:center;">
@@ -37,7 +37,7 @@
                 </div>
                 <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px; text-align:center;">
                     <div style="font-size:0.72rem; color:#888;">Pending payout</div>
-                    <div style="font-size:1.1rem; color:#f39c12; font-weight:800;" id="aff-pending">$0.00</div>
+                    <div style="font-size:1.1rem; color:#f87818; font-weight:800;" id="aff-pending">$0.00</div>
                 </div>
                 <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px; text-align:center;">
                     <div style="font-size:0.72rem; color:#888;">Paid to you</div>
@@ -103,10 +103,10 @@
             } else {
                 var btn = document.getElementById('ref-claim-btn');
                 if (!btn) {
-                    wrap.innerHTML = '<button id="ref-claim-btn" style="background:#f39c12; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>';
+                    wrap.innerHTML = '<button id="ref-claim-btn" style="background:#f87818; color:#000; border:none; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; flex:1;">Claim 500 signup points</button>';
                     btn = document.getElementById('ref-claim-btn');
                 }
-                if (btn) { btn.disabled = false; btn.textContent = 'Claim 500 signup points'; btn.style.background = '#f39c12'; btn.style.color = '#000'; btn.style.cursor = 'pointer'; }
+                if (btn) { btn.disabled = false; btn.textContent = 'Claim 500 signup points'; btn.style.background = '#f87818'; btn.style.color = '#000'; btn.style.cursor = 'pointer'; }
             }
         }
 
@@ -145,7 +145,7 @@
                 var entries = (ledger.entries||[]).slice().reverse();
                 if (!entries.length) { el('aff-entries').innerHTML = '<p class="empty">No months recorded yet.</p>'; }
                 else {
-                    el('aff-entries').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="border:1px solid #333;padding:6px;color:#f39c12;">Period</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Status</th><th style="border:1px solid #333;padding:6px;color:#f39c12;">Amount</th></tr></thead><tbody>' +
+                    el('aff-entries').innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="border:1px solid #333;padding:6px;color:#f87818;">Period</th><th style="border:1px solid #333;padding:6px;color:#f87818;">Status</th><th style="border:1px solid #333;padding:6px;color:#f87818;">Amount</th></tr></thead><tbody>' +
                         entries.map(function(e){
                             var st = e.status === 0 ? '<span style="color:#2ecc71;">Earned (pending)</span>' : e.status === 1 ? '<span style="color:#fff;">Paid</span>' : '<span style="color:#888;">Forfeited</span>';
                             return '<tr><td style="border:1px solid #333;padding:6px;">' + e.period + '</td><td style="border:1px solid #333;padding:6px;">' + st + '</td><td style="border:1px solid #333;padding:6px;">' + usd(e.amountUsdCents) + '</td></tr>';

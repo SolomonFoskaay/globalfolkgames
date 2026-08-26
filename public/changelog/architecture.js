@@ -79,7 +79,7 @@
         <h3>${esc(m.title)}</h3>
         ${m.summary ? `<p class="entry-summary">${esc(m.summary)}</p>` : ''}
         ${detailsHtml(m.details)}
-        <p class="entry-git">Module page: <a href="/changelog/architecture-${m.id.toLowerCase()}.html" style="color:#9b59b6;">${esc(m.id)} full detail →</a></p>
+        <p class="entry-git">Module page: <a href="/changelog/architecture-${m.id.toLowerCase()}.html" style="color:#7838f8;">${esc(m.id)} full detail →</a></p>
       </article>`;
   }
 

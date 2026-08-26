@@ -10,19 +10,19 @@
         body { background:#0f0f13; }
         .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
         .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
-        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
         .hint { font-size:0.8rem; color:#888; line-height:1.5; }
         label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
         input, textarea, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
         textarea { min-height:90px; font-family:monospace; }
         button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
-        .btn-primary { background:#f39c12; color:#000; margin-top:8px; }
+        .btn-primary { background:#f87818; color:#000; margin-top:8px; }
         .btn-success { background:#2ecc71; color:#000; }
         .btn-danger { background:#e74c3c; color:#fff; }
         table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
         th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
-        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
-        td.mono { font-family:monospace; color:#9b59b6; word-break:break-all; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; color:#7838f8; word-break:break-all; }
         .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
         .row input { flex:1; min-width:130px; }
     </style>
@@ -127,7 +127,7 @@
             function renderList(list){
                 if (!list.length){ listBox.innerHTML='<p class="hint">No affiliate ledgers on-chain yet.</p>'; return; }
                 listBox.innerHTML = '<table><thead><tr><th>Affiliate</th><th>Lifetime</th><th>Pending</th><th>Paid</th><th>Forfeited</th><th>Months</th></tr></thead><tbody>' +
-                    list.map(a => '<tr><td class="mono">'+esc(a.affiliate.slice(0,10))+'…</td><td>'+usd(a.lifetimeUsdCents)+'</td><td style="color:#f39c12;">'+usd(a.pendingUsdCents)+'</td><td>'+usd(a.paidUsdCents)+'</td><td style="color:#888;">'+usd(a.forfeitedUsdCents)+'</td><td>'+a.entryCount+'</td></tr>').join('') + '</tbody></table>';
+                    list.map(a => '<tr><td class="mono">'+esc(a.affiliate.slice(0,10))+'…</td><td>'+usd(a.lifetimeUsdCents)+'</td><td style="color:#f87818;">'+usd(a.pendingUsdCents)+'</td><td>'+usd(a.paidUsdCents)+'</td><td style="color:#888;">'+usd(a.forfeitedUsdCents)+'</td><td>'+a.entryCount+'</td></tr>').join('') + '</tbody></table>';
             }
             $('btn-list').addEventListener('click', async ()=>{
                 listBox.innerHTML='<p class="hint">Fetching ledgers...</p>';

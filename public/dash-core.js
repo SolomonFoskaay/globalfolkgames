@@ -202,8 +202,8 @@
         roll: 'Fallback base rolls',
     };
     const CATEGORY_COLOR = {
-        onboarding: '#f39c12',
-        house: '#9b59b6',
+        onboarding: '#f87818',
+        house: '#7838f8',
         roll: '#3498db',
     };
 
@@ -369,15 +369,15 @@
                 <div class="k">Burn rate</div>
                 <div class="gas-big">${(an.burnPerDaySol || 0).toFixed(4)} <span class="gas-unit">SOL/day</span></div>
                 <div class="gas-note">7-day average from the spend-event log. Total: ${esc(totalSol)} SOL across ${esc(ledger.playersCount)} player(s).</div>
-                <div class="gas-note" style="color:#f39c12;">Avg onboarding: ${esc(an.avgOnboardingSol)} SOL · funds ${esc(an.playersPerSol)} fresh player(s) per SOL.</div>
+                <div class="gas-note" style="color:#f87818;">Avg onboarding: ${esc(an.avgOnboardingSol)} SOL · funds ${esc(an.playersPerSol)} fresh player(s) per SOL.</div>
             </div>
 
             <div class="gas-cell gas-cell-wide">
                 <div class="k">Gas spend over time</div>
                 <div class="gas-sub">Last 7 days</div>
-                ${recentDays.map(b => barRow(b.label, b.lamports, dayMax, an.totalLamports, '#f39c12')).join('')}
+                ${recentDays.map(b => barRow(b.label, b.lamports, dayMax, an.totalLamports, '#f87818')).join('')}
                 <div class="gas-sub">Last 6 weeks</div>
-                ${recentWeeks.map(b => barRow(b.label, b.lamports, weekMax, an.totalLamports, '#9b59b6')).join('')}
+                ${recentWeeks.map(b => barRow(b.label, b.lamports, weekMax, an.totalLamports, '#7838f8')).join('')}
                 <div class="gas-sub">Last 6 months</div>
                 ${recentMonths.map(b => barRow(b.label, b.lamports, monthMax, an.totalLamports, '#3498db')).join('')}
             </div>
@@ -626,7 +626,7 @@
 
             const byLevel = {};
             activeHolders.forEach(p => { const l = Number(p.active_tier); byLevel[l] = (byLevel[l] || 0) + 1; });
-            const dist = [2, 3, 4].map(l => `<span style="color:#f39c12;">T${l}: ${byLevel[l] || 0}</span>`).join(' · ');
+            const dist = [2, 3, 4].map(l => `<span style="color:#f87818;">T${l}: ${byLevel[l] || 0}</span>`).join(' · ');
 
             const spent = tierTx.reduce((s, t) => s + Math.abs(t.points || 0), 0);
             const purchases30d = tierTx.filter(t => t.created_at && (Date.now() - new Date(t.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000).length;
@@ -643,7 +643,7 @@
                 <div class="ops-card"><div class="k">Active now</div><div class="v" style="color:#2ecc71;">${activeHolders.length}</div></div>
                 <div class="ops-card"><div class="k">Lapsed</div><div class="v">${lapsedHolders}</div></div>
                 <div class="ops-card"><div class="k">Distribution</div><div class="v small">${dist}</div></div>
-                <div class="ops-card"><div class="k">Spendable drained</div><div class="v" style="color:#f39c12;">${spent.toLocaleString()}</div></div>
+                <div class="ops-card"><div class="k">Spendable drained</div><div class="v" style="color:#f87818;">${spent.toLocaleString()}</div></div>
                 <div class="ops-card"><div class="k">Purchases (30d)</div><div class="v">${purchases30d}</div></div>`;
 
             const recentBlock = recentRows
@@ -651,13 +651,13 @@
                    <table class="mini-table"><thead><tr><th>Player</th><th>Spent</th><th>When</th></tr></thead><tbody>${recentRows}</tbody></table>`
                 : `<p class="empty">No Active Tier purchases yet — the S1 tier buy card on /profile/ seeds this view.</p>`;
 
-            return `<div style="margin-top:16px;border-top:1px solid #9b59b6;padding-top:12px;">
-                <div class="k" style="color:#9b59b6;font-weight:700;margin-bottom:4px;">⚡ Active Tier (S1) — tracked</div>
+            return `<div style="margin-top:16px;border-top:1px solid #7838f8;padding-top:12px;">
+                <div class="k" style="color:#7838f8;font-weight:700;margin-bottom:4px;">⚡ Active Tier (S1) — tracked</div>
                 <div class="ops-grid">${cells}</div>${recentBlock}
             </div>`;
         } catch (e) {
-            return `<div style="margin-top:16px;border-top:1px solid #9b59b6;padding-top:12px;">
-                <div class="k" style="color:#9b59b6;font-weight:700;">⚡ Active Tier (S1)</div>
+            return `<div style="margin-top:16px;border-top:1px solid #7838f8;padding-top:12px;">
+                <div class="k" style="color:#7838f8;font-weight:700;">⚡ Active Tier (S1)</div>
                 <p class="muted-note">Tier tracking unavailable — run <span class="mono">supabase/migrations/0001_active_tier.sql</span> first (${esc(e.message)}).</p>
             </div>`;
         }
@@ -736,10 +736,10 @@
             if (pipelineEl) {
                 pipelineEl.innerHTML =
                     `Current version: <b style="color:#fff;">v${data.current || '—'}</b><br>` +
-                    `Planned: <b style="color:#f39c12;">${planned.length}</b> · ` +
+                    `Planned: <b style="color:#f87818;">${planned.length}</b> · ` +
                     `In progress: <b style="color:#2ecc71;">${inProgress.length}</b> · ` +
                     `Released: <b style="color:#3498db;">${entries.length}</b><br>` +
-                    (pending.length ? `<br><span style="color:#9b59b6;">⚠ ${pending.length} item(s) pending approval — tell the agent "Approve: &lt;title&gt;" to publish them.</span>` : '<br><span style="color:#27ae60;">All roadmap items are approved for the user page.</span>');
+                    (pending.length ? `<br><span style="color:#7838f8;">⚠ ${pending.length} item(s) pending approval — tell the agent "Approve: &lt;title&gt;" to publish them.</span>` : '<br><span style="color:#27ae60;">All roadmap items are approved for the user page.</span>');
             }
 
             if (pendEl) {

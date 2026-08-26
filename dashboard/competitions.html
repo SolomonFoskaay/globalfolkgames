@@ -10,13 +10,13 @@
         body { background:#0f0f13; }
         .wrap { max-width:1080px; margin:0 auto; padding:80px 16px 40px; }
         .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
-        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f39c12; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
         .hint { font-size:0.8rem; color:#888; line-height:1.5; }
         label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
         input, textarea, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
         input[type=checkbox] { width:auto; margin-right:6px; }
         button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
-        .btn-primary { background:#f39c12; color:#000; margin-top:8px; }
+        .btn-primary { background:#f87818; color:#000; margin-top:8px; }
         .btn-success { background:#2ecc71; color:#000; }
         .btn-danger { background:#e74c3c; color:#fff; }
         .btn-ghost { background:#1a1a24; color:#bbb; border:1px solid #333; }
@@ -24,11 +24,11 @@
         .row > div { flex:1; min-width:150px; }
         .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
         .chip { display:inline-block; background:#1a1a24; border:1px solid #2a2a36; border-radius:999px; padding:4px 10px; font-size:0.75rem; color:#ddd; }
-        .chip.warn { border-color:rgba(243,156,18,0.5); color:#f39c12; }
+        .chip.warn { border-color:rgba(243,156,18,0.5); color:#f87818; }
         table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
         th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
-        th { background:#1a1a24; color:#f39c12; font-size:0.7rem; text-transform:uppercase; }
-        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#9b59b6; }
+        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#7838f8; }
         .share-row { display:flex; gap:6px; align-items:center; margin-top:4px; }
         .share-row input { flex:1; min-width:60px; }
     </style>
@@ -218,7 +218,7 @@
                     const val = i<n && prev ? parseFloat(prev) : eq;
                     html += '<tr><td>'+ordLabel(i)+'</td>' +
                         '<td><input id="'+pctInput(i)+'" type="number" step="0.01" min="0.01" value="'+val+'" style="width:74px;" data-i="'+i+'"></td>' +
-                        '<td id="winc-'+i+'-usd"></td><td id="winc-'+i+'-pts"></td><td id="winc-'+i+'-red" style="color:#f39c12; font-weight:800;"></td></tr>';
+                        '<td id="winc-'+i+'-usd"></td><td id="winc-'+i+'-pts"></td><td id="winc-'+i+'-red" style="color:#f87818; font-weight:800;"></td></tr>';
                 }
                 html += '</tbody></table>';
                 const box=$('shares-box'); box.innerHTML=html;
@@ -373,7 +373,7 @@
                     const w = comp.winners || [];
                     $('winner-box').innerHTML = w.length
                         ? '<div class="hint" style="margin-bottom:6px;">On-chain winners (gfgwin):</div><table><thead><tr><th>Rank</th><th>Player</th><th>Points</th><th>USD</th><th>Status</th><th></th></tr></thead><tbody>' +
-                          w.map(x => `<tr><td>#${x.rank}</td><td class="mono">${esc(x.player)}</td><td>${x.points}</td><td>$${(x.usdCents/100).toFixed(2)}</td><td style="color:${x.status===1?'#2ecc71':'#f39c12'};">${x.status===1?'PAID':'pending'}</td><td>${x.status===1?'':'<button class="btn-success" onclick="window.__pay('+cur.seq+','+x.rank+')">Mark paid</button>'}</td></tr>`).join('') +
+                          w.map(x => `<tr><td>#${x.rank}</td><td class="mono">${esc(x.player)}</td><td>${x.points}</td><td>$${(x.usdCents/100).toFixed(2)}</td><td style="color:${x.status===1?'#2ecc71':'#f87818'};">${x.status===1?'PAID':'pending'}</td><td>${x.status===1?'':'<button class="btn-success" onclick="window.__pay('+cur.seq+','+x.rank+')">Mark paid</button>'}</td></tr>`).join('') +
                           '</tbody></table>'
                         : '<div class="hint">No on-chain winner records yet (settle records them).</div>';
                 } catch (e) { $('winner-box').innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; }

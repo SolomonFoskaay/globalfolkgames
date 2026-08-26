@@ -12,7 +12,7 @@
   --game-indigo: #7c6cf6;
   --game-pink: #f472b6;
   --game-teal: #2dd4bf;
-  --game-orange: #f39c12;
+  --game-orange: #f87818;
   --game-speed: 26s;
 }
 
@@ -25,20 +25,41 @@ html, body {
 
 body {
   background:
-    /* small drifting "planets" (CSS only - no extra assets, never stretches) */
-    radial-gradient(11px 11px at 16% 20%, rgba(45, 212, 191, 0.85), transparent 60%),
-    radial-gradient(6px 6px at 30% 58%, rgba(243, 156, 18, 0.9), transparent 60%),
-    radial-gradient(15px 15px at 68% 14%, rgba(155, 89, 182, 0.95), transparent 60%),
-    radial-gradient(9px 9px at 84% 46%, rgba(45, 212, 191, 0.8), transparent 60%),
-    radial-gradient(13px 13px at 60% 84%, rgba(244, 114, 182, 0.9), transparent 60%),
-    radial-gradient(7px 7px at 10% 82%, rgba(255, 215, 0, 0.85), transparent 60%),
-    /* existing soft nebula orbs */
-    radial-gradient(1100px 620px at 14% -12%, rgba(243, 156, 18, 0.30), transparent 55%),
-    radial-gradient(900px 680px at 90% 4%, rgba(244, 114, 182, 0.24), transparent 55%),
-    radial-gradient(1000px 700px at 46% 118%, rgba(45, 212, 191, 0.22), transparent 60%),
-    radial-gradient(1200px 900px at 50% 50%, rgba(124, 108, 246, 0.18), transparent 70%),
-    /* deeper, richer base */
-    linear-gradient(168deg, #120f2b 0%, #1b1240 42%, #281150 70%, #150e31 100%);
+    /* -- deep-space starfield: dense glowing 3D stars (CSS only) -- */
+    radial-gradient(circle at 6% 8%,  rgba(255,244,214,0.95) 0px, rgba(255,244,214,0.95) 2px, rgba(255,244,214,0.25) 4px, transparent 6px),
+    radial-gradient(circle at 12% 26%, rgba(255,255,255,0.9) 0 1px, rgba(255,255,255,0.25) 3px, transparent 5px),
+    radial-gradient(circle at 9% 44%, rgba(125,211,252,0.95) 0 2px, rgba(125,211,252,0.30) 4px, transparent 6px),
+    radial-gradient(circle at 16% 62%, rgba(255,255,255,0.85) 0 1px, rgba(255,255,255,0.20) 3px, transparent 5px),
+    radial-gradient(circle at 7% 82%, rgba(255,240,170,0.95) 0 1px, rgba(255,240,170,0.28) 3px, transparent 5px),
+    radial-gradient(circle at 22% 90%, rgba(255,255,255,0.8) 0 1px, rgba(255,255,255,0.18) 3px, transparent 5px),
+    radial-gradient(circle at 26% 12%, rgba(255,255,255,0.95) 0 2px, rgba(255,255,255,0.3) 4px, transparent 6px),
+    radial-gradient(circle at 31% 34%, rgba(253,230,138,0.95) 0 1px, rgba(253,230,138,0.26) 3px, transparent 5px),
+    radial-gradient(circle at 38% 52%, rgba(196,181,253,0.95) 0 2px, rgba(196,181,253,0.28) 4px, transparent 6px),
+    radial-gradient(circle at 34% 70%, rgba(255,255,255,0.9) 0 1px, rgba(255,255,255,0.22) 3px, transparent 5px),
+    radial-gradient(circle at 42% 88%, rgba(153,246,228,0.95) 0 1px, rgba(153,246,228,0.24) 3px, transparent 5px),
+    radial-gradient(circle at 48% 6%,  rgba(255,255,255,0.85) 0 1px, rgba(255,255,255,0.2) 3px, transparent 5px),
+    radial-gradient(circle at 52% 26%, rgba(255,255,255,0.98) 0 2px, rgba(255,255,255,0.32) 4px, transparent 6px),
+    radial-gradient(circle at 55% 46%, rgba(254,202,202,0.95) 0 1px, rgba(254,202,202,0.25) 3px, transparent 5px),
+    radial-gradient(circle at 50% 66%, rgba(255,255,255,0.9) 0 2px, rgba(255,255,255,0.25) 4px, transparent 6px),
+    radial-gradient(circle at 58% 84%, rgba(147,197,253,0.95) 0 1px, rgba(147,197,253,0.26) 3px, transparent 5px),
+    radial-gradient(circle at 61% 16%, rgba(255,255,255,0.9) 0 1px, rgba(255,255,255,0.2) 3px, transparent 5px),
+    radial-gradient(circle at 66% 38%, rgba(255,235,189,0.95) 0 2px, rgba(255,235,189,0.28) 4px, transparent 6px),
+    radial-gradient(circle at 70% 58%, rgba(255,255,255,0.85) 0 1px, rgba(255,255,255,0.2) 3px, transparent 5px),
+    radial-gradient(circle at 68% 78%, rgba(165,243,252,0.95) 0 1px, rgba(165,243,252,0.24) 3px, transparent 5px),
+    radial-gradient(circle at 75% 12%, rgba(255,255,255,0.92) 0 2px, rgba(255,255,255,0.3) 4px, transparent 6px),
+    radial-gradient(circle at 79% 30%, rgba(254,240,138,0.95) 0 1px, rgba(254,240,138,0.26) 3px, transparent 5px),
+    radial-gradient(circle at 83% 52%, rgba(255,255,255,0.9) 0 2px, rgba(255,255,255,0.26) 4px, transparent 6px),
+    radial-gradient(circle at 87% 72%, rgba(186,230,253,0.95) 0 1px, rgba(186,230,253,0.24) 3px, transparent 5px),
+    radial-gradient(circle at 92% 20%, rgba(255,255,255,0.88) 0 1px, rgba(255,255,255,0.2) 3px, transparent 5px),
+    radial-gradient(circle at 96% 46%, rgba(255,255,255,0.95) 0 2px, rgba(255,255,255,0.3) 4px, transparent 6px),
+    radial-gradient(circle at 94% 82%, rgba(254,215,170,0.95) 0 1px, rgba(254,215,170,0.24) 3px, transparent 5px),
+    /* soft distant nebula glows */
+    radial-gradient(1200px 640px at 12% -10%, rgba(243, 156, 18, 0.22), transparent 55%),
+    radial-gradient(940px 700px at 88% 6%, rgba(155, 89, 182, 0.22), transparent 55%),
+    radial-gradient(1000px 720px at 50% 118%, rgba(45, 212, 191, 0.16), transparent 60%),
+    radial-gradient(1200px 900px at 50% 50%, rgba(124, 108, 246, 0.14), transparent 70%),
+    /* deep universe base */
+    linear-gradient(168deg, #07050f 0%, #0c0722 42%, #150a30 70%, #090616 100%);
   background-attachment: fixed;
   background-blend-mode: normal;
 }
@@ -111,44 +132,12 @@ body::after {
   letter-spacing: 0.08em;
   background: rgba(243, 156, 18, 0.18);
   border: 1px solid rgba(243, 156, 18, 0.55);
-  color: #f39c12;
+  color: #f87818;
   border-radius: 999px;
   padding: 1px 7px;
   margin-left: 6px;
   vertical-align: 2px;
 }
-
-/* Brand background layer: the site logo design, contain (never stretched),
-   behind all content, below the theme orbs. Gently fades in and out on a loop
-   so you can compare the photo backdrop against the pure CSS galaxy - set
-   opacity to a fixed value (or remove the animation) to keep one permanently. */
-.gfg-brand-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  opacity: 0;
-  animation: gfg-bg-cycle 18s ease-in-out infinite;
-}
-.gfg-brand-bg img {
-  width: 100vw;
-  height: 100vh;
-  object-fit: contain;
-}
-@keyframes gfg-bg-cycle {
-  0%, 8%   { opacity: 0; }
-  30%      { opacity: 0.42; }
-  45%      { opacity: 0.42; }
-  70%, 100%{ opacity: 0; }
-}
-/* Branded site title: Global (orange) Folk (purple) Games (orange), everywhere. */
-.gfg-brand { color:#fff; text-decoration:none; font-weight:800; }
-.gfg-brand:visited { color:#fff; }
-.brand-orange { color:#f39c12; }
-.brand-purple { color:#9b59b6; }
 
 /* Back-to-top arrow (injected sitewide, slim, idle-hidden). */
 #gfg-backtop { box-shadow:0 4px 12px rgba(0,0,0,0.35); }

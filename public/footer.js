@@ -20,16 +20,16 @@
             'background:rgba(15,14,45,0.55); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);' +
             'border-top:1px solid rgba(255,255,255,0.08); text-align:center; color:#ddd;');
         f.innerHTML =
-            '<a href="/" style="font-size:0.95rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-decoration:none;"><span style="color:#f39c12;">Global</span><span style="color:#9b59b6;">Folk</span><span style="color:#f39c12;">Games</span></a>' +
-            '<div style="margin-top:4px; font-size:0.72rem; color:#bbb;">\u00A9 2026 - Till Date \u00B7 Preserving native games on-chain \u00B7 <span style="color:#f39c12; font-weight:800;">Beta</span></div>' +
+            '<a href="/" style="font-size:0.95rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-decoration:none;"><span style="color:#f87818;">Global</span><span style="color:#7838f8;">Folk</span><span style="color:#f87818;">Games</span></a>' +
+            '<div style="margin-top:4px; font-size:0.72rem; color:#bbb;">\u00A9 2026 - Till Date \u00B7 Preserving native games on-chain \u00B7 <span style="color:#f87818; font-weight:800;">Beta</span></div>' +
             '<div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:0.78rem;">' +
-            '<a href="/about/" style="color:#f39c12; text-decoration:none;">About</a>' +
-            '<a href="/support/" style="color:#f39c12; text-decoration:none;">Support</a>' +
-            '<a href="/contact/" style="color:#f39c12; text-decoration:none;">Contact</a>' +
-            '<a href="/forum/" style="color:#f39c12; text-decoration:none;">Forum</a>' +
-            '<a href="/changelog/" style="color:#9b59b6; text-decoration:none;">What\'s New</a>' +
+            '<a href="/about/" style="color:#f87818; text-decoration:none;">About</a>' +
+            '<a href="/support/" style="color:#f87818; text-decoration:none;">Support</a>' +
+            '<a href="/contact/" style="color:#f87818; text-decoration:none;">Contact</a>' +
+            '<a href="/forum/" style="color:#f87818; text-decoration:none;">Forum</a>' +
+            '<a href="/changelog/" style="color:#7838f8; text-decoration:none;">What\'s New</a>' +
             '<a href="/games/" style="color:#2ecc71; text-decoration:none;">Play Native Games</a>' +
-            '<a href="/privacy.html" style="color:#f39c12; text-decoration:none;">Privacy Policy</a>' +
+            '<a href="/privacy.html" style="color:#f87818; text-decoration:none;">Privacy Policy</a>' +
             '</div>';
         document.body.appendChild(f);
     }

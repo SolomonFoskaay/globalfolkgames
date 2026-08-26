@@ -9,7 +9,7 @@
 }
 
 .changelog-page.admin {
-    border-left: 3px solid #f39c12;
+    border-left: 3px solid #f87818;
     padding-left: 13px;
     padding-right: 16px;
 }
@@ -22,7 +22,7 @@
 
 .changelog-back {
     display: inline-block;
-    color: #f39c12;
+    color: #f87818;
     text-decoration: none;
     font-size: 0.9rem;
     margin-bottom: 10px;
@@ -50,7 +50,7 @@
 }
 
 .changelog-current b { color: #fff; }
-.changelog-meta .changelog-role { color: #f39c12; }
+.changelog-meta .changelog-role { color: #f87818; }
 .changelog-meta .changelog-admin-link { color: #2ecc71; text-decoration: none; }
 .changelog-meta .changelog-admin-link:hover { text-decoration: underline; }
 
@@ -60,7 +60,7 @@
     padding: 16px 18px;
     background: #171717;
     border: 1px solid var(--border, #333);
-    border-left: 3px solid var(--accent, #f39c12);
+    border-left: 3px solid var(--accent, #f87818);
     border-radius: 10px;
 }
 
@@ -88,7 +88,7 @@
     align-self: flex-start;
     margin-bottom: 2px;
     padding: 8px 16px;
-    background: var(--accent, #f39c12);
+    background: var(--accent, #f87818);
     color: #1a1a1a;
     border: none;
     border-radius: 20px;
@@ -131,8 +131,8 @@
 .changelog-tab:hover { color: #fff; }
 
 .changelog-tab.active {
-    background: var(--accent, #f39c12);
-    border-color: var(--accent, #f39c12);
+    background: var(--accent, #f87818);
+    border-color: var(--accent, #f87818);
     color: #1a1a1a;
 }
 
@@ -165,8 +165,8 @@
 .page-btn:hover:not(:disabled):not(.active) { color: #fff; }
 
 .page-btn.active {
-    background: var(--accent, #f39c12);
-    border-color: var(--accent, #f39c12);
+    background: var(--accent, #f87818);
+    border-color: var(--accent, #f87818);
     color: #1a1a1a;
 }
 
@@ -218,7 +218,7 @@
     padding: 16px 18px;
 }
 
-.entry.entry-major { border-color: #f39c12; }
+.entry.entry-major { border-color: #f87818; }
 
 .entry-head {
     display: flex;
@@ -239,7 +239,7 @@
     letter-spacing: 0.04em;
 }
 
-.b-major { background: #f39c12; color: #1a1a1a; }
+.b-major { background: #f87818; color: #1a1a1a; }
 .b-minor { background: #2ecc71; color: #1a1a1a; }
 .b-patch { background: #3498db; color: #fff; }
 
@@ -263,7 +263,7 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #f39c12;
+    color: #f87818;
 }
 
 .entry-details ul { margin: 0; padding-left: 18px; }
@@ -273,9 +273,9 @@
 
 .admin-note {
     margin: 0 0 4px;
-    color: #f39c12;
+    color: #f87818;
     font-size: 0.82rem;
-    border: 1px dashed #f39c12;
+    border: 1px dashed #f87818;
     border-radius: 8px;
     padding: 8px 12px;
 }
@@ -292,9 +292,9 @@
     padding: 2px 10px;
     border-radius: 20px;
     background: #29294a;
-    color: #9b59b6;
+    color: #7838f8;
 }
-.econ-entry { border-left: 3px solid #9b59b6; }
+.econ-entry { border-left: 3px solid #7838f8; }
 
 /* Architecture (Modules) workspace */
 .arch-block {
@@ -307,7 +307,7 @@
 .arch-block-title {
     margin: 0 0 10px;
     font-size: 0.95rem;
-    color: #f39c12;
+    color: #f87818;
 }
 .arch-block ul, .arch-block ol {
     margin: 0;
@@ -339,7 +339,7 @@
 .arch-contract-title {
     margin: 0 0 8px;
     font-size: 0.95rem;
-    color: #f39c12;
+    color: #f87818;
 }
 .arch-contract-summary {
     margin: 0 0 10px;
@@ -375,7 +375,7 @@
     color: #fff;
     font-size: 0.9rem;
 }
-.game-search:focus { outline: none; border-color: #f39c12; }
+.game-search:focus { outline: none; border-color: #f87818; }
 .game-options {
     display: none;
     position: absolute;
@@ -412,7 +412,7 @@
 .game-option-empty:hover { background: none; }
 .game-option-title { font-weight: 600; }
 .game-spec .entry { margin-bottom: 14px; }
-.game-spec .entry-major { border-color: #f39c12; }
+.game-spec .entry-major { border-color: #f87818; }
 
 /* Left-rail module navigation on architecture pages */
 .arch-module-link { text-decoration: none; }
@@ -460,7 +460,7 @@
 }
 .ov-arrow-from, .ov-arrow-to {
     font-weight: 700;
-    color: #f39c12;
+    color: #f87818;
     white-space: nowrap;
     min-width: 30px;
 }
@@ -485,7 +485,7 @@
 .ov-uf-path {
     margin: 0 0 10px;
     font-size: 0.85rem;
-    color: #f39c12;
+    color: #f87818;
 }
 .ov-uf-table {
     width: 100%;
@@ -494,7 +494,7 @@
 }
 .ov-uf-table th {
     text-align: left;
-    color: #f39c12;
+    color: #f87818;
     font-weight: 600;
     padding: 6px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -506,7 +506,7 @@
     vertical-align: top;
 }
 .ov-uf-table code {
-    color: #9b59b6;
+    color: #7838f8;
     font-size: 0.82rem;
 }
 .ov-uf-planned td { opacity: 0.5; }

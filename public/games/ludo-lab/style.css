@@ -54,7 +54,7 @@ body {
     text-align: center;
     background: var(--danger, #e74c3c);
     color: #fff;
-    border: 2px solid #f39c12;
+    border: 2px solid #f87818;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
 }
 .chain-down-banner #chain-retry-btn {
@@ -63,7 +63,7 @@ body {
     padding: 6px 14px;
     border: none;
     border-radius: 8px;
-    background: #f39c12;
+    background: #f87818;
     color: #0f0f13;
     font-size: 0.85rem;
     font-weight: 700;
@@ -88,7 +88,7 @@ body {
 }
 .gfg-persistence-warning .gfg-pw-box {
     background: #1a1a24;
-    border: 2px solid #f39c12;
+    border: 2px solid #f87818;
     border-radius: 14px;
     padding: 22px 24px;
     max-width: 420px;
@@ -97,7 +97,7 @@ body {
     box-shadow: 0 12px 34px rgba(0,0,0,0.6);
 }
 .gfg-persistence-warning .gfg-pw-title {
-    color: #f39c12;
+    color: #f87818;
     font-size: 1.05rem;
     font-weight: 800;
     margin: 0 0 10px;
@@ -112,7 +112,7 @@ body {
     border: none;
     border-radius: 9px;
     padding: 9px 22px;
-    background: #9b59b6;
+    background: #7838f8;
     color: #fff;
     font-size: 0.9rem;
     font-weight: 700;
@@ -124,7 +124,7 @@ body {
 #ludo-log {
     font-size: 0.85rem;
     font-weight: bold;
-    color: #f39c12;
+    color: #f87818;
     text-align: center;
     width: 94vw;
     max-width: 550px;
@@ -179,9 +179,9 @@ body {
 }
 
 .mode-btn.active {
-    background: #f39c12;
+    background: #f87818;
     color: #000;
-    border-color: #f39c12;
+    border-color: #f87818;
 }
 
 .mode-btn:disabled {
@@ -290,7 +290,7 @@ body {
     white-space: nowrap;
 }
 
-#pauseBtn { background: #e67e22; }
+#pauseBtn { background: #e86818; }
 #pauseBtn.paused-state { background: #2ecc71; }
 
 #resetBtn { 
@@ -471,12 +471,12 @@ canvas {
 #result-ceremony-overlay.visible { display: flex; }
 
 .ceremony-modal-box {
-    background: #1e1e1e; border: 1px solid #f39c12; padding: 22px;
+    background: #1e1e1e; border: 1px solid #f87818; padding: 22px;
     border-radius: 12px; width: 100%; max-width: 400px; text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.8);
 }
 
-.ceremony-modal-box h3 { margin-top: 0; color: #f39c12; font-size: 1.3rem; }
+.ceremony-modal-box h3 { margin-top: 0; color: #f87818; font-size: 1.3rem; }
 .ceremony-modal-box p { font-size: 0.9rem; color: #ccc; line-height: 1.4; margin-bottom: 14px; }
 
 .ceremony-list { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 18px; }
@@ -527,7 +527,7 @@ canvas {
     align-items: center;
     gap: 6px;
     font-weight: 700;
-    color: #f39c12;
+    color: #f87818;
     font-size: 0.95rem;
 }
 
@@ -540,7 +540,7 @@ canvas {
 .ludo-origin-line {
     padding: 6px 14px;
     font-size: 0.78rem;
-    color: #9b59b6;
+    color: #7838f8;
     background: #14141c;
     border-bottom: 1px solid #2c2c3a;
     line-height: 1.4;
