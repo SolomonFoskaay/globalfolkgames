@@ -102,3 +102,24 @@ Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM
 - Referral pairs are already recorded on-chain at signup (affiliate module present, M6). Only the payment seat for the referred first-paid purchase triggers the split; subsequent paying months keep splitting the same way (they are still "this purchase pays the referrer").
 - If no referrer: 100% to the platform wallet. Non-refundable policy stays and is shown.
 - Fees journey: pay → split (80 platform / 20 referrer) → buyer's premium points credited (existing 5,000/10,000/500P flow) → Upgrade page completes activation.
+
+---
+
+## Arc 2.0 MODULE MAP & SLICE NAMING (LOCKED — owner clarity 2026-08-25)
+Slice labels are always `arc2m<N><slice>` so it is ALWAYS obvious which module a build belongs to.
+
+| Slice | Module (v2) | Owns |
+|---|---|---|
+| arc2m1d ✅ | M1 Game core | multiplayer Solo/Multiplayer, on-chain board + move commit, per-game rules profiles (registry) |
+| arc2m7e ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
+| arc2m7f ⏳ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
+| arc2m7g ⏳ | M7 AGM | P2C computer bank + anti-farm caps |
+| arc2m1xg | M1 Game core | per-game timeouts integration on the board |
+
+M7 keeps the existing v1 modules untouched: M2 seam, M3/M4 points, M5 plans, M6 affiliate (now auto 20/80), M10 lives/daily, M11 community. Good the old earn-competition M7 is RETIRED; the slot reopens as the AGM module.
+
+### M7 (AGM) expectedInput / expectedOutput
+- **expectedInput:** gameId chosen by the maker (from the games registry), order stake, seats; a matched `taker` signer; a board (M1) `match_ref` when locked; `registry rules[gameId]` for seats/turn/match caps; M2 result envelope at finish.
+- **expectedOutput:** on-chain order lifecycle (open/matched/locked/cancelled); escrow lock; settle outputs `potUsdCents`, `feeUsdCents` (10%), `winnerSeat`, `payoutUsdCents` (90%); game-agnostic - any game plugs in by picking a gameId from the registry.
+
+Build policy: any capability that is shared across games (matchmaking, escrow, fees, identity, payments) lives in a UNIVERSAL module (M7 AGM here), never inside a game. If a slice doesn't fit its module's inputs/outputs, the ARCHITECTURE changes first, then the build follows (never the reverse).
