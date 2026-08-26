@@ -20,15 +20,13 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 - **P2C (platform computer, CEX-like "bank"):** the platform funds a pool of computer seats so matches always have a counterpart. Opponents are always labelled `(Computer)` vs `(Human)` with skill band; players accept/reject. Platform publishes the reward formula and takes its fee from the finished pool.
 - **P2P (player vs player):** the **Automated Game Matcher (AGM, invented by Solomon Foskaay)** matches open orders. Player posts an order ($1..$1,000 stake), AGM matches a counterpart (2-way; N-way up to 20 for tournaments), both approve (profile/rating visible, reject allowed), escrow locks both stakes, game runs, the published split pays winners. AGM matches only; money is player-to-player.
 - **Leverage (prop-style):** player posts collateral; the bank extends X multiples on a declared **stop-loss floor**; auto stop is executed on-chain. Player can only lose their collateral; the platform's exposure is capped by the risk floor and a per-round fee. Phase-2 (needs banker accounting + on-chain stop execution).
-- **P2C break-even that does NOT need cheating (owner question, honest answer):** the platform charges 10% of the POT (not of one side). For a 2-side match each side stakes S, pot = 2S, winner gets 1.8S, the loser gets 0. If the platform is the computer side:
-  * computer wins  -> platform collects 0.8S profit (its 0.8S share over its stake).
-  * computer loses -> platform loses S (its stake).
-  EV per match = S x (1.8w - 0.8), where w = computer win rate. Break-even is w ≈ 44.4%. So the computer only needs to win roughly 45%+ of matches for the platform to break even - and any skill band above that is profit. Players mastering and beating a mid computer (say 40-45% win rate) is FINE: the house isn't losing at 44%. Mitigations we will build, in order:
-  1. **Flat 10% pot fee** pays the house first (this is the core anti-loss lever - no manipulation needed).
-  2. **P2C begets P2P:** computers fill seats when no human counterpart exists, at capped low stakes; P2P is the primary and it is fee-only revenue with NO house exposure.
-  3. **Daily/maximum loss cap** on the computer bank (e.g., pause funding for the day if net loss hits X) on top of stake caps per match - tail risk bounded.
-  4. Difficulty bands set transparently from on-chain history; computer strength is loud and visible, never rigged per-hand.
-  5. Community liquidity is PHASE-2 (later), after live data proves the bank EV, and only with the loss-protection floor + caps from §1.
+- **P2C break-even - CORRECTED, honest answer (owner 2026-08-25):** flat 10% fee on the POT. Two sides stake S each -> pot 2S -> winner gets 1.8S, loser 0. If the platform is the computer side: computer WIN -> +0.8S; computer LOSE -> -S (it loses its full stake). EV per match = S x (1.8w - 1). Break-even when w = 1/1.8 = **55.6%** (a computer must win MORE than half its matches for the bank to break even). If players study and beat a mid computer, the house DOES bleed - exactly the owner's fear, and it is CORRECT.
+- **Mitigations that make P2C survivable WITHOUT rigging:**
+  1. **P2C is the availability filler, never the profit center.** Real revenue = P2P fees (zero house exposure - players pay each other, platform takes 10% of the pot). P2C exists so matches always fill.
+  2. **Computers only fill seats when no human counterpart is ready**, capped at SMALL stakes ($1-$10) so even a bad day costs little.
+  3. **Strong-but-fair computer (~65-70% win band)** for new/small-stake seats - skill, not rigging (no per-hand switching); clearly labelled '(Computer · Strong)'.
+  4. **Anti-farm:** a wallet that clearly beats the computer gets steered to P2P/unranked + a rematch cap per wallet/week; the bank pauses for the day on a net-loss cap.
+  5. Community liquidity is PHASE-2, only after live data proves bank EV, with the loss-protection floor + caps (§1).
 - Fees: FLAT 10% of each finished pot for every earn match, all modes, all games (one number everywhere, printed up front). Premium plans stay as the separate comfort/gas subscription (lives, points, ad-free, booster, bigger daily).
 
 ## 3. Match rules / anti-abuse (all earn modes)
