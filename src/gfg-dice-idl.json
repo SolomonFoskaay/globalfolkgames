@@ -2373,6 +2373,98 @@
       "args": []
     },
     {
+      "name": "finish_forfeit",
+      "discriminator": [
+        152,
+        52,
+        29,
+        246,
+        108,
+        231,
+        102,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "winner_seat",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "finish_match",
       "discriminator": [
         65,
@@ -4907,6 +4999,282 @@
       ]
     },
     {
+      "name": "start_match_clocks",
+      "discriminator": [
+        7,
+        136,
+        140,
+        156,
+        92,
+        170,
+        34,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "timeout_seat",
+      "discriminator": [
+        142,
+        34,
+        140,
+        37,
+        187,
+        166,
+        95,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "touch_seat_clock",
+      "discriminator": [
+        219,
+        83,
+        55,
+        76,
+        33,
+        241,
+        147,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "undelegate",
       "docs": [
         "Commits the latest state and returns the PDA to this program (runs on ER)."
@@ -5452,6 +5820,19 @@
         122,
         244,
         55
+      ]
+    },
+    {
+      "name": "MatchClock",
+      "discriminator": [
+        36,
+        199,
+        189,
+        62,
+        152,
+        8,
+        240,
+        27
       ]
     },
     {
@@ -6333,6 +6714,73 @@
           {
             "name": "winner_seat",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchClock",
+      "docs": [
+        "Arc2 M1B: per-seat turn clocks + timeout record for a match. Additive to the",
+        "board (which stays game-agnostic): the game client maps its turn order onto",
+        "these per-seat clocks. A seat that stalls past its deadline accumulates a",
+        "timeout; at DEFAULT_TIMEOUT_CAP stalls it is FORFEITED, letting a finishing",
+        "seat take the win without waiting out max_match_secs. Solo boards never",
+        "create a clock, so the free path is untouched."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "turn_secs",
+            "type": "u64"
+          },
+          {
+            "name": "deadlines",
+            "type": {
+              "array": [
+                "i64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "timeouts",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "forfeited",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "timeout_cap",
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
           }
         ]
       }

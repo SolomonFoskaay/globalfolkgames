@@ -121,6 +121,8 @@ pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M7: standalone AGM o
 pub const AGM_SETTLE_SEED: &[u8] = b"gfgagms";        // Arc2 M7F: settlement (pot/fee/payout)
 pub const AGM_FEE_BPS: u64 = 1000;                    // flat 10% of the pot (locked)
 pub const P2C_SEED: &[u8] = b"gfgp2c";            // Arc2 M7C: P2C bank capital + anti-farm caps
+pub const CLOCK_SEED: &[u8] = b"gfgclock";          // Arc2 M1B: per-seat turn clocks + forfeits
+pub const DEFAULT_TIMEOUT_CAP: u8 = 3;              // timeout_seat triggers foreclosure at 3 stalls
 pub const P2C_DAY_SECS: i64 = 86_400;             // GMT day bucket for the daily net-loss cap
 pub const P2C_MIN_STAKE_USD_CENTS: u64 = 100;     // $1  - computers only fill small-stake seats
 pub const P2C_MAX_STAKE_USD_CENTS: u64 = 1_000;   // $10
@@ -1574,6 +1576,91 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ===== Arc2 M1B: per-seat turn clocks + forfeits (board additive) =====
+    // start_match_clocks: initializes the clock ledger for a begun board.
+    pub fn start_match_clocks(ctx: Context<MatchClockCtx>, game: u8, match_ref: u64) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.status == 1, PointsError::NotOpen);
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.clock;
+        c.version = 1u8;
+        c.game = game;
+        c.match_ref = match_ref;
+        c.turn_secs = ctx.accounts.board.turn_secs;
+        c.timeout_cap = DEFAULT_TIMEOUT_CAP;
+        for (i, d) in c.deadlines.iter_mut().enumerate() {
+            if (i as u8) < ctx.accounts.board.player_count {
+                *d = now + ctx.accounts.board.turn_secs as i64;
+            }
+        }
+        c.updated_at = now;
+        Ok(())
+    }
+
+    // touch_seat_clock: a seat resets its own deadline after a legal move.
+    // Anyone may touch (game logic decides whose turn it is), board gate checks.
+    pub fn touch_seat_clock(ctx: Context<MatchClockExistingCtx>, game: u8, match_ref: u64, seat: u8) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.status == 1, PointsError::NotOpen);
+        require!(seat < ctx.accounts.board.player_count, PointsError::RankOutOfRange);
+        require!(ctx.accounts.clock.forfeited[seat as usize] == 0, PointsError::AlreadyClaimed);
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.clock;
+        c.deadlines[seat as usize] = now + c.turn_secs as i64;
+        c.updated_at = now;
+        Ok(())
+    }
+
+    // timeout_seat: permissionless anti-stall. Once a seat's deadline passes,
+    // anyone may record the stall and reset the clock; at timeout_cap stalls the
+    // seat is FORFEITED so finish_forfeit can close the match early.
+    pub fn timeout_seat(ctx: Context<MatchClockExistingCtx>, game: u8, match_ref: u64, seat: u8) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.status == 1, PointsError::NotOpen);
+        require!(seat < ctx.accounts.board.player_count, PointsError::RankOutOfRange);
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.clock;
+        require!(c.forfeited[seat as usize] == 0, PointsError::AlreadyClaimed);
+        require!(now > c.deadlines[seat as usize], PointsError::StillRunning); // not stalled yet
+        let n = c.timeouts[seat as usize].saturating_add(1);
+        c.timeouts[seat as usize] = n;
+        if n >= c.timeout_cap {
+            c.forfeited[seat as usize] = 1;
+        }
+        c.deadlines[seat as usize] = now + c.turn_secs as i64;
+        c.updated_at = now;
+        Ok(())
+    }
+
+    // finish_forfeit: any SEAT still in good standing may finalize the board and
+    // claim the win when another seat has been forfeited for stalling. Clocks
+    // keep the earn match from stalling on a walkaway opponent.
+    pub fn finish_forfeit(ctx: Context<MatchClockExistingCtx>, game: u8, match_ref: u64, winner_seat: u8) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 1, PointsError::NotOpen);
+        require!(winner_seat < b.player_count, PointsError::RankOutOfRange);
+        let c = &ctx.accounts.clock;
+        require!(c.forfeited[winner_seat as usize] == 0, PointsError::AlreadyClaimed);
+        let mut forfeited_any = false;
+        for (i, f) in c.forfeited.iter().enumerate() {
+            if (i as u8) < b.player_count && *f == 1 {
+                forfeited_any = true;
+                break;
+            }
+        }
+        require!(forfeited_any, PointsError::NotSettled); // no one forfeited yet
+        let now = Clock::get()?.unix_timestamp;
+        b.status = 2;
+        b.winner_seat = winner_seat;
+        b.finished_at = now;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -2001,6 +2088,47 @@ pub struct FinishMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `post_agm_order`.
+
+/// Context for the clock instructions (arc2m1b). Clock seed [gfgclock, game, match_ref].
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct MatchClockCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + std::mem::size_of::<MatchClock>(),
+        seeds = [CLOCK_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+        bump
+    )]
+    pub clock: Account<'info, MatchClock>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `post_agm_order`.
+
+/// Context for clock state-change instructions (touch/timeout/finish): the
+/// clock MUST exist (start_match_clocks ran first), so a stale zeroed clock
+/// can never auto-forfeit a seat.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct MatchClockExistingCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+    #[account(
+        mut,
+        seeds = [CLOCK_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+        bump
+    )]
+    pub clock: Account<'info, MatchClock>,
 }
 
 /// Context for `post_agm_order`.
@@ -2707,6 +2835,25 @@ pub struct MatchBoard {
     pub last_move_commit: [u8; 32],
     pub finished_at: i64,
     pub winner_seat: u8,         // 0..player_count-1, 255 = none yet
+}
+
+/// Arc2 M1B: per-seat turn clocks + timeout record for a match. Additive to the
+/// board (which stays game-agnostic): the game client maps its turn order onto
+/// these per-seat clocks. A seat that stalls past its deadline accumulates a
+/// timeout; at DEFAULT_TIMEOUT_CAP stalls it is FORFEITED, letting a finishing
+/// seat take the win without waiting out max_match_secs. Solo boards never
+/// create a clock, so the free path is untouched.
+#[account]
+pub struct MatchClock {
+    pub version: u8,             // 1 = current
+    pub game: u8,
+    pub match_ref: u64,
+    pub turn_secs: u64,          // snapshot from the board at start
+    pub deadlines: [i64; MAX_MP],
+    pub timeouts: [u8; MAX_MP],
+    pub forfeited: [u8; MAX_MP],
+    pub timeout_cap: u8,
+    pub updated_at: i64,
 }
 
 /// Arc2 M1 (item E): game-AGNOSTIC AGM order (maker/taker). Money only - the
