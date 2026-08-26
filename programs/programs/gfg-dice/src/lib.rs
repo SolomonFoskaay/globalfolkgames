@@ -117,6 +117,7 @@ pub const MAX_GAMES: usize = 4;
 pub const MAX_WINNERS: usize = 16;
 pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board
 pub const MAX_MP: usize = 8;                      // max human seats per earn match
+pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M1 E: standalone AGM order
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1421,6 +1422,49 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ===== Arc2 M1 item E: standalone AGM order book (game-agnostic) =====
+    pub fn post_agm_order(
+        ctx: Context<PostAgmOrderCtx>,
+        game: u8,
+        order_id: u64,
+        stake_usd_cents: u64,
+        seats: u8,
+    ) -> Result<()> {
+        require!(game > 0, PointsError::InvalidCompetition);
+        require!(stake_usd_cents > 0, PointsError::InvalidCompetition);
+        require!(seats >= 2 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
+        let o = &mut ctx.accounts.order;
+        o.version = 1u8;
+        o.order_id = order_id;
+        o.game = game;
+        o.maker = ctx.accounts.payer.key();
+        o.stake_usd_cents = stake_usd_cents;
+        o.seats = seats;
+        o.status = 0u8;
+        o.taker = ctx.accounts.payer.key();
+        o.created_at = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
+    pub fn cancel_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
+        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
+        let o = &mut ctx.accounts.order;
+        require!(o.maker == ctx.accounts.signer.key(), PointsError::NotCreator);
+        require!(o.status == 0, PointsError::NotOpen);
+        o.status = 3;
+        Ok(())
+    }
+
+    pub fn match_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
+        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
+        let o = &mut ctx.accounts.order;
+        require!(ctx.accounts.signer.key() != o.maker, PointsError::InvalidCompetition);
+        require!(o.status == 0, PointsError::NotOpen);
+        o.taker = ctx.accounts.signer.key();
+        o.status = 2;
+        Ok(())
+    }
+
     pub fn register_profile_handle(
         ctx: Context<RegisterProfileHandleCtx>,
         handle: String,
@@ -1848,6 +1892,33 @@ pub struct FinishMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `post_agm_order`.
+#[derive(Accounts)]
+#[instruction(game: u8, order_id: u64, stake_usd_cents: u64, seats: u8)]
+pub struct PostAgmOrderCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<AgmOrder>(),
+        seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()],
+        bump
+    )]
+    pub order: Account<'info, AgmOrder>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Reusable context for cancel/match (seeds [gfgagm, game, order_id]).
+#[derive(Accounts)]
+#[instruction(game: u8, order_id: u64)]
+pub struct AgmOrderSeqCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()], bump)]
+    pub order: Account<'info, AgmOrder>,
 }
 
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
@@ -2460,6 +2531,22 @@ pub struct MatchBoard {
     pub last_move_commit: [u8; 32],
     pub finished_at: i64,
     pub winner_seat: u8,         // 0..player_count-1, 255 = none yet
+}
+
+/// Arc2 M1 (item E): game-AGNOSTIC AGM order (maker/taker). Money only - the
+/// game is chosen by the maker (one game per order) and the game's rules
+/// profile lives in the games registry (config), not here. All games plug in.
+#[account]
+pub struct AgmOrder {
+    pub version: u8,             // 1 = current
+    pub order_id: u64,
+    pub game: u8,                // M1 source_code the maker picked
+    pub maker: Pubkey,           // payer who posted
+    pub stake_usd_cents: u64,    // each side's stake (1 $ .. up to the game cap)
+    pub seats: u8,               // total seats wanted (min 2; computers fill rest)
+    pub status: u8,              // 0 open, 1 filled(locked by escrow later), 2 matched, 3 cancelled
+    pub taker: Pubkey,           // zero until matched
+    pub created_at: i64,
 }
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium

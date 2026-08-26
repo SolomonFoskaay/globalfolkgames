@@ -1,44 +1,849 @@
 {
   "games": [
-    { "slug": "ludo", "name": "Ludo", "emoji": "🎲", "status": "live", "play": "/games/ludo-lab/", "origins": [{ "country": "India", "flag": "🇮🇳" }, { "country": "United Kingdom", "flag": "🇬🇧" }], "history": "Ludo descends from Pachisi, the ancient cross-and-circle board game of India (played by Mughal emperor Akbar). The modern name and packaging were introduced in England in 1891, so Ludo belongs to both countries." },
-    { "slug": "mahjong", "name": "Mahjong", "emoji": "🀄", "status": "soon", "origins": [{ "country": "China", "flag": "🇨🇳" }], "history": "The ultimate Qing-dynasty tile-matching strategic game." },
-    { "slug": "weiqi", "name": "Go (Weiqi)", "emoji": "⚫", "status": "soon", "origins": [{ "country": "China", "flag": "🇨🇳" }], "history": "A 2,500-year-old abstract game of territorial capture." },
-    { "slug": "xiangqi", "name": "Xiangqi", "emoji": "♟️", "status": "soon", "origins": [{ "country": "China", "flag": "🇨🇳" }], "history": "Traditional Chinese chess simulating a battlefield." },
-    { "slug": "pachisi", "name": "Pachisi / Chaupar", "emoji": "🛡️", "status": "soon", "origins": [{ "country": "India", "flag": "🇮🇳" }], "history": "The ancient cross-and-circle board game that birthed modern Ludo." },
-    { "slug": "carrom", "name": "Carrom", "emoji": "🎯", "status": "soon", "origins": [{ "country": "India", "flag": "🇮🇳" }], "history": "A beloved tabletop strike-and-pocket disc game." },
-    { "slug": "kabaddi", "name": "Kabaddi", "emoji": "🤼", "status": "soon", "origins": [{ "country": "India", "flag": "🇮🇳" }], "history": "A traditional, highly athletic tag-and-defense sport." },
-    { "slug": "monopoly", "name": "Monopoly", "emoji": "🏠", "status": "soon", "origins": [{ "country": "United States", "flag": "🇺🇸" }], "history": "Derived from The Landlord's Game and commercialized in the 1930s." },
-    { "slug": "scrabble", "name": "Scrabble", "emoji": "🔤", "status": "soon", "origins": [{ "country": "United States", "flag": "🇺🇸" }], "history": "The iconic Depression-era word-building board game." },
-    { "slug": "cornhole", "name": "Cornhole", "emoji": "🎯", "status": "soon", "origins": [{ "country": "United States", "flag": "🇺🇸" }], "history": "A classic American backyard lawn bean-bag tossing game." },
-    { "slug": "jogo-do-bicho", "name": "Jogo do Bicho", "emoji": "🦁", "status": "soon", "origins": [{ "country": "Brazil", "flag": "🇧🇷" }], "history": "A deeply rooted 19th-century animal-themed lottery system." },
-    { "slug": "truco", "name": "Truco", "emoji": "🃏", "status": "soon", "origins": [{ "country": "Brazil", "flag": "🇧🇷" }], "history": "A fast-paced, loud, competitive card game based heavily on bluffing." },
-    { "slug": "futevolei", "name": "Futevolei (Footvolley)", "emoji": "🏐", "status": "soon", "origins": [{ "country": "Brazil", "flag": "🇧🇷" }], "history": "Beach volleyball played entirely with football rules, no hands." },
-    { "slug": "congklak", "name": "Congklak", "emoji": "🫘", "status": "soon", "origins": [{ "country": "Indonesia", "flag": "🇮🇩" }], "history": "The traditional Indonesian seed-sowing Mancala board game." },
-    { "slug": "gobak-sodor", "name": "Gobak Sodor (Galasin)", "emoji": "🏃", "status": "soon", "origins": [{ "country": "Indonesia", "flag": "🇮🇩" }], "history": "A field game centered on crossing lines guarded by defenders." },
-    { "slug": "bola-bekel", "name": "Bola Bekel (Beklan)", "emoji": "⚽", "status": "soon", "origins": [{ "country": "Indonesia", "flag": "🇮🇩" }], "history": "An intricate traditional jack game using a rubber ball and brass pieces." },
-    { "slug": "shogi", "name": "Shogi", "emoji": "♟️", "status": "soon", "origins": [{ "country": "Japan", "flag": "🇯🇵" }], "history": "Japanese chess where captured pieces can be dropped back onto the board." },
-    { "slug": "hanafuda", "name": "Hanafuda", "emoji": "🌸", "status": "soon", "origins": [{ "country": "Japan", "flag": "🇯🇵" }], "history": "Traditional flower cards used for matching and strategy games." },
-    { "slug": "sugoroku", "name": "Sugoroku", "emoji": "🎲", "status": "soon", "origins": [{ "country": "Japan", "flag": "🇯🇵" }], "history": "An ancient Japanese dice-and-board race game." },
-    { "slug": "mensch", "name": "Mensch aergere dich nicht", "emoji": "🎲", "status": "soon", "origins": [{ "country": "Germany", "flag": "🇩🇪" }], "history": "The iconic Man, Don't Get Angry cross-and-circle game." },
-    { "slug": "skat", "name": "Skat", "emoji": "🃏", "status": "soon", "origins": [{ "country": "Germany", "flag": "🇩🇪" }], "history": "Germany's national 3-player trick-taking card game dating to 1820." },
-    { "slug": "catan", "name": "The Settlers of Catan", "emoji": "🏝️", "status": "soon", "origins": [{ "country": "Germany", "flag": "🇩🇪" }], "history": "The acclaimed board game that launched the Eurogame revolution." },
-    { "slug": "yut-nori", "name": "Yut Nori", "emoji": "🥢", "status": "soon", "origins": [{ "country": "South Korea", "flag": "🇰🇷" }], "history": "A traditional New Year board game played by casting four marked wooden sticks." },
-    { "slug": "go-stop", "name": "Go-Stop", "emoji": "🎴", "status": "soon", "origins": [{ "country": "South Korea", "flag": "🇰🇷" }], "history": "A fast-paced tactical card game played with traditional Hwatu flower decks." },
-    { "slug": "janggi", "name": "Janggi", "emoji": "♟️", "status": "soon", "origins": [{ "country": "South Korea", "flag": "🇰🇷" }], "history": "The tactical Korean evolution of ancient chess." },
-    { "slug": "royal-ludo", "name": "Royal Ludo", "emoji": "👑", "status": "soon", "origins": [{ "country": "United Kingdom", "flag": "🇬🇧" }], "history": "The commercialized, patented 1896 version of Pachisi." },
-    { "slug": "pub-darts", "name": "Pub Darts", "emoji": "🎯", "status": "soon", "origins": [{ "country": "United Kingdom", "flag": "🇬🇧" }], "history": "Traditional precision target tossing popular in British pubs." },
-    { "slug": "cribbage", "name": "Cribbage", "emoji": "🃏", "status": "soon", "origins": [{ "country": "United Kingdom", "flag": "🇬🇧" }], "history": "A historic 17th-century trick-and-board card game." },
-    { "slug": "petanque", "name": "Petanque", "emoji": "⛳", "status": "soon", "origins": [{ "country": "France", "flag": "🇫🇷" }], "history": "A traditional Southern French outdoor sport of tossing heavy metal boules near a target ball." },
-    { "slug": "belote", "name": "Belote", "emoji": "🃏", "status": "soon", "origins": [{ "country": "France", "flag": "🇫🇷" }], "history": "A classic 32-card trick-taking game, the national card game of France." },
-    { "slug": "jeu-de-loie", "name": "Jeu de l'Oie", "emoji": "🦢", "status": "soon", "origins": [{ "country": "France", "flag": "🇫🇷" }], "history": "The historic prototype for modern roll-and-move racing board games." },
-    { "slug": "ayo-olopon", "name": "Ayo Olopon", "emoji": "🫘", "status": "soon", "origins": [{ "country": "Nigeria", "flag": "🇳🇬" }], "history": "A traditional Yoruba abstract strategy board game played on a wooden block with 12 holes and seeds." },
-    { "slug": "nigerian-drafts", "name": "Draft (Nigerian Draughts)", "emoji": "🦾", "status": "soon", "origins": [{ "country": "Nigeria", "flag": "🇳🇬" }], "history": "A localized, hyper-aggressive version of checkers with unique board rules and street play." },
-    { "slug": "whon", "name": "Whon", "emoji": "🃏", "status": "soon", "origins": [{ "country": "Nigeria", "flag": "🇳🇬" }], "history": "A fast-paced native card-shedding game unique to Nigerian local deck culture." },
-    { "slug": "senet", "name": "Senet", "emoji": "⛲", "status": "soon", "origins": [{ "country": "Egypt", "flag": "🇪🇬" }], "history": "One of the oldest known board games, dating back to 3100 BCE in Ancient Egypt." },
-    { "slug": "tawla", "name": "Tawla (Egyptian Backgammon)", "emoji": "🎲", "status": "soon", "origins": [{ "country": "Egypt", "flag": "🇪🇬" }], "history": "A localized, fast-paced backgammon variant, the cultural heart of Egyptian cafes." },
-    { "slug": "mehen", "name": "Mehen", "emoji": "🐍", "status": "soon", "origins": [{ "country": "Egypt", "flag": "🇪🇬" }], "history": "An ancient Egyptian game mimicking a coiled snake and a journey through the underworld." },
-    { "slug": "morabaraba", "name": "Morabaraba", "emoji": "🐄", "status": "soon", "origins": [{ "country": "South Africa", "flag": "🇿🇦" }], "history": "A traditional two-player abstract strategy board game with a 12-man layout mimicking cattle herding." },
-    { "slug": "diketo", "name": "Diketo", "emoji": "🪨", "status": "soon", "origins": [{ "country": "South Africa", "flag": "🇿🇦" }], "history": "An indigenous hand-eye coordination game played with small stones and a shallow pit." },
-    { "slug": "nshuva", "name": "Nshuva", "emoji": "🫘", "status": "soon", "origins": [{ "country": "South Africa", "flag": "🇿🇦" }], "history": "A traditional four-row strategic Mancala board game played across Southern Africa." }
+    {
+      "slug": "ludo",
+      "name": "Ludo",
+      "emoji": "🎲",
+      "status": "live",
+      "play": "/games/ludo-lab/",
+      "origins": [
+        {
+          "country": "India",
+          "flag": "🇮🇳"
+        },
+        {
+          "country": "United Kingdom",
+          "flag": "🇬🇧"
+        }
+      ],
+      "history": "Ludo descends from Pachisi, the ancient cross-and-circle board game of India (played by Mughal emperor Akbar). The modern name and packaging were introduced in England in 1891, so Ludo belongs to both countries.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "mahjong",
+      "name": "Mahjong",
+      "emoji": "🀄",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "China",
+          "flag": "🇨🇳"
+        }
+      ],
+      "history": "The ultimate Qing-dynasty tile-matching strategic game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 3600,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "weiqi",
+      "name": "Go (Weiqi)",
+      "emoji": "⚫",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "China",
+          "flag": "🇨🇳"
+        }
+      ],
+      "history": "A 2,500-year-old abstract game of territorial capture.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "move",
+        "turnSecs": 120,
+        "matchSecs": 5400,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "xiangqi",
+      "name": "Xiangqi",
+      "emoji": "♟️",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "China",
+          "flag": "🇨🇳"
+        }
+      ],
+      "history": "Traditional Chinese chess simulating a battlefield.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "move",
+        "turnSecs": 120,
+        "matchSecs": 3600,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "pachisi",
+      "name": "Pachisi / Chaupar",
+      "emoji": "🛡️",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "India",
+          "flag": "🇮🇳"
+        }
+      ],
+      "history": "The ancient cross-and-circle board game that birthed modern Ludo.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 3600,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "carrom",
+      "name": "Carrom",
+      "emoji": "🎯",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "India",
+          "flag": "🇮🇳"
+        }
+      ],
+      "history": "A beloved tabletop strike-and-pocket disc game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 45,
+        "matchSecs": 1800,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "kabaddi",
+      "name": "Kabaddi",
+      "emoji": "🤼",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "India",
+          "flag": "🇮🇳"
+        }
+      ],
+      "history": "A traditional, highly athletic tag-and-defense sport.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 1800,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "monopoly",
+      "name": "Monopoly",
+      "emoji": "🏠",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United States",
+          "flag": "🇺🇸"
+        }
+      ],
+      "history": "Derived from The Landlord's Game and commercialized in the 1930s.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 8,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 3600,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "scrabble",
+      "name": "Scrabble",
+      "emoji": "🔤",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United States",
+          "flag": "🇺🇸"
+        }
+      ],
+      "history": "The iconic Depression-era word-building board game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 90,
+        "matchSecs": 3600,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "cornhole",
+      "name": "Cornhole",
+      "emoji": "🎯",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United States",
+          "flag": "🇺🇸"
+        }
+      ],
+      "history": "A classic American backyard lawn bean-bag tossing game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 1200,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "jogo-do-bicho",
+      "name": "Jogo do Bicho",
+      "emoji": "🦁",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Brazil",
+          "flag": "🇧🇷"
+        }
+      ],
+      "history": "A deeply rooted 19th-century animal-themed lottery system.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "truco",
+      "name": "Truco",
+      "emoji": "🃏",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Brazil",
+          "flag": "🇧🇷"
+        }
+      ],
+      "history": "A fast-paced, loud, competitive card game based heavily on bluffing.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 1800,
+        "resultModel": "score"
+      }
+    },
+    {
+      "slug": "futevolei",
+      "name": "Futevolei (Footvolley)",
+      "emoji": "🏐",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Brazil",
+          "flag": "🇧🇷"
+        }
+      ],
+      "history": "Beach volleyball played entirely with football rules, no hands.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "congklak",
+      "name": "Congklak",
+      "emoji": "🫘",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Indonesia",
+          "flag": "🇮🇩"
+        }
+      ],
+      "history": "The traditional Indonesian seed-sowing Mancala board game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "gobak-sodor",
+      "name": "Gobak Sodor (Galasin)",
+      "emoji": "🏃",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Indonesia",
+          "flag": "🇮🇩"
+        }
+      ],
+      "history": "A field game centered on crossing lines guarded by defenders.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "bola-bekel",
+      "name": "Bola Bekel (Beklan)",
+      "emoji": "⚽",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Indonesia",
+          "flag": "🇮🇩"
+        }
+      ],
+      "history": "An intricate traditional jack game using a rubber ball and brass pieces.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "shogi",
+      "name": "Shogi",
+      "emoji": "♟️",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Japan",
+          "flag": "🇯🇵"
+        }
+      ],
+      "history": "Japanese chess where captured pieces can be dropped back onto the board.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "move",
+        "turnSecs": 120,
+        "matchSecs": 5400,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "hanafuda",
+      "name": "Hanafuda",
+      "emoji": "🌸",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Japan",
+          "flag": "🇯🇵"
+        }
+      ],
+      "history": "Traditional flower cards used for matching and strategy games.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "sugoroku",
+      "name": "Sugoroku",
+      "emoji": "🎲",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Japan",
+          "flag": "🇯🇵"
+        }
+      ],
+      "history": "An ancient Japanese dice-and-board race game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "mensch",
+      "name": "Mensch aergere dich nicht",
+      "emoji": "🎲",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Germany",
+          "flag": "🇩🇪"
+        }
+      ],
+      "history": "The iconic Man, Don't Get Angry cross-and-circle game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "skat",
+      "name": "Skat",
+      "emoji": "🃏",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Germany",
+          "flag": "🇩🇪"
+        }
+      ],
+      "history": "Germany's national 3-player trick-taking card game dating to 1820.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "catan",
+      "name": "The Settlers of Catan",
+      "emoji": "🏝️",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Germany",
+          "flag": "🇩🇪"
+        }
+      ],
+      "history": "The acclaimed board game that launched the Eurogame revolution.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "yut-nori",
+      "name": "Yut Nori",
+      "emoji": "🥢",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Korea",
+          "flag": "🇰🇷"
+        }
+      ],
+      "history": "A traditional New Year board game played by casting four marked wooden sticks.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "go-stop",
+      "name": "Go-Stop",
+      "emoji": "🎴",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Korea",
+          "flag": "🇰🇷"
+        }
+      ],
+      "history": "A fast-paced tactical card game played with traditional Hwatu flower decks.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "janggi",
+      "name": "Janggi",
+      "emoji": "♟️",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Korea",
+          "flag": "🇰🇷"
+        }
+      ],
+      "history": "The tactical Korean evolution of ancient chess.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "royal-ludo",
+      "name": "Royal Ludo",
+      "emoji": "👑",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United Kingdom",
+          "flag": "🇬🇧"
+        }
+      ],
+      "history": "The commercialized, patented 1896 version of Pachisi.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "pub-darts",
+      "name": "Pub Darts",
+      "emoji": "🎯",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United Kingdom",
+          "flag": "🇬🇧"
+        }
+      ],
+      "history": "Traditional precision target tossing popular in British pubs.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "cribbage",
+      "name": "Cribbage",
+      "emoji": "🃏",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "United Kingdom",
+          "flag": "🇬🇧"
+        }
+      ],
+      "history": "A historic 17th-century trick-and-board card game.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "petanque",
+      "name": "Petanque",
+      "emoji": "⛳",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "France",
+          "flag": "🇫🇷"
+        }
+      ],
+      "history": "A traditional Southern French outdoor sport of tossing heavy metal boules near a target ball.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "belote",
+      "name": "Belote",
+      "emoji": "🃏",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "France",
+          "flag": "🇫🇷"
+        }
+      ],
+      "history": "A classic 32-card trick-taking game, the national card game of France.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "jeu-de-loie",
+      "name": "Jeu de l'Oie",
+      "emoji": "🦢",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "France",
+          "flag": "🇫🇷"
+        }
+      ],
+      "history": "The historic prototype for modern roll-and-move racing board games.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "ayo-olopon",
+      "name": "Ayo Olopon",
+      "emoji": "🫘",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Nigeria",
+          "flag": "🇳🇬"
+        }
+      ],
+      "history": "A traditional Yoruba abstract strategy board game played on a wooden block with 12 holes and seeds.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "nigerian-drafts",
+      "name": "Draft (Nigerian Draughts)",
+      "emoji": "🦾",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Nigeria",
+          "flag": "🇳🇬"
+        }
+      ],
+      "history": "A localized, hyper-aggressive version of checkers with unique board rules and street play.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "whon",
+      "name": "Whon",
+      "emoji": "🃏",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Nigeria",
+          "flag": "🇳🇬"
+        }
+      ],
+      "history": "A fast-paced native card-shedding game unique to Nigerian local deck culture.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "senet",
+      "name": "Senet",
+      "emoji": "⛲",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Egypt",
+          "flag": "🇪🇬"
+        }
+      ],
+      "history": "One of the oldest known board games, dating back to 3100 BCE in Ancient Egypt.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "tawla",
+      "name": "Tawla (Egyptian Backgammon)",
+      "emoji": "🎲",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Egypt",
+          "flag": "🇪🇬"
+        }
+      ],
+      "history": "A localized, fast-paced backgammon variant, the cultural heart of Egyptian cafes.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "mehen",
+      "name": "Mehen",
+      "emoji": "🐍",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Egypt",
+          "flag": "🇪🇬"
+        }
+      ],
+      "history": "An ancient Egyptian game mimicking a coiled snake and a journey through the underworld.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "morabaraba",
+      "name": "Morabaraba",
+      "emoji": "🐄",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Africa",
+          "flag": "🇿🇦"
+        }
+      ],
+      "history": "A traditional two-player abstract strategy board game with a 12-man layout mimicking cattle herding.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "diketo",
+      "name": "Diketo",
+      "emoji": "🪨",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Africa",
+          "flag": "🇿🇦"
+        }
+      ],
+      "history": "An indigenous hand-eye coordination game played with small stones and a shallow pit.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "nshuva",
+      "name": "Nshuva",
+      "emoji": "🫘",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "South Africa",
+          "flag": "🇿🇦"
+        }
+      ],
+      "history": "A traditional four-row strategic Mancala board game played across Southern Africa.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    }
   ]
 }

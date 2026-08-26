@@ -337,6 +337,63 @@
       ]
     },
     {
+      "name": "cancel_agm_order",
+      "discriminator": [
+        200,
+        11,
+        238,
+        159,
+        23,
+        131,
+        165,
+        171
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "cancel_competition",
       "discriminator": [
         62,
@@ -3043,6 +3100,63 @@
       ]
     },
     {
+      "name": "match_agm_order",
+      "discriminator": [
+        91,
+        67,
+        195,
+        14,
+        139,
+        212,
+        189,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "migrate_points",
       "docs": [
         "(M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)",
@@ -3140,6 +3254,75 @@
         {
           "name": "game_tag",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "post_agm_order",
+      "discriminator": [
+        56,
+        199,
+        48,
+        135,
+        119,
+        207,
+        97,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  97,
+                  103,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "stake_usd_cents",
+          "type": "u64"
+        },
+        {
+          "name": "seats",
+          "type": "u8"
         }
       ]
     },
@@ -4889,6 +5072,19 @@
       ]
     },
     {
+      "name": "AgmOrder",
+      "discriminator": [
+        123,
+        185,
+        41,
+        16,
+        120,
+        220,
+        57,
+        68
+      ]
+    },
+    {
       "name": "Competition",
       "discriminator": [
         193,
@@ -5338,6 +5534,55 @@
           {
             "name": "paid_period_count",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgmOrder",
+      "docs": [
+        "Arc2 M1 (item E): game-AGNOSTIC AGM order (maker/taker). Money only - the",
+        "game is chosen by the maker (one game per order) and the game's rules",
+        "profile lives in the games registry (config), not here. All games plug in."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_usd_cents",
+            "type": "u64"
+          },
+          {
+            "name": "seats",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "taker",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
           }
         ]
       }
