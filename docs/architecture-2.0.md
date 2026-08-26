@@ -1,77 +1,73 @@
-# GlobalFolkGames — Architecture 2.0 (draft spec for review — NOT built yet)
+# GlobalFolkGames — Architecture 2.0 (FINAL DRAFT for review — NOT built yet)
 
-Goal: turn the platform into a **gassless, all-on-chain, people-to-people native-game arena** where the earn economy is player/brand-funded (not platform-funded), payments are direct crypto (Solana-first), and every rule is transparent and verifiable. This is the redraw; the current M1-M11 architecture is preserved and remains the guide for everything already shipped.
+Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn = P2P / P2C / Leverage only. No "earn competitions", no local/international split, no subsidized pools. The existing M1-M11 architecture (shipped modules, seams, universal folders, identity = GFG handle) is preserved and is the foundation; v2 rebuilds the M1 game core around multiplayer + matched play, and layers the earn rails on the same seams.
 
 ## 0. Principles (non-negotiable)
-- ER/gassless first: users never sign per-action or pay fees (embedded Dynamic wallet silently signs; sponsor/relay covers ER). Base layer only where necessary: funding a match, withdrawing winnings to a wallet, one-time initialize/delegate.
-- Everything that the user trusts us on lives on-chain (pools, boards, winners, escrow, fees). No hidden server state for money.
-- No token sale, no resellable NFT marketing; early-backer contributions optional and relevant later (see §9).
-- International + local coexist: each earn competition either Local (NG, any country) or International, priced and redeemed in its currency/asset.
-- Anti-abuse by design: max turn clock, match time caps, no cancel-on-loss, on-chain board, reputation system.
+1. **Everything that is money/trust lives on-chain.** Pools, locks, boards, winners, fees, payouts, margin, stop-losses. There is no hidden off-chain state that affects value.
+2. **Gasless for the player.** They never sign per action or feel fees. The embedded Dynamic wallet silently signs; the ER does the execution.
+3. **About the "relay" (honest answer to your question):** a server-side *signer* is unavoidable in every system, because a private key must live somewhere and 'watching' an inbox/settling at a trigger is off-chain automation. What we guarantee: the relay **never holds or controls value**; every action it takes is a signed on-chain transaction anyone can verify (payments, credits, escrow releases, payouts). Its only authority is what the program's rules give it (admin/creator gates), and the contract's on-chain state is the single source of truth. There is no off-chain ledger, balance, or hidden rule.
+4. **Base layer only where required**: funding a match/pool, withdrawing to a wallet, one-time initialize/delegate. Everything else ER (gasless).
+5. No token, no resellable NFT, no VC. Early-backer contributions are escrowed on-chain with time-based profit-share claims (see §7).
 
-## 1. Earn format — the two engines (2-in-1, like CEX+DEX)
-The earn layer is inspiration from CEX (one platform-funded liquidity pool) and DEX (community-provided liquidity):
-- **Option 2P · P2C (platform computer, CEX-like):** the platform funds a bank of computer seats so there is always a maker/taker to match. Players can always see an opponent is labelled `(Computer)` or `(Human)`, check rating/lives/level, accept or reject. Platform sets the universal reward split; platform takes a fee from each finished pool.
-- **Option 1P · P2P (player vs player, DEX-like):** the **Automated Game Matcher (AGM, invented by Solomon Foskaay)** matches open orders: a player posts an order ($1–$1,000 stake), AGM finds a counterpart (or N-way for 3–20 players), both approve (they can inspect each other's profile/rating), escrow locks both stakes, game runs, and the platform's published formula splits the pool to the winners. AGM is the match-maker only; the money is player-to-player.
-- **Future: cross-chain** for non-Solana wallets (EVM via Dynamic embedded EVM wallet later; Solana-first for beta).
-- Fees: a sustainable 5–20% sliding (higher stakes = lower %). Premium plans stay for lives/points/ad-free/boost (covers gas), separate from match fees.
+## 1. M1 v2 — Game core with multiplayer
+- Rebuild M1 around **multiplayer** while keeping the M2 result seam: every game emits `publishGameResult` exactly as today.
+- Modes (per game): Solo (vs computer, free, points only), P2P (2-4 real players via match code or random), and Earn modes below.
+- Deterministic game logic + **on-chain board/move state** for any match that involves value (could be heavy; we ship move-hashes + committed board snapshots at checkpoints; final settlement on-chain). Confirm with MagicBlock ER limits during build (see §9).
+- Turn clocks + match time caps enforced by the program/time service (§4).
 
-### Liquidity for P2C (the hard part) — honest trade-off analysis (research summary)
-- CEX-like: the platform seeds the computer bank so there are always fills. Risk: players "solve" the computer over time → net losses the platform cannot claw back. This is real and irreversible (unlike a token price that might recover).
-- DEX-like community liquidity: others deposit SOL/USDC into the AGM bank, earn a share of match fees + possibly game-wins. Risk of **impermanent/banking loss**: if the computers net-lose to skilled players, contributors lose principal irreversibly.
-- Recommended mitigations to make contributing attractive without tricking players:
-  1. **Loss-protection reserve:** keep a platform reserve that tops up contributors (capped % of principal) paid from the platform's own fee revenue, so contributors never lose principal below a floor and the platform absorbs tail loss.
-  2. **Fee-shared wins, not full wins:** contributors share a defined slice (e.g., 50% of platform fee + calibrated win-share), not the whole upside/loss; keeps EV better and bounded.
-  3. **Bounded exposure/limits:** hard caps (per contributor, per day) so nobody can drain.
-  4. Computer difficulty is skill-banded and re-balanced from on-chain history (transparent rules, not rigged).
-  5. Staggered settlement (daily/weekly) + withdrawal cooldown to keep the bank stable.
-- Recommendation: launch with **platform-funded P2C bank, small stakes, tight own-loss cap**; add community contribution as a **second phase** only after live win/loss data to calibrate honest EV. This avoids the DEX-flaw of early contributors fleeing after real losses.
+## 2. Earn engines (2-in-1, CEX bank + DEX community)
+- **P2C (platform computer, CEX-like "bank"):** the platform funds a pool of computer seats so matches always have a counterpart. Opponents are always labelled `(Computer)` vs `(Human)` with skill band; players accept/reject. Platform publishes the reward formula and takes its fee from the finished pool.
+- **P2P (player vs player):** the **Automated Game Matcher (AGM, invented by Solomon Foskaay)** matches open orders. Player posts an order ($1..$1,000 stake), AGM matches a counterpart (2-way; N-way up to 20 for tournaments), both approve (profile/rating visible, reject allowed), escrow locks both stakes, game runs, the published split pays winners. AGM matches only; money is player-to-player.
+- **Leverage (prop-style):** player posts collateral; the bank extends X multiples on a declared **stop-loss floor**; auto stop is executed on-chain. Player can only lose their collateral; the platform's exposure is capped by the risk floor and a per-round fee. Phase-2 (needs banker accounting + on-chain stop execution).
+- **Liquidity honesty (research, from your ORIGINAL insight):** community contributors to the P2C bank can earn fee-share + calibrated win-share, but real irreversible losses are possible. Mitigations we will build, in order:
+  1. Platform-funded P2C bank **first** (small stakes, own-loss cap) to gather live win/loss data before letting anyone else contribute;
+  2. Loss-protection reserve paid from platform fees (floor protects contributor principal, platform absorbs tail loss);
+  3. Bounded exposure caps per contributor/day;
+  4. Staggered settlement + withdrawal cooldown;
+  5. No rigged computers: difficulty bands set transparently from on-chain history.
+- Fees: 5–20% sliding by stake; Premium plans stay as the separate comfort/gas subscription (lives, points, ad-free, booster, bigger daily).
 
-### Leverage (Option 3)
-Suggested framing that protects the platform: **"prop-style" banked loans** — a player stakes a collateral + platform lends X times on a **loss-floor stop** (auto-exit at a predeclared stop level), fee charged per round, and any automatic stop-loss is executed on-chain. Player can only lose their collateral (never more); the platform never covers a win with borrowed funds beyond the declared risk cap. Treat as a Phase-2, requires a banker model + careful on-chain stop execution.
+## 3. Match rules / anti-abuse (all earn modes)
+- Max match time: 30 min (2p) / 45 min (3p) / 60 min (4p+), per-game override.
+- Max turn time per game (e.g., Ludo 60s): idle → the turn passes / auto-moves per game logic; stalling impossible.
+- No cancel on loss: once stakes lock, only a rules draw or platform-infra refund ends it.
+- Reputation/rating per game, visible to match parties; computers carry a fixed band label.
 
-## 2. Match rules / anti-abuse (applies to all earn games)
-- Max match time: 30 min (2 players) / 45 min (3) / 60 min (4); configurable downward by game.
-- Max turn time per player (per game constant, e.g., Ludo 60s): idle timeouts skip the player and pass the turn (their pieces may auto-advance per game rules). Stall is impossible.
-- No reset/cancel mid-match once stakes lock (except agreed draw / platform infra failure → refund escrow).
-- Board/moves are committed on-chain; result is settled by the same verification pipeline (proof rolls + result signature → seam → escrow distribution).
-- Reputation/rating per game (win/loss history), visible to match parties; computers carry a fixed band (e.g., "Computer · Mid").
+## 4. Payments & payouts (crypto-first, honest)
+- **Solana-first (beta):** pay with the user's embedded Dynamic SOL wallet or any external wallet; **Solana Pay / SPL transfer (USDC/USDT/SOL)** to the sponsor key, with a memo order id. Instant on-chain credit of premium points/upgrade to the **same embedded wallet** the site reads (existing Upgrade flow completes it). Low/near-zero fees, global, no business-registration gate. EVM stablecoins (USDC) later via Dynamic embedded EVM wallet.
+- Payouts: on-chain (to the player's embedded/wallet), or escrow release to winners; small amounts batched/credited as points when on-chain transfer economics would eat the value.
 
-## 3. Payments (international, crypto-first)
-- **Solana-first (beta):** user pays with their embedded Dynamic SOL wallet which we fund by guiding them to a faucet/exchange deposit; payments are **Solana Pay** (request) or a plain SPL transfer (USDC/USDT/SOL) to the sponsor wallet. Exceptionally low fees, global, no KYC/business-registration gate.
-- **Automation:** the relay watches incoming transfers to the sponsor wallet (or a pay request ref), **verifies amount + memo**, then instantly credits the buyer's on-chain premium points **on their own embedded wallet's premium PDA** (same account the site reads) → they use the existing Upgrade page to activate. Buildable together now; full auto-activation (upgrade on payment) is also buildable later since the credit already unlocks it — see proposed flow box below.
-- Cross-chain stablecoin acceptance (USDC/USDT/USDG on EVM) is Phase-2 via Dynamic's embedded EVM wallet, same pattern.
-- Abnormal-profit checks, memo-based order IDs to bind a payment to a purchase; on-chain receipt for every purchase.
+## 5. Platform money model (sustainability — earn is NOT subsidized)
+- Revenue: match fees (5–20%), Premium plans, competitive entry (S point or S-credit), affiliate 20%, later merch/ads/escrow.
+- Earn pools come from players (P2P escrow) or the platform P2C bank's own capital; no grants to keep competitions going.
+- Devnet launch: everyone plays free (devnet SOL is free) to prove the pipeline; mainnet funding via early-backer escrow or grants (Solana Foundation / MagicBlock) with fully on-chain accounting.
 
-## 4. Competitions split local vs international
-- Local (NG, then per-country): pool + reward in that country's currency/airtime (existing structure).
-- International (stablecoin/USD): winners paid in USDC to the embedded wallet; consider ≥5 winners (fewer, larger) so on-chain transfer fees remain worth paying on small amounts; micro-rewards (<$0.10) are batched or credited as points to avoid transfer economics.
-- Both read the same Final-Points board + gfgwin winners; payout mode differs by instance (manual local manual Naira/airtime; international direct transfer).
+## 6. On-chain inventory needed (build list, all additive)
+- Escrow match vault per game/players (`[gfgms, …]`), order book / AGM state, settlement + fee split.
+- P2C bank + risk caps account.
+- Turn-clock + match-time commit.
+- Leverage margin + on-chain stop (Phase-2).
+- Winners → player points/ledger + optional direct USDC payout.
+- No changes to existing M3-M11 seeds/layouts.
 
-## 5. Platform money model (sustainability)
-- Sources: match/competition fees (5–20%), Premium plans (lives/points/ads-free/booster), 500P competition entry, affiliate 20%, future merch/ads/escrow rake.
-- Earn competitions stop being subsidized from platform re-serves: their pools come from entrant fees + sponsor funding when a brand pays in.
-- Launch: devnet = everyone plays free (devnet SOL is free), proving the pipeline; mainnet funding via early-backer contributions or grants (Solana Foundation / MagicBlock) with on-chain accounting (escrow, claims, no token sale).
+## 7. Early backer (no token, no resellable NFT)
+- $100–$500 contributions toward the ~100 SOL mainnet runway via on-chain escrow; backers get 1–3 years of highest membership + a percentage share of platform revenue over that band, claimable (daily/weekly/monthly) on-chain; distribution ends at the term. Uses the same on-chain accounting/escrow so every income stream is traceable.
 
-## 6. On-chain inventory needed (additive; list for the build phase)
-- P2P: escrow match vault per game (`[gfgms, players…]`), order/AGM state, settlement, fee split.
-- P2C: computer bank account + risk caps.
-- Anti-abuse: turn-clock + match-time commit.
-- Rewards: winners → player points/ledger + optional direct USDC payout from sponsor.
-- All additive seeds; no re-design of what exists (M1-M11 preserved).
+## 8. What does NOT change in v2
+M1-M11 seams & universal folders, GFG-handle identity, ER-gassless-first, base-layer rules, homepage anti-copy wording, Beta badge, tooling/run-sheet, brand colors, no-token stance; the old earn competition module (M7 launch) is **retired from v2** (superseded by the AGM engines).
 
-## 7. Research grounding (to verify during build)
-- MagicBlock ER: gasless execution layer; confirm SPL token account support inside ER sessions vs base-layer for settlements (funding/withdrawal base-layer is fine).
-- Solana Pay spec + SPL Transfer for the payment link/QR; memo for order binding.
-- Spl Token/Token-2022 for USDC/USDT; balances visible on-chain for auto-verify.
-- AMM/impairment-loss literature for the P2C liquidity pool honesty (see §1).
+## 9. Research to confirm before/while building
+- MagicBlock ER: limits on arbitrary read/simple state per tx; whether on-chain board snapshots per turn are affordable vs commit-hash+checkpoint.
+- Solana Pay + SPL transfer for payments; memo binding; balances on-chain.
+- Token-2022 for USDC/USDT; base-layer settlement for escrow/payoffs.
+- AMM/impermanent-loss literature for the P2C bank (already summarized in §2) and on-chain stop mechanics for leverage.
 
-## 8. Open questions for you to decide
-1. Sliding fee table (exact %s per stake band) — pick a default table for the build.
-2. Computer-difficulty banding + whether computers can be beaten net-of-fees (affects P2C bank economics).
-3. Keep Premium plans as the "gas/comfort" subscription while match fees are separate? (Recommendation: yes.)
-4. Entry rework: keep 500P competition entry or replace with direct $s to reduce friction (you mentioned possibly lowering/removing to grow P2P orders).
-5. Receive the $10K early-backer as (a) escrowed SOL with 1–3yr profit-share claims, (b) grants-first, or (c) both.
+## 10. Open decisions before we build (want your picks)
+1. Fee table (default: \$1-\$10=10%, \$10-\$100=7%, \$100+\$1000=5% — confirm or set your own).
+2. P2C computer difficulty bands & whether the bank must net-break-even per month.
+3. Keep Premium plans separate from match fees (recommendation: yes).
+4. Competitive entry: keep S-credit entry or drop to reduce P2P friction.
+5. Funding: early-backer escrow vs grants-first vs both.
+6. Multiplayer real-time latency target (e.g., cross-turn ≤ 5s) and whether any game ships P2P at launch or solo+P2C first.
 
-## 9. Not going to change in 2.0
-M1-M11 modules, seams, universal folders, identity=GFG handle, ER-gassless-first, anti-crypto wording on the homepage, Beta badge, the run-sheet/dashboard tooling, the logo/background, and the send/earn rules already tested.
+Finalize these six and the doc becomes the build guide; we start the M1 v2 rebuild (multiplayer + AGM seams) from there.
