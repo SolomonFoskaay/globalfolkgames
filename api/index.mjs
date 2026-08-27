@@ -29,6 +29,7 @@ const routes = {
   '/api/competitions': competitions,
   '/api/plans': plans,
   '/api/agm': agm,
+  '/api/agm/balances': agm,
   '/api/delegate': delegate,
   '/api/roll': roll,
   '/api/comp': comp,

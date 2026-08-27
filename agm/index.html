@@ -47,7 +47,7 @@
 <body>
 <div class="wrap">
     <h1 style="font-size:1.3rem;margin:0 0 4px;">Earn Competition (AGM)</h1>
-    <p class="hint" style="margin:0 0 12px;"><b>AGM</b> means <b>Automated Game Matchmaking</b>: a first-of-its-kind idea for games, invented by the founder of GlobalFolkGames, Solomon Foskaay. It borrows the best of the trading world (CEX and DEX) and turns a gameplay match into something the players can open, take, and settle, just like a token or an NFT. The point is simple: native gamers show their prowess against players worldwide, and the winner of each match earns a share of the competition pot. Every step is recorded on a chain you can check.</p>
+    <p class="hint" style="margin:0 0 12px;"><b>AGM</b> means <b>Automated Game Matcher</b>: a first-of-its-kind idea for games, invented by the founder of GlobalFolkGames, Solomon Foskaay. It borrows the best of the trading world (CEX and DEX) and turns a gameplay match into something the players can open, take, and settle, just like a token or an NFT. The point is simple: native gamers show their prowess against players worldwide, and the winner of each match earns a share of the competition pot. Every step is recorded on a chain you can check.</p>
 
     <div class="bar">
         <span>Wallet: <b id="wallet">not signed in</b></span>
@@ -133,7 +133,7 @@
             Gasless and quiet: posting, taking, locking and settling are all signed
             for you automatically, so there are no wallet pop-ups and nothing to pay
             for network fees. Same for the games themselves.<br><br>
-            <b>AGM</b> = Automated Game Matchmaking, the system that opens, takes and settles matches.<br>
+            <b>AGM</b> = Automated Game Matcher, the system that opens, takes and settles matches.<br>
             <b>P2P</b> = Player vs Player, both seats are real humans.<br>
             <b>P2C</b> = Player vs Computer, a computer seat fills the match so no one waits.<br>
             <b>Pot</b> = the prize pool: every player's prize level added together.<br>
@@ -221,67 +221,94 @@
     }
 
     // Balances card shows ALL coins you hold; under the Prize level only USDC
-    // matters (that is the one match coin), so you can see if you can cover a
-    // level before you post.
-    let usdcBalance = null;
+    // matters (the match coin), so you can see if you can cover a level before
+    // you post. If the balance can't be read we say so clearly and let you post
+    // anyway - the button is never stuck.
+    let usdcBalance = null; // null = unknown/loading
+    let balanceState = 'loading'; // loading | ok | error
     const fmt = (v) => '$' + Number(v).toFixed(2);
     async function loadBalance() {
         const ci = $('coinsInfo'); if (!ci) return;
         if (!wallet) { ci.textContent = 'Your balances appear once your session is ready.'; return; }
+        balanceState = 'loading';
         ci.innerHTML = '<span class="hint">Reading your balances...</span>';
+        refreshStakeGuard();
+        const ac = new AbortController();
+        const to = setTimeout(() => ac.abort(), 15000);
         try {
-            const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store' });
+            const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store', signal: ac.signal });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
             const j = await r.json();
-            if (j.error) { usdcBalance = null; ci.innerHTML = '<span class="hint">Balance look-up failed: ' + (j.error || 'unknowerr') + '</span>'; return; }
+            if (j.error) { balanceState = 'error'; usdcBalance = null; refreshStakeGuard(); ci.innerHTML = '<span class="hint">Balance not available right now: ' + (j.error || '') + '</span>'; return; }
             const sol = Number(j.sol != null ? j.sol : 0);
             usdcBalance = Number(j.usdc != null ? j.usdc : 0);
             const usdt = Number(j.usdt != null ? j.usdt : 0);
             const usdg = Number(j.usdg != null ? j.usdg : 0);
+            balanceState = 'ok';
             ci.innerHTML = 'SOL ' + sol.toFixed(2) + ' &nbsp;·&nbsp; USDC <b>' + usdcBalance.toFixed(2) + '</b> &nbsp;·&nbsp; USDT ' + usdt.toFixed(2) + ' &nbsp;·&nbsp; USDG ' + usdg.toFixed(2) + ' <span class="hint">(devnet test coins)</span>';
-            // Under the Prize level: the one coin that funds a match.
             const bd = $('balDisplay');
             if (bd) {
                 bd.style.display = '';
-                bd.innerHTML = '<span style="font-size:0.76rem;color:' + (usdcBalance >= Number($('f_stake').value) ? '#2ecc71' : '#e74c3c') + ';">USDC available: <b>' + usdcBalance.toFixed(2) + '</b> of the level you pick below</span>';
+                const ok = usdcBalance >= prizeUsdc();
+                bd.innerHTML = '<span style="font-size:0.76rem;color:' + (ok ? '#2ecc71' : '#e74c3c') + ';">USDC available: <b>' + usdcBalance.toFixed(2) + '</b> for the level below</span>';
             }
+        } catch (e) {
+            balanceState = 'error';
+            usdcBalance = null;
+            ci.innerHTML = '<span class="hint">Balance not available right now' + (e && e.name === 'AbortError' ? ' (timed out)' : '') + '. You can still post a match on devnet.</span>';
+        } finally {
+            clearTimeout(to);
             refreshStakeGuard();
-        } catch (e) { usdcBalance = null; ci.innerHTML = '<span class="hint">Balance look-up failed: ' + (e.message || 'err') + '</span>'; }
+        }
     }
 
-    // Live guard: if the chosen prize level costs more USDC than you hold, the
-    // button stays disabled with a clear reason (never silent).
+    // Live guard: block posting ONLY when we actually know the USDC balance and
+    // it is too low for the chosen level. When the balance is unknown, we let
+    // the user post (devnet testing) instead of leaving the button stuck.
     function prizeUsdc() { return Number($('f_stake').value) || 0; }
     function refreshStakeGuard() {
         const btn = $('postBtn');
         const err = $('postErr');
         if (!btn || !err) return;
         if (!wallet) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Sign in to post a match.'; err.style.display = 'block'; return; }
-        if (usdcBalance == null) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Checking your USDC balance...'; err.style.display = 'block'; return; }
-        if (prizeUsdc() > usdcBalance) {
+        if (usdcBalance != null && prizeUsdc() > usdcBalance) {
             btn.setAttribute('disabled', 'disabled');
             err.textContent = 'Not enough USDC: this level costs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.';
             err.style.display = 'block';
-        } else {
-            btn.removeAttribute('disabled');
-            err.style.display = 'none';
+            return;
         }
+        if (usdcBalance == null && balanceState === 'loading') {
+            btn.setAttribute('disabled', 'disabled');
+            err.textContent = 'Checking your USDC balance...';
+            err.style.display = 'block';
+            return;
+        }
+        // balance ok, or unknown-but-not-loading -> allow post
+        btn.removeAttribute('disabled');
+        err.style.display = 'none';
     }
 
     async function postOrder() {
         const btn = $('postBtn'), err = $('postErr');
         if (!wallet) { log('Please sign in first'); return; }
-        if (usdcBalance != null && prizeUsdc() > usdcBalance) { err.textContent = 'Still not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').'; err.style.display = 'block'; return; }
+        if (usdcBalance != null && prizeUsdc() > usdcBalance) {
+            err.textContent = 'Still not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').';
+            err.style.display = 'block';
+            log('Blocked: not enough USDC for this level.');
+            return;
+        }
         if (btn) btn.setAttribute('disabled', 'disabled');
         log('Posting your match (you are the maker)...');
         try {
             const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet });
-            if (r && r.error) { log('Error: ' + r.error); if (btn) btn.removeAttribute('disabled'); return; }
+            if (r && r.error) { log('Error: ' + r.error); if (btn) btn.removeAttribute('disabled'); if (err) { err.textContent = r.error; err.style.display = 'block'; } return; }
             log('OK match #' + r.orderId + ' is now OPEN on-chain (ref ' + r.pda.slice(0, 10) + '...).');
             if (btn) btn.removeAttribute('disabled');
             loadBalance(); loadOrders();
         } catch (e) {
             log('Error: ' + (e.message || e.error));
             if (btn) btn.removeAttribute('disabled');
+            if (err) { err.textContent = (e.message || e.error); err.style.display = 'block'; }
         }
     }
 
