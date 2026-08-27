@@ -1,21 +1,21 @@
 // scripts/agm-relay.mjs — Arc2 AGM lobby relay core: relay/sponsor signs every
 // on-chain AGM action on behalf of the AUTHENTICATED wallet (passed via maker/
-// taker). An order registry file keeps the lobby listable (order PDAs are not
-// enumerable); statuses are always read live from chain.
+// taker). The order source of truth is the CHAIN (order PDAs scanned live via
+// getProgramAccounts) - never a config/per-instance file, so ids never collide
+// and every reload/instance sees the same real orders.
 import './load-env.mjs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
 const AGM = Buffer.from('gfgagm');
 const AGMS = Buffer.from('gfgagms');
 const P2C_GLOBAL = Buffer.from('gfgp2cbank'); // ONE shared pool across every game
-const REG_FILE = new URL('./.gfg-agm-registry.json', import.meta.url).pathname;
 
 const sponsor = loadSponsor();
 const wallet = { publicKey: sponsor.publicKey, signTransaction: async (t) => { t.partialSign(sponsor); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(sponsor)); return ts; } };
@@ -32,20 +32,7 @@ export function bankPda(_gameIgnored) {
   return PublicKey.findProgramAddressSync([P2C_GLOBAL], PROGRAM)[0]; // shared: all games use the same pool
 }
 
-// Durable registry so the lobby can list open orders across reloads. On Vercel
-// the fs is per-instance; devnet accepted (same as the spend ledger).
-function readRegistry() {
-  try { if (existsSync(REG_FILE)) return JSON.parse(readFileSync(REG_FILE, 'utf8')) || []; } catch (e) {}
-  return [];
-}
-function writeRegistry(list) {
-  try { writeFileSync(REG_FILE, JSON.stringify(list, null, 2)); } catch (e) { /* fail-open */ }
-}
-function nextOrderId() {
-  let n = 900000;
-  for (const o of readRegistry()) n = Math.max(n, Number(o.order_id) || 0);
-  return n + 1;
-}
+
 
 async function sendTx(tx, extraSigners = []) {
   tx.feePayer = sponsor.publicKey;
@@ -153,25 +140,61 @@ function RPC_CANDIDATES() {
   return out;
 }
 
-// ---- actions (relay sponsor signs; maker/taker = the authenticated wallet) ----
+// ---- order index (ids + seed metadata only; every display field comes from
+// the chain). The MagicBlock router chain cannot be enumerated with
+// getProgramAccounts, so the relay keeps the orders it has seen. This is a
+// LIGHT index, NOT the source of truth: each id is re-read on-chain on every
+// list (readOrder), so status/maker/stake/seats/taker are always live. Ids are
+// unix-ms timestamps, so cross-instance collisions are impossible.
+import { existsSync, readFileSync as _readIdx, writeFileSync as _writeIdx } from 'fs';
+const IDX_FILE = new URL('./.gfg-agm-ids.json', import.meta.url).pathname;
+function knownOrders() {
+  try {
+    if (existsSync(IDX_FILE)) {
+      const s = JSON.parse(_readIdx(IDX_FILE, 'utf8'));
+      if (Array.isArray(s)) return s.filter(x => x && x.id != null && x.game != null);
+    }
+  } catch (e) {}
+  return [];
+}
+function rememberOrder(game, orderId, maker, stakeUsdCents, seats) {
+  try {
+    const list = knownOrders();
+    if (!list.some(x => Number(x.id) === Number(orderId))) {
+      list.push({ game: Number(game), id: orderId, maker, stake_usd_cents: Number(stakeUsdCents), seats: Number(seats) });
+      _writeIdx(IDX_FILE, JSON.stringify(list));
+    }
+  } catch (e) { /* fail-open */ }
+}
+
 export async function agmPost({ game, stakeUsdCents, seats, maker }) {
-  const orderId = nextOrderId();
+  const orderId = Date.now();
   const pda = orderPda(game, orderId);
   await sendTx(await prog.methods.postAgmOrder(game, new BN(orderId), new BN(stakeUsdCents), seats, new PublicKey(maker)).accounts({ payer: sponsor.publicKey, order: pda, systemProgram: SystemProgram.programId }).transaction());
-  const list = readRegistry();
-  list.push({ order_id: orderId, game, maker, stake_usd_cents: stakeUsdCents, seats, status: 0, created_at: Date.now() });
-  writeRegistry(list);
+  rememberOrder(game, orderId, maker, stakeUsdCents, seats);
   return { orderId, pda: pda.toBase58(), order: await readOrder(game, orderId) };
 }
 
-export async function agmList({ game, orderId } = {}) {
-  const orders = readRegistry().filter((o) => (game == null || Number(o.game) === Number(game)) && (orderId == null || Number(o.order_id) === Number(orderId)));
-  const out = [];
-  for (const o of orders) {
-    const live = await readOrder(Number(o.game), Number(o.order_id));
-    out.push({ ...o, ...(live || {}), status: live ? live.status : 'missing' });
+export async function agmList({ game, orderId, ids } = {}) {
+  const idx = knownOrders();
+  let entries = idx.slice();
+  if (orderId != null) entries = entries.filter(x => Number(x.id) === Number(orderId));
+  if (ids) {
+    const wanted = String(ids).split(',').map(Number).filter(Boolean);
+    const known = new Set(entries.map(x => Number(x.id)));
+    for (const w of wanted) if (!known.has(w)) entries.push({ game: Number(game) || 1, id: w });
+    // honour the explicit ids list (browser-known orders the relay never saw)
+    entries = entries.filter(x => wanted.includes(Number(x.id)));
   }
-  out.sort((a, b) => b.order_id - a.order_id);
+  if (game != null) entries = entries.filter(x => Number(x.game) === Number(game));
+  const out = [];
+  for (const e of entries) {
+    const g = Number(e.game) || 1;
+    const live = await readOrder(g, Number(e.id));
+    if (!live) { out.push({ order_id: Number(e.id), game: g, status: 'missing' }); continue; }
+    out.push(live);
+  }
+  out.sort((a, b) => Number(b.order_id) - Number(a.order_id));
   return { count: out.length, orders: out };
 }
 
@@ -183,9 +206,6 @@ export async function agmMatch({ game, orderId, taker }) {
   if (taker === order.maker) throw new Error('a wallet cannot match its own order');
   const pda = orderPda(game, orderId);
   await sendTx(await prog.methods.matchAgmOrder(game, new BN(orderId), new PublicKey(taker)).accounts({ signer: sponsor.publicKey, order: pda }).transaction());
-  const list = readRegistry();
-  const o = list.find((x) => Number(x.order_id) === Number(orderId));
-  if (o) { o.status = 2; o.taker = taker; writeRegistry(list); }
   return { order: await readOrder(game, orderId) };
 }
 

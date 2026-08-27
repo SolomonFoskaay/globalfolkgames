@@ -1506,12 +1506,14 @@ pub mod gfg_dice {
     }
 
     // settle_agm_match: finalizes the order once the board (M1) has finished.
-    // finished, so the wallet/escrow rail can pay the 90% winner.
+    // finished, so the wallet/escrow rail can pay the 90% winner. Status becomes
+    // 4 = SETTLED (distinct from 1=locked), so the UI can show Open / Locked /
+    // Settled as three honest on-chain states.
     pub fn settle_agm_match(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
         require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
         let o = &mut ctx.accounts.order;
         require!(o.status == 1, PointsError::NotOpen); // must have been locked (escrow committed)
-        o.status = 1; // FILLED (final)
+        o.status = 4; // SETTLED (final)
         Ok(())
     }
 

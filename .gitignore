@@ -43,3 +43,4 @@ scripts/.gfg-agm-registry.json
 *-keypair.json
 id.json
 ~/.config/solana/
+scripts/.gfg-agm-ids.json

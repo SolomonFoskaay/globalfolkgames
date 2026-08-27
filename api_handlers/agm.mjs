@@ -20,7 +20,8 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const game = url.searchParams.get('game');
       const orderId = url.searchParams.get('orderId');
-      const result = await agmList({ game: game != null ? Number(game) : null, orderId: orderId != null ? Number(orderId) : null });
+      const ids = url.searchParams.get('ids');
+      const result = await agmList({ game: game != null ? Number(game) : null, orderId: orderId != null ? Number(orderId) : null, ids });
       res.status(200).json(result);
       return;
     }
