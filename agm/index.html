@@ -80,9 +80,9 @@
                 <p class="mini">This is you opening a match for other players to take. You are the maker.</p>
                 <label>Game</label>
                 <select id="f_game"><option value="1">Ludo</option></select>
-                <label>Prize level (USD per player)</label>
+                <label>Prize per player (USD)</label>
                 <div class="bal" id="balDisplay" style="display:none;"></div>
-                <p class="mini" id="coinLine" style="margin:2px 0 0;">Matches use one coin only: <b>USDC</b>. Top up in your profile first, then pick a level you can cover.</p>
+                <p class="mini" id="coinLine" style="margin:2px 0 0;">Matches use one coin only: <b>USDC</b>. Top up in your profile first if you need more.</p>
                 <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
                 <label>Players</label>
                 <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
@@ -98,7 +98,7 @@
         </div>
         <div class="card" style="margin-top:12px;">
             <h3>Your balance &amp; the coin in use</h3>
-            <p class="hint">All matches on the arena run in one coin: <b>USDC</b>. The amount you see is the amount you post and the amount the winner receives, with no conversion at the end. Your available USDC is shown below so you can pick a prize level you can cover.</p>
+            <p class="hint">All matches on the arena run in one coin: <b>USDC</b>. The amount you see is the amount you post and the amount the winner receives, with no conversion at the end. Your available USDC is shown under the prize picker so you can choose an amount you can cover.</p>
             <div id="coinsInfo" style="margin-top:8px;"><span class="hint">Reading your balance...</span></div>
         </div>
     </div>
@@ -249,8 +249,7 @@
             const bd = $('balDisplay');
             if (bd) {
                 bd.style.display = '';
-                const ok = usdcBalance >= prizeUsdc();
-                bd.innerHTML = '<span style="font-size:0.76rem;color:' + (ok ? '#2ecc71' : '#e74c3c') + ';">USDC available: <b>' + usdcBalance.toFixed(2) + '</b> for the level below</span>';
+                bd.innerHTML = '<span style="font-size:0.76rem;color:#fff;">Balance: <b style="color:#2ecc71;">' + usdcBalance.toFixed(3) + ' USDC</b></span>';
             }
         } catch (e) {
             balanceState = 'error';
@@ -263,9 +262,11 @@
     }
 
     // Live guard: block posting ONLY when we actually know the USDC balance and
-    // it is too low for the chosen level. When the balance is unknown, we let
+    // it is too low for the chosen prize. When the balance is unknown, we let
     // the user post (devnet testing) instead of leaving the button stuck.
-    function prizeUsdc() { return Number($('f_stake').value) || 0; }
+    // NOTE: the stake <select> values are in cents (300 = $3); convert to
+    // dollars so they compare against the dollar USDC balance.
+    function prizeUsdc() { return (Number($('f_stake').value) || 0) / 100; }
     function refreshStakeGuard() {
         const btn = $('postBtn');
         const err = $('postErr');
@@ -273,7 +274,7 @@
         if (!wallet) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Sign in to post a match.'; err.style.display = 'block'; return; }
         if (usdcBalance != null && prizeUsdc() > usdcBalance) {
             btn.setAttribute('disabled', 'disabled');
-            err.textContent = 'Not enough USDC: this level costs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.';
+            err.textContent = 'Not enough USDC: this match needs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.';
             err.style.display = 'block';
             return;
         }
@@ -294,7 +295,7 @@
         if (usdcBalance != null && prizeUsdc() > usdcBalance) {
             err.textContent = 'Still not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').';
             err.style.display = 'block';
-            log('Blocked: not enough USDC for this level.');
+            log('Blocked: not enough USDC for this prize.');
             return;
         }
         if (btn) btn.setAttribute('disabled', 'disabled');
