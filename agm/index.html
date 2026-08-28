@@ -13,36 +13,66 @@
         .hint { font-size:0.8rem; color:#888; line-height:1.5; }
         label { font-size:0.82rem; color:#aaa; display:block; margin:10px 0 4px; }
         input, select { width:100%; padding:9px 11px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem; box-sizing:border-box; }
-        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+        button { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:700; transition:opacity .15s, transform .1s; }
+        button:active { transform:scale(0.97); }
+        button:disabled { opacity:0.45; cursor:not-allowed; }
         .btn-primary { background:#f87818; color:#000; margin-top:8px; }
         .btn-success { background:#2ecc71; color:#000; }
         .btn-danger { background:#e74c3c; color:#fff; }
         .btn-ghost { background:#1a1a24; color:#bbb; border:1px solid #333; }
-        .btn-sm { padding:6px 10px; font-size:0.75rem; }
         .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
         .row > div { flex:1; min-width:130px; }
-        table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:8px; }
-        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
-        th { background:#1a1a24; color:#f87818; font-size:0.7rem; text-transform:uppercase; }
-        td.mono { font-family:monospace; font-size:0.72rem; word-break:break-all; color:#7838f8; }
         .bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:6px 0 12px; font-size:0.8rem; color:#ccc; }
         .bar b { color:#f87818; }
         .log { background:#0a0a10; border:1px solid #222; border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; color:#9fe8a8; max-height:300px; overflow:auto; white-space:pre-wrap; }
-        .locked { color:#2ecc71; font-weight:700; }
-        .open { color:#f87818; font-weight:700; }
-        .matched { color:#7838f8; font-weight:700; }
-        .settled { color:#2ecc71; font-weight:700; }
         .intro { background:rgba(155,89,182,0.08); border:1px solid rgba(155,89,182,0.35); }
         /* ===== tabs ===== */
-        .tabs { display:flex; gap:8px; margin:14px 0 12px; overflow-x:auto; }
-        .tab { flex:1; min-width:0; padding:10px 6px; border:1px solid #2a2a36; background:#1a1a24; color:#bbb; border-radius:10px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; text-align:center; transition:all .15s; }
+        .tabs { display:flex; gap:8px; margin:14px 0 12px; }
+        .tab { flex:1; min-width:0; padding:10px 6px; border:1px solid #2a2a36; background:#1a1a24; color:#bbb; border-radius:10px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; text-align:center; }
         .tab.active { background:#f87818; border-color:#f87818; color:#000; }
-        .tab.hidden { display:none; }
         .pane { animation:fadein .2s ease; }
         @keyframes fadein { from { opacity:0; transform:translateX(6px); } to { opacity:1; transform:none; } }
+        .sub-tabs { display:flex; gap:8px; margin-bottom:10px; }
+        .sub-tabs .tab { flex:0 0 auto; padding:8px 14px; }
         .swipe-hint { font-size:0.7rem; color:#555; text-align:center; margin:0 0 8px; }
         .mini { font-size:0.72rem; color:#666; line-height:1.4; margin:4px 0 0; }
         .glossary b { color:#f87818; }
+
+        /* ===== order book: card list, mobile-first (no overflowing table) ===== */
+        .obook { display:flex; flex-direction:column; gap:10px; }
+        .oc { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px 14px; }
+        .oc-top { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .oc-id { font-size:0.72rem; color:#888; }
+        .oc-id b { color:#ddd; }
+        .oc-date { font-size:0.7rem; color:#666; }
+        .oc-mid { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; flex-wrap:wrap; }
+        .oc-prize { font-size:1.1rem; font-weight:800; color:#fff; }
+        .oc-prize small { font-size:0.7rem; color:#888; font-weight:600; }
+        .oc-meta { font-size:0.74rem; color:#999; text-align:right; line-height:1.55; }
+        .oc-meta b { color:#fff; }
+        .oc-bot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; flex-wrap:wrap; }
+        .oc-maker { font-size:0.72rem; color:#888; }
+        .oc-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        /* status pills */
+        .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:0.7rem; font-weight:800; }
+        .pill.open { background:rgba(248,120,24,0.15); color:#f87818; border:1px solid rgba(248,120,24,0.4); }
+        .pill.locked { background:rgba(120,56,248,0.15); color:#b08cf6; border:1px solid rgba(120,56,248,0.4); }
+        .pill.matched { background:rgba(120,56,248,0.12); color:#b08cf6; border:1px solid rgba(120,56,248,0.3); }
+        .pill.settled { background:rgba(46,204,113,0.15); color:#2ecc71; border:1px solid rgba(46,204,113,0.4); }
+        .pill.cancelled { background:rgba(231,76,60,0.12); color:#e0877e; border:1px solid rgba(231,76,60,0.3); }
+        .pill.gray { background:rgba(255,255,255,0.05); color:#999; border:1px solid #333; }
+        .oc-empty { text-align:center; color:#777; font-size:0.85rem; padding:20px 0; }
+
+        /* ===== toast ===== */
+        #toast { position:fixed; left:12px; right:12px; bottom:16px; z-index:20000; display:none; }
+        .toast-in { background:#1c1c28; border:1px solid #333; border-left:4px solid #f87818; border-radius:10px; padding:12px 14px; font-size:0.85rem; color:#eee; box-shadow:0 6px 24px rgba(0,0,0,0.5); line-height:1.5; }
+        .toast-in.ok { border-left-color:#2ecc71; }
+        .toast-in.err { border-left-color:#e74c3c; }
+
+        /* ===== post card ===== */
+        .bal-line { font-size:0.78rem; color:#fff; margin:2px 0 4px; }
+        .bal-line b { color:#2ecc71; }
+        .post-err { font-size:0.78rem; color:#ff8a80; margin:8px 0 0; line-height:1.5; }
     </style>
 </head>
 <body>
@@ -52,7 +82,7 @@
 
     <div class="bar">
         <span>Wallet: <b id="wallet">not signed in</b></span>
-        <span>Program: <b id="program">...</b></span>
+        <span>Fees &amp; gas: <b>none</b></span>
     </div>
 
     <div class="tabs" id="tabs">
@@ -72,55 +102,56 @@
                 <li><span class="step">Play:</span> two players, one winner. The prize pool is locked the moment the match is taken.</li>
                 <li><span class="step">Settle:</span> the winner's share is finalized on-chain and ready to be paid out.</li>
             </ol>
-            <p class="hint">The share split is shown clearly on each match before you take it. There is no hidden maths, and the platform share is printed up front so anyone can see it.</p>
         </div>
 
-        <div class="row">
-            <div class="card" style="flex:1; min-width:320px;">
-                <h3>Post a match</h3>
-                <p class="mini">This is you opening a match for other players to take. You are the maker.</p>
-                <label>Game</label>
-                <select id="f_game"><option value="1">Ludo</option></select>
-                <label>Prize per player (USD)</label>
-                <div class="bal" id="balDisplay" style="display:none;"></div>
-                <p class="mini" id="coinLine" style="margin:2px 0 0;">Matches use one coin only: <b>USDC</b>. Top up in your profile first if you need more.</p>
-                <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
-                <label>Players</label>
-                <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
-                <button class="btn-primary" id="postBtn" onclick="postOrder()">Post my match (on-chain)</button>
-                <p id="postErr" style="display:none; font-size:0.78rem; color:#e74c3c; margin:8px 0 0; line-height:1.5;"></p>
-                <p class="mini">When someone takes your match, the winner's share is locked and settled on-chain. The platform share is shown on each open match.</p>
+        <div class="card">
+            <h3>Post a match</h3>
+            <div class="row">
+                <div>
+                    <label>Game</label>
+                    <select id="f_game"><option value="1">Ludo</option></select>
+                </div>
+                <div>
+                    <label>Prize per player (USD)</label>
+                    <div class="bal-line" id="balDisplay" style="display:none;"></div>
+                    <select id="f_stake"><option value="100">$1</option><option value="300">$3</option><option value="500" selected>$5</option><option value="750">$7.50</option><option value="1000">$10</option></select>
+                </div>
+                <div>
+                    <label>Players</label>
+                    <select id="f_seats"><option value="2" selected>2 players (head to head)</option><option value="3">3 players</option><option value="4">4 players</option></select>
+                </div>
             </div>
-            <div class="card" style="flex:1; min-width:320px;">
-                <h3>Take a match (the other side)</h3>
-                <p class="mini">An open match on the <b>Open matches</b> tab is waiting for someone to take it. Taking it commits you as the opponent, and the winner's share is locked for you both. You can never take your own match, and you only ever pay with the same coin the maker used, so the deal is always fair and single-currency.</p>
-                <div class="mini" style="margin-top:8px;">Matches with a <b>(Computer backer)</b> tag are filled by the platform's own pool when no human is ready, so a match is never left waiting.</div>
-            </div>
+            <button class="btn-primary" id="postBtn" onclick="postOrder()">Post my match (on-chain)</button>
+            <p class="post-err" id="postErr" style="display:none;"></p>
+            <p class="mini">Matches run in one coin only: <b>USDC</b>. The amount you see is the amount you post and the amount the winner receives, with no conversion at the end.</p>
         </div>
-        <div class="card" style="margin-top:12px;">
-            <h3>Your balance &amp; the coin in use</h3>
-            <p class="hint">All matches on the arena run in one coin: <b>USDC</b>. The amount you see is the amount you post and the amount the winner receives, with no conversion at the end. Your available USDC is shown under the prize picker so you can choose an amount you can cover.</p>
-            <div id="coinsInfo" style="margin-top:8px;"><span class="hint">Reading your balance...</span></div>
+
+        <div class="card">
+            <h3>Take a match (the other side)</h3>
+            <p class="mini">An open match on the <b>Orders</b> tab is waiting for someone to take it. Taking it commits you as the opponent. You can never take your own match, and you only ever pay with the same coin the maker used.</p>
+            <div class="mini" style="margin-top:6px;">Matches with a <b>(Computer backer)</b> tag are filled by the platform's own pool when no human is ready, so a match is never left waiting.</div>
+        </div>
+
+        <div class="card">
+            <h3>Your balance</h3>
+            <div id="coinsInfo"><span class="hint">Reading your balance...</span></div>
         </div>
     </div>
 
     <!-- ===== TAB 2: ORDERS (Open / Locked / Settled) ===== -->
     <div class="pane" id="pane-orders" style="display:none;">
-        <div class="sub-tabs" id="order-subtabs" style="display:flex; gap:8px; margin-bottom:10px;">
+        <div class="sub-tabs" id="order-subtabs">
             <button class="tab sub active" data-sub="open">Open</button>
             <button class="tab sub" data-sub="locked">Locked</button>
             <button class="tab sub" data-sub="settled">Settled</button>
         </div>
         <div class="card">
-            <div style="display:flex; gap:8px; margin-bottom:8px;">
-                <button class="btn-ghost" onclick="loadOrders()">Refresh</button>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+                <button class="btn-ghost" onclick="loadOrders('manual')">↻ Refresh</button>
                 <span class="hint" id="lobbyCount"></span>
             </div>
-            <table>
-                <thead><tr><th>Match</th><th>Date</th><th>Game</th><th>Prize</th><th>Players</th><th>Opened by</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody id="ordersBody"><tr><td colspan="8" style="text-align:center;color:#888;">Loading...</td></tr></tbody>
-            </table>
-            <div id="ordersPager" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-top:10px;"></div>
+            <div class="obook" id="ordersBody"><div class="oc-empty">Loading live orders...</div></div>
+            <div id="ordersPager" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px;"></div>
         </div>
     </div>
 
@@ -128,7 +159,7 @@
     <div class="pane" id="pane-log" style="display:none;">
         <div class="card">
             <h3>Records</h3>
-            <p class="hint">Every write you trigger on this page appears here with its result. Each one is signed on-chain.</p>
+            <p class="hint">Every action you trigger on this page appears here with its result. On-chain order receipts live under the Orders tab (Open / Locked / Settled).</p>
             <div class="log" id="log"></div>
         </div>
     </div>
@@ -148,53 +179,81 @@
     </div>
 </div>
 
+<div id="toast"><div class="toast-in" id="toastMsg"></div></div>
+
 <script src="/global_header.js"></script>
 <script>
     const $ = (id) => document.getElementById(id);
     const PANES = ['home', 'orders', 'log'];
     let activeTab = 'home';
+    let wallet = null;
+    let usdcBalance = null; // dollars; null = unknown
+    let balanceState = 'loading';
+    let orderSub = 'open';
+    let allOrders = [];
+    let ordersPage = 0;
+    let ordersTimer = null;
+    const ORDERS_PER_PAGE = 15;
+    const fmt = (v) => '$' + Number(v).toFixed(2);
 
-    // ===== tabs: click + swipe left/right =====
+    // ===== toast + log feedback =====
+    let toastTimer = null;
+    function toast(msg, type) {
+        const t = $('toast'), m = $('toastMsg');
+        m.textContent = msg;
+        m.className = 'toast-in ' + (type || '');
+        t.style.display = 'block';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+    function log(msg) {
+        const el = $('log');
+        el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '  ' + msg + '\n' + el.textContent;
+        try { el.scrollTop = 0; } catch (e) {}
+    }
+    function busy(btnId, on, label) {
+        const b = document.getElementById(btnId);
+        if (!b) return;
+        if (on) { b.dataset.txt = b.textContent; b.setAttribute('disabled', 'disabled'); b.textContent = (label || 'Working…'); }
+        else { b.removeAttribute('disabled'); b.textContent = b.dataset.txt || b.textContent; }
+    }
+
+    // ===== tabs =====
     function showTab(name) {
         activeTab = name;
         document.querySelectorAll('.tab[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
         PANES.forEach((p) => { $('pane-' + p).style.display = (p === name) ? '' : 'none'; });
-        if (name === 'orders') loadOrders();
-        if (name === 'log') log('Opened Records. On-chain receipts are listed under Orders.');
+        if (name === 'orders') { loadOrders(); startOrdersPoll(); } else stopOrdersPoll();
     }
-    function nextTab(dir) { // dir: 1 = right (next), -1 = left (prev)
+    function nextTab(dir) {
         const i = PANES.indexOf(activeTab);
         const j = Math.min(PANES.length - 1, Math.max(0, i + dir));
         if (j !== i) showTab(PANES[j]);
     }
-    document.querySelectorAll('#order-subtabs .sub').forEach((b) => b.addEventListener('click', () => setOrderSub(b.dataset.sub)));
+    function startOrdersPoll() { stopOrdersPoll(); ordersTimer = setInterval(() => loadOrders(), 12000); }
+    function stopOrdersPoll() { if (ordersTimer) { clearInterval(ordersTimer); ordersTimer = null; } }
     document.querySelectorAll('.tab[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    document.querySelectorAll('#order-subtabs .sub').forEach((b) => b.addEventListener('click', () => setOrderSub(b.dataset.sub)));
+    // swipe guard: only when gesture is horizontal across the panes, and never
+    // when it starts on a button/select (so tapping controls never flips tabs).
     (function () {
         const cont = document.querySelector('.wrap');
-        let sx = 0, dx = 0, sy = 0, tracking = false;
-        cont.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; tracking = true; }, { passive: true });
-        cont.addEventListener('touchmove', (e) => { if (!tracking) return; const t = e.touches[0]; dx = t.clientX - sx; }, { passive: true });
+        let sx = 0, sy = 0, dx = 0, dy = 0, tracking = false;
+        cont.addEventListener('touchstart', (e) => {
+            if (e.target && e.target.closest && e.target.closest('button,input,select,a')) { tracking = false; return; }
+            const t = e.touches[0]; sx = t.clientX; sy = t.clientY; dx = 0; dy = 0; tracking = true;
+        }, { passive: true });
+        cont.addEventListener('touchmove', (e) => { if (!tracking) return; const t = e.touches[0]; dx = t.clientX - sx; dy = t.clientY - sy; }, { passive: true });
         cont.addEventListener('touchend', () => {
-            if (!tracking) return;
-            tracking = false;
-            const horiz = Math.abs(dx);
-            if (horiz < 50) return; // too small a swipe
-            if (dx < 0) nextTab(1);      // swipe left -> next
-            else nextTab(-1);             // swipe right -> previous
+            if (!tracking) return; tracking = false;
+            if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return; // horizontal only
+            nextTab(dx < 0 ? 1 : -1);
         }, { passive: true });
     })();
 
-    // ===== helpers =====
-    function log(msg) { const el = $('log'); el.textContent = new Date().toISOString().slice(11, 19) + ' ' + msg + '\n' + el.textContent; try { el.scrollTop = 0; } catch (e) {} }
-    let wallet = null; // string address (getDynamicSolanaWallet returns a string, NOT a Pubkey)
+    function maskAddr(a) { if (!a) return 'not signed in'; return a.slice(0, 4) + '…' + a.slice(-4); }
 
-    function maskAddr(a) {
-        if (!a) return 'not signed in';
-        return a.slice(0, 4) + '…' + a.slice(-4);
-    }
     async function signInState() {
-        // Dynamic restores the wallet asynchronously after page load, so poll
-        // up to ~10s like the dashboard gate does, then keep listening.
         wallet = null;
         const deadline = Date.now() + 10000;
         while (Date.now() < deadline) {
@@ -207,201 +266,161 @@
         }
         const el = $('wallet');
         if (wallet) {
-            el.innerHTML = maskAddr(wallet) + ' <button class="btn-link" style="background:none;border:none;color:#f87818;cursor:pointer;padding:0;font-size:0.72rem;" onclick="window.location.href=\'/profile/\'" title="View my profile">(view profile)</button>';
-            loadBalance();
+            el.innerHTML = maskAddr(wallet) + ' <button class="btn-link" style="background:none;border:none;color:#f87818;cursor:pointer;padding:0;font-size:0.72rem;margin-left:6px;" onclick="window.location.href=\'/profile/\'">(view profile)</button>';
         } else {
             el.textContent = 'Session still restoring... tap Sign in and come back.';
-            const ci = $('coinsInfo'); if (ci) ci.textContent = 'Balance appears once your session is ready.';
         }
+        loadBalance();
     }
 
-    async function apiPost(o) { const r = await fetch('/api/agm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o) }); return r.json(); }
+    function apiPost(o) { return fetch('/api/agm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o) }).then(r => r.json()); }
 
-    // Balances card shows ALL coins you hold; under the Prize level only USDC
-    // matters (the match coin), so you can see if you can cover a level before
-    // you post. If the balance can't be read we say so clearly and let you post
-    // anyway - the button is never stuck.
-    let usdcBalance = null; // null = unknown/loading
-    let balanceState = 'loading'; // loading | ok | error
-    const fmt = (v) => '$' + Number(v).toFixed(2);
+    // ===== balance (always live, no cache) =====
     async function loadBalance() {
         const ci = $('coinsInfo'); if (!ci) return;
-        if (!wallet) { ci.textContent = 'Your balances appear once your session is ready.'; return; }
-        balanceState = 'loading';
-        ci.innerHTML = '<span class="hint">Reading your balances...</span>';
-        refreshStakeGuard();
+        if (!wallet) { ci.innerHTML = '<span class="hint">Your balances appear once your session is ready.</span>'; return; }
         const ac = new AbortController();
         const to = setTimeout(() => ac.abort(), 15000);
         try {
             const r = await fetch('/api/agm/balances?wallet=' + encodeURIComponent(wallet), { cache: 'no-store', signal: ac.signal });
             if (!r.ok) throw new Error('HTTP ' + r.status);
             const j = await r.json();
-            if (j.error) { balanceState = 'error'; usdcBalance = null; refreshStakeGuard(); ci.innerHTML = '<span class="hint">Balance not available right now: ' + (j.error || '') + '</span>'; return; }
-            const sol = Number(j.sol != null ? j.sol : 0);
-            usdcBalance = Number(j.usdc != null ? j.usdc : 0);
-            const usdt = Number(j.usdt != null ? j.usdt : 0);
-            const usdg = Number(j.usdg != null ? j.usdg : 0);
-            balanceState = 'ok';
-            ci.innerHTML = 'SOL ' + sol.toFixed(2) + ' &nbsp;·&nbsp; USDC <b>' + usdcBalance.toFixed(2) + '</b> &nbsp;·&nbsp; USDT ' + usdt.toFixed(2) + ' &nbsp;·&nbsp; USDG ' + usdg.toFixed(2) + ' <span class="hint">(devnet test coins)</span>';
-            const bd = $('balDisplay');
-            if (bd) {
-                bd.style.display = '';
-                bd.innerHTML = '<span style="font-size:0.76rem;color:#fff;">Balance: <b style="color:#2ecc71;">' + usdcBalance.toFixed(3) + ' USDC</b></span>';
+            if (j.error) { usdcBalance = null; balanceState = 'error'; toast('Could not read balance right now', 'err'); }
+            else {
+                usdcBalance = Number(j.usdc != null ? j.usdc : 0);
+                balanceState = 'ok';
+                const sol = Number(j.sol != null ? j.sol : 0), usdt = Number(j.usdt != null ? j.usdt : 0), usdg = Number(j.usdg != null ? j.usdg : 0);
+                ci.innerHTML = 'SOL ' + sol.toFixed(2) + ' &nbsp;·&nbsp; USDC <b>' + usdcBalance.toFixed(2) + '</b> &nbsp;·&nbsp; USDT ' + usdt.toFixed(2) + ' &nbsp;·&nbsp; USDG ' + usdg.toFixed(2) + ' <span class="hint">(devnet test coins)</span>';
             }
-        } catch (e) {
-            balanceState = 'error';
-            usdcBalance = null;
-            ci.innerHTML = '<span class="hint">Balance not available right now' + (e && e.name === 'AbortError' ? ' (timed out)' : '') + '. You can still post a match on devnet.</span>';
-        } finally {
-            clearTimeout(to);
-            refreshStakeGuard();
-        }
+        } catch (e) { usdcBalance = null; balanceState = 'error'; ci.innerHTML = '<span class="hint">Balance not available right now.</span>'; }
+        finally { clearTimeout(to); refreshStakeGuard(); }
     }
 
-    // Live guard: block posting ONLY when we actually know the USDC balance and
-    // it is too low for the chosen prize. When the balance is unknown, we let
-    // the user post (devnet testing) instead of leaving the button stuck.
-    // NOTE: the stake <select> values are in cents (300 = $3); convert to
-    // dollars so they compare against the dollar USDC balance.
     function prizeUsdc() { return (Number($('f_stake').value) || 0) / 100; }
     function refreshStakeGuard() {
-        const btn = $('postBtn');
-        const err = $('postErr');
+        const btn = $('postBtn'), err = $('postErr');
         if (!btn || !err) return;
-        if (!wallet) { btn.setAttribute('disabled', 'disabled'); err.textContent = 'Sign in to post a match.'; err.style.display = 'block'; return; }
+        if (!wallet) { btn.setAttribute('disabled', 'disabled'); showErr(err, 'Sign in to post a match.'); return; }
         if (usdcBalance != null && prizeUsdc() > usdcBalance) {
             btn.setAttribute('disabled', 'disabled');
-            err.textContent = 'Not enough USDC: this match needs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.';
-            err.style.display = 'block';
+            showErr(err, 'Not enough USDC: this match needs ' + fmt(prizeUsdc()) + ' but you have ' + fmt(usdcBalance) + '. Top up in your profile first.');
             return;
         }
         if (usdcBalance == null && balanceState === 'loading') {
             btn.setAttribute('disabled', 'disabled');
-            err.textContent = 'Checking your USDC balance...';
-            err.style.display = 'block';
+            showErr(err, 'Checking your USDC balance...');
             return;
         }
-        // balance ok, or unknown-but-not-loading -> allow post
-        btn.removeAttribute('disabled');
-        err.style.display = 'none';
+        btn.removeAttribute('disabled'); err.style.display = 'none';
     }
+    function showErr(el, text) { if (el) { el.textContent = text; el.style.display = 'block'; } }
 
+    // ===== post (live: fresh balance + order + balance refresh in one action) =====
     async function postOrder() {
         const btn = $('postBtn'), err = $('postErr');
-        if (!wallet) { log('Please sign in first'); return; }
-        if (usdcBalance != null && prizeUsdc() > usdcBalance) {
-            err.textContent = 'Still not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').';
-            err.style.display = 'block';
-            log('Blocked: not enough USDC for this prize.');
-            return;
-        }
-        if (btn) btn.setAttribute('disabled', 'disabled');
-        log('Posting your match (you are the maker)...');
+        if (!wallet) { toast('Sign in first to post a match', 'err'); return; }
+        busy('postBtn', true, 'Posting…');
         try {
+            await loadBalance();                      // fresh balance before posting
+            if (usdcBalance != null && prizeUsdc() > usdcBalance) {
+                showErr(err, 'Not enough USDC (need ' + fmt(prizeUsdc()) + ', have ' + fmt(usdcBalance) + ').');
+                toast('Not enough USDC for this match', 'err'); busy('postBtn', false); return;
+            }
             const r = await apiPost({ action: 'post', game: Number($('f_game').value), stakeUsdCents: Number($('f_stake').value), seats: Number($('f_seats').value), maker: wallet });
-            if (r && r.error) { log('Error: ' + r.error); if (btn) btn.removeAttribute('disabled'); if (err) { err.textContent = r.error; err.style.display = 'block'; } return; }
-            log('OK match #' + r.orderId + ' is now OPEN on-chain (ref ' + r.pda.slice(0, 10) + '...).');
-            rememberMyOrder(r.orderId);
-            if (btn) btn.removeAttribute('disabled');
-            loadBalance(); loadOrders();
+            if (r && r.error) {
+                showErr(err, r.error); toast(r.error, 'err'); busy('postBtn', false); return;
+            }
+            log('Match #' + r.orderId + ' is OPEN on-chain.');
+            toast('✅ Match #' + r.orderId + ' posted on-chain', 'ok');
+            // refresh orders + balance together in the SAME flow
+            await loadBalance();
+            await loadOrders();
         } catch (e) {
-            log('Error: ' + (e.message || e.error));
-            if (btn) btn.removeAttribute('disabled');
-            if (err) { err.textContent = (e.message || e.error); err.style.display = 'block'; }
-        }
+            showErr(err, (e.message || e.error || 'Could not post')); toast('Post failed: ' + (e.message || e.error), 'err');
+        } finally { busy('postBtn', false); }
     }
 
-    // Take a match: THIS signed-in wallet commits as the taker (self-match is
-    // blocked on-chain). The maker's coin is the match coin; you pay in the same
-    // stablecoin, no conversion.
-    async function matchOrder(oid) {
-        if (!wallet) { log('Please sign in first to take a match.'); return; }
+    // ===== take / lock / settle / cancel (every action gives feedback, errors
+    // like self-take are shown, never silently swallowed) =====
+    async function takeOrder(oid, btn) {
+        if (!wallet) { toast('Sign in first to take a match', 'err'); return; }
+        busyEl(btn, 'Taking…');
         try {
-            log('Taking match #' + oid + ' with your wallet (' + maskAddr(wallet) + ')...');
             const r = await apiPost({ action: 'match', game: 1, orderId: oid, taker: wallet });
-            log('OK match #' + oid + ' is now MATCHED. You are committed as the taker.');
-            loadOrders();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
+            if (r && r.error) { toast(r.error, 'err'); log('Take #' + oid + ' failed: ' + r.error); busyEl(btn); return; }
+            toast('✅ You took match #' + oid, 'ok'); log('You took match #' + oid + ' (taker).');
+            await loadOrders();
+        } catch (e) { toast('Take failed: ' + (e.message || e.error), 'err'); busyEl(btn); }
     }
-    async function lockOrder(oid) {
+    async function lockOrder(oid, btn) {
+        busyEl(btn, 'Locking…');
         try {
-            const winner = prompt('Winner seat (the player who won this match; 0 = first player on the order)', '0');
-            if (winner === null) { log('Cancelled lock.'); return; }
+            const winner = prompt('Winner seat (0 = first player)?', '0');
+            if (winner === null) { busyEl(btn); return; }
             const r = await apiPost({ action: 'lock', game: 1, orderId: oid, winnerSeat: Number(winner) });
-            log('OK match #' + oid + ' locked, winner seat ' + winner + ' recorded; pot frozen on-chain.');
-            loadOrders();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
+            if (r && r.error) { toast(r.error, 'err'); log('Lock #' + oid + ' failed: ' + r.error); busyEl(btn); return; }
+            toast('✅ Match #' + oid + ' locked (pot frozen)', 'ok'); log('Match #' + oid + ' locked, winner seat ' + winner + '.');
+            await loadOrders();
+        } catch (e) { toast('Lock failed: ' + (e.message || e.error), 'err'); busyEl(btn); }
     }
-    async function settleOrder(oid) {
+    async function settleOrder(oid, btn) {
+        busyEl(btn, 'Settling…');
         try {
             const r = await apiPost({ action: 'settle', game: 1, orderId: oid });
-            log('OK match #' + oid + ' settled on-chain (status ' + r.order.status + ').');
-            loadOrders();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
+            if (r && r.error) { toast(r.error, 'err'); log('Settle #' + oid + ' failed: ' + r.error); busyEl(btn); return; }
+            toast('✅ Match #' + oid + ' settled', 'ok'); log('Match #' + oid + ' settled on-chain.');
+            await loadOrders();
+        } catch (e) { toast('Settle failed: ' + (e.message || e.error), 'err'); busyEl(btn); }
     }
-    async function cancelOrder(oid) {
+    async function cancelOrder(oid, btn) {
+        busyEl(btn, 'Cancelling…');
         try {
             const r = await apiPost({ action: 'cancel', game: 1, orderId: oid, maker: wallet || '' });
-            log('OK match #' + oid + ' cancelled.');
-            loadOrders();
-        } catch (e) { log('Error: ' + (e.message || e.error)); }
+            if (r && r.error) { toast(r.error, 'err'); log('Cancel #' + oid + ' failed: ' + r.error); busyEl(btn); return; }
+            toast('Match #' + oid + ' cancelled', 'ok'); log('Match #' + oid + ' cancelled.');
+            await loadOrders();
+        } catch (e) { toast('Cancel failed: ' + (e.message || e.error), 'err'); busyEl(btn); }
+    }
+    function busyEl(btn, label) {
+        if (!btn) return;
+        if (label) { btn.dataset.txt = btn.textContent; btn.setAttribute('disabled', 'disabled'); btn.textContent = label; }
+        else { btn.removeAttribute('disabled'); btn.textContent = btn.dataset.txt || btn.textContent; }
     }
 
-    // ---- Orders: sub-tabs (Open / Locked / Settled), pagination, and the browser
-// remembers the order ids THIS device created (localStorage) so they always
-// show even when the serverless relay is a cold instance. Every row is
-// re-verified live on-chain by the relay (readOrder) - never cached.
-    let orderSub = 'open';
-    let allOrders = [];
-    let ordersPage = 0;
-    const ORDERS_PER_PAGE = 20;
-    const LS_KEY = 'gfg_agm_my_order_ids_v1';
-
-    function myOrderIds() {
-        try { const s = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); return Array.isArray(s) ? s : []; } catch (e) { return []; }
-    }
-    function rememberMyOrder(id) {
-        try {
-            const ids = myOrderIds();
-            if (!ids.includes(Number(id))) { ids.push(Number(id)); localStorage.setItem(LS_KEY, JSON.stringify(ids)); }
-        } catch (e) {}
-    }
+    // ===== orders: live, all users (on-chain index), mobile-first cards =====
     function setOrderSub(name) {
-        orderSub = name;
-        ordersPage = 0;
+        orderSub = name; ordersPage = 0;
         document.querySelectorAll('#order-subtabs .sub').forEach((b) => b.classList.toggle('active', b.dataset.sub === name));
         renderOrders();
     }
-
-    function statusClass(s) {
-        if (s === 0) return '<span class="open">OPEN</span>';
-        if (s === 1) return '<span class="locked">LOCKED</span>';
-        if (s === 2) return '<span class="matched">MATCHED</span>';
-        if (s === 3) return '<span>cancelled</span>';
-        if (s === 4) return '<span class="settled">SETTLED</span>';
-        return '<span>' + s + '</span>';
+    function pill(s) {
+        if (s === 0) return '<span class="pill open">OPEN</span>';
+        if (s === 1) return '<span class="pill locked">LOCKED</span>';
+        if (s === 2) return '<span class="pill matched">TAKEN</span>';
+        if (s === 3) return '<span class="pill cancelled">CANCELLED</span>';
+        if (s === 4) return '<span class="pill settled">SETTLED</span>';
+        return '<span class="pill gray">' + s + '</span>';
     }
     function fmtDate(ts) {
         if (!ts) return '—';
         return new Date(Number(ts) * 1000).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
+    function gameName(g) { return g === 1 ? 'Ludo' : ('Game ' + g); }
 
     async function loadOrders() {
         try {
-            // merge: relay index + this device's own order ids
-            const mine = myOrderIds();
-            const q = mine.length ? '?ids=' + encodeURIComponent(mine.join(',')) : '';
-            const r = await (await fetch('/api/agm' + q, { cache: 'no-store' })).json();
+            const r = await apiGetSafe();
             allOrders = (r.orders || []).filter(o => o.order_id != null && o.status !== 'missing');
+            $('lobbyCount').textContent = allOrders.length + ' order(s) live';
             renderOrders();
         } catch (e) {
-            $('ordersBody').innerHTML = '<tr><td colspan="8" style="color:#e74c3c;">error: ' + (e.message || e.error) + '</td></tr>';
+            $('ordersBody').innerHTML = '<div class="oc-empty">Could not load orders: ' + (e.message || 'error') + '</div>';
         }
     }
+    function apiGetSafe() { return fetch('/api/agm', { cache: 'no-store' }).then(r => r.json()); }
 
     function renderOrders() {
         const body = $('ordersBody');
-        $('lobbyCount').textContent = allOrders.length + ' order(s) seen';
         let list = allOrders.slice();
         if (orderSub === 'open') list = list.filter(o => o.status === 0);
         else if (orderSub === 'locked') list = list.filter(o => o.status === 1 || o.status === 2);
@@ -409,41 +428,41 @@
         const pages = Math.max(1, Math.ceil(list.length / ORDERS_PER_PAGE));
         if (ordersPage >= pages) ordersPage = pages - 1;
         const slice = list.slice(ordersPage * ORDERS_PER_PAGE, (ordersPage + 1) * ORDERS_PER_PAGE);
-        const tableHead = '<tr><th>Match</th><th>Date</th><th>Game</th><th>Prize</th><th>Players</th><th>Opened by</th><th>Status</th><th>Actions</th></tr>';
-        if (!slice.length) {
-            body.innerHTML = tableHead + '<tr><td colspan="8" style="text-align:center;color:#888;">No ' + orderSub + ' orders yet.</td></tr>';
-        } else {
-            body.innerHTML = tableHead + slice.map((o) => {
+        if (!slice.length) { body.innerHTML = '<div class="oc-empty">No ' + orderSub + ' orders right now.</div>'; }
+        else {
+            body.innerHTML = slice.map((o) => {
                 const seats = Math.max(2, Number(o.seats) || 2);
                 const pot = (Number(o.stake_usd_cents) || 0) * seats;
+                const own = wallet && o.maker === wallet;
                 const actions = [];
-                if (o.status === 0) actions.push('<button class="btn-sm btn-success" onclick="matchOrder(' + o.order_id + ')">Take</button>', '<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>');
-                if (o.status === 2) actions.push('<button class="btn-sm btn-primary" onclick="lockOrder(' + o.order_id + ')">Play &amp; lock</button>');
-                if (o.status === 1) actions.push('<button class="btn-sm btn-ghost" onclick="settleOrder(' + o.order_id + ')">Settle</button>');
-                const desc = seats === 2
-                    ? '(winner to get ' + (pot * 0.9 / 100).toFixed(2) + ', platform ' + (pot * 0.1 / 100).toFixed(2) + ')'
-                    : '(' + seats + ' players, winners share, platform ' + (pot * 0.1 / 100).toFixed(2) + ')';
-                return '<tr><td>' + o.order_id + '</td><td>' + fmtDate(o.created_at) +
-                    '</td><td>' + o.game + '</td><td>$' + (Number(o.stake_usd_cents) / 100).toFixed(2) + '<br><span class="hint">' + desc + '</span></td><td>' + seats +
-                    '</td><td class="mono">' + maskAddr(o.maker || '') + '</td><td>' + statusClass(o.status) + '</td><td>' + actions.join(' ') + '</td></tr>';
+                if (o.status === 0) {
+                    actions.push('<button class="btn-sm btn-success" onclick="takeOrder(' + o.order_id + ', this)">Take</button>');
+                    if (own) actions.push('<button class="btn-sm btn-danger" onclick="cancelOrder(' + o.order_id + ', this)">Cancel</button>');
+                }
+                if (o.status === 2) actions.push('<button class="btn-sm btn-ghost" onclick="lockOrder(' + o.order_id + ', this)">Play &amp; lock</button>');
+                if (o.status === 1) actions.push('<button class="btn-sm btn-ghost" onclick="settleOrder(' + o.order_id + ', this)">Settle</button>');
+                const share = seats === 2
+                    ? 'winner ' + (pot * 0.9 / 100).toFixed(2) + ' · platform ' + (pot * 0.1 / 100).toFixed(2)
+                    : seats + ' players · platform ' + (pot * 0.1 / 100).toFixed(2);
+                return '<div class="oc">' +
+                    '<div class="oc-top"><span class="oc-id">Match <b>#' + o.order_id + '</b></span>' + pill(o.status) + '</div>' +
+                    '<div class="oc-mid"><span class="oc-prize">$' + (Number(o.stake_usd_cents) / 100).toFixed(2) + ' <small>per player</small></span>' +
+                    '<span class="oc-meta">' + gameName(o.game) + ' · ' + seats + ' players<br>' + share + '<br><span class="oc-date">' + fmtDate(o.created_at) + '</span></span></div>' +
+                    '<div class="oc-bot"><span class="oc-maker">' + (own ? 'You' : maskAddr(o.maker || '')) + (own ? ' (maker)' : '') + '</span>' +
+                    '<span class="oc-actions">' + actions.join(' ') + '</span></div>' +
+                    '</div>';
             }).join('');
         }
-        // pagination
         const pgr = $('ordersPager');
         if (pages <= 1) { pgr.innerHTML = ''; return; }
-        let h = '';
-        h += '<button class="btn-sm btn-ghost" onclick="ordersPage--;renderOrders()">‹ Prev</button>';
-        h += '<span class="hint">' + (ordersPage + 1) + ' / ' + pages + '</span>';
-        h += '<button class="btn-sm btn-ghost" onclick="ordersPage++;renderOrders()">Next ›</button>';
-        pgr.innerHTML = h;
+        pgr.innerHTML = '<button class="btn-sm btn-ghost" onclick="ordersPage--;renderOrders()">‹ Prev</button>' +
+            '<span class="hint">' + (ordersPage + 1) + ' / ' + pages + '</span>' +
+            '<button class="btn-sm btn-ghost" onclick="ordersPage++;renderOrders()">Next ›</button>';
     }
 
+    // ===== boot =====
     window.addEventListener('DOMContentLoaded', async () => {
-        $('program').textContent = 'CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWrBu8wgAuJ';
-        ['f_stake', 'f_seats', 'f_game'].forEach(id => {
-            const el = $(id);
-            if (el) el.addEventListener('change', refreshStakeGuard);
-        });
+        ['f_stake', 'f_seats', 'f_game'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', refreshStakeGuard); });
         await signInState();
         document.addEventListener('gfg:auth-changed', signInState);
     });

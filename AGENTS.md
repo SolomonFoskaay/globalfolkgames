@@ -339,6 +339,30 @@ build ahead of its module status.
   3. Base-layer rolls via the paid queue (0.0005–0.0008 SOL) remain available as
      a fallback if the ER validator is unreachable.
 
+## Where the program & data live (LOCKED — never re-derive this)
+
+- **ALL on-chain game/program data (gfg-dice + AGM orders/points/ledgers) lives on
+  the MagicBlock devnet chain**, reached via the Magic Router / ER RPCs:
+  `devnet-router.magicblock.app` (base + routing), `devnet-as.magicblock.app`
+  (AS region, pinned since 2026-08-18; US `devnet-us` is banned), and
+  `devnet-eu.magicblock.app`. `baseRpcUrl()` in `src/gfg-rpc.js` resolves this.
+  Both writes (`sendMagicTx` → router blockhash) and reads (`getAccountInfo` on
+  order/points PDAs) go through these endpoints. `getProgramAccounts` is NOT
+  supported here (returns "Method not found") - never rely on chain enumeration;
+  use on-chain index accounts (e.g. `AgmOrderIndex` `gfgagmindex`) for discovery.
+- **DEPLOYS go to the MagicBlock router/region RPC, never the base Solana chain**
+  (base-layer deploys are costly; with MagicBlock they are the standard path):
+  `solana program deploy ... --url "$GFG_MAGIC_RPC"` where `GFG_MAGIC_RPC` is the
+  MagicBlock region (AS `devnet-as.magicblock.app`) or router endpoint.
+- **Alchemy (`GFG_DEVNET_RPC`) is ONLY the fast/reliable *public Solana devnet*
+  RPC** used for embedded-wallet SPL token-balance reads (SOL/USDC/USDT/USDG for
+  posting orders) and as the public-devnet fallback when `api.devnet.solana.com`
+  is flaky. It is NOT a deploy target and NOT a game-state read/write target.
+- Deploy flow stays: `cd programs && anchor build` → copy IDL to
+  `src/gfg-dice-idl.json` → `source .env && solana program deploy ... --url
+  "$GFG_MAGIC_RPC" --skip-fee-check` (retry once if the RPC reports transient
+  "write transactions failed"; a printed Signature = land).
+
 ## Key addresses (devnet)
 
 | Item | Value |

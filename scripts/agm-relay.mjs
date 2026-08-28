@@ -1,8 +1,11 @@
 // scripts/agm-relay.mjs — Arc2 AGM lobby relay core: relay/sponsor signs every
 // on-chain AGM action on behalf of the AUTHENTICATED wallet (passed via maker/
-// taker). The order source of truth is the CHAIN (order PDAs scanned live via
-// getProgramAccounts) - never a config/per-instance file, so ids never collide
-// and every reload/instance sees the same real orders.
+// taker). Order ids are unix-ms timestamps (globally unique, no collisions).
+// Discovery = a light local id index + ids the caller/browser knows; every
+// display field (status/maker/stake/seats/taker) is re-read ON-CHAIN each list
+// via readOrder over the MagicBlock router/region RPCs. The MagicBlock chain
+// cannot be enumerated with getProgramAccounts, so the index is a pointer list,
+// never a cache of order data.
 import './load-env.mjs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
@@ -30,6 +33,14 @@ export function settlementPda(orderId) {
 }
 export function bankPda(_gameIgnored) {
   return PublicKey.findProgramAddressSync([P2C_GLOBAL], PROGRAM)[0]; // shared: all games use the same pool
+}
+
+// Order discovery: a local id index (ids only; every display field is re-read
+// on-chain via readOrder each list) plus any ids the caller (browser) supplies.
+// The primary proofs stay on-chain; the index is just "what order ids exist" -
+// MagicBlock's chain cannot be enumerated with getProgramAccounts.
+async function readIndexIds() {
+  return knownOrders().map(e => Number(e.id)).filter(x => x && x > 0);
 }
 
 
@@ -168,34 +179,74 @@ function rememberOrder(game, orderId, maker, stakeUsdCents, seats) {
 }
 
 export async function agmPost({ game, stakeUsdCents, seats, maker }) {
+  // Server-side balance guard: a maker's OPEN orders + this new one can never
+  // exceed their live USDC balance. This prevents "fake orders" from stale
+  // balances. (On devnet USDC is test coin; the rule still holds.)
+  try {
+    const bal = await walletBalances(maker);
+    if (bal.usdc != null) {
+      const open = await openOrderTotalFor(maker, game);
+      if (open + Number(stakeUsdCents) > Math.round(bal.usdc * 100)) {
+        throw new Error('Not enough USDC: your open orders already use ' + (open / 100).toFixed(2) + ' of your ' + bal.usdc.toFixed(2) + ', and this needs ' + (Number(stakeUsdCents) / 100).toFixed(2) + '.');
+      }
+    }
+  } catch (e) { if (e && e.message && e.message.indexOf('Not enough USDC') === 0) throw e; /* balance read failure is not a hard block on devnet */ }
   const orderId = Date.now();
   const pda = orderPda(game, orderId);
   await sendTx(await prog.methods.postAgmOrder(game, new BN(orderId), new BN(stakeUsdCents), seats, new PublicKey(maker)).accounts({ payer: sponsor.publicKey, order: pda, systemProgram: SystemProgram.programId }).transaction());
   rememberOrder(game, orderId, maker, stakeUsdCents, seats);
-  return { orderId, pda: pda.toBase58(), order: await readOrder(game, orderId) };
+  return { orderId, pda: pda.toBase58(), order: await readOrder(game, orderId), balance: await walletBalances(maker).catch(() => null) };
 }
 
 export async function agmList({ game, orderId, ids } = {}) {
-  const idx = knownOrders();
-  let entries = idx.slice();
-  if (orderId != null) entries = entries.filter(x => Number(x.id) === Number(orderId));
+  // Authoritative source: the ON-CHAIN order index (every user's orders).
+  const ringIds = await readIndexIds();
+  let wantedIds = ringIds;
+  if (orderId != null) wantedIds = ringIds.filter(x => Number(x) === Number(orderId));
+  // Supplement with locally-known ids (legacy orders posted before the index).
+  const sup = knownOrders().map(e => Number(e.id)).filter(x => x && !ringIds.includes(x));
   if (ids) {
-    const wanted = String(ids).split(',').map(Number).filter(Boolean);
-    const known = new Set(entries.map(x => Number(x.id)));
-    for (const w of wanted) if (!known.has(w)) entries.push({ game: Number(game) || 1, id: w });
-    // honour the explicit ids list (browser-known orders the relay never saw)
-    entries = entries.filter(x => wanted.includes(Number(x.id)));
+    const sup2 = String(ids).split(',').map(Number).filter(Boolean).filter(x => !ringIds.includes(x));
+    for (const x of sup2) if (!sup.includes(x)) sup.push(x);
   }
-  if (game != null) entries = entries.filter(x => Number(x.game) === Number(game));
+  wantedIds = wantedIds.concat(sup);
+  if (game != null) {
+    // game filter needs the order's game; resolve each and filter
+    const out = [];
+    for (const id of Array.from(new Set(wantedIds))) {
+      const orders = await Promise.all([1, 2, 3, 4].map(g => readOrder(g, id)));
+      const live = orders.find(o => o);
+      if (!live) continue;
+      if (live.game === Number(game)) out.push(live);
+    }
+    out.sort((a, b) => Number(b.order_id) - Number(a.order_id));
+    return { count: out.length, orders: out };
+  }
   const out = [];
-  for (const e of entries) {
-    const g = Number(e.game) || 1;
-    const live = await readOrder(g, Number(e.id));
-    if (!live) { out.push({ order_id: Number(e.id), game: g, status: 'missing' }); continue; }
-    out.push(live);
+  for (const id of Array.from(new Set(wantedIds))) {
+    // determine the order's game by trying known ones (game is in the PDA seed)
+    const o1 = await readOrder(1, id);
+    if (o1) { out.push(o1); continue; }
+    const o2 = await readOrder(2, id);
+    if (o2) { out.push(o2); continue; }
+    const o3 = await readOrder(3, id);
+    if (o3) { out.push(o3); continue; }
+    const o4 = await readOrder(4, id);
+    if (o4) { out.push(o4); continue; }
+    out.push({ order_id: id, game: game != null ? Number(game) : 1, status: 'missing' });
   }
   out.sort((a, b) => Number(b.order_id) - Number(a.order_id));
   return { count: out.length, orders: out };
+}
+
+async function openOrderTotalFor(maker, game) {
+  const ringIds = await readIndexIds();
+  let total = 0;
+  for (const id of ringIds.slice(0, 100)) {
+    const o = await readOrder(game, id);
+    if (o && o.maker === maker && (o.status === 0 || o.status === 2)) total += Number(o.stake_usd_cents) * Math.max(1, Number(o.seats));
+  }
+  return total;
 }
 
 export async function agmMatch({ game, orderId, taker }) {
