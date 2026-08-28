@@ -12,14 +12,15 @@ every dice roll is a cryptographically verifiable on-chain roll.
 
 ## Terminology (IMPORTANT — do not confuse these)
 
-- **VRF** = the randomness primitive. All dice randomness comes from MagicBlock
-  **VRF** (on-chain, verifiable). When talking about dice/randomness, use
-  "VRF" — never "ER".
+- **ER VRF** = the randomness primitive, ALWAYS via the MagicBlock ER VRF queue
+  (`5hBR571...`, free, on the Ephemeral Rollup - gasless). When talking about
+  dice/randomness, say **"ER VRF"**, never plain "VRF", to avoid the trap of
+  implementing the direct/base MagicBlock VRF (paid queue `Cuj97...`, per-roll
+  base-layer cost). `src/magicblock-er-vrf.js` is the ONLY VRF path.
 - **ER (Ephemeral Rollup)** = the gasless execution/points/rewards LAYER. The
-  ER is where future on-chain rewards live (`record_points`-style instruction on
-  the same delegated program) and where rolls are executed gaslessly. Do NOT
-  call dice randomness "ER randomness"; calls it the "ER VRF queue" only when
-  describing WHERE the VRF runs. When discussing rewards/points, use "ER".
+  ER is where on-chain rewards live (`record_points`-style instruction on the
+  same delegated program) and where rolls execute gaslessly. Dice randomness is
+  the **ER VRF** (gasless). When discussing rewards/points, use "ER".
 
 ## Module guide (THE master plan — never derail, read before any feature work)
 
@@ -326,8 +327,10 @@ build ahead of its module status.
 
 - **Player identity:** Solana wallet via Dynamic wallet (email OTP). Session-key
   signing means no wallet popups. Player wallets hold 0 SOL by design.
-- **VRF dice:** MagicBlock VRF + gfg-dice Solana program on **devnet**.
-  Provably fair: two independent 16-byte VRF halves produce two 6-sided rolls.
+- **ER VRF dice:** MagicBlock ER VRF (free queue `5hBR...` on the ER) + gfg-dice
+  Solana program on **devnet**. Provably fair: two independent 16-byte ER VRF
+  halves produce two 6-sided rolls. NEVER the direct/base MagicBlock VRF
+  (paid queue `Cuj97...`, per-roll base-layer cost).
 - **Gasless model — MagicBlock Ephemeral Rollup (ER):** players never pay.
   1. On a player's first roll, a **sponsor relay** (the app) runs two base-layer
      transactions on the player's behalf:
@@ -335,7 +338,7 @@ build ahead of its module status.
      the PDA into an ER session, sponsor pays the one-time session cost).
      Total onboarding cost ~0.0013 SOL.
   2. After delegation, every roll runs **free** on the ER (public ER nodes are
-     gasless; VRF on the ER queue is free). Player's session key signs.
+     gasless; ER VRF on the ER queue is free). Player's session key signs.
   3. Base-layer rolls via the paid queue (0.0005–0.0008 SOL) remain available as
      a fallback if the ER validator is unreachable.
 

@@ -10,7 +10,7 @@ import './load-env.mjs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
-import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints, getDelegationStatus, regionUrlForFqdn } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
 import { readFileSync } from 'fs';
 
@@ -33,6 +33,45 @@ export function settlementPda(orderId) {
 }
 export function bankPda(_gameIgnored) {
   return PublicKey.findProgramAddressSync([P2C_GLOBAL], PROGRAM)[0]; // shared: all games use the same pool
+}
+
+const BOARD_SEED = Buffer.from('gfgboard');
+export function boardPda(game, matchRef) {
+  return PublicKey.findProgramAddressSync([BOARD_SEED, Buffer.from([game]), new BN(matchRef).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
+}
+
+// region-agnostic read/write RPC for a board PDA (delegated accounts live on
+// exactly ONE ER region; the Router tells us which via getDelegationStatus ->
+// fqdn, and we submit/poll THERE, not on some other region).
+export async function boardRegionUrl(game, matchRef) {
+  const pda = boardPda(game, matchRef);
+  try {
+    const st = await getDelegationStatus(conn, pda);
+    if (st && st.fqdn) {
+      const u = regionUrlForFqdn(st.fqdn);
+      if (u) return u;
+    }
+  } catch (e) { /* fall through */ }
+  return baseRpcUrl();
+}
+
+// Idempotent board onboarding: if the board PDA exists but is NOT delegated,
+// delegate it once (sponsor pays the one-time ER session). `start_match` is
+// the application's job (sponsor signs init on base). Blocks for gasless
+// writes afterwards.
+export async function ensureBoardDelegated(game, matchRef) {
+  const pda = boardPda(game, matchRef);
+  const info = await conn.getAccountInfo(pda).catch(() => null);
+  if (!info) return { pda: pda.toBase58(), delegated: false, why: 'board-not-created-yet' };
+  const st = await getDelegationStatus(conn, pda).catch(() => null);
+  if (st && st.isDelegated) return { pda: pda.toBase58(), delegated: true, region: st.fqdn || '' };
+  // delegate using the relay/sponsor signer (same wallet that init the board)
+  const tx = await prog.methods.delegateBoard(game, new BN(matchRef))
+    .accounts({ payer: sponsor.publicKey, board: pda }).transaction();
+  tx.feePayer = sponsor.publicKey;
+  const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
+  await conn.confirmTransaction({ signature: sig }, 'confirmed');
+  return { pda: pda.toBase58(), delegated: true, sig };
 }
 
 // Order discovery: a local id index (ids only; every display field is re-read

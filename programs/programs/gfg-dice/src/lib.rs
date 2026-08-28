@@ -427,6 +427,35 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Delegates the arc2m1 MATCH BOARD PDA into an ER session (base layer,
+    /// sponsor/relay pays) so `begin_match`/`commit_move`/`finish_match` run
+    /// GASLESS on the ER. Mirrors `delegate_result`; seed [gfgboard, game, match_ref].
+    pub fn delegate_board(ctx: Context<DelegateBoardInput>, game: u8, match_ref: u64) -> Result<()> {
+        ctx.accounts.delegate_board(
+            &ctx.accounts.payer,
+            &[MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+            DelegateConfig {
+                // Optionally set a specific validator from the first remaining account
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Commits the latest state and returns a MATCH BOARD PDA to this program
+    /// (runs on ER). Mirrors `undelegate_result`. Additive.
+    pub fn undelegate_board(ctx: Context<CommitAndUndelegateBoardInput>, game: u8, match_ref: u64) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.board.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
     /// Idempotent: creates the player's RESULT PDA if it does not exist yet.
     /// Payer (sponsor) pays rent; the account belongs to `player_authority`.
     pub fn initialize_result(ctx: Context<InitializeResult>) -> Result<()> {
@@ -2648,6 +2677,32 @@ pub struct CommitAndUndelegateResultInput<'info> {
     pub player_authority: AccountInfo<'info>,
     #[account(mut, seeds = [RESULT, player_authority.key().as_ref()], bump)]
     pub result: Account<'info, PlayerResult>,
+}
+
+/// Context for `delegate_board`: moves a MATCH BOARD PDA into an ER session so
+/// `begin_match`/`commit_move`/`finish_match` run gasless. The PDA's real seeds
+/// [gfgboard, game, match_ref] are passed to `delegate_board(...)`. Additive
+/// (arc2m1a G0).
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateBoardInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The board PDA to delegate.
+    #[account(mut, del)]
+    pub board: UncheckedAccount<'info>,
+}
+
+/// Context for `undelegate_board`: returns a MATCH BOARD PDA to this program
+/// (runs on the ER). Mirrors CommitAndUndelegateResultInput. Additive.
+#[commit]
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct CommitAndUndelegateBoardInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
 }
 
 /// Context for `undelegate_global_points`: returns the GLOBAL POINTS PDA to

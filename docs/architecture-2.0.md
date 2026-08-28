@@ -83,9 +83,17 @@ Finalize these six and the doc becomes the build guide; we start the M1 v2 rebui
 ### Summary
 M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 result seam, but the game core now also supports 3 play modes: **Solo** (vs computer, free, points only), **Multiplayer** (AGM-matched real players; match-code for private games), **P2C** (AGM-matched computer, earn). Deterministic moves are committed on-chain (board snapshot checkpoints + move hashes; full board replay on chain for earn games where affordable, ER permitting). Turn-clock + match-time are enforced. Identity = GFG handle (never name/email/wallet).
 
+### GAME-AGNOSTIC CONTRACT (hard - all games must satisfy this, none may violate)
+1. **One board, any game.** The on-chain `MatchBoard` (seed `gfgboard`, `[game u8][match_ref u64]`) is game-agnostic: it stores seats/players/stake/window/checkpoints/finish order, NOT game rules. A new game simply passes its own `game` source_code + registry ruleset; the board never changes.
+2. **Reward-neutral by construction.** M1 (game + board + clocks) NEVER computes or credits points/money/fees. It only records FACTS: participants, move-hash checkpoints, turn times, finish order, winner seat. M3/M4/M7/AGM consume those facts via the M2 seam + board reads. No scoring table, no pot math, no fee logic in M1 code. (Current ludo-lab already follows this: seam emit + result-PDA only - keep it.)
+3. **Deterministic + hashed moves.** The game commits a 32-byte `move_commit` hash per turn checkpoint (cheap, gasless on ER). For earn games, an affordable full board snapshot is also committed at checkpoints, ER permitting. Gaming the hash is prevented by the game's own determinism rules (same input = same state).
+4. **Clocks are per-seat and optional.** `MatchClock` (seed `gfgclock`, `[game][match_ref]`) exists ONLY for matches that need anti-stall (earn modes). Solo free play creates no clock and no board - it stays exactly as today (zero change).
+5. **Identity = GFG handle.** The board stores wallets (needed for escrow), but all player-facing identity and display uses the GFG handle. Never leak name/email/wallet as an identity label to other players.
+6. **Hands off to pluggable modules.** When a match ends, M1 publishes the seam envelope (with additive fields below) AND makes the board readable via `matchState(matchRef)`. It does NOT know or care which downstream module consumes: M3 points, M4 ledgers, AGM settle, M7 competition tally - they all read the same facts.
+
 ### expectedInput (what M1 v2 receives)
 - FROM M2 SEAM: the normalized `gfg:game-result@1` envelope (seat/actor/position, proof sig, finishedAt) - unchanged, games keep emitting it.
-- FROM THE LOBBY/AGM MODULE (new): match config `{ mode, players:[{wallet,handle,rating}], poolUsdCents/stake, ruleset, clocks, escrowRef }`. Earn matches only start when escrow (AGM) confirms funds are locked.
+- FROM THE LOBBY/AGM MODULE (new): match config `{ mode, players:[{wallet,handle,rating}], poolUsdCents/stake, ruleset, clocks: {turnSecs, maxMatchSecs}, escrowRef }`. Earn matches only start when escrow (AGM) confirms funds are locked.
 - FROM M5 (plans): allowed-tier gate for earn modes (mirror of competition tier gating).
 - FROM GAME RUNTIME: per-turn state checkpoints `{ matchRef, turn, hash }` the game posts to the on-chain board.
 
@@ -94,8 +102,31 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 - On-chain board records per match: participants, committed move checkpoints, turn times, final result → readable by M3/M4/AGM/escrow for rewards, fees and dispute checks.
 - A `matchState(matchRef)` API (relay) returning participants/rules/timers so the AGM + escrow lock and settle deterministically.
 
+### CURRENT STATE vs BUILD LIST (verified 2026-08-28)
+**What already exists (live, working, deployed):**
+- `MatchBoard` account + instructions `start_match` / `begin_match` / `commit_move` / `finish_match` (seeds `gfgboard`, MAX_MP=8). Smoke-tested on devnet (arc2m1a). **NOT yet wired into any game.**
+- `MatchClock` account + instructions `start_match_clocks` / `touch_seat_clock` / `timeout_seat` / `finish_forfeit` (seed `gfgclock`). Smoke-tested (arc2m1b). **NOT yet wired into any game.**
+- ludo-lab gameplay is LOCAL and complete: **ER VRF** dice (gasless), move/movement/capture/AI, persistence, win ceremony, M2 seam emit (`publishGameResult`), Scope C result-PDA commit. Plays Solo today (You vs computers).
+- `source_code` map: 1=ludo, 2=ayo_olopon (registry.json is the games catalog; rulesets per game live there or in a config module, config-first).
+
+**Gaps to close (strict build order - follow exactly, verify each before moving on):**
+- [x] G0. **`delegate_board` + `undelegate_board` instruction (BLOCKER for G1 - confirmed missing).** DONE: additive `delegate_board` (mirror `delegate_result`) + `undelegate_board` (mirror `undelegate_result`) added to the program + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor). Verified: program + IDL compile, relay parses. Board writes are then gasless on the ER; region-agnostic via `boardRegionUrl` (`getDelegationStatus -> fqdn`).
+- [ ] G1. **Board wiring (ludo-lab Solo proof):** create+delegate a MatchBoard PDA per match on first use (relay/sponsor idempotent, like dice/points/result), then commit a move-hash after each turn, and finish with the real finish order. Verify: solo game runs, board readable via relay `matchState`. Do NOT add points/money logic here.
+- [ ] G2. **matchState(matchRef) relay API:** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify with the solo board from G1.
+- [ ] G3. **Clock wiring for earn matches only:** earn lobby starts clocks; forfeit path closes stalled matches. Solo never creates clocks. Verify against a stalling seat.
+- [ ] G4. **Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake`, `escrowRef` when present (additive; old consumers unaffected). Verify M3/M4 still fire.
+- [ ] G5. **Rulesets registry (config-first):** per-game `{ gameId, source_code, seatsCap, defaultTurnSecs, defaultMaxMatchSecs, earnAllowed, p2cAllowed }` in a config module (like plans-config). Board reads turn/match caps from here, not from hardcoded game code.
+- [ ] G6. **Multiplayer (2mp) real-play:** the actual multi-human shared board. This is the big one - wire board + turn + clocks + seam for 2 real players across devices, exact same Ludo rules, no money yet.
+
+**Hard constraints while building (do not regress):**
+- Every board/clock write is gasless on the ER (delegate the PDA once, then write via ER RPC). Never `sendMagicTx` on base for feature writes.
+- Program upgrades are additive + upgrade-safe (new seeds/instructions, never mutate live layouts; preserve data). Same program id `CH8Jep…`.
+- Keep account payloads small (SVM 4KB stack-frame cap - the `[u64; 512]` lesson).
+- Solo/free play and existing M3/M4/Scope-C result wiring must keep working with zero changes.
+- When in doubt about an on-chain capability (deposit/withdraw/VRF/commit), check MagicBlock ER docs first, then confirm the plan - never assume base-layer works for it.
+
 ### Dependencies/order
-Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM lobby + P2P match lock; (3) clocks/timeouts; (4) P2C bank binding; (5) settle/fee. Solo/non-earn play keeps working with zero changes (existing seams).
+Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM lobby + P2P match lock; (3) clocks/timeouts; (4) P2C bank binding; (5) settle/fee. Solo/non-earn play keeps working with zero changes (existing seams). Within M1 now: G1 → G2 → G3 → G4 → G5 → G6 above.
 
 ---
 
