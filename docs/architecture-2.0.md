@@ -109,14 +109,14 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 - ludo-lab gameplay is LOCAL and complete: **ER VRF** dice (gasless), move/movement/capture/AI, persistence, win ceremony, M2 seam emit (`publishGameResult`), Scope C result-PDA commit. Plays Solo today (You vs computers).
 - `source_code` map: 1=ludo, 2=ayo_olopon (registry.json is the games catalog; rulesets per game live there or in a config module, config-first).
 
-**Gaps to close (strict build order - follow exactly, verify each before moving on):**
-- [x] G0. **`delegate_board` + `undelegate_board` instruction (BLOCKER for G1 - confirmed missing).** DONE: additive `delegate_board` (mirror `delegate_result`) + `undelegate_board` (mirror `undelegate_result`) added to the program + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor). Verified: program + IDL compile, relay parses. Board writes are then gasless on the ER; region-agnostic via `boardRegionUrl` (`getDelegationStatus -> fqdn`).
-- [ ] G1. **Board wiring (ludo-lab Solo proof):** create+delegate a MatchBoard PDA per match on first use (relay/sponsor idempotent, like dice/points/result), then commit a move-hash after each turn, and finish with the real finish order. Verify: solo game runs, board readable via relay `matchState`. Do NOT add points/money logic here.
-- [ ] G2. **matchState(matchRef) relay API:** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify with the solo board from G1.
-- [ ] G3. **Clock wiring for earn matches only:** earn lobby starts clocks; forfeit path closes stalled matches. Solo never creates clocks. Verify against a stalling seat.
-- [ ] G4. **Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake`, `escrowRef` when present (additive; old consumers unaffected). Verify M3/M4 still fire.
-- [ ] G5. **Rulesets registry (config-first):** per-game `{ gameId, source_code, seatsCap, defaultTurnSecs, defaultMaxMatchSecs, earnAllowed, p2cAllowed }` in a config module (like plans-config). Board reads turn/match caps from here, not from hardcoded game code.
-- [ ] G6. **Multiplayer (2mp) real-play:** the actual multi-human shared board. This is the big one - wire board + turn + clocks + seam for 2 real players across devices, exact same Ludo rules, no money yet.
+**Remaining M1 slices (strict build order - follow exactly, verify each before moving on). NOTE: this module's alphabet is c,d,e,f,g,h (arc2m1a + arc2m1b already shipped); never call them G0/G1/... in docs or commits.**
+- [x] **arc2m1c. Board ER onboarding (was "G0"):** `delegate_board` + `undelegate_board` instructions (the board PDA had NO delegation, so board writes couldn't run gasless) + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor) + region-agnostic `boardRegionUrl` (`getDelegationStatus -> fqdn`). DONE: program + IDL compile, relay parses. Board writes become gasless on the ER after one delegate.
+- [ ] **arc2m1d. Board wiring (ludo-lab Solo proof, was "G1"):** create+delegate a MatchBoard PDA per match on first use (relay/sponsor idempotent, like dice/points/result), then commit a move-hash after each turn, and finish with the real finish order. Verify: solo game runs, board readable via relay `matchState`. Do NOT add points/money logic here.
+- [ ] **arc2m1e. `matchState(matchRef)` relay API (was "G2"):** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify with the solo board from arc2m1d.
+- [ ] **arc2m1f. Clock wiring for earn matches only:** earn lobby starts clocks; forfeit path closes stalled matches. Solo never creates clocks. Verify against a stalling seat.
+- [ ] **arc2m1g. Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake`, `escrowRef` when present (additive; old consumers unaffected). Verify M3/M4 still fire.
+- [ ] **arc2m1h. Rulesets registry (config-first):** per-game `{ gameId, source_code, seatsCap, defaultTurnSecs, defaultMaxMatchSecs, earnAllowed, p2cAllowed }` in a config module (like plans-config). Board reads turn/match caps from here, not from hardcoded game code.
+- [ ] **arc2m1i. Multiplayer (2mp) real-play:** the actual multi-human shared board. This is the big one - wire board + turn + clocks + seam for 2 real players across devices, exact same Ludo rules, no money yet.
 
 **Hard constraints while building (do not regress):**
 - Every board/clock write is gasless on the ER (delegate the PDA once, then write via ER RPC). Never `sendMagicTx` on base for feature writes.
@@ -126,7 +126,7 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 - When in doubt about an on-chain capability (deposit/withdraw/VRF/commit), check MagicBlock ER docs first, then confirm the plan - never assume base-layer works for it.
 
 ### Dependencies/order
-Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM lobby + P2P match lock; (3) clocks/timeouts; (4) P2C bank binding; (5) settle/fee. Solo/non-earn play keeps working with zero changes (existing seams). Within M1 now: G1 → G2 → G3 → G4 → G5 → G6 above.
+Build M1 v2 in this order: (1) on-chain board + move commit instruction; (2) AGM lobby + P2P match lock; (3) clocks/timeouts; (4) P2C bank binding; (5) settle/fee. Solo/non-earn play keeps working with zero changes (existing seams). Remaining M1 work now: arc2m1c (done) → arc2m1d → arc2m1e → arc2m1f → arc2m1g → arc2m1h → arc2m1i.
 
 ---
 
@@ -145,6 +145,8 @@ Slice labels are always `arc2m<N><slice>` so it is ALWAYS obvious which module a
 | Slice | Module (v2) | Owns |
 |---|---|---|
 | arc2m1a ✅ | M1 Game core | multiplayer Solo/Multiplayer, on-chain board + move commit, per-game rules profiles (registry) |
+| arc2m1b ✅ | M1 Game core | per-game timeouts: per-seat clocks, timeout->forfeit, finish_forfeit |
+| arc2m1c ✅ | M1 Game core | board ER onboarding: delegate_board/undelegate_board (gasless board writes) + region-agnostic relay |
 | arc2m7a ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
 | arc2m7b ✅ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
 | arc2m7c ✅ | M7 AGM | P2C computer bank + anti-farm caps |
