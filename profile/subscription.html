@@ -97,7 +97,7 @@
             var statusEl = document.getElementById('plans-status');
 
             // Nigeria-beta strike values (current conversion; the ONLY naira in the UI)
-            var NG_STRIKE = { 2: 'N13,350', 3: 'N13,350' };
+            var NG_STRIKE = { 2: '', 3: '' };
 
             function renderPlans(plans) {
                 var order = [2, 3];
@@ -115,9 +115,8 @@
                         '<div style="font-size:0.78rem; color:#bbb;">' + p.name + '</div>' +
                         '<div class="price-now">$' + usd + ' <small>/ 30 days</small></div>' +
                         '<div style="font-size:0.78rem; color:#bbb; margin-top:4px;">Regular <span style="text-decoration:line-through; color:#888;">$' + reg + '</span> · launch discount</div>' +
-                        '<div style="margin-top:8px; font-size:0.78rem; line-height:1.5;"><span class="strike">' + NG_STRIKE[lvl] + '</span> <span class="ng-discount">' + p.nigeriaDiscount + '</span><br><span style="color:#888;">Nigeria beta, limited time</span></div>' +
-                        '<div class="benefit-line"><b>' + p.mult + 'x</b> on every win · <b>' + p.dailyReward + 'P</b> daily reward · <b>' + p.livesPerDay + '</b> lives a day' + (hot ? ' · <b style="color:#2ecc71;">ad-free</b>' : '') + (lvl === 3 ? ' · <b style="color:#2ecc71;">1.5x competition final score</b>' : '') + '</div>' +
-                        '<a class="launch-btn onchain cta" href="/gf-checkout" onclick="return window.__payPlan(this,' + lvl + ');">Pay $' + usd + ' (' + p.nigeriaDiscount + ')</a>' +
+                        '<div class="benefit-line" style="margin-top:8px;"><b>' + p.mult + 'x</b> on every win · <b>' + p.dailyReward + 'P</b> daily reward · <b>' + p.livesPerDay + '</b> lives a day' + (hot ? ' · <b style="color:#2ecc71;">ad-free</b>' : '') + (lvl === 3 ? ' · <b style="color:#2ecc71;">1.5x competition final score</b>' : '') + '</div>' +
+                        '<a class="launch-btn onchain cta" href="/gf-checkout" onclick="return window.__payPlan(this,' + lvl + ');">Pay $' + usd + '</a>' +
                         '<a class="launch-btn cta" style="background:#1a1a24; border:1px solid #333; color:#bbb;" href="/subscription-paid/">I have paid · confirm payment</a>' +
                         '</div>';
                 });
@@ -134,8 +133,8 @@
             async function loadPlans() {
                 var fallback = {
                     1: { level:1, name:'Level 1', mult:1, dailyReward:25, livesPerDay:5 },
-                    2: { level:2, name:'Level 2 (2x)', mult:2, dailyReward:200, livesPerDay:10, activationPremiumCost:5000, usdRegularCents:1000, usdDiscountCents:500, nigeriaDiscount:'N5,000' },
-                    3: { level:3, name:'Level 3 (3x)', mult:3, dailyReward:300, livesPerDay:15, activationPremiumCost:10000, usdRegularCents:2000, usdDiscountCents:1000, nigeriaDiscount:'N8,000' }
+                    2: { level:2, name:'Level 2 (2x)', mult:2, dailyReward:200, livesPerDay:10, activationPremiumCost:5000, usdRegularCents:1000, usdDiscountCents:500 },
+                    3: { level:3, name:'Level 3 (3x)', mult:3, dailyReward:300, livesPerDay:15, activationPremiumCost:10000, usdRegularCents:2000, usdDiscountCents:1000 }
                 };
                 var plans = fallback;
                 try {

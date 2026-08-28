@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Pricing - Admin - GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        body { background:#0f0f13; }
+        .page { max-width:1080px; margin:0 auto; padding:24px 16px 60px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; margin-bottom:16px; }
+        .card h3 { margin:0 0 8px; font-size:0.95rem; color:#f87818; }
+        .hint { font-size:0.8rem; color:#888; line-height:1.5; }
+        table { width:100%; border-collapse:collapse; font-size:0.78rem; margin-top:8px; }
+        th, td { border:1px solid #2a2a36; padding:6px 8px; text-align:left; }
+        th { background:#1a1a24; color:#f87818; font-size:0.68rem; text-transform:uppercase; }
+        td.mono { font-family:monospace; font-size:0.7rem; word-break:break-all; color:#7838f8; }
+        .free { color:#2ecc71; font-weight:800; }
+        .paid { color:#f87818; font-weight:800; }
+        .tbd { color:#888; font-style:italic; }
+        .feature { padding:2px 0; font-size:0.8rem; color:#ccc; line-height:1.7; }
+        .feature b { color:#f87818; }
+        .staff-note { background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.25); border-radius:8px; padding:12px 16px; font-size:0.8rem; color:#ccc; line-height:1.6; }
+        .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; }
+        .pill.ok { background:rgba(46,204,113,0.15); color:#2ecc71; }
+        .pill.wip { background:rgba(248,120,24,0.15); color:#f87818; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Plan Pricing (L0 - L10 ladder)</h1>
+        <p class="hint" style="margin:0 0 12px;">Admin reference for the CONFIG-DRIVEN premium plan ladder. Every figure below is USD only (crypto-first, international; no Naira/local currency on pricing). More levels = more rows in <span class="mono" style="color:#f87818;">scripts/plans-config.mjs</span>, never code.</p>
+
+        <div class="card">
+            <h3>Ladder rule</h3>
+            <p class="feature">Each level is 2x the previous level. <b>L0</b> is the base FREE plan for new sign-ups. Levels <b>L1 - L10</b> require premium subscriptions. Features below drive lives, games-per-day, win points, ads and referrals.</p>
+        </div>
+
+        <div class="card">
+            <h3>The Levels (price = regular / payable)</h3>
+            <table>
+                <thead><tr><th>Level</th><th>Type</th><th>Price (USD)</th><th>Games/day (G)</th><th>Lives (L)</th><th>Win points (PfeGW)</th><th>Ads</th><th>Daily bonus (PaDB)</th><th>Affiliate</th></tr></thead>
+                <tbody>
+                    <tr><td><b>L0</b></td><td><span class="free">FREE</span></td><td>$5 / $0</td><td>1 (rotated)</td><td>2</td><td>100</td><td>Full ads</td><td>25P</td><td>20%</td></tr>
+                    <tr><td><b>L1</b></td><td><span class="paid">Premium</span></td><td>$10 / $5</td><td>2</td><td>4</td><td>150</td><td>Less ads</td><td>50P</td><td>20%</td></tr>
+                    <tr><td><b>L2</b></td><td><span class="paid">Premium</span></td><td>$20 / $10</td><td>4</td><td>8</td><td>200</td><td>Less ads</td><td>100P</td><td>20%</td></tr>
+                    <tr><td><b>L3</b></td><td><span class="paid">Premium</span></td><td>$30 / $15</td><td>8</td><td>16</td><td>300</td><td>Less ads</td><td>200P</td><td>20%</td></tr>
+                    <tr><td><b>L4</b></td><td><span class="paid">Premium</span></td><td>$40 / $20</td><td>16</td><td>32</td><td>400</td><td>Less ads</td><td>400P</td><td>20%</td></tr>
+                    <tr><td><b>L5</b></td><td><span class="paid">Premium</span></td><td>$50 / $25</td><td>32</td><td>64</td><td>500</td><td>Less ads</td><td>800P</td><td>20%</td></tr>
+                    <tr><td><b>L6</b></td><td><span class="paid">Premium</span></td><td class="tbd">$60 / $30 (derived)</td><td>64</td><td>128</td><td class="tbd">600 (derived)</td><td>Less ads</td><td>1600P</td><td>20%</td></tr>
+                    <tr><td><b>L7</b></td><td><span class="paid">Premium</span></td><td class="tbd">$70 / $35 (derived)</td><td>128</td><td>256</td><td class="tbd">700 (derived)</td><td>Less ads</td><td>3200P</td><td>20%</td></tr>
+                    <tr><td><b>L8</b></td><td><span class="paid">Premium</span></td><td class="tbd">$80 / $40 (derived)</td><td>256</td><td>512</td><td class="tbd">800 (derived)</td><td>Less ads</td><td>6400P</td><td>20%</td></tr>
+                    <tr><td><b>L9</b></td><td><span class="paid">Premium</span></td><td class="tbd">$90 / $45 (derived)</td><td>512</td><td>1024</td><td class="tbd">900 (derived)</td><td>Less ads</td><td>12800P</td><td>20%</td></tr>
+                    <tr><td><b>L10</b></td><td><span class="paid">Premium</span></td><td class="tbd">$100 / $50 (derived)</td><td>1024</td><td>2048</td><td class="tbd">1000 (derived)</td><td>Less ads</td><td>25600P</td><td>20%</td></tr>
+                </tbody>
+            </table>
+            <p class="hint" style="margin-top:8px;">L0 - L5 are the locked numbers. L6 - L10 follow the 2x ladder (marked derived; confirm before wiring).</p>
+        </div>
+
+        <div class="card">
+            <h3>Features</h3>
+            <div class="feature"><b>F1 - Game Access (G):</b> Free accounts cannot pick their game. The platform rotates one free game per day (all free accounts get the same game, so creating multiple accounts to pick a different game is pointless). Today Ludo free, tomorrow another game, rotating daily across all available games, so a free player can try everything before upgrading (one per day, platform-chosen). L1 and above unlock all games, but a player who plays 4 different games cannot open a 5th that day, even with lives left: remaining lives only work on the same 4 games they already spent at least 1 life on that day. Resets every 24 hours.</div>
+            <div class="feature"><b>F2 - Lives (L):</b> Free-play lives per day per the ladder (2 at L0, doubling upward).</div>
+            <div class="feature"><b>F3 - Win points (100PfeGW):</b> Points earned for every game win: 100 at L0, 150 at L1, 200 at L2, 300 at L3, 400 at L4, 500 at L5, and up per the ladder.</div>
+            <div class="feature"><b>F4 - Ads (FAds / LAds):</b> Full ads on the free plan; Less ads from L1 upward.</div>
+            <div class="feature"><b>F5 - Daily bonus (25PaDB):</b> Daily claimable bonus: 25P at L0, doubling per level (50, 100, 200, 400, 800...).</div>
+            <div class="feature"><b>F6 - Affiliate (20%):</b> 20% of each referred plan's payable USD price. Referrer does NOT need an active subscription to earn. Any account that refers a player who upgrades to any level within 1 year of the referral can earn on up to 10 upgrade/renewal events for that referral within 365 days (no more active-sub monthly gate, no more 60-day pair forfeit; stops after 10 paid renewals or 365 days per referral).</div>
+        </div>
+
+        <div class="card">
+            <h3>Implementation status</h3>
+            <table>
+                <thead><tr><th>Item</th><th>Status</th></tr></thead>
+                <tbody>
+                    <tr><td>Config ladder (scripts/plans-config.mjs) carries current L1/L2/L3 rows</td><td><span class="pill wip">WIP - extend to L0-L10, USD only</span></td></tr>
+                    <tr><td>Free daily game rotation (F1)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>4-game daily cap for premium (F1)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>Lives ladder by level (F2)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>Win points by level (F3)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>Ad tiering (F4)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>Daily bonus by level (F5)</td><td><span class="pill wip">WIP</span></td></tr>
+                    <tr><td>Affiliate 20% no-active-sub, 10x/365d (F6)</td><td><span class="pill wip">WIP - replaces active-sub gate + 60-day forfeit</span></td></tr>
+                </tbody>
+            </table>
+            <p class="hint" style="margin-top:8px;">This page is the planning reference; wiring each feature into the modules (M5 plans, M10 lives, M6 affiliate) is tracked in <a href="/changelog/architecture-v2.html" style="color:#f87818;">Architecture V2</a>.</p>
+        </div>
+
+        <div class="staff-note" id="staffNote">Checking staff access...</div>
+    </div>
+
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        (async function init() {
+            if (!window.DashCore) { document.getElementById('staffNote').textContent = 'Staff-only page. If you are staff, reload after the header loads.'; return; }
+            const staff = await window.DashCore.gateStaff().catch(() => false);
+            if (!staff) { document.getElementById('staffNote').textContent = 'This page is only for GlobalFolkGames staff. You do not have access.'; return; }
+            document.getElementById('staffNote').style.display = 'none';
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Pricing',
+                active: 'pricing',
+                sections: [
+                    { heading: 'Overview', items: [ { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' } ]},
+                    { heading: 'Earn &amp; Plans', items: [
+                        { key: 'pricing', label: '💳 Plan Pricing (L0-L10)', href: '/dashboard/pricing.html' },
+                        { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
+                    ]},
+                ]
+            });
+        })();
+    </script>
+</body>
+</html>

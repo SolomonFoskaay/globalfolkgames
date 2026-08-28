@@ -53,7 +53,7 @@
 
         <section class="game-card" style="border:1px solid var(--accent, #f87818);">
             <h3>Premium subscription</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your Level 2 (2x) boost, daily reward and lives are managed on a dedicated page. Regular price <span style="text-decoration:line-through;">$10</span> — beta now <b style="color:#f87818;">$3</b> (Nigeria beta <b style="color:#2ecc71;">₦4,000</b>) for 30 days. Limited time.</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your Level 2 (2x) boost, daily reward and lives are managed on a dedicated page. Regular price <span style="text-decoration:line-through;">$10</span> — limited time beta now <b style="color:#f87818;">$5</b> for 30 days. Crypto only, all USD.</p>
             <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin:10px 0;">--</p>
             <a href="/profile/subscription.html" class="launch-btn onchain" style="display:inline-block; text-decoration:none; text-align:center;">View Premium plans — beta offer</a>
             <p id="tier-spendable" style="color:var(--muted); font-size:0.78rem; margin-top:10px;">--</p>
@@ -317,7 +317,7 @@
                 if (active) {
                     statusEl.innerHTML = 'You have <b style="color:#f87818;">Level ' + level + ' (' + mult + 'x)</b> active until <b>' + new Date((tier ? tier.expiry : legacy.expiresAt)).toLocaleDateString() + '</b> (' + daysLeft + ' days left). <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">Manage plan</a> — no auto-renew, renew manually if you want to.';
                 } else {
-                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">See Premium beta</a> — regular <span style="text-decoration:line-through;">$10</span> now <b>$3</b> (Nigeria beta <b>₦4,000</b>) for 30 days, 2x wins, 200P daily, 10 lives. Non-refundable, no auto-debit.';
+                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">See Premium beta</a> — regular <span style="text-decoration:line-through;">$10</span> now <b>$5</b> for 30 days, 2x wins, 200P daily, 10 lives. Non-refundable, no auto-debit. Crypto only, all USD.';
                 }
 
                 if (spendableEl) {

@@ -32,7 +32,7 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 - Fees: FLAT 10% of each finished pot for every earn match, all modes, all games (one number everywhere, printed up front). Premium plans stay as the separate comfort/gas subscription (lives, points, ad-free, booster, bigger daily).
 
 ## 3. Match rules / anti-abuse (all earn modes)
-- Max match time: 30 min (2p) / 45 min (3p) / 60 min (4p+), per-game override.
+- Max match time: **60 min (2p)** / 90 min (3p) / 120 min (4p+), per-game override. (2p raised from 30 min to 60 min so players are never rushed; boards use `max_match_secs` per game.)
 - Max turn time per game (e.g., Ludo 60s): idle → the turn passes / auto-moves per game logic; stalling impossible.
 - No cancel on loss: once stakes lock, only a rules draw or platform-infra refund ends it.
 - Reputation/rating per game, visible to match parties; computers carry a fixed band label.

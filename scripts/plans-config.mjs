@@ -2,8 +2,7 @@
 // Single source of truth for the premium plan attributes used by the relay
 // (affiliate share, pricing) and later served to the client at /api/plans.
 // More levels = more rows HERE, never code. Owner-approved values 2026-08-22.
-// Prices are USD CENTS (the site is USD-first; Naira is a Nigeria-only beta
-// line, nigeriaDiscount shown as a strike-through local price).
+// Prices are USD CENTS only (crypto-first, international). No local currency.
 export const PLAN_LADDER = {
   1: {
     level: 1,
@@ -16,7 +15,6 @@ export const PLAN_LADDER = {
     activationPremiumCost: 0,
     usdRegularCents: 0,
     usdDiscountCents: 0,
-    nigeriaDiscount: '0',
     activeDays: 0,
   },
   2: {
@@ -30,7 +28,6 @@ export const PLAN_LADDER = {
     activationPremiumCost: 5000,
     usdRegularCents: 1000,      // $10 strike
     usdDiscountCents: 500,      // $5 payable (launch discount)
-    nigeriaDiscount: '5000',    // N5,000 Nigeria beta (strike N13,350 shown in UI)
     activeDays: 30,
   },
   3: {
@@ -44,7 +41,6 @@ export const PLAN_LADDER = {
     activationPremiumCost: 10000,
     usdRegularCents: 2000,      // $20 actual
     usdDiscountCents: 1000,     // $10 payable (launch discount)
-    nigeriaDiscount: '8000',    // N8,000 Nigeria beta (strike N13,350 shown in UI)
     activeDays: 30,
   },
 };

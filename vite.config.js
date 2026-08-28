@@ -69,6 +69,7 @@ export default defineConfig({
         'dashboard-premium-subscribers': './dashboard/premium-subscribers.html',
         'dashboard-affiliate': './dashboard/affiliate.html',
         'dashboard-agm': './dashboard/agm.html',
+        'dashboard-pricing': './dashboard/pricing.html',
         'dashboard-competitions': './dashboard/competitions.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
         verify: './verify/index.html',
