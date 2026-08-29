@@ -433,7 +433,7 @@
         "Top-up: players can fund their embedded Solana wallet (Dynamic on-ramp) and buy spendable points; points unlock extra allowance and specials (lives, tournament re-entries). Earned and purchased points share the existing point_transactions ledger (different reason tags).",
         "Early refill: during the onboarding phase players can request a free allowance refill from their profile (owner grants). The limit is taught from day one so later removal of free refills is never a surprise.",
         "Transparency: per-game sponsor cost, allowance used, wins and turns are tracked and visible on both the user profile and the admin dashboard, so the owner can see how far the free gas budget stretches (games/turns per SOL).",
-        "Competition fairness: competitions are never pay-to-enter; each event bundles an allowance sized to finish it. Paid pressure applies to extra/grinding play, never to locking a player out of an event they already entered."
+        "Competition fairness: competitions are never pay-to-enter; each event bundles an allowance sized to finish it. Paid pressure applies to extra/grinding play, never to locking a player out of an event they already  entered."
       ],
       "status": "planned",
       "approved": true,
