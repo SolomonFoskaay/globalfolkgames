@@ -11,10 +11,14 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 
 ## 1. M1 v2 — Game core with multiplayer
 - Rebuild M1 around **multiplayer** while keeping the M2 result seam: every game emits `publishGameResult` exactly as today.
-- Modes (per game): **Solo** (you vs computer/human seats, free, points only) and **Multiplayer** (abbreviated 2mp, 3mp, 4mp... = the number of HUMAN wallets in the match, earn-capable). There are NOT two versions of a game: the single game build powers both - Solo just has no money+AGM attached. Per-game seat capacity is dynamic (Ludo supports 2-seat or 4-seat; Monopoly 5-8 seats; etc.), so '2p/4p' (seat count within Ludo) is never confused with 'mp' (how many humans).
-- Earn fill rules: an earn match fills 2..N human wallets via AGM; if not enough humans accept within the window, the remaining SEATS get a labelled (Computer) seat only when the mode is P2C-allowed (player can reject).
-- Deterministic game logic + **on-chain board/move state** for any match that involves value (could be heavy; we ship move-hashes + committed board snapshots at checkpoints; final settlement on-chain). Confirm with MagicBlock ER limits during build (see §9).
-- Turn clocks + match time caps enforced by the program/time service (§4).
+- **The GAME IS STANDALONE — AGM never changes gameplay.** All game features (multiplayer, match codes, turn clocks, timers, forfeit, replay, points seam) live INSIDE the game and work with zero money. AGM is a game-agnostic money/escrow/betting plug that DRAPS ON TOP later: same game, same logic, same features, whether you play friends for free or play with earn. A player trains on exactly what they will bet on.
+- Modes (per game), all in the ONE game build:
+  - **Solo** (you vs computer/human seats, free, points only) — today's ludo-lab, unchanged.
+  - **Multiplayer** (abbreviated 2mp, 3mp, 4mp... = number of HUMAN wallets in the match): played via **match codes** (2 real players share a code, no lobby/AGM needed). Free to play with friends right now; the SAME match can later carry earn when AGM is plugged on. Computers may fill empty seats when P2C is allowed (player can reject).
+  - **Earn fills** (later, only when AGM is attached): AGM matches orders; if not enough humans accept within the window, remaining seats get a labelled (Computer) seat when P2C-allowed.
+- **On-chain board/move state runs GASLESS on the ER** (MagicBlock ER, same proven pattern as MagicBlock's own multiplayer game solana-generals): create the match PDA on chain once → delegate it to the ER once (sponsor ~0.0003 SOL) → every player's move is a GASLESS ER transaction signed by their session key → all players listen to the delegated board on the ER for updates → finish commits the result → later undelegate when settling. Move-hashes committed per turn; earn/checkpoint full snapshots ER-permitting. NO per-move base-layer writes.
+- Turn clocks + match time caps are part of the GAME (enforced in the game + program/service). §3 shows the current caps.
+- Identity = GFG handle (never name/email/wallet).
 
 ## 2. Earn engines (2-in-1, CEX bank + DEX community)
 - **P2C (platform computer, CEX-like "bank"):** the platform funds a pool of computer seats so matches always have a counterpart. Opponents are always labelled `(Computer)` vs `(Human)` with skill band; players accept/reject. Platform publishes the reward formula and takes its fee from the finished pool.
@@ -87,20 +91,21 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 1. **One board, any game.** The on-chain `MatchBoard` (seed `gfgboard`, `[game u8][match_ref u64]`) is game-agnostic: it stores seats/players/stake/window/checkpoints/finish order, NOT game rules. A new game simply passes its own `game` source_code + registry ruleset; the board never changes.
 2. **Reward-neutral by construction.** M1 (game + board + clocks) NEVER computes or credits points/money/fees. It only records FACTS: participants, move-hash checkpoints, turn times, finish order, winner seat. M3/M4/M7/AGM consume those facts via the M2 seam + board reads. No scoring table, no pot math, no fee logic in M1 code. (Current ludo-lab already follows this: seam emit + result-PDA only - keep it.)
 3. **Deterministic + hashed moves.** The game commits a 32-byte `move_commit` hash per turn checkpoint (cheap, gasless on ER). For earn games, an affordable full board snapshot is also committed at checkpoints, ER permitting. Gaming the hash is prevented by the game's own determinism rules (same input = same state).
-4. **Clocks are per-seat and optional.** `MatchClock` (seed `gfgclock`, `[game][match_ref]`) exists ONLY for matches that need anti-stall (earn modes). Solo free play creates no clock and no board - it stays exactly as today (zero change).
-5. **Identity = GFG handle.** The board stores wallets (needed for escrow), but all player-facing identity and display uses the GFG handle. Never leak name/email/wallet as an identity label to other players.
-6. **Hands off to pluggable modules.** When a match ends, M1 publishes the seam envelope (with additive fields below) AND makes the board readable via `matchState(matchRef)`. It does NOT know or care which downstream module consumes: M3 points, M4 ledgers, AGM settle, M7 competition tally - they all read the same facts.
+4. **Clocks are per-seat and part of the GAME.** `MatchClock` (seed `gfgclock`, `[game][match_ref]`) runs for SOLO AND MULTIPLAYER alike (anti-stall, so free play already enforces turn time; earn adds nothing new to the game). Solo can skip the clock only if the game chooses not to - the rules are in the game, not tied to money. A player training free sees the same turn timer they'll bet against.
+5. **Identity = GFG handle.** The board stores wallets (needed for escrow later), but all player-facing identity and display uses the GFG handle. Never leak name/email/wallet as an identity label to other players.
+6. **Hands off to pluggable modules.** When a match ends, M1 publishes the seam envelope (with additive fields below) AND makes the board readable via `matchState(matchRef)`. It does NOT know or care which downstream module consumes: M3 points, M4 ledgers, AGM settle, M7 competition tally - they all read the same facts. AGM simply plugs into the SAME free match (add money/escrow) - it never changes the game.
 
 ### expectedInput (what M1 v2 receives)
 - FROM M2 SEAM: the normalized `gfg:game-result@1` envelope (seat/actor/position, proof sig, finishedAt) - unchanged, games keep emitting it.
-- FROM THE LOBBY/AGM MODULE (new): match config `{ mode, players:[{wallet,handle,rating}], poolUsdCents/stake, ruleset, clocks: {turnSecs, maxMatchSecs}, escrowRef }`. Earn matches only start when escrow (AGM) confirms funds are locked.
-- FROM M5 (plans): allowed-tier gate for earn modes (mirror of competition tier gating).
-- FROM GAME RUNTIME: per-turn state checkpoints `{ matchRef, turn, hash }` the game posts to the on-chain board.
+- FROM THE GAME ITSELF (standalone, no AGM needed): match config from the CREATOR player `{ mode, players:[{wallet,handle}], ruleset, clocks: {turnSecs, maxMatchSecs} }` and a **match code** the opponent enters to join. Multiplayer works with the game alone.
+- FROM AGM (LATER, optional - only when earn is plugged on): the SAME config plus `poolUsdCents/stake`, `escrowRef`. Earn only starts when escrow (AGM) confirms funds are locked. The game does not notice the difference.
+- FROM M5 (plans): allowed-tier gate for earn modes (mirror of competition tier gating) - only in earn matches.
+- FROM GAME RUNTIME: per-turn state checkpoints `{ matchRef, turn, hash }` the game posts to the on-chain board (gasless on the ER).
 
 ### expectedOutput (what M1 v2 exposes)
-- `publishGameResult` completes as today PLUS additive fields: `mode`, `players[]` (handle + wallet), `stake/PoolUsdCents`, `escrowRef` so M3 (local points), M4 (global), and the earn engines can consume without reading game internals.
-- On-chain board records per match: participants, committed move checkpoints, turn times, final result → readable by M3/M4/AGM/escrow for rewards, fees and dispute checks.
-- A `matchState(matchRef)` API (relay) returning participants/rules/timers so the AGM + escrow lock and settle deterministically.
+- `publishGameResult` completes as today PLUS additive fields: `mode`, `players[]` (handle + wallet), `stake/PoolUsdCents` (0 when free), `escrowRef` (null when free) so M3 (local points), M4 (global), and the earn engines can consume without reading game internals. Free multiplayer emits the same envelope with stake 0.
+- On-chain board records per match: participants, committed move checkpoints, turn times, final result → readable by M3/M4/AGM/escrow for rewards, fees and dispute checks. Written gasless on the ER; all players listen to the delegated board for updates.
+- A `matchState(matchRef)` API (relay) returning participants/rules/timers so the AGM + escrow lock and settle deterministically (later).
 
 ### CURRENT STATE vs BUILD LIST (verified 2026-08-28)
 **What already exists (live, working, deployed):**
@@ -111,13 +116,20 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 
 **Remaining M1 slices (strict build order - follow exactly, verify each before moving on). NOTE: this module's alphabet is c,d,e,f,g,h (arc2m1a + arc2m1b already shipped); never call them G0/G1/... in docs or commits.**
 - [x] **arc2m1c. Board ER onboarding (was "G0"):** `delegate_board` + `undelegate_board` instructions (the board PDA had NO delegation, so board writes couldn't run gasless) + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor) + region-agnostic `boardRegionUrl` (`getDelegationStatus -> fqdn`). DONE: program + IDL compile, relay parses. Board writes become gasless on the ER after one delegate.
-- [ ] **arc2m1d. Board wiring (ludo-lab Solo proof):** create+delegate a MatchBoard PDA per match on first use (relay/sponsor idempotent, like dice/points/result), then commit a move-hash after each turn, and finish with the real finish order. Verify: solo game runs, board readable via relay `matchState`. Do NOT add points/money logic here.
-  > **SKIPPED-into-PARTIAL (2026-08-29):** client wiring IS in place and safe (soft-fail `board-hooks.js` wraps initiateArenaMatch/passTurnSequence + win-detection finish; game unchanged otherwise). Board `start_match` (stake=0 allowed now) + `begin_match` work via the sponsor/base path. **BLOCKER: delegate_board tx lands on-chain but MagicBlock Router `getDelegationStatus` does not report the board delegated** (dice/points/result work; board does not). Until delegation registers, `commit_move`/`finish_match` cannot run gasless on the ER. NEXT FOCUS = debug board delegation registration (compare to delegateResultPda; likely the macro's injected-account layout for a 3-seed PDA). The game stays fully playable in the meantime (soft-fail skips board writes).
-- [ ] **arc2m1e. `matchState(matchRef)` relay API (was "G2"):** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify with the solo board from arc2m1d.
-- [ ] **arc2m1f. Clock wiring for earn matches only:** earn lobby starts clocks; forfeit path closes stalled matches. Solo never creates clocks. Verify against a stalling seat.
-- [ ] **arc2m1g. Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake`, `escrowRef` when present (additive; old consumers unaffected). Verify M3/M4 still fire.
+- [ ] **arc2m1d. Standalone MULTIPLAYER (match codes, free - the heart of M1).** Turn ludo-lab into a real 2-human multiplayer game that works with ZERO money and NO AGM. Built as TWO layers so every future game reuses the rail:
+  - **UNIVERSAL RAIL (game-agnostic, one build):** `public/universal/multiplayer/` - match creation + ER delegation (sponsor, one-time) + per-player gasless move-commit + **listen/notify loop** (subscribe to the delegated board on ER like solana-generals `subscribeToEphemAccountInfo`, broadcast state changes to all players) + turn clocks/forfeit + finish + `matchState` + match codes/join. Touches only participants, move-hashes, turn times, finish order - NEVER interprets a move. Same as the M2 seam: one rail, all games.
+  - **PER-GAME ADAPTER (small, inside each game):** encode one move → hash; decode an opponent's move → render; expose the game's turn order + rules + win detection (game already has these). Ludo adapter is the reference implementation.
+  1. **Create match** → on-chain MatchBoard PDA (game, players, seats, stakes=0 free, turn/max clocks) created + **delegated to the ER** once (sponsor), and a short **match code** returned to the creator.
+  2. **Opponent joins** by entering the code → board records both players (already in players[]), game starts.
+  3. **Every move gasless on the ER**: player's session key signs `commit_move` (move-hash) to the delegated board; ALL players LISTEN to the delegated board on the ER and update the UI when it changes.
+  4. **Clocks/forfeit** (arc2m1f) run for BOTH players (turn timer, timeout, forfeit) - same in free and earn.
+  5. **Finish** → `finish_match` writes winner/positions; M2 seam emits as today (stake 0); M3/M4 consume identically to Solo.
+  Verify: two devices play a full free match with match codes; board updates in real time on the ER; every move committed gasless; Solo unchanged. This is the game AGM plugs onto later - adding earn changes NOTHING in the game.
+  > **Solo wiring (prior attempt) was discarded** (2026-08-29): delegation for a 3-seed board PDA wouldn't register in the Router; the whole feature must be built ER-first via the delegated-board listen pattern, not forced onto Solo. Solo stays as-is (zero change), multiplayer is the goal.
+- [ ] **arc2m1e. `matchState(matchRef)` relay API:** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify against a real multiplayer match (arc2m1d).
+- [ ] **arc2m1f. Clock wiring (part of the GAME, all modes):** multiplayer starts clocks; forfeit path closes stalled matches; turn timer visible to players. Verify against a stalling seat.
+- [ ] **arc2m1g. Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake` (0 when free), `escrowRef` (null when free) when present (additive; old consumers unaffected). Verify M3/M4 still fire.
 - [ ] **arc2m1h. Rulesets registry (config-first):** per-game `{ gameId, source_code, seatsCap, defaultTurnSecs, defaultMaxMatchSecs, earnAllowed, p2cAllowed }` in a config module (like plans-config). Board reads turn/match caps from here, not from hardcoded game code.
-- [ ] **arc2m1i. Multiplayer (2mp) real-play:** the actual multi-human shared board. This is the big one - wire board + turn + clocks + seam for 2 real players across devices, exact same Ludo rules, no money yet.
 
 **Hard constraints while building (do not regress):**
 - Every board/clock write is gasless on the ER (delegate the PDA once, then write via ER RPC). Never `sendMagicTx` on base for feature writes.

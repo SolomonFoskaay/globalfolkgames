@@ -159,7 +159,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
     module that plugs into any game has a canonical folder there
     (`result-seam/` = M2, `points/` = M3, `ledgers/` = M4,
     `subscription/` = M5, `point-sources/` = M6, `competitions/` = M7,
-    `escrow/` = M8). A game plugs in ONCE (`publishGameResult`); a universal
+    `escrow/` = M8, `multiplayer/` = M1 arc2m1d standalone MP rail). A game plugs in ONCE (`publishGameResult`); a universal
     module subscribes ONCE (`onGameResult`) and updates inside its own folder
     without touching the game. UNIVERSAL MEANS REUSABLE BY NAME: a universal
     module is game-agnostic - ANY M1 game (Ludo, Ayo Olopon, ...) plugs into it
