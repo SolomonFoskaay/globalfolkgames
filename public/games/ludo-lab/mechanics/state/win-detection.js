@@ -169,6 +169,12 @@
             console.log('[M1] Match complete — result:', result);
         }
 
+        // arc2m1d: report the on-chain MatchBoard finish (soft-fail observer;
+        // never blocks the game). Exists only when board-hooks.js is loaded.
+        if (typeof window.gfgBoardFinish === 'function') {
+            try { window.gfgBoardFinish(window.finishOrder || players); } catch (e) { /* soft */ }
+        }
+
         // Commit the full 1st..4th finish order on-chain (Scope C).
         commitGameResultOnchain(proofSig);
     }

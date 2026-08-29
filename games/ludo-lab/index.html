@@ -284,5 +284,8 @@
     <script src="/games/ludo-lab/mechanics/actions/movement.js"></script>
     <script src="/games/ludo-lab/mechanics/actions/capture.js"></script>
     <script src="/games/ludo-lab/mechanics/actions/ai.js"></script>
+    <!-- arc2m1d: on-chain MatchBoard integration (soft-fail; never breaks Solo).
+         Loads AFTER turn.js so it can wrap initiateArenaMatch/passTurnSequence. -->
+    <script src="/games/ludo-lab/mechanics/state/board-hooks.js"></script>
 </body>
 </html>

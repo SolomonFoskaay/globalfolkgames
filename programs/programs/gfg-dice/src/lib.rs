@@ -1393,7 +1393,9 @@ pub mod gfg_dice {
         require!(players.len() >= 2 && players.len() <= MAX_MP, PointsError::InvalidCompetition);
         require!(seats >= players.len() as u8 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
         require!(game > 0, PointsError::InvalidCompetition);
-        require!(stake_usd_cents > 0, PointsError::InvalidCompetition);
+        // stake 0 = Solo/free match (board records facts only, reward-neutral);
+        // stake > 0 = earn match (escrow locks it via AGM). M1 never computes
+        // rewards - it only stores the stake for downstream modules to read.
         require!(turn_secs > 0 && max_match_secs > 0, PointsError::InvalidCompetition);
         let b = &mut ctx.accounts.board;
         b.version = 1u8;

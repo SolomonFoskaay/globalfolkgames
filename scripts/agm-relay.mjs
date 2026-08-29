@@ -10,7 +10,7 @@ import './load-env.mjs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
-import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints, getDelegationStatus, regionUrlForFqdn } from '../src/gfg-rpc.js';
+import { baseRpcUrl, createConnection, sendMagicTx, baseRpcEndpoints, getDelegationStatus, regionUrlForFqdn, pickErRpcUrl } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
 import { readFileSync } from 'fs';
 
@@ -19,6 +19,8 @@ const PROGRAM = new PublicKey(idl.address);
 const AGM = Buffer.from('gfgagm');
 const AGMS = Buffer.from('gfgagms');
 const P2C_GLOBAL = Buffer.from('gfgp2cbank'); // ONE shared pool across every game
+const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
+const ER_VALIDATOR_ID = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57'); // AS region pin
 
 const sponsor = loadSponsor();
 const wallet = { publicKey: sponsor.publicKey, signTransaction: async (t) => { t.partialSign(sponsor); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(sponsor)); return ts; } };
@@ -40,21 +42,6 @@ export function boardPda(game, matchRef) {
   return PublicKey.findProgramAddressSync([BOARD_SEED, Buffer.from([game]), new BN(matchRef).toArrayLike(Buffer, 'le', 8)], PROGRAM)[0];
 }
 
-// region-agnostic read/write RPC for a board PDA (delegated accounts live on
-// exactly ONE ER region; the Router tells us which via getDelegationStatus ->
-// fqdn, and we submit/poll THERE, not on some other region).
-export async function boardRegionUrl(game, matchRef) {
-  const pda = boardPda(game, matchRef);
-  try {
-    const st = await getDelegationStatus(conn, pda);
-    if (st && st.fqdn) {
-      const u = regionUrlForFqdn(st.fqdn);
-      if (u) return u;
-    }
-  } catch (e) { /* fall through */ }
-  return baseRpcUrl();
-}
-
 // Idempotent board onboarding: if the board PDA exists but is NOT delegated,
 // delegate it once (sponsor pays the one-time ER session). `start_match` is
 // the application's job (sponsor signs init on base). Blocks for gasless
@@ -65,13 +52,191 @@ export async function ensureBoardDelegated(game, matchRef) {
   if (!info) return { pda: pda.toBase58(), delegated: false, why: 'board-not-created-yet' };
   const st = await getDelegationStatus(conn, pda).catch(() => null);
   if (st && st.isDelegated) return { pda: pda.toBase58(), delegated: true, region: st.fqdn || '' };
-  // delegate using the relay/sponsor signer (same wallet that init the board)
+  // delegate using the relay/sponsor signer (same wallet that init the board).
+  // The #[delegate] macro injects buffer/delegation-record/delegation-metadata
+  // PDAs derived from `board.key()` (seeds use DELEGATE_BUFFER_TAG etc.), plus
+  // owner/delegation/system programs. Pass them EXPLICITLY (mirrors the proven
+  // delegateResultPda in delegate-relay) so the ER router recognizes the record.
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), pda.toBytes()], PROGRAM);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), pda.toBytes()], DELEGATION_PROGRAM_ID);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), pda.toBytes()], DELEGATION_PROGRAM_ID);
   const tx = await prog.methods.delegateBoard(game, new BN(matchRef))
-    .accounts({ payer: sponsor.publicKey, board: pda }).transaction();
+    .accounts({
+      payer: sponsor.publicKey,
+      bufferBoard: buffer,
+      delegationRecordBoard: record,
+      delegationMetadataBoard: metadata,
+      board: pda,
+      ownerProgram: PROGRAM,
+      delegationProgram: DELEGATION_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .remainingAccounts([{ pubkey: ER_VALIDATOR_ID, isSigner: false, isWritable: false }])
+    .transaction();
   tx.feePayer = sponsor.publicKey;
   const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
   await conn.confirmTransaction({ signature: sig }, 'confirmed');
   return { pda: pda.toBase58(), delegated: true, sig };
+}
+
+// ===== Board actions (arc2m1d) - relay/sponsor signs, board PDA writes run
+// gasless on the ER after one delegation. Soft-fail friendly for the game:
+// each returns { ok, sig?, error? } and NEVER throws, so ludo-lab Solo can't
+// be broken by a flaky board write. game = M1 source_code (1 = ludo).
+
+const boardSleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Hosting region RPC for a board PDA (Router -> fqdn). Falls back through the
+// ER registry so a single region hiccup never fakes a write failure.
+async function boardHostUrl(pda) {
+  try {
+    const st = await getDelegationStatus(conn, pda);
+    if (st && st.fqdn) {
+      const u = regionUrlForFqdn(st.fqdn);
+      if (u) return u;
+    }
+  } catch (e) { /* fall through */ }
+  return pickErRpcUrl();
+}
+
+// Poll the board's hosting ER region until the validator has picked the
+// account up (owner == OUR program, data present). Fresh delegations take a
+// beat to report their region; re-resolve each pass like the client does.
+async function waitBoardPickup(pda, timeoutMs = 8000) {
+  const deadline = Date.now() + timeoutMs;
+  let url = await boardHostUrl(pda);
+  while (Date.now() < deadline) {
+    try { url = await boardHostUrl(pda); } catch (e) {}
+    try {
+      const c = createConnection(url, 'confirmed', 8000);
+      const info = await c.getAccountInfo(pda);
+      if (info && info.owner.toBase58() === PROGRAM.toBase58() && info.data.length >= 430) {
+        return url;
+      }
+    } catch (e) { /* not picked up yet - keep polling */ }
+    await boardSleep(600);
+  }
+  return url; // best-effort: submit on the host anyway
+}
+
+// Gasless ER write for a board instruction: resolve host region -> wait for
+// pickup -> sign (sponsor) + submit + confirm on THAT region. Returns {ok,sig}
+// or {ok:false,error}. NEVER throws.
+async function boardSignerSend(method, pda, opts = {}) {
+  try {
+    let url = opts.regionUrl || (await waitBoardPickup(pda));
+    const connEr = createConnection(url, 'confirmed');
+    const bh = await connEr.getLatestBlockhash('confirmed');
+    const tx = await method.transaction();
+    tx.feePayer = sponsor.publicKey;
+    tx.recentBlockhash = bh.blockhash;
+    tx.lastValidBlockHeight = bh.lastValidBlockHeight;
+    tx.partialSign(sponsor);
+    const sig = await connEr.sendRawTransaction(tx.serialize(), { skipPreflight: true });
+    await connEr.confirmTransaction({ signature: sig }, 'confirmed');
+    return { ok: true, sig };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+export async function boardStart({ game, matchRef, players, seats, stakeUsdCents, turnSecs, maxMatchSecs }) {
+  try {
+    const pda = boardPda(game, matchRef);
+    const info = await conn.getAccountInfo(pda).catch(() => null);
+    let created = false;
+    if (!info) {
+      const tx = await prog.methods.startMatch(game, new BN(matchRef), players.map(p => new PublicKey(p)), seats, new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
+        .accounts({ payer: sponsor.publicKey, board: pda, systemProgram: SystemProgram.programId }).transaction();
+      await sendTx(tx);
+      created = true;
+    }
+    // delegate (idempotent): board writes then run gasless on the ER
+    const d = await ensureBoardDelegated(game, matchRef);
+    if (!d.delegated) await boardSleep(1200); // give the router/pickup a beat
+    // begin the match on a workspace (status 0 -> 1) - this is a one-time status
+    // flip, so it runs on the sponsor/base path like start_match, NOT the ER.
+    const st = await boardState({ game, matchRef }).catch(() => null);
+    if (st && st.ok && st.status !== 1) {
+      const meth = prog.methods.beginMatch(game, new BN(matchRef)).accounts({ signer: sponsor.publicKey, board: pda });
+      const tx2 = await meth.transaction();
+      tx2.feePayer = sponsor.publicKey;
+      const s2 = await sendMagicTx(conn, tx2, [sponsor], { skipPreflight: true });
+      await conn.confirmTransaction({ signature: s2 }, 'confirmed');
+    }
+    return { ok: true, pda: pda.toBase58(), matchRef, created, delegated: !!d.delegated };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+export async function boardCommit({ game, matchRef, seat, moveCommit, regionUrl }) {
+  try {
+    const pda = boardPda(game, matchRef);
+    const method = prog.methods.commitMove(game, new BN(matchRef), seat, Array.isArray(moveCommit) ? moveCommit : hexTo32(moveCommit))
+      .accounts({ signer: sponsor.publicKey, board: pda });
+    return await boardSignerSend(method, pda, { regionUrl });
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+export async function boardFinish({ game, matchRef, winnerSeat, regionUrl }) {
+  try {
+    const pda = boardPda(game, matchRef);
+    const method = prog.methods.finishMatch(game, new BN(matchRef), winnerSeat)
+      .accounts({ signer: sponsor.publicKey, board: pda });
+    return await boardSignerSend(method, pda, { regionUrl });
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+export async function boardState({ game, matchRef }) {
+  try {
+    const pda = boardPda(game, matchRef);
+    const url = await boardHostUrl(pda);
+    const c = createConnection(url, 'confirmed');
+    const info = await c.getAccountInfo(pda).catch(() => null);
+    if (!info) return { ok: false, error: 'board not found' };
+    const d = info.data;
+    if (d.length < 430) return { ok: false, error: 'board too small' };
+    const playerCount = d[275];
+    const players = [];
+    for (let i = 0; i < Math.min(8, playerCount); i++) {
+      const s = d.subarray(19 + i * 32, 51 + i * 32);
+      if (s.every(b => b === 0)) continue;
+      try { players.push(new PublicKey(s).toBase58()); } catch (e) {}
+    }
+    return {
+      ok: true,
+      pda: pda.toBase58(),
+      version: d[8],
+      game: d[9],
+      match_ref: Number(d.readBigUInt64LE(10)),
+      status: d[18],
+      players,
+      player_count: d[275],
+      seats: d[276],
+      stake_usd_cents: Number(d.readBigUInt64LE(277)),
+      seat_pot_usd_cents: Number(d.readBigUInt64LE(285)),
+      turn_secs: Number(d.readBigUInt64LE(293)),
+      max_match_secs: Number(d.readBigUInt64LE(301)),
+      started_at: Number(d.readBigInt64LE(309)),
+      move_count: Number(d.readBigUInt64LE(381)),
+      winner_seat: d[429],
+      region: url,
+    };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+function hexTo32(hex) {
+  const out = new Uint8Array(32);
+  const clean = String(hex || '').replace(/^0x/i, '');
+  if (clean.length === 64) { for (let i = 0; i < 32; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16) || 0; }
+  return Array.from(out);
 }
 
 // Order discovery: a local id index (ids only; every display field is re-read

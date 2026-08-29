@@ -38,6 +38,10 @@ export default async function handler(req, res) {
       case 'p2c-fund': { const r = await agmP2cFund({ game: Number(b.game), amountUsdCents: Number(b.amountUsdCents) }); res.status(200).json(r); return; }
       case 'p2c-settle': { const r = await agmP2cSettle({ game: Number(b.game), orderId: Number(b.orderId), computerSeat: Number(b.computerSeat), computerWon: !!b.computerWon }); res.status(200).json(r); return; }
       case 'bank': { const r = await agmBank({ game: Number(b.game) }); res.status(200).json(r); return; }
+      case 'board-start': { const { boardStart } = await import('../scripts/agm-relay.mjs'); const r = await boardStart({ game: Number(b.game), matchRef: Number(b.matchRef), players: b.players, seats: Number(b.seats), stakeUsdCents: Number(b.stakeUsdCents) || 0, turnSecs: Number(b.turnSecs) || 60, maxMatchSecs: Number(b.maxMatchSecs) || 3600 }); res.status(200).json(r); return; }
+      case 'board-commit': { const { boardCommit } = await import('../scripts/agm-relay.mjs'); const r = await boardCommit({ game: Number(b.game), matchRef: Number(b.matchRef), seat: Number(b.seat), moveCommit: b.moveCommit, regionUrl: b.regionUrl }); res.status(200).json(r); return; }
+      case 'board-finish': { const { boardFinish } = await import('../scripts/agm-relay.mjs'); const r = await boardFinish({ game: Number(b.game), matchRef: Number(b.matchRef), winnerSeat: Number(b.winnerSeat), regionUrl: b.regionUrl }); res.status(200).json(r); return; }
+      case 'board-state': { const { boardState } = await import('../scripts/agm-relay.mjs'); const r = await boardState({ game: Number(b.game), matchRef: Number(b.matchRef) }); res.status(200).json(r); return; }
       default: res.status(400).json({ error: 'unknown action: ' + b.action });
     }
   } catch (e) {
