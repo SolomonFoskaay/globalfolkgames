@@ -195,6 +195,21 @@ function processTokenMovementExecution(selectedTokenIndex) {
     // Commit token placement transformations directly to LocalStorage
     if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
 
+    // M12 arc2m12b: after a real move, broadcast it gasless via the multiplayer
+    // rail (soft-fail; no-op when multiplayer is not active).
+    if (typeof window.gfgLudoAdapter === 'object' && window.gfgLudoAdapter && window.gfgLudoAdapter.isActive && window.gfgLudoAdapter.isActive()) {
+        try {
+            window.gfgLudoAdapter.onMove(
+                lastDiceRoll1 || appliedMoveValue,
+                lastDiceRoll2 || 0,
+                selectedTokenIndex,
+                (currentPiece._prevPath === undefined ? 0 : currentPiece._prevPath),
+                currentPiece.pathIndex
+            );
+        } catch (e) { /* soft */ }
+    }
+    try { if (currentPiece) currentPiece._prevPath = currentPiece.pathIndex; } catch (e) {}
+
     if (currentTurnMoves.length > 0) {
         displayEducationalLog(`${upperColor}: One move remaining. Select another blinking token.`);
         let hasValidRemainingMove = activeTokens.some((t, idx) => isTokenMovable(currentTurn, t, idx));

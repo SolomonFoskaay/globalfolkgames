@@ -63,27 +63,25 @@
             maxMatchSecs: opts.maxMatchSecs || 3600,
         });
         if (!r.ok) return { okay: false, error: r.error };
-        // short code for the creator to share (matchRef encoded -> 6-char)
-        var code = (matchRef % 100000000).toString(36).toUpperCase().slice(0, 6);
+        // The code IS the matchRef in base36 (round-trips exactly; 9-10 chars).
+        var code = (matchRef).toString(36).toUpperCase();
         return { okay: true, code: code, matchRef: matchRef, pda: r.pda };
     }
 
-    // code -> matchRef (inverse of create's encoding)
+    // code -> matchRef (exact inverse of create's encode)
     function codeToRef(code) {
-        // create used (Date.now() % 1e8).toString(36).slice(0,6); can't recover
-        // the full ref from a truncated code. Real impl: match code maps to a
-        // shared/relayed index. For now join() is resolved by the game adapter
-        // passing the ref it knows; kept here for API symmetry.
-        return Number(code) || 0;
+        try {
+            var v = parseInt(String(code || '').toLowerCase(), 36);
+            return (v && v > 0) ? v : 0;
+        } catch (e) { return 0; }
     }
 
     async function join(gameId, code) {
-        // Standalone discovery of an open match by code belongs to the game/
-        // lobby. The rail's job is just to expose a join() shape. If the game
-        // knows the matchRef it calls state(matchRef) instead.
         var ref = codeToRef(code);
-        if (!ref) return { okay: false, error: 'join code needs a lobby/mapping' };
-        return { okay: true, matchRef: ref };
+        if (!ref) return { okay: false, error: 'invalid code (expected base36 match ref)' };
+        var s = await state(ref);
+        if (!s || !s.ok) return { okay: false, error: 'no open match with that code' };
+        return { okay: true, matchRef: ref, pda: s.pda };
     }
 
     // ---- moves (gasless ER via relay) ----

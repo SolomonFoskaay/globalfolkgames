@@ -30,6 +30,15 @@
         <!-- Native Educational Text Display Line -->
         <div id="ludo-log">Setup players below then click "Start Arena Match" to lock choices.</div>
 
+        <!-- M12 arc2m12a/c: multiplayer join/create bar (free, game-agnostic rail) -->
+        <div id="mp-bar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.78rem;">
+            <span style="color:#f87818; font-weight:800;">Multiplayer</span>
+            <button id="mp-create" onclick="window.mpCreateMatch()" style="background:#7838f8; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Create match</button>
+            <input id="mp-join-code" placeholder="enter code" style="width:130px; font-family:monospace;" />
+            <button id="mp-join" onclick="window.mpJoinMatch()" style="background:#2ecc71; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Join</button>
+            <span id="mp-status" style="color:#9fe8a8; font-family:monospace;"></span>
+        </div>
+
         <!-- Anti-Cheat Tournament Setup Panel Matrix -->
         <div id="player-setup-panel">
             <div class="mode-selector">
@@ -289,5 +298,33 @@
     <script src="/universal/multiplayer/multiplayer.js"></script>
     <!-- Ludo ADAPTER for the rail (reference for other games). -->
     <script src="/games/ludo-lab/mechanics/state/multiplayer-adapter.js"></script>
+    <script>
+    // M12 arc2m12c: multiplayer buttons -> rail create/join + status.
+    window.mpSetStatus = function (text) {
+        var el = document.getElementById('mp-status');
+        if (el) el.textContent = text || '';
+    };
+    window.mpCreateMatch = function () {
+        var a = window.gfgLudoAdapter;
+        if (!a) { window.mpSetStatus('rail not loaded'); return; }
+        mpSetStatus('creating...');
+        // Creator takes seat 0 (green), opponent takes seat 1 (red).
+        a.start(1, [], 2, 60, 3600, 0).then(function (r) {
+            if (!r) { mpSetStatus('create failed (see console)'); return; }
+            mpSetStatus('CODE: ' + r.code + ' (share this) · I am GREEN');
+        });
+    };
+    window.mpJoinMatch = function () {
+        var a = window.gfgLudoAdapter;
+        if (!a) { mpSetStatus('rail not loaded'); return; }
+        var code = (document.getElementById('mp-join-code') || {}).value || '';
+        if (!code) { mpSetStatus('enter a code'); return; }
+        mpSetStatus('joining ' + code + '...');
+        a.join(1, code.trim(), 1).then(function (r) {
+            if (!r) { mpSetStatus('join failed (check code)'); return; }
+            mpSetStatus('JOINED · I am RED');
+        });
+    };
+    </script>
 </body>
 </html>

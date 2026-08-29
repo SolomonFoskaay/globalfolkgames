@@ -133,8 +133,8 @@ changes. This is its OWN module (not inside M1) so every future game reuses it.
 **Module home:** `public/universal/multiplayer/` (README + multiplayer.js rail).
 
 **Slices (M12 own alphabet a,b,c...):**
-- [ ] **arc2m12a. Rail core:** `public/universal/multiplayer/multiplayer.js` - match create (→ on-chain MatchBoard PDA via relay board-start, stake 0 free), opponent join (match code), per-player gasless move-commit on the ER, `subscribe(matchRef, onUpdate)` LISTEN loop (poll board on ER like solana-generals `subscribeToEphemAccountInfo`), `finish`, `state`. Soft-fail; never breaks the game.
-- [ ] **arc2m12b. Ludo adapter (reference):** `games/ludo-lab/mechanics/state/multiplayer-adapter.js` - `encodeMove`/`applyOpponent`/`currentSeat`/`isFinished` on top of the rail; hooks the game's existing turn + finish seams. Other games copy this shape.
+- [x] **arc2m12a. Rail core (built, live-verified 2026-08-29):** `public/universal/multiplayer/multiplayer.js` - match create (→ on-chain MatchBoard PDA via relay board-start, stake 0 free), opponent join (match code), per-player gasless move-commit on the ER, `subscribe(matchRef, onUpdate)` LISTEN loop (poll board on ER like solana-generals `subscribeToEphemAccountInfo`), `finish`, `state`. Soft-fail; never breaks the game.
+- [x] **arc2m12b. Ludo adapter (reference, built):** `games/ludo-lab/mechanics/state/multiplayer-adapter.js` - `encodeMove`/`applyOpponent`/`currentSeat`/`isFinished` on top of the rail; hooks the game's existing turn + finish seams. Other games copy this shape.
 - [ ] **arc2m12c. Match codes + join UX:** the rail returns a short code; the game shows it for the opponent to enter; opponent joins the same board from another device.
 - [ ] **arc2m12d. Earn-ready seam:** the finish emits `publishGameResult` as today with stake 0 / escrowRef null when free (additive), so M3/M4 and, later, AGM consume identically.
 - Verify (arc2m12a+b): two devices play a full FREE match with a match code; board updates in real time on the ER; every move committed gasless; Solo unchanged. AGM later just adds stake/escrow.
