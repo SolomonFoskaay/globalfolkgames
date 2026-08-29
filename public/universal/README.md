@@ -14,7 +14,10 @@ public/universal/
 ├── subscription/     M5  Active Tier subscription (powers the multiplier)
 ├── point-sources/    M6  referral / giveaway / signup / social earn
 ├── competitions/     M7  game-agnostic competitions (earn events)
-└── escrow/           M8  optional sponsor escrow plugin (brand prize pools)
+├── escrow/           M8  optional sponsor escrow plugin (brand prize pools)
+└── multiplayer/      M12 standalone  FREE multiplayer RAIL (match codes,
+                                     gasless ER moves, clocks, finish; AGM
+                                     plugs money on later, game never changes)
 ```
 
 ## How a game plugs in (the only contract games need)

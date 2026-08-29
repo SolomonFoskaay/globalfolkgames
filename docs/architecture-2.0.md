@@ -114,22 +114,30 @@ M1 v2 = the multiplayer native-game core. Every game keeps the existing M2 resul
 - ludo-lab gameplay is LOCAL and complete: **ER VRF** dice (gasless), move/movement/capture/AI, persistence, win ceremony, M2 seam emit (`publishGameResult`), Scope C result-PDA commit. Plays Solo today (You vs computers).
 - `source_code` map: 1=ludo, 2=ayo_olopon (registry.json is the games catalog; rulesets per game live there or in a config module, config-first).
 
-**Remaining M1 slices (strict build order - follow exactly, verify each before moving on). NOTE: this module's alphabet is c,d,e,f,g,h (arc2m1a + arc2m1b already shipped); never call them G0/G1/... in docs or commits.**
-- [x] **arc2m1c. Board ER onboarding (was "G0"):** `delegate_board` + `undelegate_board` instructions (the board PDA had NO delegation, so board writes couldn't run gasless) + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor) + region-agnostic `boardRegionUrl` (`getDelegationStatus -> fqdn`). DONE: program + IDL compile, relay parses. Board writes become gasless on the ER after one delegate.
-- [ ] **arc2m1d. Standalone MULTIPLAYER (match codes, free - the heart of M1).** Turn ludo-lab into a real 2-human multiplayer game that works with ZERO money and NO AGM. Built as TWO layers so every future game reuses the rail:
-  - **UNIVERSAL RAIL (game-agnostic, one build):** `public/universal/multiplayer/` - match creation + ER delegation (sponsor, one-time) + per-player gasless move-commit + **listen/notify loop** (subscribe to the delegated board on ER like solana-generals `subscribeToEphemAccountInfo`, broadcast state changes to all players) + turn clocks/forfeit + finish + `matchState` + match codes/join. Touches only participants, move-hashes, turn times, finish order - NEVER interprets a move. Same as the M2 seam: one rail, all games.
-  - **PER-GAME ADAPTER (small, inside each game):** encode one move → hash; decode an opponent's move → render; expose the game's turn order + rules + win detection (game already has these). Ludo adapter is the reference implementation.
-  1. **Create match** → on-chain MatchBoard PDA (game, players, seats, stakes=0 free, turn/max clocks) created + **delegated to the ER** once (sponsor), and a short **match code** returned to the creator.
-  2. **Opponent joins** by entering the code → board records both players (already in players[]), game starts.
-  3. **Every move gasless on the ER**: player's session key signs `commit_move` (move-hash) to the delegated board; ALL players LISTEN to the delegated board on the ER and update the UI when it changes.
-  4. **Clocks/forfeit** (arc2m1f) run for BOTH players (turn timer, timeout, forfeit) - same in free and earn.
-  5. **Finish** → `finish_match` writes winner/positions; M2 seam emits as today (stake 0); M3/M4 consume identically to Solo.
-  Verify: two devices play a full free match with match codes; board updates in real time on the ER; every move committed gasless; Solo unchanged. This is the game AGM plugs onto later - adding earn changes NOTHING in the game.
-  > **Solo wiring (prior attempt) was discarded** (2026-08-29): delegation for a 3-seed board PDA wouldn't register in the Router; the whole feature must be built ER-first via the delegated-board listen pattern, not forced onto Solo. Solo stays as-is (zero change), multiplayer is the goal.
-- [ ] **arc2m1e. `matchState(matchRef)` relay API:** returns participants/rules/timers/finish order for any match from chain. Needed by AGM/escrow later. Verify against a real multiplayer match (arc2m1d).
-- [ ] **arc2m1f. Clock wiring (part of the GAME, all modes):** multiplayer starts clocks; forfeit path closes stalled matches; turn timer visible to players. Verify against a stalling seat.
+**Remaining M1 slices (strict build order). The board + clock INSTRUCTIONS stay M1 (arc2m1a/arc2m1b/arc2m1c/arc2m1e/arc2m1g/arc2m1h below). The STANDALONE MULTIPLAYER RAIL they feed is its OWN module M12 (slices arc2m12a..) - NEVER call it M1/G0/G1.**
+- [x] **arc2m1c. Board ER onboarding:** `delegate_board` + `undelegate_board` instructions (the board PDA had NO delegation) + relay `ensureBoardDelegated(game, matchRef)` (idempotent, sponsor) + region-agnostic `boardRegionUrl` (`getDelegationStatus -> fqdn`). DONE: program + IDL compile, relay parses. Feeds M12.
+- [ ] **arc2m1e. `matchState(matchRef)` relay API:** returns participants/rules/timers/finish order for any match from chain. Needed by M12 (listen) and AGM/escrow later.
+- [ ] **arc2m1f. Clock wiring (part of the GAME, all modes):** multiplayer starts clocks; forfeit path closes stalled matches; turn timer visible to players. Verify against a stalling seat. Feeds M12.
 - [ ] **arc2m1g. Seam additive fields:** game emits `mode`, `players[].handle+wallet`, `poolUsdCents/stake` (0 when free), `escrowRef` (null when free) when present (additive; old consumers unaffected). Verify M3/M4 still fire.
 - [ ] **arc2m1h. Rulesets registry (config-first):** per-game `{ gameId, source_code, seatsCap, defaultTurnSecs, defaultMaxMatchSecs, earnAllowed, p2cAllowed }` in a config module (like plans-config). Board reads turn/match caps from here, not from hardcoded game code.
+
+---
+
+## M12 — Standalone MULTIPLAYER (game-agnostic rail; FREE, no AGM)
+
+Turn a single-player game into 2-human multiplayer that works with ZERO money
+and NO AGM. Players train on exactly what they will bet on later: AGM is a
+separate money/escrow plug that attaches the SAME match later, the game never
+changes. This is its OWN module (not inside M1) so every future game reuses it.
+
+**Module home:** `public/universal/multiplayer/` (README + multiplayer.js rail).
+
+**Slices (M12 own alphabet a,b,c...):**
+- [ ] **arc2m12a. Rail core:** `public/universal/multiplayer/multiplayer.js` - match create (→ on-chain MatchBoard PDA via relay board-start, stake 0 free), opponent join (match code), per-player gasless move-commit on the ER, `subscribe(matchRef, onUpdate)` LISTEN loop (poll board on ER like solana-generals `subscribeToEphemAccountInfo`), `finish`, `state`. Soft-fail; never breaks the game.
+- [ ] **arc2m12b. Ludo adapter (reference):** `games/ludo-lab/mechanics/state/multiplayer-adapter.js` - `encodeMove`/`applyOpponent`/`currentSeat`/`isFinished` on top of the rail; hooks the game's existing turn + finish seams. Other games copy this shape.
+- [ ] **arc2m12c. Match codes + join UX:** the rail returns a short code; the game shows it for the opponent to enter; opponent joins the same board from another device.
+- [ ] **arc2m12d. Earn-ready seam:** the finish emits `publishGameResult` as today with stake 0 / escrowRef null when free (additive), so M3/M4 and, later, AGM consume identically.
+- Verify (arc2m12a+b): two devices play a full FREE match with a match code; board updates in real time on the ER; every move committed gasless; Solo unchanged. AGM later just adds stake/escrow.
 
 **Hard constraints while building (do not regress):**
 - Every board/clock write is gasless on the ER (delegate the PDA once, then write via ER RPC). Never `sendMagicTx` on base for feature writes.
@@ -163,6 +171,10 @@ Slice labels are always `arc2m<N><slice>` so it is ALWAYS obvious which module a
 | arc2m7a ✅ | M7 AGM (Matchmaker & Escrow) | standalone game-agnostic order book: post/cancel/match |
 | arc2m7b ✅ | M7 AGM | escrow lock + settle (flat 10% pot fee: winner 90%, house 10%) |
 | arc2m7c ✅ | M7 AGM | P2C computer bank + anti-farm caps |
+| arc2m12a ⏳ | M12 Multiplayer (STANDALONE) | game-agnostic multiplayer rail: match codes, gasless ER moves, listen loop, finish |
+| arc2m12b ⏳ | M12 Multiplayer | Ludo adapter (reference for all games) |
+| arc2m12c ⏳ | M12 Multiplayer | match code + join UX |
+| arc2m12d ⏳ | M12 Multiplayer | earn-ready seam (stake 0 free / escrowRef null; AGM plugs on later) |
 | arc2m1b ✅ | M1 Game core | per-game timeouts: per-seat clocks, timeout->forfeit, finish_forfeit |
 
 > **arc2m7c (built, deployed, smoke PASS):** `P2cBank` account per game ([gfgp2c, game]): capital pool, GMT day bucket, signed day-net, day-loss cap (default $20) pauses the bank for the day, win/loss/trades counters. `p2c_fund` top-up (init_fresh seeds real defaults on a zeroed bank), `p2c_settle` applies one computer-seat result from a locked settlement exactly once (AgmSettlement.status 0->1) with the $1-$10 small-stake band enforced on-chain. Net math = computer win `+(payout - stake)`, computer loss `-stake` (2-seat $5: win +$4, loss -$5, EV as spec). Smoke: fund $1000, lose $5, win $4 -> dayNet -$1, trades 2, bank open.

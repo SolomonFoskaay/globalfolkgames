@@ -159,7 +159,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
     module that plugs into any game has a canonical folder there
     (`result-seam/` = M2, `points/` = M3, `ledgers/` = M4,
     `subscription/` = M5, `point-sources/` = M6, `competitions/` = M7,
-    `escrow/` = M8, `multiplayer/` = M1 arc2m1d standalone MP rail). A game plugs in ONCE (`publishGameResult`); a universal
+    `escrow/` = M8, `multiplayer/` = **M12 standalone** game-agnostic multiplayer rail). A game plugs in ONCE (`publishGameResult`); a universal
     module subscribes ONCE (`onGameResult`) and updates inside its own folder
     without touching the game. UNIVERSAL MEANS REUSABLE BY NAME: a universal
     module is game-agnostic - ANY M1 game (Ludo, Ayo Olopon, ...) plugs into it
@@ -314,6 +314,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   5/10/15 lives, 25/200/300P daily).
 
 - **M11 — Community (on-chain UGC forum, M11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
+
+- **M12 — Multiplayer (STANDALONE game-agnostic rail, M12):** a FREE multiplayer rail (match codes, gasless ER moves via a delegated board, turn clocks/forfeit, finish + seam) that ANY game plugs into with a small adapter. Standalone = works with zero money and NO AGM; players train on exactly what they'll bet on later. AGM is a separate money plug that attaches the SAME match later, zero gameplay change. Canonical home `public/universal/multiplayer/` (README + multiplayer.js); per-game adapter lives in each game (Ludo's is the reference). Slices arc2m12a-d. NOT inside M1 - it is its own module (program board/clocks instructions stay M1: arc2m1a/b/c/e/f/g/h).
 
 **Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
 (premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
