@@ -1,14 +1,14 @@
 // scripts/er-premium-points-harness.mjs
 // M5 — on-chain harness proving the PREMIUM points + Active Tier launch engine:
 // initialize_premium_points + delegate_premium_points + credit_premium_points
-// + spend_premium_points + activate_subscription run against the live program
-// and land on the correct buy-only premium ledger ([gfgprem, player]).
+// + spend_premium_points + activate_subscription_level run against the live
+// program and land on the correct buy-only premium ledger ([gfgprem, player]).
 //
 // Benchmark = the locked M5 spec (architecture.json / TEST section):
-//   credit-then-activate: admin credits 5,000P -> activate_subscription deducts
-//     it and sets subscription_level=2 + active window (30d, no auto-renew).
+//   credit-then-activate: admin credits 5,000P -> activate_subscription_level(1)
+//     deducts it and sets subscription_level=1 + active window (30d, no auto-renew).
 //   idempotency: re-credit the SAME credit_ref = no-op (DuplicateCreditRef);
-//     re-activate after spendable is exhausted = InsufficientPremiumBalance.
+//     re-activate while a sub is already active = AlreadyActive.
 //   spend guard: cannot spend premium below balance; premium never feeds
 //     global (M4) or local (M3) ledgers.
 //
@@ -20,8 +20,8 @@
 //      ER: premium_lifetime=5000, premium_spendable=5000, level=0.
 //   3. Idempotency: re-credit the SAME ref (101) must NO-OP (DuplicateCreditRef
 //      guard surfaced by the relay, ledger unchanged at 5000/5000).
-//   4. activate_subscription (gasless ER write): spendable 5000 -> 0, level 2,
-//      active_until ~ now+30d. Re-activate now = InsufficientPremiumBalance.
+//   4. activate_subscription_level(1) (gasless ER write): spendable 5000 -> 0,
+//      level 1, active_until ~ now+30d. Re-activate now = AlreadyActive.
 //   5. spend_premium_points guard: spend 700 (>0 balance) succeeds; an
 //      overdraw (spend while balance < amount) is rejected.
 //   6. Premium never feeds global: the player's global points PDA stays 0/0/0.
@@ -117,9 +117,10 @@ function assert(label, cond, extra) {
 
 // PointsError custom codes (Anchor 6000 base; see the enum in lib.rs).
 const ERR = {
-  DuplicateCreditRef: 6016,
-  InsufficientPremiumBalance: 6017,
-  NotAdmin: 6015,
+  DuplicateCreditRef: 6026,
+  InsufficientPremiumBalance: 6024,
+  AlreadyActive: 6025,
+  NotAdmin: 6027,
 };
 // A thrown tx surfaces as 'Transaction failed on-chain: {"InstructionError":...
 // {"Custom":6016}' (or a BN/u32 variant); match the numeric code anywhere.
@@ -189,37 +190,39 @@ async function main() {
     C !== null && C.premiumLifetime === 5000 && C.premiumSpendable === 5000,
     JSON.stringify(C));
 
-  // Step 4: activate_subscription (gasless ER) — spendable 5000 -> 0, level 2
+  //   Step 4: activate_subscription_level(1) (gasless ER) — spendable 5000 -> 0,
+//   level 1 (L1 = 5,000P at 500 pts = $1; owner 2026-08-31)
   const s1 = await write(program, sponsor,
-    program.methods.activateSubscription().accounts({
+    program.methods.activateSubscriptionLevel(new BN(1)).accounts({
       premiumPoints: premPub, payer: sponsor.publicKey, playerAuthority: player.publicKey,
     }).transaction());
   await sleep(1500);
   const D = await readPrem();
   const now = Math.floor(Date.now() / 1000);
-  console.log(`activate_subscription ${s1.slice(0, 12)} -> ${JSON.stringify(D)}`);
+  console.log(`activate_subscription_level(1) ${s1.slice(0, 12)} -> ${JSON.stringify(D)}`);
   assert('activation deducts the full 5,000 spendable (spendable now 0)',
     D !== null && D.premiumSpendable === 0 && D.premiumLifetime === 5000, JSON.stringify(D));
-  assert('subscription_level = 2', D !== null && D.subscriptionLevel === 2, JSON.stringify(D));
+  assert('subscription_level = 1 (L1, 5,000P)', D !== null && D.subscriptionLevel === 1, JSON.stringify(D));
   assert('subscription_active_until ~ now+30d (window, NO auto-renew field)',
     D !== null && D.subscriptionActiveUntil >= now + 29 * 86400 && D.subscriptionActiveUntil <= now + 31 * 86400,
     `active_until=${D && D.subscriptionActiveUntil} now=${now}`);
 
-  // Step 4b: re-activate after exhaustion -> InsufficientPremiumBalance
+  // Step 4b: re-activate while a sub is already active -> AlreadyActive
+  const ERR_ALREADY_ACTIVE = 6025;
   let reactRejected = false;
   try {
     await write(program, sponsor,
-      program.methods.activateSubscription().accounts({
+      program.methods.activateSubscriptionLevel(new BN(1)).accounts({
         premiumPoints: premPub, payer: sponsor.publicKey, playerAuthority: player.publicKey,
       }).transaction());
   } catch (e) {
-    reactRejected = rejectedWith(e, ERR.InsufficientPremiumBalance);
+    reactRejected = rejectedWith(e, ERR_ALREADY_ACTIVE);
     console.log('  re-activate rejected:', String(e && e.message || e).slice(0, 80));
   }
   const E = await readPrem();
-  assert('re-activate with 0 spendable is rejected (InsufficientPremiumBalance)', reactRejected);
-  assert('ledger still spendable 0 / level 2 after rejected re-activate',
-    E !== null && E.premiumSpendable === 0 && E.subscriptionLevel === 2, JSON.stringify(E));
+  assert('re-activate while sub active is rejected (AlreadyActive)', reactRejected);
+  assert('ledger still spendable 0 / level 1 after rejected re-activate',
+    E !== null && E.premiumSpendable === 0 && E.subscriptionLevel === 1, JSON.stringify(E));
 
   // Step 5: credit a second tranche (ref=202) so the spend guard can be tested
   const c2 = await handleCreditPremium(playerStr, 1000, 202);

@@ -1,8 +1,9 @@
 // scripts/m6-affiliate-harness.mjs
 // M6 harness: prove the on-chain affiliate ledger end to end on devnet.
 // Uses a fresh random affiliate wallet (never writes to a real account owner);
-// referral = the owner's test wallet. Records earned + forfeited periods, a
-// payout, then reads the ledger back. Run: node scripts/m6-affiliate-harness.mjs
+// referral = the owner's test wallet. Records the FIRST-upgrade earned period,
+// asserts the one-time-per-pair guard (AffiliateOnceOnly), pays out, then reads
+// the ledger back. Run: node scripts/m6-affiliate-harness.mjs
 import { Keypair, PublicKey } from '@solana/web3.js';
 import {
   handleRecordAffiliatePeriod, handleAffiliatePayout, readAffiliateLedger,
@@ -17,32 +18,41 @@ async function main() {
   console.log('affiliate PDA:', affiliateAccountPda(affiliate).toBase58());
 
   const period = 202608;
-  console.log('\n1) record EARNED month (15% of $3 = 45 USD cents)');
-  let r = await handleRecordAffiliatePeriod({ affiliate, referral, period, usdCents: 45, eligibility: 0 });
+  console.log('\n1) record EARNED (first upgrade: 20% of $5 = 100 USD cents)');
+  let r = await handleRecordAffiliatePeriod({ affiliate, referral, period, usdCents: 100, eligibility: 0 });
   console.log('   sig', String(r.sig).slice(0, 20));
 
   console.log('\n2) duplicate same period should error (idempotency)');
   try {
-    await handleRecordAffiliatePeriod({ affiliate, referral, period, usdCents: 45, eligibility: 0 });
+    await handleRecordAffiliatePeriod({ affiliate, referral, period, usdCents: 100, eligibility: 0 });
     console.log('   FAIL: did not reject duplicate');
   } catch (e) { console.log('   ok duplicate rejected:', e.message.slice(0, 60)); }
 
-  console.log('\n3) record FORFEITED month (inactive affiliate) next period');
-  let r2 = await handleRecordAffiliatePeriod({ affiliate, referral, period: 202609, usdCents: 45, eligibility: 2 });
-  console.log('   sig', String(r2.sig).slice(0, 20));
+  console.log('\n3) a SECOND earned period (later upgrade) must be REJECTED (first-upgrade-only)');
+  let onceOnly = false;
+  try {
+    await handleRecordAffiliatePeriod({ affiliate, referral, period: 202609, usdCents: 200, eligibility: 0 });
+    console.log('   FAIL: second earned period was accepted (must be one-time)');
+  } catch (e) {
+    onceOnly = String(e.message || '').indexOf('AffiliateOnceOnly') >= 0
+      || /one-time per referral/i.test(String(e.message || ''))
+      || String(e.message || '').indexOf('6028') >= 0
+      || /"Custom":6028/.test(String(e.message || ''));
+    console.log('   ' + (onceOnly ? 'ok second earn rejected (one-time per pair)' : 'rejected: ' + e.message.slice(0, 80)));
+  }
 
-  console.log('\n4) payout 45 cents (pending -> paid)');
-  let r3 = await handleAffiliatePayout({ affiliate, usdCents: 45, payoutRef: 9001 });
+  console.log('\n4) payout 100 cents (pending -> paid)');
+  let r3 = await handleAffiliatePayout({ affiliate, usdCents: 100, payoutRef: 9001 });
   console.log('   sig', String(r3.sig).slice(0, 20));
 
   console.log('\n5) read ledger back');
   const ledger = await readAffiliateLedger(affiliate);
   console.log('   lifetime', ledger && ledger.lifetimeUsdCents, 'pending', ledger && ledger.pendingUsdCents,
-    'paid', ledger && ledger.paidUsdCents, 'forfeited', ledger && ledger.forfeitedUsdCents, 'entries', ledger && ledger.entryCount);
-  if (ledger && ledger.lifetimeUsdCents === 45 && ledger.pendingUsdCents === 0 && ledger.paidUsdCents === 45 && ledger.forfeitedUsdCents === 45) {
+    'paid', ledger && ledger.paidUsdCents, 'entries', ledger && ledger.entryCount);
+  if (onceOnly && ledger && ledger.lifetimeUsdCents === 100 && ledger.pendingUsdCents === 0 && ledger.paidUsdCents === 100) {
     console.log('\nPASS');
   } else {
-    console.log('\nCHECK: ledger totals', JSON.stringify(ledger));
+    console.log('\nCHECK: ledger totals', JSON.stringify(ledger), 'onceOnly', onceOnly);
   }
   process.exit(0);
 }

@@ -29,25 +29,29 @@
             <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Pick a plan and activate it with your premium points. This checks on-chain that only premium points count (other points do not count). Not enough? Get premium points on the <a href="/profile/subscription.html" style="color:#f87818;">Premium plans page</a>.</p>
             <div id="upgrade-action-msg" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></div>
             <div id="upgrade-countdown" style="display:none; font-size:0.9rem; color:#2ecc71; font-weight:700; margin-bottom:8px;"></div>
-            <div id="plan-pick" style="display:flex; gap:8px; margin-bottom:10px;">
-                <button type="button" class="launch-btn onchain" data-plan="2" onclick="window.__pickPlan(this,2)">Level 2 (2x) · 5,000P</button>
-                <button type="button" class="launch-btn" data-plan="3" onclick="window.__pickPlan(this,3)">Level 3 (3x) · 10,000P</button>
+            <div id="plan-pick" style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                <button type="button" class="launch-btn onchain" data-plan="1" onclick="window.__pickPlan(this,1)">Level 1 · 5,000P</button>
+                <button type="button" class="launch-btn" data-plan="2" onclick="window.__pickPlan(this,2)">Level 2 · 10,000P</button>
+                <button type="button" class="launch-btn" data-plan="3" onclick="window.__pickPlan(this,3)">Level 3 · 15,000P</button>
             </div>
-            <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 2 (cost 5,000P)</button>
+            <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 1 (cost 5,000P)</button>
             <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits your premium points, come here, refresh, pick a plan and tap Upgrade to start your 30 days.</p>
         </section>
 
         <section id="booster-card" class="game-card" style="border:1px solid #2ecc71;">
-            <h3>72h unlimited-lives booster</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Spend 500 premium points ($1 at the standard rate of $0.002 per point) for 72 hours (3 days) of unlimited play on any game and any plan, free, Level 2 or Level 3. The countdown starts the moment you tap Activate. It buys time, not points: payout rates stay exactly the same, and it never touches your lifetime balances.</p>
+            <h3>Unlimited-lives booster (24h or 72h)</h3>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Spend premium points for unlimited play on any game and any plan, free, Level 1, Level 2 or Level 3. The countdown starts the moment you tap Activate. It buys time, not points: payout rates stay exactly the same, and it never touches your lifetime balances.</p>
             <div style="background:#10241a; border:1px solid rgba(46,204,113,0.35); border-radius:10px; padding:12px 14px; font-size:0.8rem; color:#cde9d6; line-height:1.7; margin-bottom:12px;">
                 <b style="color:#2ecc71;">How to get it (same steps as Premium)</b><br>
-                1. Order it on the <a href="/profile/booster.html" style="color:#2ecc71; font-weight:700;">Unlimited lives sales page</a> (secure payment link, pay $1).<br>
-                2. Support credits you 500 premium points after confirming payment.<br>
-                3. Refresh your balance, then tap the button here to activate your 72h of unlimited lives.
+                1. Order it on the <a href="/profile/booster.html" style="color:#2ecc71; font-weight:700;">Unlimited lives sales page</a> (crypto payment guide, pay from your own wallet).<br>
+                2. Support credits your premium points after confirming payment (24h = 500P, 72h = 1,500P).<br>
+                3. Refresh your balance, then tap the button here to activate your window of unlimited lives.
             </div>
             <div id="booster-status" style="font-size:0.85rem; color:var(--muted); margin-bottom:8px;"></div>
-            <button id="booster-btn" class="launch-btn onchain" style="width:100%;">Activate 72h booster (cost 500P)</button>
+            <div id="booster-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                <button id="booster-btn-24" class="launch-btn onchain" style="flex:1; min-width:200px;">Activate 24h booster (500P)</button>
+                <button id="booster-btn-72" class="launch-btn onchain" style="flex:1; min-width:200px;">Activate 72h booster (1,500P)</button>
+            </div>
         </section>
 
         </div>
@@ -143,33 +147,33 @@
                         <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:10px;text-align:center;">
                             <div style="font-size:0.75rem;color:#888;">Spendable</div>
                             <div style="font-size:1.2rem;color:#7838f8;font-weight:800;">${spend}</div>
-                            <div style="font-size:0.7rem;color:#888;">buys Level 2</div>
+                            <div style="font-size:0.7rem;color:#888;">spends on plans & boosters</div>
                         </div>
                     </div>
                     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Subscription</span><b>${status}</b></div>
                     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);"><span style="color:var(--muted);">Active until</span><b style="font-size:0.82rem;">${until ? new Date(until).toLocaleString() : '—'}</b></div>
-                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">Last credit</span><b style="font-size:0.82rem;">${(ledger.lastCreditPoints||0).toLocaleString()}P (Level 2 payment) ref ${ledger.lastCreditRef||'—'}</b></div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);">Last credit</span><b style="font-size:0.82rem;">${(ledger.lastCreditPoints||0).toLocaleString()}P (subscription payment) ref ${ledger.lastCreditRef||'—'}</b></div>
                 `;
                 // Upgrade button rules (against double-upgrade):
                 if (active) {
                     // Already on the plan -> permanently disabled + live countdown to expiry.
                     upgradeBtn.disabled = true;
                     countdownEl.style.display='block';
-                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are on the Level 2 (2x) plan. The Upgrade button stays locked until this plan ends.</span>';
+                    actionMsg.innerHTML = '<span style="color:#2ecc71;">You are on the Level ' + lvl + ' plan. The Upgrade button stays locked until this plan ends.</span>';
                 } else if (!balanceChecked) {
                     // Must do a fresh balance check first (unlocks after tapping Refresh).
                     upgradeBtn.disabled = true;
                     actionMsg.innerHTML = '<span style="color:#f87818;">Tap <b>Refresh</b> above (once every 2 minutes) to check your balance, then Upgrade unlocks.</span>';
-                } else if ((ledger.premiumSpendable||0) >= 5000) {
+                } else if ((ledger.premiumSpendable||0) >= PLAN_COSTS[pick]) {
                     upgradeBtn.disabled = false;
-                    actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have 5,000P. Tap Upgrade to start your 30-day Level 2 boost.</span>';
+                    actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have ' + spend + ' spendable. Tap Upgrade to start your 30-day Level ' + pick + ' plan.</span>';
                 } else {
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#e86818;">You need 5,000 premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> to get premium points.</span>';
+                    actionMsg.innerHTML = '<span style="color:#e86818;">You need ' + PLAN_COSTS[pick].toLocaleString() + ' premium points to upgrade. Go to <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> to get premium points.</span>';
                 }
                 tickCountdown();
                 if (ledger.premiumLifetime != null) {
-                    statusEl.textContent = active? 'Level 2 active — your boost is running.' : ('Balance checked — ' + spend + ' spendable.')
+                    statusEl.textContent = active? 'Level ' + lvl + ' active — your boost is running.' : ('Balance checked — ' + spend + ' spendable.')
                         + (balanceChecked? '' : ' Tap Refresh for the live value.');
                 }
             }
@@ -242,8 +246,8 @@
                 } catch (e) { /* ignore */ }
             })();
 
-            const PLAN_COSTS = { 2: 5000, 3: 10000 };
-            let pick = 2;
+            const PLAN_COSTS = { 1: 5000, 2: 10000, 3: 15000 };
+            let pick = 1;
             window.__pickPlan = function (el, lvl) {
                 pick = lvl;
                 document.querySelectorAll('#plan-pick .launch-btn').forEach(function (b) {
@@ -251,7 +255,7 @@
                 });
                 const cost = PLAN_COSTS[lvl];
                 upgradeBtn.textContent = 'Upgrade to Level ' + lvl + ' (cost ' + cost.toLocaleString() + 'P)';
-                actionMsg.innerHTML = '<span style="color:var(--muted);">Selected Level ' + lvl + (lvl === 3 ? ' (3x, ad-free, 1.5x competitions)' : ' (2x)') + ' for ' + cost.toLocaleString() + 'P.</span>';
+                actionMsg.innerHTML = '<span style="color:var(--muted);">Selected Level ' + lvl + ' for ' + cost.toLocaleString() + 'P.</span>';
             };
 
             upgradeBtn.addEventListener('click', async () => {
@@ -283,8 +287,8 @@
                         let sig = null;
                         if (window.magicblockDice && typeof window.magicblockDice.activateSubscriptionLevel === 'function') {
                             sig = await window.magicblockDice.activateSubscriptionLevel(pick);
-                        } else if (pick === 2 && window.premiumPoints && typeof window.premiumPoints.activate === 'function') {
-                            sig = await window.premiumPoints.activate();
+                        } else if (window.premiumPoints && typeof window.premiumPoints.activate === 'function') {
+                            sig = await window.premiumPoints.activate(pick);
                         }
                         if (sig) {
                             actionMsg.innerHTML = '<span style="color:#2ecc71;">Upgraded to Level ' + pick + ' for 30 days! Sig: ' + String(sig).slice(0,16) + '...</span>';
@@ -312,7 +316,7 @@
                         upgradeBtn.textContent = 'Upgrade to Level ' + pick + ' (cost ' + PLAN_COSTS[pick].toLocaleString() + 'P)';
                     }
                 };
-                // Reconfirm before spending 5,000 premium points (Yes on the left to subscribe).
+                // Reconfirm before spending premium points (Yes on the left to subscribe).
                 if (window.showConfirmDialog) {
                     window.showConfirmDialog({
                         title: 'Upgrade to Level ' + pick + '?',
@@ -336,9 +340,9 @@
                 });
             }
 
-            // ---- M5 v3: 72h unlimited-lives booster ----------------------------
-            const BOOSTER_COST = 500;
-            const boosterBtn = document.getElementById('booster-btn');
+            // ---- M5 v3: unlimited-lives booster (24h or 72h) --------------------
+            const BOOSTER_OPTIONS = { 24: 500, 72: 1500 };
+            const boosterBtns = { 24: document.getElementById('booster-btn-24'), 72: document.getElementById('booster-btn-72') };
             const boosterStatus = document.getElementById('booster-status');
             let boosterTimer = null;
 
@@ -348,6 +352,15 @@
                 const until = pp ? Number(pp.boosterActiveUntil || 0) : 0;
                 return { pp, until, active: until > Date.now() };
             }
+            function runBooster(hours) {
+                if (!boosterBtns[hours]) return;
+                const v = boosterView();
+                const cost = BOOSTER_OPTIONS[hours];
+                const disabled = v.active || !v.pp || Number(v.pp.premiumSpendable||0) < cost;
+                boosterBtns[hours].disabled = disabled;
+                boosterBtns[hours].style.background = '';
+                boosterBtns[hours].textContent = 'Activate ' + hours + 'h booster (' + cost.toLocaleString() + 'P)';
+            }
             function renderBooster() {
                 const v = boosterView();
                 if (v.active) {
@@ -355,38 +368,43 @@
                     const h = Math.floor(leftMs / 3600000);
                     const m = Math.floor((leftMs % 3600000) / 60000);
                     if (boosterStatus) boosterStatus.innerHTML = '<span style="color:#2ecc71;font-weight:700;">Booster active. Unlimited lives for ' + h + 'h ' + m + 'm.</span>';
-                    if (boosterBtn) boosterBtn.textContent = 'Booster active (extends on tap)';
-                    if (boosterBtn) boosterBtn.style.background = '#2ecc71';
                 } else {
                     const has = v.pp ? Number(v.pp.premiumSpendable || 0) : 0;
-                    if (boosterStatus) boosterStatus.innerHTML = has >= BOOSTER_COST
-                        ? 'You have ' + has.toLocaleString() + 'P premium spendable. One tap activates 72h of unlimited lives, no multiplier.'
-                        : '<span style="color:#e86818;">You need 500P premium points ($1, base rate $0.002 per point). Your spendable is ' + has.toLocaleString() + 'P. Get premium points on <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a>.</span>';
-                    if (boosterBtn) { boosterBtn.textContent = 'Activate 72h booster (cost 500P)'; boosterBtn.style.background = ''; boosterBtn.disabled = has < BOOSTER_COST; }
+                    if (boosterStatus) boosterStatus.innerHTML = has >= 500
+                        ? 'You have ' + has.toLocaleString() + 'P premium spendable. Pick a window: 24h = 500P, 72h = 1,500P. No multiplier.'
+                        : '<span style="color:#e86818;">You need at least 500P premium points ($1, base rate $0.002 per point). Your spendable is ' + has.toLocaleString() + 'P. Get premium points on <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a>.</span>';
                 }
+                runBooster(24);
+                runBooster(72);
             }
-            if (boosterBtn) boosterBtn.addEventListener('click', async () => {
-                const v = boosterView();
-                if (!window.magicblockDice || typeof window.magicblockDice.activateBooster !== 'function') {
-                    if (boosterStatus) boosterStatus.textContent = 'Not signed in, or the on-chain booster is not ready yet. Sign in and try again.';
-                    return;
-                }
-                if (!v.pp || Number(v.pp.premiumSpendable || 0) < BOOSTER_COST) {
-                    if (boosterStatus) boosterStatus.textContent = 'You need 500P premium spendable ($1) to activate the booster.';
-                    return;
-                }
-                boosterBtn.disabled = true;
-                if (boosterStatus) boosterStatus.textContent = 'Activating your 72h booster on-chain (gasless, a few seconds)...';
-                try {
-                    await window.magicblockDice.activateBooster();
-                    if (window.premiumPoints && typeof window.premiumPoints.refresh === 'function') await window.premiumPoints.refresh();
-                    else if (typeof window.premiumPoints === 'object' && window.premiumPoints.fetch) await window.premiumPoints.fetch();
-                    if (boosterStatus) boosterStatus.textContent = 'Done! Your lives are unlimited for 72 hours.';
-                    renderBooster();
-                } catch (e) {
-                    if (boosterStatus) boosterStatus.innerHTML = 'Booster failed: ' + String(e.message || e).slice(0, 160) + '. Your premium balance is untouched.';
-                }
-                boosterBtn.disabled = false;
+            Object.keys(boosterBtns).forEach(function (hours) {
+                const btn = boosterBtns[hours];
+                if (!btn) return;
+                btn.addEventListener('click', async function () {
+                    const h = Number(hours);
+                    const v = boosterView();
+                    const cost = BOOSTER_OPTIONS[h];
+                    if (!window.magicblockDice || typeof window.magicblockDice.activateBooster !== 'function') {
+                        if (boosterStatus) boosterStatus.textContent = 'Not signed in, or the on-chain booster is not ready yet. Sign in and try again.';
+                        return;
+                    }
+                    if (!v.pp || Number(v.pp.premiumSpendable || 0) < cost) {
+                        if (boosterStatus) boosterStatus.textContent = 'You need ' + cost.toLocaleString() + 'P premium spendable to activate the ' + h + 'h booster.';
+                        return;
+                    }
+                    btn.disabled = true;
+                    if (boosterStatus) boosterStatus.textContent = 'Activating your ' + h + 'h booster on-chain (gasless, a few seconds)...';
+                    try {
+                        await window.magicblockDice.activateBooster(h);
+                        if (window.premiumPoints && typeof window.premiumPoints.refresh === 'function') await window.premiumPoints.refresh();
+                        else if (typeof window.premiumPoints === 'object' && window.premiumPoints.fetch) await window.premiumPoints.fetch();
+                        if (boosterStatus) boosterStatus.textContent = 'Done! Your lives are unlimited for ' + h + ' hours.';
+                        renderBooster();
+                    } catch (e) {
+                        if (boosterStatus) boosterStatus.innerHTML = 'Booster failed: ' + String(e.message || e).slice(0, 160) + '. Your premium balance is untouched.';
+                    }
+                    btn.disabled = false;
+                });
             });
             renderBooster();
             if (boosterTimer) clearInterval(boosterTimer);

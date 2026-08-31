@@ -48,12 +48,12 @@
         <section class="game-card">
             <h3>What happens next</h3>
             <ul class="steps">
-                <li>Fill the short form below. It tells us the bank account your transfer came from, so we can match it to your GlobalFolkGames account.</li>
+                <li>Fill the short form below. It tells us the plan you paid for and your wallet, so we can match it to your GlobalFolkGames account.</li>
                 <li>Your account email and wallet are filled in for you when you are signed in. If they look empty, sign in with the buttons at the top, then refresh this page.</li>
-                <li id="next-reward-line">Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 2 (2x) boost for 30 days.</li>
-                <li>You will see your boost on your <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> page (or on the <a href="/profile/booster.html" style="color:#2ecc71;">booster page</a> for the unlimited-lives pack). <b>No auto-renew and non-refundable</b> — nothing charges again without you choosing it.</li>
+                <li id="next-reward-line">Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 1 plan for 30 days.</li>
+                <li>You will see your plan on your <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> page (or on the <a href="/profile/booster.html" style="color:#2ecc71;">booster page</a> for the unlimited-lives packs). <b>No auto-renew and non-refundable</b> — nothing charges again without you choosing it.</li>
             </ul>
-            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">Beta pricing: the Level 2 (2x) plan is <span style="text-decoration:line-through;">$10</span> now $3 globally, Nigeria beta ₦4,000 for 5,000 premium points. The 72h unlimited-lives booster is $1 (₦1,500 Nigeria beta) for 500 premium points. Limited time.</p>
+            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">All prices are in US dollars (USDC) and are the same for every player. Level 1 (5,000 premium points) is now $5 (regular $10). Level 2 (10,000 premium points) is now $10 (regular $20). Level 3 (15,000 premium points) is now $15 (regular $30). The 24h unlimited-lives booster is $1 for 500 points and the 72h booster is $2 (regular $3) for 1,500 points. Limited time.</p>
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
@@ -79,26 +79,23 @@
                     </div>
                 </div>
 
-                <label for="pay-bank">Bank name (where the transfer came from)</label>
-                <input type="text" id="pay-bank" placeholder="e.g. Access Bank" autocomplete="off">
-
-                <label for="pay-acct-name">Bank account name</label>
-                <input type="text" id="pay-acct-name" placeholder="Name on the bank account" autocomplete="off">
-
-                <label for="pay-acct-num">Bank account number</label>
-                <input type="text" id="pay-acct-num" placeholder="10 digit account number" inputmode="numeric" maxlength="16" autocomplete="off">
-
                 <label for="pay-plan">Plan paid for</label>
                 <select id="pay-plan">
-                    <option value="2x" selected>Level 2 (2x) — 5,000 premium points</option>
-                    <option value="3x">Level 3 (3x) — 10,000 premium points</option>
-                    <option value="booster">72h Unlimited Lives booster — 500 premium points</option>
+                    <option value="l1" selected>Level 1 plan — 5,000 premium points</option>
+                    <option value="l2">Level 2 plan — 10,000 premium points</option>
+                    <option value="l3">Level 3 plan — 15,000 premium points</option>
+                    <option value="b24">24h Unlimited Lives booster — 500 premium points</option>
+                    <option value="b72">72h Unlimited Lives booster — 1,500 premium points</option>
                 </select>
-                <div class="receipt-hint" id="plan-hint">Pick what you paid for. This page handles every premium-point pack (and any future one).</div>
+                <div class="receipt-hint" id="plan-hint">Pick what you paid for. This page handles every plan and booster pack.</div>
 
-                <label for="pay-amount">Amount paid (Naira)</label>
-                <input type="number" id="pay-amount" value="4000" min="1" step="1" autocomplete="off">
-                <div class="receipt-hint" id="amount-hint">Level 2 plan: ₦4,000. 72h booster: ₦1,500. Editable in case the price changes.</div>
+                <label for="pay-amount">Amount paid (USD)</label>
+                <input type="number" id="pay-amount" value="5" min="1" step="1" autocomplete="off">
+                <div class="receipt-hint" id="amount-hint">Level 1: $5 (regular $10). 24h booster: $1. 72h booster: $2. Editable in case the price changes.</div>
+
+                <label for="pay-txid">Transaction signature (optional)</label>
+                <input type="text" id="pay-txid" placeholder="paste the Solana/USDC transaction signature if you have it" autocomplete="off">
+                <div class="receipt-hint">Optional but speeds up verification: copy the tx signature from the wallet that paid.</div>
 
                 <div class="form-actions">
                     <button type="submit" id="submit-receipt" class="launch-btn onchain">Submit to support</button>
@@ -123,27 +120,27 @@
             var form = document.getElementById('premium-receipt-form');
             var emailEl = document.getElementById('pay-email');
             var walletEl = document.getElementById('pay-wallet');
-            var bankEl = document.getElementById('pay-bank');
-            var acctEl = document.getElementById('pay-acct-name');
-            var acctNumEl = document.getElementById('pay-acct-num');
+            var txidEl = document.getElementById('pay-txid');
             var planEl = document.getElementById('pay-plan');
             var amountEl = document.getElementById('pay-amount');
             var statusEl = document.getElementById('form-status');
             var signedOutBox = document.getElementById('signedout-box');
             var storedKey = 'gfg_premium_payment_draft_v1';
 
-            var PLAN_AMOUNTS = { '2x': 4000, '3x': 8000, 'booster': 1500 };
+            var PLAN_AMOUNTS = { l1: 5, l2: 10, l3: 15, b24: 1, b72: 2 };
             var PLAN_NEXT = {
-                '2x': 'Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 2 (2x) boost for 30 days.',
-                'booster': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.',
-                '3x': 'Our support team verifies the payment and credits your account with <b>10,000 premium points</b>. You then activate your <b>Level 3 (3x)</b> plan on your upgrade page.'
+                'l1': 'Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 1 plan for 30 days.',
+                'l2': 'Our support team verifies the payment and credits your account. You get <b>10,000 premium points</b> and a Level 2 plan for 30 days.',
+                'l3': 'Our support team verifies the payment and credits your account. You get <b>15,000 premium points</b> and a Level 3 plan for 30 days.',
+                'b24': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>24-hour unlimited-lives booster</b> on your upgrade page.',
+                'b72': 'Our support team verifies the payment and credits your account with <b>1,500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.'
             };
-            var PLAN_HINTS = { '2x': 'Level 2 (2x): 5,000 premium points, ₦5,000 (Nigeria beta) / $5 (global).', '3x': 'Level 3 (3x): 10,000 premium points, ₦8,000 (Nigeria beta) / $10 (global).', 'booster': '72h Unlimited Lives: 500 premium points, ₦1,500 (Nigeria beta) / $1 (global).' };
+            var PLAN_HINTS = { 'l1': 'Level 1: $5 paid (regular $10) for 5,000 premium points.', 'l2': 'Level 2: $10 paid (regular $20) for 10,000 premium points.', 'l3': 'Level 3: $15 paid (regular $30) for 15,000 premium points.', 'b24': '24h Unlimited Lives: $1 for 500 premium points.', 'b72': '72h Unlimited Lives: $2 (regular $3) for 1,500 premium points.' };
             planEl.addEventListener('change', function () {
                 if (PLAN_AMOUNTS[planEl.value]) {
                     amountEl.value = PLAN_AMOUNTS[planEl.value];
                 }
-                document.getElementById('next-reward-line').innerHTML = PLAN_NEXT[planEl.value] || PLAN_NEXT['2x'];
+                document.getElementById('next-reward-line').innerHTML = PLAN_NEXT[planEl.value] || PLAN_NEXT['l1'];
                 document.getElementById('plan-hint').textContent = PLAN_HINTS[planEl.value] || 'Pick what you paid for.';
                 document.getElementById('amount-hint').textContent = PLAN_HINTS[planEl.value] || 'Editable in case the price changes.';
             });
@@ -187,26 +184,22 @@
             // Draft persistence so a hasty refresh never loses the filled form.
             var persisted = {};
             try { persisted = JSON.parse(localStorage.getItem(storedKey) || '{}') || {}; } catch (e) { persisted = {}; }
-            if (persisted.bank) bankEl.value = persisted.bank;
-            if (persisted.acctName) acctEl.value = persisted.acctName;
-            if (persisted.acctNum) acctNumEl.value = persisted.acctNum;
             if (persisted.plan && PLAN_AMOUNTS[persisted.plan]) { planEl.value = persisted.plan; amountEl.value = PLAN_AMOUNTS[persisted.plan]; }
             else if (persisted.amount) amountEl.value = persisted.amount;
+            if (persisted.txid) txidEl.value = persisted.txid;
 
             function persistDraft() {
                 persisted = {
                     email: emailEl.value.trim(),
                     wallet: walletEl.value.trim(),
-                    bank: bankEl.value.trim(),
-                    acctName: acctEl.value.trim(),
-                    acctNum: acctNumEl.value.trim(),
                     plan: planEl.value,
                     amount: amountEl.value.trim(),
+                    txid: txidEl.value.trim(),
                 };
                 try { localStorage.setItem(storedKey, JSON.stringify(persisted)); } catch (e) { /* ignore */ }
             }
-            ['bank', 'acctName', 'acctNum', 'amount'].forEach(function (key) {
-                var el = key === 'bank' ? bankEl : key === 'acctName' ? acctEl : key === 'acctNum' ? acctNumEl : amountEl;
+            ['amount', 'txid'].forEach(function (key) {
+                var el = key === 'amount' ? amountEl : txidEl;
                 el.addEventListener('input', persistDraft);
             });
             emailEl.addEventListener('input', persistDraft);
@@ -235,26 +228,21 @@
                     'Email: ' + (emailEl.value.trim() || '(empty)'),
                     'Wallet: ' + (walletEl.value.trim() || '(empty)'),
                     'Plan: ' + (planEl.selectedOptions[0] ? planEl.selectedOptions[0].text : planEl.value),
-                    'Amount paid: N' + (amountEl.value.trim() || '0'),
-                    'Bank: ' + (bankEl.value.trim() || '(empty)'),
-                    'Account name: ' + (acctEl.value.trim() || '(empty)'),
-                    'Account number: ' + (acctNumEl.value.trim() || '(empty)'),
+                    'Amount paid (USD): $' + (amountEl.value.trim() || '0'),
+                    'Tx signature: ' + (txidEl.value.trim() || '(not provided)'),
                     '',
                     'Signed in at submit time: ' + (d.signedIn ? 'yes' : 'no'),
                 ].join('\n');
             }
 
             function valid() {
-                if (!bankEl.value.trim()) { statusEl.textContent = 'Please enter the bank name.'; statusEl.style.color = '#e74c3c'; bankEl.focus(); return false; }
-                if (!acctEl.value.trim()) { statusEl.textContent = 'Please enter the bank account name.'; statusEl.style.color = '#e74c3c'; acctEl.focus(); return false; }
-                if (!acctNumEl.value.trim()) { statusEl.textContent = 'Please enter the bank account number.'; statusEl.style.color = '#e74c3c'; acctNumEl.focus(); return false; }
                 var n = Number(amountEl.value);
                 if (!n || n <= 0) { statusEl.textContent = 'Please enter a valid amount.'; statusEl.style.color = '#e74c3c'; amountEl.focus(); return false; }
                 return true;
             }
 
             function summarize(body) {
-                return 'Premium plan payment: ' + (planEl.selectedOptions[0] ? planEl.selectedOptions[0].text : planEl.value) + ' for account ' + (acctNumEl.value.trim() || '?');
+                return 'Premium payment: ' + (planEl.selectedOptions[0] ? planEl.selectedOptions[0].text : planEl.value) + ' for wallet ' + (walletEl.value.trim() || '?');
             }
 
             form.addEventListener('submit', function (e) {
@@ -307,7 +295,7 @@
 
             // Auto-fill amount whenever a plan is chosen (also on first load).
             if (PLAN_AMOUNTS[planEl.value]) amountEl.value = PLAN_AMOUNTS[planEl.value];
-            document.getElementById('next-reward-line').innerHTML = PLAN_NEXT[planEl.value] || PLAN_NEXT['2x'];
+            document.getElementById('next-reward-line').innerHTML = PLAN_NEXT[planEl.value] || PLAN_NEXT['l1'];
             document.getElementById('plan-hint').textContent = PLAN_HINTS[planEl.value] || 'Pick what you paid for.';
             document.getElementById('amount-hint').textContent = PLAN_HINTS[planEl.value] || 'Editable in case the price changes.';
         });

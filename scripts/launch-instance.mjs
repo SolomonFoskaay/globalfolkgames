@@ -1,6 +1,6 @@
 // scripts/launch-instance.mjs — G: create the LUDO EARN launch competition on
 // devnet (72h, $2 = 1000 pts, 10 ways) and prove the Final-Points board E2E
-// (L3 1.5x, L2 1.0x, L1 hidden) with throwaway wallets.
+// (L3 1.5x, L2 1.25x, L1 1.0x, non-qualifying hidden) with throwaway wallets.
 import { readFileSync } from 'fs';
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';

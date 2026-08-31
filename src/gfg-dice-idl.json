@@ -10,9 +10,11 @@
     {
       "name": "activate_booster",
       "docs": [
-        "(M5 v3) Activates the 72h unlimited-life booster by spending premium",
-        "spendable (BOOSTER_COST = $1 / 500P, base rate $0.002/pt USD). No win",
-        "lives unlimited. Extends from now (or the current active booster) by 72h.",
+        "(M5 v3) Activates an unlimited-life booster by spending premium spendable.",
+        "Two durations (owner 2026-08-29): hours=24 -> $1 actual / 500 pts;",
+        "hours=72 -> $3 actual (discounted $2) / 1,500 pts. Points always derive",
+        "from the ACTUAL price so removing the discount later needs no program",
+        "change. Extends from now (or the current active booster) by `hours`.",
         "Gasless on the ER (session key signs). One plan/booster per account flow."
       ],
       "discriminator": [
@@ -59,7 +61,12 @@
           }
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "hours",
+          "type": "i64"
+        }
+      ]
     },
     {
       "name": "activate_subscription",
@@ -120,12 +127,14 @@
       "name": "activate_subscription_level",
       "docs": [
         "(M5, plan ladder 2026-08-22) Activates a SPECIFIC plan level from PREMIUM",
-        "spendable: Level-2 2x costs 5,000P, Level-3 3x costs 10,000P (level is an",
-        "arg, so more levels are data/constants, never a new instruction). Sets",
-        "subscription_level = level and active_until = now + 30 days (no auto-",
-        "renew). One active plan at a time. Gasless on the ER. Additive: the",
-        "original activate_subscription (L2 only) stays untouched for existing",
-        "callers."
+        "spendable: L1 costs 5,000P (actual $10), L2 10,000P (actual $20), L3",
+        "15,000P (actual $30) - points derive from the ACTUAL price at the base",
+        "rate 500 points = $1 (owner 2026-08-31), so removing a launch discount",
+        "never changes this (level is an arg, so more levels are",
+        "data/constants, never a new instruction). Sets subscription_level =",
+        "level and active_until = now + 30 days (no auto-renew). One active",
+        "plan at a time. Gasless on the ER. Additive: the original",
+        "activate_subscription (L2 only) stays untouched for existing callers."
       ],
       "discriminator": [
         139,
@@ -333,63 +342,6 @@
         {
           "name": "client_seed",
           "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "cancel_agm_order",
-      "discriminator": [
-        200,
-        11,
-        238,
-        159,
-        23,
-        131,
-        165,
-        171
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
         }
       ]
     },
@@ -3312,95 +3264,6 @@
       "args": []
     },
     {
-      "name": "lock_agm_match",
-      "discriminator": [
-        194,
-        214,
-        188,
-        64,
-        44,
-        250,
-        1,
-        176
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "settlement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
-        },
-        {
-          "name": "winner_seat",
-          "type": "u8"
-        }
-      ]
-    },
-    {
       "name": "mark_winner_paid",
       "discriminator": [
         21,
@@ -3459,67 +3322,6 @@
         {
           "name": "rank",
           "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "match_agm_order",
-      "discriminator": [
-        91,
-        67,
-        195,
-        14,
-        139,
-        212,
-        189,
-        210
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
-        },
-        {
-          "name": "taker",
-          "type": "pubkey"
         }
       ]
     },
@@ -3621,225 +3423,6 @@
         {
           "name": "game_tag",
           "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "p2c_fund",
-      "discriminator": [
-        10,
-        77,
-        34,
-        8,
-        82,
-        146,
-        9,
-        162
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "bank",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  112,
-                  50,
-                  99,
-                  98,
-                  97,
-                  110,
-                  107
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "amount_usd_cents",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "p2c_settle",
-      "discriminator": [
-        75,
-        219,
-        201,
-        174,
-        154,
-        73,
-        47,
-        149
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "bank",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  112,
-                  50,
-                  99,
-                  98,
-                  97,
-                  110,
-                  107
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "settlement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109,
-                  115
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
-        },
-        {
-          "name": "computer_seat",
-          "type": "u8"
-        },
-        {
-          "name": "computer_won",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "post_agm_order",
-      "discriminator": [
-        56,
-        199,
-        48,
-        135,
-        119,
-        207,
-        97,
-        82
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
-        },
-        {
-          "name": "stake_usd_cents",
-          "type": "u64"
-        },
-        {
-          "name": "seats",
-          "type": "u8"
-        },
-        {
-          "name": "maker",
-          "type": "pubkey"
         }
       ]
     },
@@ -4683,63 +4266,6 @@
         {
           "name": "client_seed",
           "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "settle_agm_match",
-      "discriminator": [
-        76,
-        63,
-        58,
-        66,
-        207,
-        56,
-        54,
-        193
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  97,
-                  103,
-                  109
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "game"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "game",
-          "type": "u8"
-        },
-        {
-          "name": "order_id",
-          "type": "u64"
         }
       ]
     },
@@ -5994,32 +5520,6 @@
       ]
     },
     {
-      "name": "AgmOrder",
-      "discriminator": [
-        123,
-        185,
-        41,
-        16,
-        120,
-        220,
-        57,
-        68
-      ]
-    },
-    {
-      "name": "AgmSettlement",
-      "discriminator": [
-        217,
-        147,
-        46,
-        222,
-        26,
-        191,
-        223,
-        4
-      ]
-    },
-    {
       "name": "Competition",
       "discriminator": [
         193,
@@ -6095,19 +5595,6 @@
         8,
         240,
         27
-      ]
-    },
-    {
-      "name": "P2cBank",
-      "discriminator": [
-        151,
-        197,
-        233,
-        80,
-        188,
-        120,
-        188,
-        2
       ]
     },
     {
@@ -6345,11 +5832,16 @@
     },
     {
       "code": 6028,
+      "name": "AffiliateOnceOnly",
+      "msg": "affiliate reward is one-time per referral (first upgrade only)"
+    },
+    {
+      "code": 6029,
       "name": "DuplicateHandle",
       "msg": "profile handle already taken"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     }
@@ -6495,108 +5987,6 @@
           {
             "name": "paid_period_count",
             "type": "u16"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AgmOrder",
-      "docs": [
-        "Arc2 M1 (item E): game-AGNOSTIC AGM order (maker/taker). Money only - the",
-        "game is chosen by the maker (one game per order) and the game's rules",
-        "profile lives in the games registry (config), not here. All games plug in."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "order_id",
-            "type": "u64"
-          },
-          {
-            "name": "game",
-            "type": "u8"
-          },
-          {
-            "name": "maker",
-            "type": "pubkey"
-          },
-          {
-            "name": "stake_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "seats",
-            "type": "u8"
-          },
-          {
-            "name": "status",
-            "type": "u8"
-          },
-          {
-            "name": "taker",
-            "type": "pubkey"
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AgmSettlement",
-      "docs": [
-        "arc2m7b: settlement of a filled order. Reads the stake/seats at lock and",
-        "computes the flat-10% fee + 90% winner payout (recorded on-chain; actual",
-        "token move happens in the payout rail or embedded-wallet credit)."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "order_id",
-            "type": "u64"
-          },
-          {
-            "name": "game",
-            "type": "u8"
-          },
-          {
-            "name": "pot_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "fee_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "seats",
-            "type": "u8"
-          },
-          {
-            "name": "winner_seat",
-            "type": "u8"
-          },
-          {
-            "name": "payout_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "settled_at",
-            "type": "i64"
-          },
-          {
-            "name": "status",
-            "type": "u8"
           }
         ]
       }
@@ -7043,67 +6433,6 @@
           {
             "name": "updated_at",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "P2cBank",
-      "docs": [
-        "Arc2 M7C: the platform P2C bank - ONE shared capital pool for ALL games",
-        "(no per-game split, so liquidity is never fractured). Computers fill",
-        "unmatched seats only (small stakes, $1-$10); per-day anti-farm guards."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "game",
-            "type": "u8"
-          },
-          {
-            "name": "balance_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "day_started_at",
-            "type": "i64"
-          },
-          {
-            "name": "day_net_usd_cents",
-            "type": "i64"
-          },
-          {
-            "name": "day_loss_cap_usd_cents",
-            "type": "u64"
-          },
-          {
-            "name": "day_wins",
-            "type": "u32"
-          },
-          {
-            "name": "day_losses",
-            "type": "u32"
-          },
-          {
-            "name": "total_wins",
-            "type": "u64"
-          },
-          {
-            "name": "total_losses",
-            "type": "u64"
-          },
-          {
-            "name": "trades",
-            "type": "u64"
-          },
-          {
-            "name": "status",
-            "type": "u8"
           }
         ]
       }

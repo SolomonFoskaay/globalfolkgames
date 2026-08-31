@@ -93,10 +93,12 @@ export async function readTierFor(wallet) {
   return (level > 0 && until * 1000 > Date.now()) ? level : 0;
 }
 
-// Final Points: Total Wins x live plan boost (L3 1.5 / L2 1.0); L1 or a level not
-// in tierBits => hidden (excluded from ranking, not removed).
+// Final Points: Total Wins x live plan boost from the config ladder
+// (L2 1.25x, L3 1.5x, L1 1.0x); a level not in tierBits => hidden (excluded
+// from ranking, not removed).
 export function boostFor(level, comp, planBoosts) {
   if (level <= 0) return null;
   if (!(comp.tierBits & (1 << level))) return null;
-  return (planBoosts && planBoosts[level]) ? planBoosts[level] : (level >= 3 ? 1.5 : 1.0);
+  if (planBoosts && planBoosts[level]) return planBoosts[level];
+  return level >= 3 ? 1.5 : (level === 2 ? 1.25 : 1.0);
 }

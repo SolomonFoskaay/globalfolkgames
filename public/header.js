@@ -61,7 +61,7 @@
                 items: [
                     { label: '🎮 Games', href: '/games/', match: 'games' },
                     { label: '🌍 Countries', href: '/countries/', match: 'countries' },
-                    { label: '🤝 Earn Competitions (AGM)', href: '/agm/', match: 'agm' },
+                    { label: '🏆 Competitions', href: '/competitions/', match: 'competitions' },
                     { label: 'Home', href: '/', match: 'home' }
                 ]
             },
@@ -416,9 +416,9 @@
         const signedIn = !!(window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()));
         if (!signedIn) { el.style.display = 'none'; return; }
         const tier = (window.activeTier && typeof window.activeTier.get === 'function') ? window.activeTier.get() : null;
-        const active = !!tier && tier.active === true && (tier.level || 0) >= 2;
+        const active = !!tier && tier.active === true && (tier.level || 0) >= 1;
         if (active) {
-            el.textContent = 'L' + tier.level + ' · ' + (tier.level === 2 ? '2x' : tier.level + 'x');
+            el.textContent = 'L' + tier.level + ' · Premium';
             el.style.background = 'rgba(243,156,18,0.18)';
             el.style.border = '1px solid rgba(243,156,18,0.6)';
             el.style.color = '#f87818';
@@ -455,7 +455,7 @@
 
         // Monetag ads gate: paused while Adsense approval is pending (see
         // ad-gate.js ADS_ENABLED flag - flip it back to restore). Once active,
-        // L1/L2/anon see Monetag; ACTIVE Level-3 is ad-free.
+        // every level shows ads (L0 full, L1-L3 less); no level is ad-free.
         ensureScript('/ad-gate.js');
 
         // Google AdSense loader (sitewide <head>). The publisher script itself

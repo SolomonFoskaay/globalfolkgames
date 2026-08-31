@@ -7,10 +7,11 @@
 // intrusive formats can never serve. Monetag decides exact placement/cadence
 // from its dashboard; we control which pages get the tags.
 //
-// Tier logic (unchanged): signed-out / Level 1 / Level 2 get the two ads.
-// ACTIVE Level 3 is ad-FREE: the tags are never injected. Any leftover Monetag
-// push service-worker (from the multitag era) is unregistered sitewide, since
-// push is no longer part of the ads we run.
+// Tier logic (owner 2026-08-31): ads are NEVER hidden for any level. Free
+// (L0) = full ads, Premium (L1-L3) = less ads, but both still run the ad
+// units because ads are a revenue line. There is NO ad-free tier. Any
+// leftover Monetag push service-worker (from the multitag era) is unregistered
+// sitewide, since push is no longer part of the ads we run.
 (function () {
     'use strict';
     if (window.__gfgAdGate) return;
@@ -75,14 +76,9 @@
         tries++;
         unregisterAdServiceWorkers(); // keep clearing any leftover push SW
         if (!ADS_ENABLED) return;     // paused: do not inject any ad tag
-        var t = tier();
-        if (t.lvl >= 3 && t.active) return; // Level 3 = ad-free
-        // Signed in but premium snapshot not cached yet: wait briefly for it.
-        if (signedIn() && !t.snapshot && tries < 16) {
-            setTimeout(decide, 250);
-            return;
-        }
-        // Everyone else (signout, L1, L2, or timeout): show the two gentle ads.
+        // Ads are NEVER hidden for any level (owner 2026-08-31). Free = full
+        // ads, Premium L1-L3 = less ads; both still show ad units because ads
+        // are a revenue line. Unlike the old build there is no ad-free tier.
         ZONES.forEach(injectZone);
     }
 

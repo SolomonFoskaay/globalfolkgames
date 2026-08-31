@@ -27,12 +27,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function send(tx) { tx.feePayer = sponsor.publicKey; const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true }); await conn.confirmTransaction({ signature: sig }, 'confirmed'); return sig; }
 
-// ---- A1: L3 activation (10,000P) -----------------------------------------
+// ---- A1: L3 activation (15,000P) -----------------------------------------
 const a1 = Keypair.generate().publicKey;
 const [prem] = PublicKey.findProgramAddressSync([PREMIUM_SEED, a1.toBytes()], PROGRAM);
 const sigInit = await send(await prog.methods.initializePremiumPoints().accounts({ payer: sponsor.publicKey, playerAuthority: a1, premiumPoints: prem, systemProgram: SystemProgram.programId }).transaction());
 const ref = (Date.now() % 1000000000) + 3000000000;
-const sigCredit = await send(await prog.methods.creditPremiumPoints(new BN(10000), new BN(ref), 1).accounts({ premiumPoints: prem, admin: sponsor.publicKey, playerAuthority: a1, systemProgram: SystemProgram.programId }).transaction());
+const sigCredit = await send(await prog.methods.creditPremiumPoints(new BN(15000), new BN(ref), 1).accounts({ premiumPoints: prem, admin: sponsor.publicKey, playerAuthority: a1, systemProgram: SystemProgram.programId }).transaction());
 const sigAct = await send(await prog.methods.activateSubscriptionLevel(new BN(3)).accounts({ payer: sponsor.publicKey, playerAuthority: a1, premiumPoints: prem }).transaction());
 const p = await conn.getAccountInfo(prem);
 const lvl = p.data[57], spendable = Number(p.data.readBigUInt64LE(49));

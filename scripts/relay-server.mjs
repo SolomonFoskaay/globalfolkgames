@@ -274,11 +274,11 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { player, token } = JSON.parse(body || '{}');
+      const { player, token, level } = JSON.parse(body || '{}');
       const expected = process.env.GFG_OPERATOR_TOKEN;
       if (expected && expected.length >= 16 && token && token !== expected) throw new Error('unauthorized operator token');
       if (!player) throw new Error('missing "player" pubkey');
-      const result = await handleAdminActivatePremium(player);
+      const result = await handleAdminActivatePremium(player, level);
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify(result));
     } catch (e) {

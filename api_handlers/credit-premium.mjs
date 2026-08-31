@@ -1,7 +1,7 @@
 // api/credit-premium.mjs
 // Vercel serverless function: the M5 admin credit entry point. Only the owner
 // (holding GFG_OPERATOR_TOKEN) may credit a player's PREMIUM points ledger
-// after a VERIFIED manual Paystack payment. This is the ONLY entry point for
+// after a VERIFIED manual crypto (USDC) payment. This is the ONLY entry point for
 // money-like value, so the operator gate is mandatory.
 // Requires env vars: GFG_Gasless_Sponsor_Keypair + GFG_OPERATOR_TOKEN.
 

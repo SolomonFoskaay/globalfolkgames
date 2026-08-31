@@ -1,6 +1,7 @@
 // api/activate-premium.mjs
 // Vercel serverless: admin activates a subscription for a player after credit.
-// Still consumes 5000 premium spendable via the normal activate check (no shortcut).
+// Level is an optional body field (1/2/3); default Level 1. The relay spends
+// the matching premium points (500/1,000/1,500) via activate_subscription_level.
 // Authority-gated via GFG_OPERATOR_TOKEN, sponsor-signed, delegation-aware.
 
 import { handleAdminActivatePremium } from '../scripts/delegate-relay.mjs';
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
       return;
     }
     if (!body.player) throw new Error('missing "player" pubkey');
-    const result = await handleAdminActivatePremium(body.player);
+    const result = await handleAdminActivatePremium(body.player, body.level);
     res.status(200).json(result);
   } catch (e) {
     console.error('activate-premium error:', e.message);

@@ -169,10 +169,13 @@
             let handle = null;
             try { handle = (window.gfgReferral && typeof window.gfgReferral.handle === 'function') ? window.gfgReferral.handle() : null; } catch (e) {}
             const name = (handle || profile?.display_name || 'Player').slice(0, 12);
-            const tier = (typeof window.getActiveTier === 'function')
-                ? window.getActiveTier()
-                : { tier: 1, mult: 1, label: 'Tier 1' };
-            const tierBadge = (tier.tier > 1)
+            const premium = (window.activeTier && typeof window.activeTier.get === 'function') ? window.activeTier.get() : null;
+            const tier = premium && premium.active
+                ? { tier: premium.level, mult: [1, 1.5, 2, 3][premium.level] || 1, label: 'Level ' + premium.level }
+                : ((typeof window.getActiveTier === 'function')
+                    ? window.getActiveTier()
+                    : { tier: 0, mult: 1, label: 'Level 0' });
+            const tierBadge = (tier.tier > 0 && tier.mult > 1)
                 ? `<span class="tier-badge" title="Active ${tier.label} (${tier.mult}x on win points)">${tier.mult}x</span>`
                 : '';
 

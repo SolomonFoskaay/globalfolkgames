@@ -48,11 +48,11 @@
 <body>
     <div class="wrap">
         <h1 style="font-size:1.3rem;margin:0 0 4px;">Premium Subscribers</h1>
-        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 12px;">Admin: credit premium points after a verified payment (on-chain, gasless), then track every subscriber below — auto-loaded from the same Dynamic account list, no manual typing. Upgrade requires 5,000 premium spendable; downgrade revokes an active or beyond-30-day sub. Point value is <b style="color:#f87818;">$0.002 per point (USD)</b>, so $1 = 500 points, $2 = 1,000 points, $10 = 5,000 points. Credit the USD-equivalent amount of the payment received.</p>
+        <p style="color:var(--muted,#888);font-size:0.85rem;margin:0 0 12px;">Admin: credit premium points after a verified payment (on-chain, gasless), then track every subscriber below — auto-loaded from the same Dynamic account list, no manual typing. Plans run 30 days per level (Level 1 = 5,000 pts, Level 2 = 10,000 pts, Level 3 = 15,000 pts); downgrade revokes an active or beyond-30-day sub. Point value is <b style="color:#f87818;">$0.002 per point (USD)</b>, so $1 = 500 points, $2 = 1,000 points, $10 = 5,000 points. Credit the USD-equivalent amount of the payment received.</p>
 
         <!-- Credit card -->
         <div class="card">
-            <h3>Credit premium points (Level 2 plan = 5,000P)</h3>
+            <h3>Credit premium points (plans & boosters)</h3>
             <p class="hint">Pick the account from the dropdown (email and embedded wallet, loaded from Dynamic) or filter with search, choose the preset, keep the auto-filled credit reference, and click Credit. The relay signs gasless on the ER with the sponsor key already in Vercel env — no tokens or keys needed here.</p>
             <div>
                 <label>Search user (email or wallet)</label>
@@ -69,7 +69,11 @@
             <div>
                 <label>Premium points</label>
                 <select id="points-preset">
-                    <option value="5000">Premium Level 2 (5,000 Point)</option>
+                    <option value="5000">Level 1 plan (5,000 Point) — $5 launch (regular $10)</option>
+                    <option value="10000">Level 2 plan (10,000 Point) — $10 launch (regular $20)</option>
+                    <option value="15000">Level 3 plan (15,000 Point) — $15 launch (regular $30)</option>
+                    <option value="500">24h Unlimited Lives booster (500 Point) — $1</option>
+                    <option value="1500">72h Unlimited Lives booster (1,500 Point) — $2 launch (regular $3)</option>
                     <option value="custom">Custom amount — type below</option>
                 </select>
                 <input type="number" id="prem-points" placeholder="e.g. 5000" min="1" autocomplete="off" style="margin-top:6px;">
@@ -111,8 +115,13 @@
                 <h3>Selected subscriber</h3>
                 <div class="hint">Wallet: <span id="sel-wallet" class="mono" style="color:#f87818;">-</span> · <span id="sel-email" style="color:#bbb;"></span></div>
                 <div id="sel-ledger" style="margin-top:8px;"></div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                    <button id="btn-upgrade" class="btn-success" disabled>Upgrade to Level 2 (5,000P)</button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+                    <select id="activate-level" style="width:auto; flex:0 0 auto;">
+                        <option value="1">Level 1 (5,000 pts)</option>
+                        <option value="2">Level 2 (10,000 pts)</option>
+                        <option value="3">Level 3 (15,000 pts)</option>
+                    </select>
+                    <button id="btn-upgrade" class="btn-success" disabled>Activate plan (spends premium pts)</button>
                     <button id="btn-cancel" class="btn-danger" disabled>Downgrade / cancel subscription</button>
                 </div>
                 <div class="msg" id="action-msg"></div>
@@ -304,7 +313,7 @@
                     <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Lifetime</div><div style="font-size:1.05rem;color:#f87818;font-weight:700;">${fmt(row.premiumLifetime)}</div></div>
                     <div style="background:#1a1a24;border:1px solid #333;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:0.72rem;color:#888;">Spendable</div><div style="font-size:1.05rem;color:#7838f8;font-weight:700;">${fmt(row.premiumSpendable)}</div></div></div>
                     <p class="hint" style="margin-top:6px;">Level ${row.subscriptionLevel||0} · ${active?`Active ${days}d left`:'(not active)'} · last credit ${row.lastCreditPoints?`+${fmt(row.lastCreditPoints)}P ref ${esc(row.lastCreditRef)}`: '—'} · traceable by ref.</p>`;
-                $btnUpgrade.disabled=!((row.premiumSpendable||0)>=5000 && !active);
+                $btnUpgrade.disabled=!((row.premiumSpendable||0)>=500 && !active);
                 $btnCancel.disabled=!active;
                 $actionMsg.textContent='';
             }
@@ -314,10 +323,11 @@
 
             $btnUpgrade.onclick=async()=>{
                 const w=$selWallet.textContent; if(!w) return;
-                if(!confirm('Upgrade '+w+'? This spends 5,000 premium spendable on-chain (fails if they don\'t have it).')) return;
-                $actionMsg.textContent='Upgrading on-chain...'; $btnUpgrade.disabled=true;
+                const lvl=Number(document.getElementById('activate-level')?.value||1);
+                if(!confirm('Activate Level '+lvl+' for '+w+'? This spends '+(lvl===1?5000:lvl===2?10000:15000)+' premium spendable on-chain (fails if they don\'t have it).')) return;
+                $actionMsg.textContent='Activating on-chain...'; $btnUpgrade.disabled=true;
                 try{
-                    const r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w})});
+                    const r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w,level:lvl})});
                     const j=await r.json(); if(!r.ok) throw new Error(j.error||'upgrade failed');
                     $actionMsg.textContent='Upgraded. Sig: '+String(j.sig||'').slice(0,16)+' — refreshing.'; await loadTracker();
                 }catch(e){ $actionMsg.textContent='Upgrade failed: '+esc(e.message); }

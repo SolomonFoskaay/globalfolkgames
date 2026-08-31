@@ -42,10 +42,10 @@
             <table>
                 <thead><tr><th>Level</th><th>Type</th><th>Price (USD)</th><th>Games/day (G)</th><th>Lives (L)</th><th>Win points (PfeGW)</th><th>Ads</th><th>Daily bonus (PaDB)</th><th>Affiliate</th></tr></thead>
                 <tbody>
-                    <tr><td><b>L0</b></td><td><span class="free">FREE</span></td><td>$5 / $0</td><td>1 (rotated)</td><td>2</td><td>100</td><td>Full ads</td><td>25P</td><td>20%</td></tr>
-                    <tr><td><b>L1</b></td><td><span class="paid">Premium</span></td><td>$10 / $5</td><td>2</td><td>4</td><td>150</td><td>Less ads</td><td>50P</td><td>20%</td></tr>
-                    <tr><td><b>L2</b></td><td><span class="paid">Premium</span></td><td>$20 / $10</td><td>4</td><td>8</td><td>200</td><td>Less ads</td><td>100P</td><td>20%</td></tr>
-                    <tr><td><b>L3</b></td><td><span class="paid">Premium</span></td><td>$30 / $15</td><td>8</td><td>16</td><td>300</td><td>Less ads</td><td>200P</td><td>20%</td></tr>
+                    <tr><td><b>L0</b></td><td><span class="free">FREE</span></td><td>$5 / $0</td><td>—</td><td>5</td><td>1x (100)</td><td>Full ads</td><td>25P</td><td>20%</td></tr>
+                    <tr><td><b>L1</b></td><td><span class="paid">Premium</span></td><td>$10 / $5</td><td>—</td><td>10</td><td>1.5x (150)</td><td>Less ads</td><td>50P</td><td>20%</td></tr>
+                    <tr><td><b>L2</b></td><td><span class="paid">Premium</span></td><td>$20 / $10</td><td>—</td><td>15</td><td>2x (200)</td><td>Less ads</td><td>100P</td><td>20%</td></tr>
+                    <tr><td><b>L3</b></td><td><span class="paid">Premium</span></td><td>$30 / $15</td><td>—</td><td>20</td><td>3x (300)</td><td>Less ads</td><td>200P</td><td>20%</td></tr>
                     <tr><td><b>L4</b></td><td><span class="paid">Premium</span></td><td>$40 / $20</td><td>16</td><td>32</td><td>400</td><td>Less ads</td><td>400P</td><td>20%</td></tr>
                     <tr><td><b>L5</b></td><td><span class="paid">Premium</span></td><td>$50 / $25</td><td>32</td><td>64</td><td>500</td><td>Less ads</td><td>800P</td><td>20%</td></tr>
                     <tr><td><b>L6</b></td><td><span class="paid">Premium</span></td><td class="tbd">$60 / $30 (derived)</td><td>64</td><td>128</td><td class="tbd">600 (derived)</td><td>Less ads</td><td>1600P</td><td>20%</td></tr>
@@ -61,11 +61,11 @@
         <div class="card">
             <h3>Features</h3>
             <div class="feature"><b>F1 - Game Access (G):</b> Free accounts cannot pick their game. The platform rotates one free game per day (all free accounts get the same game, so creating multiple accounts to pick a different game is pointless). Today Ludo free, tomorrow another game, rotating daily across all available games, so a free player can try everything before upgrading (one per day, platform-chosen). L1 and above unlock all games, but a player who plays 4 different games cannot open a 5th that day, even with lives left: remaining lives only work on the same 4 games they already spent at least 1 life on that day. Resets every 24 hours.</div>
-            <div class="feature"><b>F2 - Lives (L):</b> Free-play lives per day per the ladder (2 at L0, doubling upward).</div>
+            <div class="feature"><b>F2 - Lives (L):</b> Free-play lives per day per the ladder (5 at L0, 10 at L1, 15 at L2, 20 at L3).</div>
             <div class="feature"><b>F3 - Win points (100PfeGW):</b> Points earned for every game win: 100 at L0, 150 at L1, 200 at L2, 300 at L3, 400 at L4, 500 at L5, and up per the ladder.</div>
             <div class="feature"><b>F4 - Ads (FAds / LAds):</b> Full ads on the free plan; Less ads from L1 upward.</div>
             <div class="feature"><b>F5 - Daily bonus (25PaDB):</b> Daily claimable bonus: 25P at L0, doubling per level (50, 100, 200, 400, 800...).</div>
-            <div class="feature"><b>F6 - Affiliate (20%):</b> 20% of each referred plan's payable USD price. Referrer does NOT need an active subscription to earn. Any account that refers a player who upgrades to any level within 1 year of the referral can earn on up to 10 upgrade/renewal events for that referral within 365 days (no more active-sub monthly gate, no more 60-day pair forfeit; stops after 10 paid renewals or 365 days per referral).</div>
+            <div class="feature"><b>F6 - Affiliate (20%):</b> 20% of the referred plan's payable USD price, paid ONCE on the referred player's FIRST upgrade only. The referrer does NOT need an active subscription - anyone who referred a player that then upgrades earns the 20%. Later renewals/upgrades by the same referral pay nothing (enforced on-chain, one-time per pair).</div>
         </div>
 
         <div class="card">

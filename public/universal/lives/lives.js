@@ -24,7 +24,8 @@
 
     var FREE_LIVES = 5;
     var PREMIUM_LIVES = 10;
-    var LEVEL3_LIVES = 15; // Level 3 (3x) lives pool (M5 ladder 2026-08-22)
+    var LEVEL3_LIVES = 15; // Level 2 lives pool
+    var LEVEL4_LIVES = 20; // Level 3 lives pool (M5 ladder 2026-08-31)
 
     var store = {};
     try {
@@ -93,15 +94,16 @@
 
     function isPremiumActive() {
         var v = activeView();
-        return !!(v && v.active === true && (v.level || 0) >= 2);
+        return !!(v && v.active === true && (v.level || 0) >= 1);
     }
 
     function totalForLevel() {
-        // Plan-ladder ladder (M5, config-driven): free 5 / Level-2 10 / Level-3 15.
+        // Plan-ladder (M5, config-driven): L0 5 / L1 10 / L2 15 / L3 20.
         var v = activeView();
         var lvl = v ? (v.level || 0) : 0;
-        if (lvl >= 3) return LEVEL3_LIVES;
-        if (lvl >= 2) return PREMIUM_LIVES;
+        if (lvl >= 3) return LEVEL4_LIVES;
+        if (lvl >= 2) return LEVEL3_LIVES;
+        if (lvl >= 1) return PREMIUM_LIVES;
         return FREE_LIVES;
     }
 

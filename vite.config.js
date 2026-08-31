@@ -55,6 +55,7 @@ export default defineConfig({
         'profile-upgrade': './profile/upgrade.html',
         'profile-subscription': './profile/subscription.html',
         'profile-booster': './profile/booster.html',
+        'profile-pay-crypto': './profile/pay-crypto.html',
         'profile-affiliate': './profile/affiliate.html',
         'profile-activity': './profile/activity.html',
         'subscription-paid': './subscription-paid/index.html',

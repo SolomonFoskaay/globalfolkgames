@@ -47,13 +47,13 @@
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
             <h3>Premium points (on-chain, buy-only)</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your premium ledger is separate from game points. <b style="color:#f87818;">Lifetime</b> is your permanent credential (never spent). <b style="color:#7838f8;">Spendable</b> buys the Level 2 boost and future extras. Premium points are only gotten by paying after support verifies your payment — never from wins, daily, or referral. Gasless on-chain (the platform covers the fees).</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">Your premium ledger is separate from game points. <b style="color:#f87818;">Lifetime</b> is your permanent credential (never spent). <b style="color:#7838f8;">Spendable</b> buys plans and boosters. Premium points are only gotten by paying after support verifies your payment — never from wins, daily, or referral. Gasless on-chain (the platform covers the fees).</p>
             <div id="points-premium-ledger"><p class="empty">Loading premium ledger...</p></div>
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent, #f87818);">
             <h3>Premium subscription</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your Level 2 (2x) boost, daily reward and lives are managed on a dedicated page. Regular price <span style="text-decoration:line-through;">$10</span> — limited time beta now <b style="color:#f87818;">$5</b> for 30 days. Crypto only, all USD.</p>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.6;">Your plan boost, daily reward and lives are managed on a dedicated page. Level 1 is now <b style="color:#f87818;">$5</b> (regular <span style="text-decoration:line-through;">$10</span>), Level 2 <b style="color:#f87818;">$10</b> (regular <span style="text-decoration:line-through;">$20</span>), Level 3 <b style="color:#f87818;">$15</b> (regular <span style="text-decoration:line-through;">$30</span>) for 30 days. Crypto only, all USD.</p>
             <p id="tier-status" style="color:var(--muted); font-size:0.85rem; margin:10px 0;">--</p>
             <a href="/profile/subscription.html" class="launch-btn onchain" style="display:inline-block; text-decoration:none; text-align:center;">View Premium plans — beta offer</a>
             <p id="tier-spendable" style="color:var(--muted); font-size:0.78rem; margin-top:10px;">--</p>
@@ -308,8 +308,8 @@
                 const tier = window.activeTier ? window.activeTier.get() : null;
                 const legacy = (typeof window.getActiveTier === 'function') ? window.getActiveTier() : { tier: 1, mult: 1 };
 
-                const level = tier && tier.level > 0 ? tier.level : (legacy && legacy.tier > 1 ? legacy.tier : 0);
-                const mult = level > 1 ? (level === 2 ? 2 : level) : 1;
+const level = tier && tier.level > 0 ? tier.level : (legacy && legacy.tier > 1 ? legacy.tier : 0);
+                const mult = [1, 1.5, 2, 3][level] || 1;
                 const daysLeft = tier && tier.level > 0 ? tier.daysLeft : (legacy && legacy.expiresAt ? Math.max(0, Math.ceil((legacy.expiresAt - Date.now()) / 86400000)) : 0);
                 const active = level > 0 && daysLeft > 0;
 
@@ -317,13 +317,13 @@
                 if (active) {
                     statusEl.innerHTML = 'You have <b style="color:#f87818;">Level ' + level + ' (' + mult + 'x)</b> active until <b>' + new Date((tier ? tier.expiry : legacy.expiresAt)).toLocaleDateString() + '</b> (' + daysLeft + ' days left). <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">Manage plan</a> — no auto-renew, renew manually if you want to.';
                 } else {
-                    statusEl.innerHTML = 'You are on the free <b>Tier 1 (1x)</b>. <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">See Premium beta</a> — regular <span style="text-decoration:line-through;">$10</span> now <b>$5</b> for 30 days, 2x wins, 200P daily, 10 lives. Non-refundable, no auto-debit. Crypto only, all USD.';
+                    statusEl.innerHTML = 'You are on the free <b>Level 0 (1x)</b>. <a href="/profile/subscription.html" style="color:#f87818; text-decoration:underline;">See Premium plans</a> — Level 1 now <span style="text-decoration:line-through;">$10</span> <b>$5</b> for 30 days, 1.5x wins, 5,000 premium points, 50P daily, 10 lives. Non-refundable, no auto-debit. Crypto only, all USD.';
                 }
 
                 if (spendableEl) {
                     spendableEl.innerHTML = prem
                         ? 'Premium balance: <b style="color:#7838f8;">' + (prem.premiumLifetime || 0).toLocaleString() + '</b> lifetime · <b style="color:#f87818;">' + (prem.premiumSpendable || 0).toLocaleString() + '</b> spendable' + ' · <a href="/profile/subscription.html" style="color:#7838f8; text-decoration:underline;">Go Premium</a>'
-                        : 'Premium balance: -- · <a href="/profile/subscription.html" style="color:#7838f8; text-decoration:underline;">Go Premium</a>';
+                        : 'Premium balance: -- · <a href="/profile/subscription.html" style="color:#7838f8; tetext-decoration:underline;">Go Premium</a>';
                 }
             }
 

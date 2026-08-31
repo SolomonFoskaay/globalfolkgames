@@ -17,8 +17,9 @@
     var CACHE_KEY = 'gfg_daily_cache_v1';
 
     var FREE_REWARD = 25;
-    var PREMIUM_REWARD = 200;
-    var LEVEL3_REWARD = 300; // Level 3 (3x) daily reward (M5 ladder 2026-08-22)
+    var PREMIUM_REWARD = 50;    // L1
+    var LEVEL3_REWARD = 100;    // L2
+    var LEVEL4_REWARD = 200;    // L3 daily reward (M5 ladder 2026-08-31)
     var DAILY_REASON = 6; // daily_reward reason tag (WIN_* are 1..3, tier_boost is 5)
 
     var store = {};
@@ -86,14 +87,15 @@
 
     function isPremiumActive() {
         var v = activeView();
-        return !!(v && v.active === true && (v.level || 0) >= 2);
+        return !!(v && v.active === true && (v.level || 0) >= 1);
     }
 
     function amount() {
-        // Plan-ladder ladder (M5, config-driven): free 25 / Level-2 200 / Level-3 300.
+        // Plan-ladder (M5, config-driven): L0 25 / L1 50 / L2 100 / L3 200.
         var l = tierLevel();
-        if (l >= 3) return LEVEL3_REWARD;
-        if (l >= 2) return PREMIUM_REWARD;
+        if (l >= 3) return LEVEL4_REWARD;
+        if (l >= 2) return LEVEL3_REWARD;
+        if (l >= 1) return PREMIUM_REWARD;
         return FREE_REWARD;
     }
 

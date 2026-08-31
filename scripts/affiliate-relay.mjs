@@ -1,15 +1,15 @@
 // scripts/affiliate-relay.mjs
 // M6 — AFFILIATE RELAY (server-side, sponsor-signed, on-chain audit ledger).
-// The platform records each affiliate->referred-month accrual ON-CHAIN in USD cents
-// (15% of the $3 plan = $0.45) with an eligibility flag, so earnings are provable
-// forever. Runs base-layer (admin writes, rare) like the premium credit path.
+// The platform records each referred player's FIRST-upgrade accrual ON-CHAIN in
+// USD cents (20% of the plan's payable USD, read live from the config ladder),
+// so earnings are provable forever. Runs base-layer (admin writes, rare) like
+// the premium credit path.
 //
-// Accrual rules (owner 2026-08-21):
-//   - affiliate earns 15% of each subscription period the referred player pays,
-//     up to 12 months after the referred player's first subscription.
-//   - referrer must hold an ACTIVE Level-2 sub that month, else that month's share
-//     is forfeited (never back-paid).
-//   - 2 consecutive inactive periods (~60 days) permanently close that pair.
+// Accrual rules (owner 2026-08-31):
+//   - the affiliate earns 20% of the referred player's FIRST subscription only.
+//   - NO active-sub gate: anyone who referred can earn.
+//   - a later renewal/upgrade by the same referral pays nothing (the program
+//     enforces one-time-per-pair with AffiliateOnceOnly).
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
@@ -335,25 +335,28 @@ async function readPremium(wallet) {
   return { pda: pda.toBase58(), level: 0, activeUntilMs: 0 };
 }
 
-// Settle one affiliate->referral pair for a period (month index = yyyymm).
-// eligibility = referral paid that month, affiliate active that month, pair not
-// forfeited, within 12 months of the referral's first sub. Returns the decided
-// record so the caller can reject or apply.
+// Decide one affiliate->referral pair.
+// New model (owner 2026-08-31): NO active-sub gate for the referrer - anyone
+// who referred may earn 20% of the referred player's FIRST upgrade. The
+// program enforces one-time-per-pair (AffiliateOnceOnly). The referral must
+// have an ACTIVE subscription for the earn to trigger.
 export async function decideAffiliatePair({ affiliate, referral }) {
   const pair = await readPremium(referral);
-  const af = await readPremium(affiliate);
   const now = Date.now();
-  const referralActive = pair.level >= 2 && pair.activeUntilMs > now;
-  const affiliateActive = af.level >= 2 && af.activeUntilMs > now;
-  return { referralActive, affiliateActive, eligible: referralActive && affiliateActive };
+  const referralActive = pair.level >= 1 && pair.activeUntilMs > now;
+  return { referralActive, affiliateActive: true, eligible: referralActive };
 }
 
-// Full settle for a list of pairs (used by the monthly settle route / script).
+// Full settle for a list of pairs (used by the settle route / script).
+// New model (owner 2026-08-31): the affiliate earns 20% of the referred plan's
+// PAYABLE USD price on the referral's FIRST upgrade only. No active-sub gate
+// for the referrer, no renewals, no 12-month window. The program enforces the
+// one-time-per-pair rule (AffiliateOnceOnly); the relay only records earned
+// (eligibility 0) for pairs whose referral has an active sub, and skips the
+// rest (no forfeiture records).
 // Affiliate share = AFFILIATE_RATE (20%) of the referred plan's PAYABLE USD
-// price, read live from the config plan-ladder (owner 2026-08-22). Raising/
-// lowering a plan price (or adding a plan) auto-updates the share - no code.
-// An explicit usdCentsPerSub override (historical admin tests) is still honored
-// and similarly multiplied by AFFILIATE_RATE.
+// price, read live from the config plan-ladder. An explicit usdCentsPerSub
+// override (historical admin tests) is still honored.
 export async function settleAffiliatePeriod({ period, pairs, usdCentsPerSub = null }) {
   if (!Array.isArray(pairs) || !pairs.length) throw new Error('pairs[] required');
   const out = [];
@@ -365,15 +368,16 @@ export async function settleAffiliatePeriod({ period, pairs, usdCentsPerSub = nu
       ? usdCentsPerSub
       : planPayableUsdCents(pairInfo.level || 0);
     const usdCents = Math.floor(priceCents * AFFILIATE_RATE);
-    let eligibility = 0;
     if (!d.eligible) {
-      eligibility = 2; // forfeited month (inactive affiliate, inactive pair, or referral not paying)
+      // No earn for an inactive referral; not recorded (first-upgrade model).
+      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents: 0, eligibility: 2, skipped: true });
+      continue;
     }
     try {
-      const res = await handleRecordAffiliatePeriod({ affiliate: p.affiliate, referral: p.referral, period, usdCents, eligibility });
-      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility, sig: res.sig });
+      const res = await handleRecordAffiliatePeriod({ affiliate: p.affiliate, referral: p.referral, period, usdCents, eligibility: 0 });
+      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility: 0, sig: res.sig });
     } catch (e) {
-      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility, error: e.message });
+      out.push({ ...p, ...d, referralLevel: pairInfo.level || 0, usdCents, eligibility: 0, error: e.message });
     }
   }
   return out;

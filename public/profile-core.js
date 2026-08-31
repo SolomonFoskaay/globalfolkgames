@@ -254,7 +254,7 @@
         const lastCreditTs = ledger.lastCreditTs ? new Date(ledger.lastCreditTs).toLocaleString() : '—';
         const lastSpendTs = ledger.lastSpendTs ? new Date(ledger.lastSpendTs).toLocaleString() : '—';
         const subUntil = ledger.subscriptionActiveUntil ? new Date(ledger.subscriptionActiveUntil).toLocaleString() : '—';
-        const subLabel = ledger.subscriptionLevel === 2 ? 'Level 2 (2x)' : (ledger.subscriptionLevel ? 'Level ' + ledger.subscriptionLevel : 'Free (1x)');
+        const subLabel = ledger.subscriptionLevel ? 'Level ' + ledger.subscriptionLevel : 'Level 0 (free)';
         const daysLeft = ledger.subscriptionActiveUntil && ledger.subscriptionActiveUntil > Date.now() ? Math.ceil((ledger.subscriptionActiveUntil - Date.now())/86400000) : 0;
         const subStatus = ledger.subscriptionLevel > 0 && daysLeft > 0 ? `Active — ${daysLeft}d left` : (ledger.subscriptionLevel > 0 ? 'Expired' : 'No active subscription');
         const pda = window.magicblockDice && typeof window.magicblockDice.premiumPointsPda === 'function' ? window.magicblockDice.premiumPointsPda() : null;
@@ -296,7 +296,7 @@
                 <div style="padding:8px 0;">
                     <span style="color:var(--muted); font-size:0.82rem;">Premium ledger account (yours, buy-only)</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
-                    <div style="color:#666;font-size:0.75rem;margin-top:6px;">How you get it: you pay the Level 2 plan price, support verifies the payment and credits 5,000P to your premium ledger (on-chain, platform pays the network fees). Premium never comes from wins or daily. You can quote the payment reference as your receipt.</div>
+                    <div style="color:#666;font-size:0.75rem;margin-top:6px;">How you get it: you pay for a plan or booster, support verifies the payment and credits premium points to your premium ledger (on-chain, platform pays the network fees). Premium never comes from wins or daily. You can quote the payment reference as your receipt.</div>
                 </div>`;
     }
 
@@ -319,7 +319,7 @@
         try {
             const fetched = await magic.fetchPremiumPointsPdaFor(typeof wallet === 'string' ? wallet : wallet.address || wallet);
             if (!fetched) {
-                el.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten via Paystack purchase after support verifies your payment — they buy your Level 2 boost. <a href="/profile/subscription.html" style="color:#f87818;">Go Premium</a></p>';
+                el.innerHTML = '<p class="empty">No premium points yet. Premium points are only gotten by paying (crypto) after support verifies your payment — they buy your plan or booster. <a href="/profile/subscription.html" style="color:#f87818;">Go Premium</a></p>';
                 return null;
             }
             renderPremiumLedgerCard(el, fetched);
@@ -332,11 +332,12 @@
 
     // On-chain premium credit reason (M3/M4-style tag stored in last_credit_reason).
     function PREMIUM_REASON_LABEL(code) {
-        switch (Number(code)) {
-            case 1: return 'Subscription payment (Level 2)';
+        switch (code) {
+        case 1: return 'Subscription / plan payment';
             case 2: return 'In-game premium purchase';
             case 3: return 'Promo / giveaway credit';
-            default: return 'Subscription payment (Level 2)';
+            case 4: return 'Booster purchase';
+            default: return 'Subscription / plan payment';
         }
     }
 

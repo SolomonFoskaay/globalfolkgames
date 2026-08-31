@@ -3,17 +3,18 @@
 //
 // Loads the REAL universal module (public/universal/subscription/premium-ledger.js)
 // under a stubbed DOM and drives it to assert the locked launch rules:
-//   - Credit-then-activate: a banked 5,000P premium balance activates Level 2,
-//     deducting 5,000 premium spendable and setting a 30-day window.
+//   - Credit-then-activate: a banked 5,000P premium balance activates Level 1
+//     (2x), deducting 5,000 premium spendable and setting a 30-day window.
 //   - Re-activate with an insufficient balance is refused (the module surfaces
 //     the failure, never silently).
 //   - spend: premium spendable decrements, premium_lifetime is NEVER touched.
 //   - Spend guard: spending more than the balance fails.
-//   - Multiplier AT M4 FLOW-UP ONLY: on a verified finish while Level 2 is
+//   - Multiplier AT M4 FLOW-UP ONLY: on a verified finish while a paid level is
 //     active, the module credits M4 kind=1 source=tier_boost (points =
-//     (level-1)*base, reason 5), NEVER touch M4a pure, and NEVER re-boosts a
-//     match it already boosted; a free tier boosts nothing; an expired sub
-//     boosts nothing.
+//     (multiplier-1)*base, reason 5), NEVER touch M4a pure, and NEVER re-boosts
+//     a match it already boosted; a free tier boosts nothing; an expired sub
+//     boosts nothing. Ladder (owner 2026-08-31): L1 1.5x -> +0.5*base,
+//     L2 2x -> +1*base, L3 3x -> +2*base.
 //   - 30-day expiry pass-through: active_until lapsing drops back to free.
 //
 // Run: node scripts/m5-module-harness.mjs   (exit 0 = all green)
@@ -80,17 +81,20 @@ globalThis.window = {
       mockPremium.spendCount += 1;
       return 'mock-premium-spend-' + mockPremium.spendCount;
     },
-    activateSubscription: async () => {
-      if (mockPremium.premiumSpendable < 5000) {
+    activateSubscriptionLevel: async (level) => {
+      const lvl = Math.min(3, Math.max(1, Number(level) || 1));
+      const cost = [0, 5000, 10000, 15000][lvl];
+      if (mockPremium.premiumSpendable < cost) {
         throw new Error('InsufficientPremiumBalance');
       }
-      mockPremium.premiumSpendable -= 5000;
-      mockPremium.subscriptionLevel = 2;
+      mockPremium.premiumSpendable -= cost;
+      mockPremium.subscriptionLevel = lvl;
       const now = activateNowImpl ? activateNowImpl() : Date.now();
       mockPremium.subscriptionActiveUntil = now + 30 * 24 * 60 * 60 * 1000;
       return 'mock-activate-' + Date.now();
     },
     matchRefFromSignature: (sig) => String([...sig].reduce((a, c) => a + c.charCodeAt(0), 0)),
+    boostRefFromSignature: (sig) => String([...sig].reduce((a, c) => a + c.charCodeAt(0) * 2, 0)),
   },
   // M3's computed award (the module reads the base award from M3).
   localPoints: {
@@ -209,7 +213,7 @@ await sleep(80);
 check('activate returns a receipt', typeof actSig === 'string' && actSig.length > 0 && actSig.indexOf('mock-activate') === 0);
 check('activation deducted 5,000 premium spendable', mockPremium.premiumSpendable === 0);
 check('premium_lifetime UNTOUCHED by activation', mockPremium.premiumLifetime === 5000);
-check('level is now 2', (window.activeTier.get() || {}).level === 2);
+check('level is now 1', (window.activeTier.get() || {}).level === 1);
 check('30-day window set', (window.activeTier.get() || {}).daysLeft >= 29 && (window.activeTier.get() || {}).daysLeft <= 30);
 check('subscription reported active', (window.activeTier.get() || {}).active === true);
 
@@ -256,11 +260,11 @@ await emitAndSync(envelope([seat('green', 'user', 3, '7aGs8riYmxQsMy1jiaGavw7Rnx
 check('tier_boost credited to M4', boosts.length === 1);
 check('kind=1 (M4a pure NEVER touched)', boosts[0].kind === 1);
 check('source = tier_boost (code 13)', boosts[0].source === 'tier_boost' && boosts[0].sourceCode === 13);
-check('boost points = (level-1)*base = 100', boosts[0].points === 100);
+check('boost points = (mult-1)*base = 50 (L1 1.5x)', boosts[0].points === 50);
 check('reason = 5', boosts[0].reason === 5);
 check('M4a pure stays 0 (kind=1 never credits pure)', mockGlobal.globalPureLifetime === 0);
-check('M4b lifetime +100', mockGlobal.globalLifetime === 100);
-check('M4c spendable +100', mockGlobal.globalSpendableBalance === 100);
+check('M4b lifetime +50', mockGlobal.globalLifetime === 50);
+check('M4c spendable +50', mockGlobal.globalSpendableBalance === 50);
 
 console.log('\n=== duplicate match never double-boosts ===');
 resetMock();
@@ -274,7 +278,7 @@ setMockAward('ludo', 100, 1, 'dup-boost-ref');
 await emitAndSync(envelope([seat('green', 'user', 1, '7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB'), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)], dupSig));
 await emitAndSync(envelope([seat('green', 'user', 1, '7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB'), seat('yellow', 'house', 2), seat('blue', 'house', 3), seat('red', 'house', 4)], dupSig));
 check('only one boost for the duplicate match', boosts.length === 1);
-check('M4b lifetime = 100 (not 200)', mockGlobal.globalLifetime === 100);
+check('M4b lifetime = 50 (not 100)', mockGlobal.globalLifetime === 50);
 
 console.log('\n=== free tier boosts nothing ===');
 resetMock();

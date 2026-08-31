@@ -117,29 +117,29 @@ pub const MAX_GAMES: usize = 4;
 pub const MAX_WINNERS: usize = 16;
 pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board
 pub const MAX_MP: usize = 8;                      // max human seats per earn match
-pub const AGM_SEED: &[u8] = b"gfgagm";              // Arc2 M7: standalone AGM order
-pub const AGM_SETTLE_SEED: &[u8] = b"gfgagms";        // Arc2 M7F: settlement (pot/fee/payout)
-pub const AGM_FEE_BPS: u64 = 1000;                    // flat 10% of the pot (locked)
-pub const P2C_SEED: &[u8] = b"gfgp2c";            // legacy per-game P2C seed (kept, unused by new code)
-pub const P2C_GLOBAL_SEED: &[u8] = b"gfgp2cbank";    // Arc2 M7C: ONE shared cross-game pool (no per-game split)
 pub const CLOCK_SEED: &[u8] = b"gfgclock";          // Arc2 M1B: per-seat turn clocks + forfeits
 pub const DEFAULT_TIMEOUT_CAP: u8 = 3;              // timeout_seat triggers foreclosure at 3 stalls
-pub const P2C_DAY_SECS: i64 = 86_400;             // GMT day bucket for the daily net-loss cap
-pub const P2C_MIN_STAKE_USD_CENTS: u64 = 100;     // $1  - computers only fill small-stake seats
-pub const P2C_MAX_STAKE_USD_CENTS: u64 = 1_000;   // $10
-pub const P2C_DAY_LOSS_CAP_USD_CENTS: u64 = 2_000; // bank pauses for the day on $-20 net loss
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
 pub const RAKE_BPS: u16 = 3000; // 30% platform rake on competition pools
 pub const WINNER_SHARES: [u16; 3] = [5000, 3000, 2000]; // 1st/2nd/3rd of the 70% winners bucket
 
-// M5 — Active Tier Level-2 2x launch plan (owner-locked 2026-08-20).
-pub const PREMIUM_PLAN_COST: u64 = 5_000; // premium spendable required to activate Level 2
-pub const PREMIUM_PLAN_COST_L3: u64 = 10_000; // premium spendable required to activate Level 3 (owner 2026-08-22)
+// M5 — Active Tier plan ladder (L0 free .. L3). Activation points are based on
+// the ACTUAL (strike) USD price, never the discount, so removing a discount
+// later never requires a program change. Base rate: 500 premium points = $1
+// (owner 2026-08-31), so an actual price of $N needs N * 500 points.
+//   L1 actual $10 -> 5,000 pts | L2 actual $20 -> 10,000 | L3 actual $30 -> 15,000
+pub const PREMIUM_PLAN_COST: u64 = 5_000;   // L1 (actual $10) requires 5,000 premium pts
+pub const PREMIUM_PLAN_COST_L2: u64 = 10_000; // L2 (actual $20) requires 10,000
+pub const PREMIUM_PLAN_COST_L3: u64 = 15_000; // L3 (actual $30) requires 15,000
 pub const SUBSCRIPTION_DAYS: i64 = 30; // active-sub window (no auto-renew)
-pub const BOOSTER_COST: u64 = 500; // $1 / 500P (base rate $0.002 per point, USD - never Naira) for 72h unlimited life
-pub const BOOSTER_HOURS: i64 = 72; // unlimited-life booster window
+// Two boosters (owner 2026-08-29): 24h = $1 actual / 500 pts; 72h = $3 actual
+// (discounted $2) / 1,500 pts. Points always on actual price (500 pts = $1).
+pub const BOOSTER_1D_POINTS: u64 = 500;
+pub const BOOSTER_1D_HOURS: i64 = 24;
+pub const BOOSTER_3D_POINTS: u64 = 1_500;
+pub const BOOSTER_3D_HOURS: i64 = 72;
 pub const DAY_SECS: i64 = 24 * 60 * 60;
 
 /// Registered M1A game tags for per-game point ledgers. Add a game here when
@@ -945,20 +945,20 @@ pub mod gfg_dice {
         let prem = &mut ctx.accounts.premium_points;
         require!(prem.version >= 3, PointsError::NeedsUpgrade);
         // One active plan at a time: reject a second upgrade while the current
-        // 30-day window is still live, so a user can't spend another 5,000P to
-        // stack/extend the same plan. They may re-activate only after expiry.
+        // 30-day window is still live, so a user can't spend another PREMIUM_PLAN_COST_L2
+        // to stack/extend the same plan. They may re-activate only after expiry.
         let now = Clock::get()?.unix_timestamp;
         require!(
             !(prem.subscription_level > 0 && prem.subscription_active_until > now),
             PointsError::AlreadyActive
         );
         require!(
-            prem.premium_spendable >= PREMIUM_PLAN_COST,
+            prem.premium_spendable >= PREMIUM_PLAN_COST_L2,
             PointsError::InsufficientPremiumBalance
         );
         prem.premium_spendable = prem
             .premium_spendable
-            .checked_sub(PREMIUM_PLAN_COST)
+            .checked_sub(PREMIUM_PLAN_COST_L2)
             .ok_or(PointsError::InsufficientPremiumBalance)?;
         prem.subscription_level = 2u8;
         prem.subscription_active_until =
@@ -972,18 +972,21 @@ pub mod gfg_dice {
     }
 
     /// (M5, plan ladder 2026-08-22) Activates a SPECIFIC plan level from PREMIUM
-    /// spendable: Level-2 2x costs 5,000P, Level-3 3x costs 10,000P (level is an
-    /// arg, so more levels are data/constants, never a new instruction). Sets
-    /// subscription_level = level and active_until = now + 30 days (no auto-
-    /// renew). One active plan at a time. Gasless on the ER. Additive: the
-    /// original activate_subscription (L2 only) stays untouched for existing
-    /// callers.
+    /// spendable: L1 costs 5,000P (actual $10), L2 10,000P (actual $20), L3
+    /// 15,000P (actual $30) - points derive from the ACTUAL price at the base
+    /// rate 500 points = $1 (owner 2026-08-31), so removing a launch discount
+    /// never changes this (level is an arg, so more levels are
+    /// data/constants, never a new instruction). Sets subscription_level =
+    /// level and active_until = now + 30 days (no auto-renew). One active
+    /// plan at a time. Gasless on the ER. Additive: the original
+    /// activate_subscription (L2 only) stays untouched for existing callers.
     pub fn activate_subscription_level(ctx: Context<ActivateSubscriptionLevelCtx>, level: u8) -> Result<()> {
         let prem = &mut ctx.accounts.premium_points;
         require!(prem.version >= 3, PointsError::NeedsUpgrade);
         let cost = match level {
-            2 => PREMIUM_PLAN_COST,
-            3 => PREMIUM_PLAN_COST_L3,
+            1 => PREMIUM_PLAN_COST,     // L1 (actual $10)
+            2 => PREMIUM_PLAN_COST_L2,  // L2 (actual $20)
+            3 => PREMIUM_PLAN_COST_L3,  // L3 (actual $30)
             _ => return Err(PointsError::InvalidLevel.into()),
         };
         let now = Clock::get()?.unix_timestamp;
@@ -1058,11 +1061,14 @@ pub mod gfg_dice {
     }
 
     // ================= M6 AFFILIATE (relay-signed immutable audit ledger) ===========
-    // The platform (relay, stored as account authority) records each referral-month
-    // accrual ON-CHAIN in USD cents (15% of $3 = $0.45), with an eligibility flag so
-    // nothing can be accused of being manipulated: 0 = earned (pending), 1 = paid,
+    // The platform (relay, stored as account authority) records each referral's
+    // FIRST upgrade accrual ON-CHAIN in USD cents (20% of the plan's payable USD,
+    // read live from the config ladder). On-chain rule (owner 2026-08-31): a pair
+    // earns exactly ONCE - the first upgrade; later renewals/upgrades by the same
+    // referral pay nothing. And there is NO active-sub requirement: anyone who
+    // referred may earn. status flags on entries: 0 = earned (pending), 1 = paid,
     // 2 = forfeited. Totals are permanent; the account keeps a rolling ring of the
-    // most recent 68 month-records for detail, and running totals for all history.
+    // most recent 68 records, and running totals for all history.
 
     /// Creates/updates the affiliate ledger for one affiliate->referral month.
     /// Authority = stored account authority (relay/sponsor). Idempotent per
@@ -1081,6 +1087,14 @@ pub mod gfg_dice {
         }
         require!(acct.authority == ctx.accounts.payer.key(), PointsError::NotAdmin);
         require!(av_has_period(&acct, period, referral) == false, PointsError::DuplicateAffiliatePeriod);
+        let pair = &mut ctx.accounts.affiliate_pair;
+        // ONE-TIME EARN PER PAIR (owner 2026-08-31): the affiliate reward is 20% of
+        // the referred player's FIRST upgrade only. A pair that already earned is
+        // permanently done - a later renewal/upgrade by the same referral pays
+        // nothing. No active-sub gate: anyone who referred may earn once.
+        if eligibility == 0 {
+            require!(pair.paid_period_count == 0, PointsError::AffiliateOnceOnly);
+        }
         let now = Clock::get()?.unix_timestamp;
         // Update running totals by eligibility.
         if eligibility == 0 {
@@ -1100,8 +1114,8 @@ pub mod gfg_dice {
         };
         acct.entry_count = acct.entry_count.checked_add(1).ok_or(PointsError::Overflow)?;
 
-        // Pair bookkeeping (drives the 60-day permanent forfeit + pause/resume).
-        let pair = &mut ctx.accounts.affiliate_pair;
+        // Pair bookkeeping (the old 60-day forfeit/pause rules are retired; a pair
+        // simply records its first-earned timestamp and locks forever after).
         if pair.first_subscribed_ts == 0 {
             pair.first_subscribed_ts = now;
         }
@@ -1145,18 +1159,25 @@ pub mod gfg_dice {
         mig.migrate(next)
     }
 
-    /// (M5 v3) Activates the 72h unlimited-life booster by spending premium
-    /// spendable (BOOSTER_COST = $1 / 500P, base rate $0.002/pt USD). No win
-    /// lives unlimited. Extends from now (or the current active booster) by 72h.
+    /// (M5 v3) Activates an unlimited-life booster by spending premium spendable.
+    /// Two durations (owner 2026-08-29): hours=24 -> $1 actual / 500 pts;
+    /// hours=72 -> $3 actual (discounted $2) / 1,500 pts. Points always derive
+    /// from the ACTUAL price so removing the discount later needs no program
+    /// change. Extends from now (or the current active booster) by `hours`.
     /// Gasless on the ER (session key signs). One plan/booster per account flow.
-    pub fn activate_booster(ctx: Context<ActivateBoosterCtx>) -> Result<()> {
+    pub fn activate_booster(ctx: Context<ActivateBoosterCtx>, hours: i64) -> Result<()> {
+        let (cost, window) = match hours {
+            24 => (BOOSTER_1D_POINTS, BOOSTER_1D_HOURS),
+            72 => (BOOSTER_3D_POINTS, BOOSTER_3D_HOURS),
+            _ => return Err(PointsError::InvalidLevel.into()),
+        };
         let prem = &mut ctx.accounts.premium_points;
         require!(prem.version >= 3, PointsError::NeedsUpgrade);
-        require!(prem.premium_spendable >= BOOSTER_COST, PointsError::InsufficientPremiumBalance);
+        require!(prem.premium_spendable >= cost, PointsError::InsufficientPremiumBalance);
         let now = Clock::get()?.unix_timestamp;
         let current = if prem.booster_active_until > now { prem.booster_active_until } else { now };
-        let until = current.checked_add(BOOSTER_HOURS * 3600).ok_or(PointsError::Overflow)?;
-        prem.premium_spendable = prem.premium_spendable.checked_sub(BOOSTER_COST).ok_or(PointsError::InsufficientPremiumBalance)?;
+        let until = current.checked_add(window * 3600).ok_or(PointsError::Overflow)?;
+        prem.premium_spendable = prem.premium_spendable.checked_sub(cost).ok_or(PointsError::InsufficientPremiumBalance)?;
         prem.booster_active_until = until;
         prem.last_spend_reason = 30; // BOOST_ACTIVATE
         prem.last_spend_ref = until as u64;
@@ -1460,157 +1481,6 @@ pub mod gfg_dice {
         b.status = 2;
         b.winner_seat = winner_seat;
         b.finished_at = now;
-        Ok(())
-    }
-
-    // ===== arc2m7a: standalone AGM order book (game-agnostic) =====
-    pub fn post_agm_order(
-        ctx: Context<PostAgmOrderCtx>,
-        game: u8,
-        order_id: u64,
-        stake_usd_cents: u64,
-        seats: u8,
-        maker: Pubkey,
-    ) -> Result<()> {
-        require!(game > 0, PointsError::InvalidCompetition);
-        require!(stake_usd_cents > 0, PointsError::InvalidCompetition);
-        require!(seats >= 2 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
-        // Maker is passed explicitly so the sponsor relay can place an order on
-        // behalf of the AUTHENTICATED wallet (the payer only funds rent).
-        require!(maker != ctx.accounts.payer.key(), PointsError::InvalidCompetition); // relay-only maker override
-        let o = &mut ctx.accounts.order;
-        o.version = 1u8;
-        o.order_id = order_id;
-        o.game = game;
-        o.maker = maker;
-        o.stake_usd_cents = stake_usd_cents;
-        o.seats = seats;
-        o.status = 0u8;
-        o.taker = maker; // placeholder until matched
-        o.created_at = Clock::get()?.unix_timestamp;
-        Ok(())
-    }
-
-    pub fn cancel_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
-        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
-        let o = &mut ctx.accounts.order;
-        require!(o.maker == ctx.accounts.signer.key(), PointsError::NotCreator);
-        require!(o.status == 0, PointsError::NotOpen);
-        o.status = 3;
-        Ok(())
-    }
-
-    pub fn match_agm_order(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64, taker: Pubkey) -> Result<()> {
-        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
-        let o = &mut ctx.accounts.order;
-        require!(taker != o.maker, PointsError::InvalidCompetition); // same wallet cannot self-match
-        require!(o.status == 0, PointsError::NotOpen);
-        o.taker = taker;
-        o.status = 2;
-        Ok(())
-    }
-
-    // ===== Arc2 M7F: lock + settle a matched AGM order =====
-    // lock_agm_match: any party may call once the order is MATCHED (status 2);
-    // writes the settlement snapshot from the order's stake/seats (fee = 10% pot)
-    // and marks the order LOCKED (status 1).
-    pub fn lock_agm_match(ctx: Context<LockAgmMatchCtx>, game: u8, order_id: u64, winner_seat: u8) -> Result<()> {
-        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
-        let o = &ctx.accounts.order;
-        require!(o.status == 2, PointsError::NotOpen);
-        require!(winner_seat < o.seats, PointsError::RankOutOfRange);
-        let pot = o.stake_usd_cents.checked_mul(o.seats as u64).ok_or(PointsError::Overflow)?;
-        let fee = (pot * AGM_FEE_BPS) / 10_000;
-        let st = &mut ctx.accounts.settlement;
-        st.version = 1u8;
-        st.order_id = order_id;
-        st.game = o.game;
-        st.pot_usd_cents = pot;
-        st.fee_usd_cents = fee;
-        st.seats = o.seats;
-        st.winner_seat = winner_seat;
-        st.payout_usd_cents = pot.checked_sub(fee).ok_or(PointsError::Overflow)?;
-        st.settled_at = Clock::get()?.unix_timestamp;
-        st.status = 0; // recorded, not yet applied to the P2C bank
-        ctx.accounts.order.status = 1; // LOCKED (escrow committed after matching)
-        Ok(())
-    }
-
-    // settle_agm_match: finalizes the order once the board (M1) has finished.
-    // finished, so the wallet/escrow rail can pay the 90% winner. Status becomes
-    // 4 = SETTLED (distinct from 1=locked), so the UI can show Open / Locked /
-    // Settled as three honest on-chain states.
-    pub fn settle_agm_match(ctx: Context<AgmOrderSeqCtx>, game: u8, order_id: u64) -> Result<()> {
-        require!(ctx.accounts.order.game == game, PointsError::InvalidCompetition);
-        let o = &mut ctx.accounts.order;
-        require!(o.status == 1, PointsError::NotOpen); // must have been locked (escrow committed)
-        o.status = 4; // SETTLED (final)
-        Ok(())
-    }
-
-    // ===== Arc2 M7C: P2C bank funding + per-day settle with anti-farm caps =====
-    // init_fresh: a zeroed (freshly init_if_needed) bank gets its real defaults,
-    // so the day-loss cap / game / day bucket are never 0 when first used. Idempotent.
-    pub fn p2c_fund(ctx: Context<P2cBankCtx>, game: u8, amount_usd_cents: u64) -> Result<()> {
-        p2c_bank_init_fresh(&mut ctx.accounts.bank, game)?;
-        ctx.accounts.bank.balance_usd_cents = ctx.accounts.bank
-            .balance_usd_cents
-            .checked_add(amount_usd_cents)
-            .ok_or(PointsError::Overflow)?;
-        Ok(())
-    }
-
-    // p2c_settle: applies ONE computer-seat result of a locked order to the bank.
-    //   computer seat wins -> bank  +(payout - stake)   (its 90% payout less its stake)
-    //   computer seat loses -> bank -(stake)            (loses its stake to the human)
-    // Enforces the small-stake band ($1-$10), day rollover, and pauses the bank for
-    // the day if the net-loss cap is reached. Idempotent per settlement (status 0 -> 1).
-    pub fn p2c_settle(
-        ctx: Context<P2cSettleCtx>,
-        game: u8,
-        order_id: u64,
-        computer_seat: u8,
-        computer_won: bool,
-    ) -> Result<()> {
-        require!(ctx.accounts.settlement.game == game, PointsError::InvalidCompetition);
-        require!(ctx.accounts.settlement.status == 0, PointsError::AlreadyClaimed);
-        let st = &ctx.accounts.settlement;
-        require!(computer_seat < st.seats, PointsError::RankOutOfRange);
-        let stake = st.pot_usd_cents / (st.seats as u64);
-        require!(stake >= P2C_MIN_STAKE_USD_CENTS && stake <= P2C_MAX_STAKE_USD_CENTS,
-            PointsError::InvalidCompetition); // computers only fill small-stake seats
-        let bank = &mut ctx.accounts.bank;
-        p2c_bank_init_fresh(bank, game)?;
-        // roll the day bucket
-        let now = Clock::get()?.unix_timestamp;
-        if now - bank.day_started_at >= P2C_DAY_SECS {
-            bank.day_net_usd_cents = 0;
-            bank.day_wins = 0;
-            bank.day_losses = 0;
-            bank.status = 0;
-            bank.day_started_at = now;
-        }
-        let net: i64 = if computer_won {
-            (st.payout_usd_cents.saturating_sub(stake)) as i64
-        } else {
-            -(stake as i64)
-        };
-        if net >= 0 {
-            bank.balance_usd_cents = bank.balance_usd_cents.checked_add(net as u64)
-                .ok_or(PointsError::Overflow)?;
-            bank.day_wins += 1;
-            bank.total_wins += 1;
-        } else {
-            bank.balance_usd_cents = bank.balance_usd_cents.saturating_sub((-net) as u64);
-            bank.day_losses += 1;
-            bank.total_losses += 1;
-        }
-        bank.trades += 1;
-        bank.day_net_usd_cents = bank.day_net_usd_cents.checked_add(net).ok_or(PointsError::Overflow)?;
-        if bank.day_net_usd_cents < -(bank.day_loss_cap_usd_cents as i64) {
-            bank.status = 1; // paused for the day
-        }
-        ctx.accounts.settlement.status = 1; // applied to the bank exactly once
         Ok(())
     }
 
@@ -2128,9 +1998,7 @@ pub struct FinishMatchCtx<'info> {
     pub board: Account<'info, MatchBoard>,
 }
 
-/// Context for `post_agm_order`.
-
-/// Context for the clock instructions (arc2m1b). Clock seed [gfgclock, game, match_ref].
+/// Context for `start_match_clocks` (arc2m1b). Clock seed [gfgclock, game, match_ref].
 #[derive(Accounts)]
 #[instruction(game: u8, match_ref: u64)]
 pub struct MatchClockCtx<'info> {
@@ -2149,9 +2017,7 @@ pub struct MatchClockCtx<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Context for `post_agm_order`.
-
-/// Context for clock state-change instructions (touch/timeout/finish): the
+/// Context for the clock state-change instructions (touch/timeout/finish): the
 /// clock MUST exist (start_match_clocks ran first), so a stale zeroed clock
 /// can never auto-forfeit a seat.
 #[derive(Accounts)]
@@ -2167,100 +2033,6 @@ pub struct MatchClockExistingCtx<'info> {
         bump
     )]
     pub clock: Account<'info, MatchClock>,
-}
-
-/// Context for `post_agm_order`.
-#[derive(Accounts)]
-#[instruction(game: u8, order_id: u64, stake_usd_cents: u64, seats: u8)]
-pub struct PostAgmOrderCtx<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + std::mem::size_of::<AgmOrder>(),
-        seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()],
-        bump
-    )]
-    pub order: Account<'info, AgmOrder>,
-    pub system_program: Program<'info, System>,
-}
-
-/// Reusable context for cancel/match (seeds [gfgagm, game, order_id]).
-#[derive(Accounts)]
-#[instruction(game: u8, order_id: u64)]
-pub struct AgmOrderSeqCtx<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(mut, seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()], bump)]
-    pub order: Account<'info, AgmOrder>,
-}
-
-/// Context for `lock_agm_match` (creates the settlement snapshot).
-#[derive(Accounts)]
-#[instruction(game: u8, order_id: u64, winner_seat: u8)]
-pub struct LockAgmMatchCtx<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(mut, seeds = [AGM_SEED, &game.to_le_bytes(), &order_id.to_le_bytes()], bump)]
-    pub order: Account<'info, AgmOrder>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + std::mem::size_of::<AgmSettlement>(),
-        seeds = [AGM_SETTLE_SEED, &order_id.to_le_bytes()],
-        bump
-    )]
-    pub settlement: Account<'info, AgmSettlement>,
-    pub system_program: Program<'info, System>,
-}
-
-fn p2c_bank_init_fresh(bank: &mut Account<'_, P2cBank>, game: u8) -> Result<()> {
-    if bank.version != 0 {
-        return Ok(());
-    }
-    bank.version = 1u8;
-    bank.game = game;
-    bank.day_started_at = Clock::get()?.unix_timestamp;
-    bank.day_loss_cap_usd_cents = P2C_DAY_LOSS_CAP_USD_CENTS;
-    bank.status = 0u8;
-    Ok(())
-}
-
-/// Context for `p2c_fund` (bank account, init-if-needed per game).
-#[derive(Accounts)]
-#[instruction(game: u8)]
-pub struct P2cBankCtx<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + std::mem::size_of::<P2cBank>(),
-        seeds = [P2C_GLOBAL_SEED],
-        bump
-    )]
-    pub bank: Account<'info, P2cBank>,
-    pub system_program: Program<'info, System>,
-}
-
-/// Context for `p2c_settle` (applies one computer-seat result to the bank).
-#[derive(Accounts)]
-#[instruction(game: u8, order_id: u64, computer_seat: u8, computer_won: bool)]
-pub struct P2cSettleCtx<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + std::mem::size_of::<P2cBank>(),
-        seeds = [P2C_GLOBAL_SEED],
-        bump
-    )]
-    pub bank: Account<'info, P2cBank>,
-    #[account(mut, seeds = [AGM_SETTLE_SEED, &order_id.to_le_bytes()], bump)]
-    pub settlement: Account<'info, AgmSettlement>,
-    pub system_program: Program<'info, System>,
 }
 
 /// Context for `spend_global`. Runs on the ER (gasless): the player's session
@@ -2421,6 +2193,7 @@ pub struct UpgradePremiumV3Ctx<'info> {
 
 /// Context for `activate_booster` (M5 v3). Gasless on the ER (session key signs).
 #[derive(Accounts)]
+#[instruction(hours: i64)]
 pub struct ActivateBoosterCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -2920,57 +2693,7 @@ pub struct MatchClock {
     pub updated_at: i64,
 }
 
-/// Arc2 M1 (item E): game-AGNOSTIC AGM order (maker/taker). Money only - the
-/// game is chosen by the maker (one game per order) and the game's rules
-/// profile lives in the games registry (config), not here. All games plug in.
-#[account]
-pub struct AgmOrder {
-    pub version: u8,             // 1 = current
-    pub order_id: u64,
-    pub game: u8,                // M1 source_code the maker picked
-    pub maker: Pubkey,           // payer who posted
-    pub stake_usd_cents: u64,    // each side's stake (1 $ .. up to the game cap)
-    pub seats: u8,               // total seats wanted (min 2; computers fill rest)
-    pub status: u8,              // 0 open, 1 filled(locked by escrow later), 2 matched, 3 cancelled
-    pub taker: Pubkey,           // zero until matched
-    pub created_at: i64,
-}
 
-/// arc2m7b: settlement of a filled order. Reads the stake/seats at lock and
-/// computes the flat-10% fee + 90% winner payout (recorded on-chain; actual
-/// token move happens in the payout rail or embedded-wallet credit).
-#[account]
-pub struct AgmSettlement {
-    pub version: u8,
-    pub order_id: u64,
-    pub game: u8,
-    pub pot_usd_cents: u64,
-    pub fee_usd_cents: u64,     // pot * 10%
-    pub seats: u8,
-    pub winner_seat: u8,
-    pub payout_usd_cents: u64,  // pot * 90% (single winner takes all)
-    pub settled_at: i64,
-    pub status: u8,             // 0 recorded/locked, 1 bank-applied (P2C once guard)
-}
-
-/// Arc2 M7C: the platform P2C bank - ONE shared capital pool for ALL games
-/// (no per-game split, so liquidity is never fractured). Computers fill
-/// unmatched seats only (small stakes, $1-$10); per-day anti-farm guards.
-#[account]
-pub struct P2cBank {
-    pub version: u8,
-    pub game: u8,
-    pub balance_usd_cents: u64,   // live bank capital
-    pub day_started_at: i64,      // ripples to the next GMT-day bucket on use
-    pub day_net_usd_cents: i64,   // signed: computer wins add, computer losses subtract
-    pub day_loss_cap_usd_cents: u64,
-    pub day_wins: u32,
-    pub day_losses: u32,
-    pub total_wins: u64,
-    pub total_losses: u64,        // lifetime skill-truth loss counter
-    pub trades: u64,
-    pub status: u8,               // 0 open, 1 paused for the day (net-loss cap hit)
-}
 
 /// On-chain PREMIUM points ledger for one player (M5 — subscription + premium
 /// points, the launch engine). One account per player, seed [gfgprem, player].
@@ -3292,6 +3015,8 @@ pub enum PointsError {
     NeedsUpgrade,
     #[msg("affiliate period for this referral already recorded")]
     DuplicateAffiliatePeriod,
+    #[msg("affiliate reward is one-time per referral (first upgrade only)")]
+    AffiliateOnceOnly,
     #[msg("profile handle already taken")]
     DuplicateHandle,
     #[msg("profile handle is invalid (5-24 chars, letters/numbers only)")]

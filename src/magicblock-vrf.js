@@ -933,11 +933,12 @@ export async function activateSubscriptionLevel(level) {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
-// M5 v3 — activates the 72h unlimited-lives booster: deducts BOOSTER_COST
-// premium spendable and sets booster_active_until = now + 72h (extends an
-// already-active booster). No win multiplier. Gasless on the ER; the player's
-// session key signs.
-export async function activateBooster() {
+// M5 v3 — activates the unlimited-lives booster (two durations, owner 2026-08-29):
+// hours=24 -> $1 actual / 500 premium spendable; hours=72 -> $3 actual
+// (discounted $2) / 1,500 premium spendable. Deducts the matching cost and sets
+// booster_active_until = now + hours (extends an already-active booster).
+// No win multiplier. Gasless on the ER; the player's session key signs.
+export async function activateBooster(hours = 24) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
@@ -950,7 +951,7 @@ export async function activateBooster() {
   const regionUrl = await regionUrlFor(premiumPda);
 
   const sig = await withErRetry('activate_booster', async (ctx) => ctx.program.methods
-    .activateBooster()
+    .activateBooster(hours)
     .accounts({
       premiumPoints: premiumPda,
       payer: wallet.publicKey,
@@ -1349,10 +1350,11 @@ export function initMagicBlockDice() {
       return activateSubscriptionLevel(level);
     },
 
-    // M5 v3 — activates the 72h unlimited-lives booster (deducts 1,500 premium
-    // spendable, sets booster_active_until = now + 72h). Gasless ER write.
-    activateBooster() {
-      return activateBooster();
+    // M5 v3 — activates the unlimited-lives booster (two durations: 24h = 500
+    // spendable, 72h = 1,500 spendable; sets booster_active_until = now + hours).
+    // Gasless ER write.
+    activateBooster(hours) {
+      return activateBooster(hours);
     },
 
     // M5 — operator-gated PREMIUM credit (staff UI only). The relay calls back

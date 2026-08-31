@@ -5,13 +5,14 @@
 // ([gfgprem, player], buy-only): premium_lifetime (a permanent credential,
 // never spent) + premium_spendable (the subscription/special-purchase
 // currency). Acquired ONLY by direct purchase via the admin credit flow after
-// a VERIFIED manual Paystack payment. Never merges into M3/M4 and never
+// a VERIFIED manual crypto payment. Never merges into M3/M4 and never
 // touches M4a pure.
 //
 // Subscription state lives ON-CHAIN in the same PDA (subscription_level u8,
-// subscription_active_until i64): 0 = free, 2 = Level 2 (2x) at launch, with
-// a HARD 30-day window and NO auto-renew. Any page reads the truth from the
-// chain gaslessly; Supabase keeps only payment/affiliate relationship rows.
+// subscription_active_until i64): 0 = free, 1 = Level 1, 2 = Level 2,
+// 3 = Level 3, with a HARD 30-day window and NO auto-renew. Any page reads
+// the truth from the chain gaslessly; Supabase keeps only payment/affiliate
+// relationship rows.
 //
 // Exposes:
 //   window.premiumPoints = { get(), checked(), fetch(), spend(amount,
@@ -207,15 +208,17 @@
                 return null;
             }
         },
-        // Activate the Level-2 subscription on-chain (deducts 5,000 premium
-        // spendable, sets a hard 30-day window, NO auto-renew). Gasless ER
-        // write. Soft-fail. Returns the receipt sig on success.
-        activate: async function () {
+        // Activate a plan on-chain via activate_subscription_level (deducts
+        // 5,000/10,000/15,000 premium spendable for Level 1/2/3, sets a hard
+        // 30-day window, NO auto-renew). Gasless ER write. Soft-fail. Returns
+        // the receipt sig on success.
+        activate: async function (level) {
             if (!magicReady()) return null;
             try {
-                var sig = await window.magicblockDice.activateSubscription();
+                var lvl = Math.min(3, Math.max(1, Number(level) || 1));
+                var sig = await window.magicblockDice.activateSubscriptionLevel(lvl);
                 await refreshLedger(true);
-                lastSpend = { amount: 5000, reason: 'activate_subscription', ref: 'activate', sig: sig, at: Date.now() };
+                lastSpend = { amount: [0, 5000, 10000, 15000][lvl], reason: 'activate_subscription', ref: 'activate', sig: sig, at: Date.now() };
                 notify(cached);
                 return sig || null;
             } catch (e) {
@@ -364,9 +367,11 @@
     var BOOST_REASON = 5; // mirrors the program's u8 reason for tier boosts
 
     function multiplierForLevel(level) {
-        // Launch ladder: Level 2 = 2x. Future levels (when tiers reopen): 3/4/5.
+        // Ladder L0-L3 (owner 2026-08-31): L0 free 1x, L1 1.5x, L2 2x, L3 3x.
         if (level <= 0) return 1;
-        return level; // level 2 -> 2x (locked launch), level 3 -> 3x, etc.
+        if (level === 1) return 1.5;
+        if (level === 2) return 2;
+        return 3;
     }
 
     function baseAwardForEnv(env, matchRef) {
@@ -429,9 +434,9 @@
         if (!boostRef || boostRef === '0') return;
         if (boostProcessed[boostRef]) return; // already boosted this match
 
-        // Sub must be active for the boost to apply.
+        // Sub must be active for the boost to apply (L0 free never boosts).
         var view = activeView();
-        if (!view || !view.active || view.level <= 1) return;
+        if (!view || !view.active || view.level <= 0) return;
 
         // Resolve M3's base award for this envelope (M4 banks it the same way).
         var award = baseAwardForEnv(env, matchRef);

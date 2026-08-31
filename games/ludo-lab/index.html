@@ -174,10 +174,10 @@
         <div style="background:#1a1a24; border:1px solid rgba(243,156,18,0.5); border-radius:16px; padding:24px 18px; max-width:340px; width:100%; box-sizing:border-box;">
             <div style="font-size:2.2rem;">⏰</div>
             <h2 style="color:#f87818; margin:8px 0 6px;">No lives left today</h2>
-            <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">double lives</b>, <b style="color:#2ecc71;">double win points</b>, and a <b style="color:#f87818;">bigger daily reward</b>.</p>
+            <p style="color:#ddd; font-size:0.9rem; line-height:1.6; margin:0 0 12px;">Your lives refill at midnight (GMT). Want to keep playing today? Go Premium to unlock <b style="color:#2ecc71;">more lives</b>, <b style="color:#2ecc71;">higher win points</b>, and a <b style="color:#f87818;">bigger daily reward</b>.</p>
             <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f87818; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
-            <div style="margin-top:8px; font-size:0.8rem; color:#bbb; line-height:1.5;">Or get <b style="color:#2ecc71;">UNLIMITED lives for 72 hours</b> for $1 (500 premium points), no subscription needed.</div>
-            <button id="lives-go-booster" onclick="window.location.href='/profile/booster.html'" style="width:100%; background:#2ecc71; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; margin-top:8px;">Get 72h unlimited lives ($1 / 500P)</button>
+            <div style="margin-top:8px; font-size:0.8rem; color:#bbb; line-height:1.5;">Or get <b style="color:#2ecc71;">UNLIMITED lives, 24h for $1</b> or <b style="color:#2ecc71;">72h for $2</b> (500P / 1,500P), no subscription needed.</div>
+            <button id="lives-go-booster" onclick="window.location.href='/profile/booster.html'" style="width:100%; background:#2ecc71; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; margin-top:8px;">Get unlimited lives (24h $1 / 72h $2)</button>
             <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) in <span id="lives-reset-countdown" style="color:#f87818; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
         </div>
     </div>
@@ -186,7 +186,7 @@
      Compact glass chip: max ~46vw so it never covers more than half the mobile
      screen, thin 2-line copy, translucent see-through so the game stays
      visible around it. -->
-    <div id="booster-promo-pill" onclick="window.location.href='/profile/booster.html'" style="position:fixed; left:10px; bottom:10px; z-index:9000; width:min(46vw, 210px); box-sizing:border-box; background:rgba(17,14,49,0.55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); border:1px solid rgba(243,156,18,0.5); color:#ffe1a1; font-weight:800; font-size:0.66rem; line-height:1.3; padding:8px 10px; border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,0.35); cursor:pointer; text-align:center;">72h <span style="color:#ffde59;">UNLIMITED lives</span> · $1<br><span style="font-weight:600; font-size:0.62rem; color:#ffe9b8;">no subscription needed</span></div>
+    <div id="booster-promo-pill" onclick="window.location.href='/profile/booster.html'" style="position:fixed; left:10px; bottom:10px; z-index:9000; width:min(46vw, 210px); box-sizing:border-box; background:rgba(17,14,49,0.55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); border:1px solid rgba(243,156,18,0.5); color:#ffe1a1; font-weight:800; font-size:0.66rem; line-height:1.3; padding:8px 10px; border-radius:12px; box-shadow:0 3px 10px rgba(0,0,0,0.35); cursor:pointer; text-align:center;">UNLIMITED lives<br><span style="font-weight:600; font-size:0.62rem; color:#ffe9b8;">24h $1 · 72h $2 · no subscription</span></div>
     <script>
     (function () {
         try {

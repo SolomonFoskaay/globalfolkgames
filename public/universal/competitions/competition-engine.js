@@ -5,7 +5,8 @@
 // every OPEN competition whose games[] includes the finished game and whose
 // window is live ([starts_at, ends_at]) it records the verified win to the
 // server-side window-fresh ledger (proof sig kept, so every row is checkable).
-// Final Points (Total x live plan boost: L3 1.5 / L2 1.0, L1 hidden-not-removed)
+// Final Points (Total x live plan boost: L2 1.25x, L3 1.5x, L1 1.0x;
+// non-qualifying levels hidden, never removed)
 // are computed server-side at board time — the admin settles from that board.
 //
 // Emits window.gfgCompetitions:
