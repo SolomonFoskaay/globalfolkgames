@@ -108,8 +108,8 @@ const DICE_FACE_NORMALS = {
     6: [0, 0, -1],  // back
     3: [1, 0, 0],   // right
     4: [-1, 0, 0],  // left
-    5: [0, 1, 0],   // top
-    2: [0, -1, 0],  // bottom
+    5: [0, -1, 0],  // CSS 'top' lives at -Y (rotateX(-90) maps +Z -> -Y)
+    2: [0, 1, 0],   // CSS 'bottom' lives at +Y (rotateX(+90) maps +Z -> +Y)
 };
 
 function DICE_Q_IDENTITY() { return [1, 0, 0, 0]; }
