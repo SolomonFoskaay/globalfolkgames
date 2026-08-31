@@ -244,6 +244,11 @@
                     <button id="gfg-menu-btn" class="gfg-menu-btn" aria-label="Open menu" aria-haspopup="true">☰</button>
                 </div>
             </header>
+            <a href="/backers/" class="gfg-backer-banner" aria-label="Become an Early Backer">
+                <span class="b-emoji">🧡</span>
+                <span class="b-text"><b>You can become an Early Backer.</b>&nbsp; 100 seats, lifetime L3, and you help this reach Mainnet.</span>
+                <span class="b-cta">See how →</span>
+            </a>
         `;
 
         document.body.insertAdjacentHTML('afterbegin', headerHTML);

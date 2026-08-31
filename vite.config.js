@@ -61,6 +61,7 @@ export default defineConfig({
         'subscription-paid': './subscription-paid/index.html',
         payment: './payment/index.html',
         dashboard: './dashboard/index.html',
+        backers: './backers/index.html',
         'dashboard-ops': './dashboard/ops.html',
         'dashboard-endpoints': './dashboard/endpoints.html',
         'dashboard-activity': './dashboard/activity.html',

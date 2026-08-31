@@ -69,6 +69,28 @@ body {
     white-space: nowrap;
 }
 
+/* ===== EARLY BACKER BANNER (sitewide, under the header) =====
+   High-converting strip linking to /backers/ on every page so beta players
+   discover the Early Backer mint as they explore the site. */
+.gfg-backer-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(90deg, rgba(155,89,182,0.22), rgba(243,156,18,0.16), rgba(155,89,182,0.22));
+    border-bottom: 1px solid rgba(243,156,18,0.35);
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.8rem;
+    min-height: 34px;
+    box-sizing: border-box;
+}
+.gfg-backer-banner .b-emoji { font-size: 1rem; flex-shrink: 0; }
+.gfg-backer-banner .b-text { flex: 1; color: #eee; line-height: 1.4; }
+.gfg-backer-banner .b-text b { color: #f87818; }
+.gfg-backer-banner .b-cta { color: #f87818; font-weight: 800; white-space: nowrap; flex-shrink: 0; }
+.gfg-backer-banner:hover .b-cta { text-decoration: underline; }
+
 .gfg-header-right {
     display: flex;
     align-items: center;
