@@ -498,6 +498,17 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === 'GET' && req.url === '/api/pay-config') {
+    try {
+      const { publicPayConfig } = await import('./pay-config.mjs');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60', ...cors });
+      res.end(JSON.stringify(publicPayConfig()));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
   if (req.method === 'GET' && req.url === '/api/plans') {
     try {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', ...cors });

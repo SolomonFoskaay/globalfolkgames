@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment auto Tests | Dashboard | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background:#0f0f13; }
+        .net-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+        .net-chip { font-size:0.78rem; font-weight:800; border-radius:999px; padding:4px 12px; }
+        .net-devnet { color:#e74c3c; background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.4); }
+        .net-mainnet { color:#2ecc71; background:rgba(46,204,113,0.12); border:1px solid rgba(46,204,113,0.4); }
+        .auto-frame { width:100%; border:1px solid #2a2a36; border-radius:12px; background:#0a0a0e; min-height:1200px; }
+    </style>
+</head>
+<body>
+    <main class="mobile-container" style="max-width:860px; margin:0 auto; padding:20px 16px 60px;">
+        <h1 style="font-size:1.3rem;margin:0 0 4px;">Payment auto Tests</h1>
+        <p class="hint" style="color:var(--muted); font-size:0.85rem; margin:0 0 12px;">Staff-only: the devnet copy of the automated premium-point payment flow, preserved for testing. The user-facing version runs on <b style="color:#2ecc71;">mainnet</b>.</p>
+        <div class="net-bar">
+            <span>Testing on:</span>
+            <a href="/payment/?net=devnet" class="net-chip net-devnet" style="text-decoration:none;">DEVNET (test)</a>
+            <a href="/payment/" class="net-chip net-mainnet" style="text-decoration:none;">MAINNET (live users)</a>
+        </div>
+        <div class="hint" style="color:#888; font-size:0.8rem; margin-bottom:12px;">
+            Devnet uses test USDC (Circle faucet) - nothing real moves. Open the devnet link in a new tab to run a full test payment: fund your embedded wallet with test SOL + USDC, pick a plan, pay, and confirm the points credit server-side.
+        </div>
+        <iframe class="auto-frame" src="/payment/?net=devnet" title="Payment auto test (devnet)"></iframe>
+    </main>
+    <script src="/global_header.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'payment-tests',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Revenue', items: [
+                        { key: 'premium', label: '💎 Premium credit', href: '/dashboard/premium.html' },
+                        { key: 'premium-subscribers', label: '📈 Premium tracker', href: '/dashboard/premium-subscribers.html' },
+                        { key: 'payment-tests', label: '🧪 Payment auto Tests', href: '/dashboard/payment-tests.html' },
+                        { key: 'affiliate', label: '🤝 Affiliate payouts', href: '/dashboard/affiliate.html' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'activity', label: '👥 Player activity', href: '/dashboard/activity.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                        { key: 'recovery', label: '🔧 Points recovery', href: '/dashboard/recovery.html' },
+                        { key: 'release', label: '📊 Release pipeline', href: '/dashboard/release.html' },
+                    ]},
+                ]
+            });
+        });
+    </script>
+</body>
+</html>

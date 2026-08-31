@@ -33,6 +33,10 @@
 
     <div class="card">
         <b style="color:#2ecc71;">Your payment wallet</b>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
+            <span style="font-size:0.78rem; color:#888;">Payment network: <span id="pay-net" style="color:#f87818; font-weight:800;">…</span></span>
+            <span id="net-devnet-tag" style="display:none; font-size:0.72rem; font-weight:800; color:#e74c3c; background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.4); border-radius:999px; padding:2px 10px;">DEVNET TEST</span>
+        </div>
         <div id="wallet-box" class="wallet-box" style="margin-top:6px;">Loading your embedded wallet...</div>
         <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; font-size:0.85rem;">
             <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:8px 12px;">
@@ -53,6 +57,9 @@
         <div id="precheck" class="status err" style="display:none;"></div>
         <button id="pay-btn" class="pay-btn" disabled>Pay with my GlobalFolkGames wallet</button>
         <div id="status" class="status" style="display:none;"></div>
+        <div style="margin-top:10px; font-size:0.8rem; line-height:1.5; color:#f3b4ad; background:rgba(231,76,60,0.10); border:1px solid rgba(231,76,60,0.4); border-radius:10px; padding:10px 12px;">
+            <b>Non-refundable.</b> Every premium-point purchase is final. Once the points are credited to your wallet they cannot be refunded, whether you use them or not, and they cannot be transferred between accounts. Please be sure before you pay.
+        </div>
     </div>
 
     <div class="card">
@@ -125,6 +132,16 @@
     async function refreshWallet() {
         try {
             const gpay = window.gfgPay;
+            // Show which payment network this page is running on.
+            try {
+                if (gpay && typeof gpay.network === 'function' && gpay.payConfig) {
+                    const net = await gpay.network();
+                    const el = document.getElementById('pay-net');
+                    if (el) el.textContent = net;
+                    const tag = document.getElementById('net-devnet-tag');
+                    if (tag) tag.style.display = /devnet/.test(net) ? 'inline-block' : 'none';
+                }
+            } catch (e) { /* ignore */ }
             const addr = (gpay && typeof gpay.connectedWallet === 'function') ? gpay.connectedWallet() : null;
             const box = document.getElementById('wallet-box');
             if (addr) { box.textContent = addr; box.style.color = '#9fe8a8'; box.title = addr; }

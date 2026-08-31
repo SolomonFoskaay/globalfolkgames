@@ -1,28 +1,53 @@
-// scripts/pay-config.mjs — PAYMENT AUTOMATION config (M5/M6, owner 2026-08-31).
+// scripts/pay-config.mjs — PAYMENT + MINT NETWORK config (single switch point).
 //
-// Single swap point for devnet <-> mainnet, decoupled from the game cluster
-// (the game/ER/program stay on devnet; PAYMENTS may be mainnet real USDC):
-//   - The player pays USDC from their OWN embedded Dynamic wallet to the
-//     platform treasury (TA) on the cluster below.
-//   - /api/verify-and-credit reads that transaction on `payCluster`, checks
-//     amount / mint / sender / freshness, then credits premium points on the
-//     existing devnet program path (sponsor signs, gasless ER).
+// One env decides the cluster for ALL value flows (premium-point auto-pay,
+// NFT mint guidance):
+//   GFG_PAY_NETWORK = 'mainnet' (default for launch) | 'devnet' (preserved for
+//                    the admin 'Payment auto Tests' submenu).
 //
-// SWAP TO MAINNET: change PAY_CLUSTER to 'mainnet' and set PAY_TREASURY_PUBKEY
-// to the mainnet wallet you control. Nothing else in the app changes (the
-// client and verifier both read /api/pay-config). Devnet USDC is test money;
-// mainnet USDC is real — the credit amount is always the plan's points.
-export const PAY_TREASURY_PUBKEY =
-  process.env.GFG_PAY_TREASURY || 'Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3'; // NFT wallet (owner 2026-08-31): all funds land here for now
+// The config is served to the client via /api/pay-config (a tiny endpoint) and
+// read server-side by verify-and-credit, so the running site can move between
+// mainnet and devnet without a rebuild - and the devnet copy stays usable under
+// the admin tests while the user-facing pages run mainnet.
+//
+// NOTE (owner-verified): the Early Backer collection (Hj6EU...) is a creator
+// wallet + LaunchMyNFT-hosted config; on-site mint is NOT possible without
+// LaunchMyNFT's authority. The mint therefore stays on their page (connected
+// wallet receives it). This config governs the premium-point USDC payment flow.
 
-// Grace-period funding destinations the verifier also accepts (besides the
-// NFT wallet) so payments sent before the swap still auto-credit. Includes the
-// former sponsor treasury used at launch.
-export const PAY_ACCEPTED_DESTINATIONS = [
-  '5ec9bYwVJVSfM3xnrzpg9jkoepX58pY1tWoGDsMdhdTQ', // prior sponsor treasury (payments before 2026-08-31 swap)
-];
+import { createRequire } from 'module';
 
-export const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // devnet USDC (Circle faucet)
+function envOr(keys) {
+  for (const k of keys) {
+    try { if (process.env[k]) return process.env[k]; } catch (e) {}
+  }
+  return null;
+}
+
+export const PAY_NETWORK = (envOr(['GFG_PAY_NETWORK']) || 'mainnet').toLowerCase();
+
+// --- mainnet (launch) -------------------------------------------------------
+// Real Solana USDC; funds land in the NFT/creator wallet.
+const MAINNET = {
+  rpc: ['https://api.mainnet-beta.solana.com'],
+  usdcMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // real USDC
+  treasury: 'Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3', // NFT wallet (all funds here)
+  acceptedDest: ['Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3'],
+};
+
+// --- devnet (preserved for admin tests) -------------------------------------
+const DEVNET = {
+  rpc: ['https://api.devnet.solana.com', 'https://solana-devnet.api.onfinality.io/public'],
+  usdcMint: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Circle faucet USDC
+  treasury: 'Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3',
+  acceptedDest: ['Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3'],
+};
+
+const NET = PAY_NETWORK === 'devnet' ? DEVNET : MAINNET;
+
+export const PAY_TREASURY_PUBKEY = NET.treasury;
+export const PAY_ACCEPTED_DESTINATIONS = NET.acceptedDest;
+export const USDC_MINT = NET.usdcMint;
 export const USDC_DECIMALS = 6;
 
 // Points credited per paid plan/booster (mirrors the on-chain ladder at
@@ -40,24 +65,34 @@ export function payPlan(key) {
 }
 
 // RPC endpoints the VERIFIER uses to read the payment transaction on the pay
-// cluster. IMPORTANT: the MagicBlock devnet ROUTER cannot serve getTransaction
-// (it answers ER ops + getBalance only, not archive tx reads), so the verifier
-// must hit a real BASE devnet RPC first. `GFG_DEVNET_RPC` (Alchemy) is used
-// when present (server env), then public devnet. SWAP TO MAINNET: replace this
-// list with mainnet RPCs (e.g. your Alchemy/Helius mainnet endpoint first).
+// cluster. IMPORTANT: must be a REAL base RPC (the MagicBlock devnet router
+// cannot serve getTransaction). Server env GFG_DEVNET_RPC (Alchemy) is used
+// when present and the cluster is devnet; mainnet uses public mainnet RPC.
 export function payRpcEndpoints() {
-  const out = [];
-  try {
-    if (typeof process !== 'undefined' && process.env?.GFG_DEVNET_RPC) out.push(process.env.GFG_DEVNET_RPC);
-  } catch (e) { /* not a node env */ }
-  out.push(
-    'https://api.devnet.solana.com',
-    'https://solana-devnet.api.onfinality.io/public'
-  );
-  return out;
+  if (PAY_NETWORK === 'devnet') {
+    const out = [];
+    try {
+      if (typeof process !== 'undefined' && process.env?.GFG_DEVNET_RPC) out.push(process.env.GFG_DEVNET_RPC);
+    } catch (e) { /* not a node env */ }
+    out.push(...DEVNET.rpc);
+    return out;
+  }
+  return [...MAINNET.rpc];
 }
 
 // USDC base units for a price in USD cents ($1 = 1_000_000 base).
 export function usdcBaseForCents(usdCents) {
   return Math.round(usdCents * 10000);
+}
+
+// Public-safe client config (served by /api/pay-config). No secrets.
+export function publicPayConfig() {
+  return {
+    network: PAY_NETWORK,
+    rpc: NET.rpc[0],
+    usdcMint: NET.usdcMint,
+    usdcDecimals: USDC_DECIMALS,
+    treasury: NET.treasury,
+    plans: PAY_PLANS,
+  };
 }

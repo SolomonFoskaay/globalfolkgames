@@ -25,10 +25,12 @@ import competitions from '../api_handlers/competitions.mjs';
 import plans from '../api_handlers/plans.mjs';
 import agm from '../api_handlers/agm.mjs';
 import verifyAndCredit from '../api_handlers/verify-and-credit.mjs';
+import payConfig from '../api_handlers/pay-config.mjs';
 
 const routes = {
   '/api/competitions': competitions,
   '/api/plans': plans,
+  '/api/pay-config': payConfig,
   '/api/agm': agm,
   '/api/agm/balances': agm,
   '/api/verify-and-credit': verifyAndCredit,

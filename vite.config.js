@@ -70,6 +70,7 @@ export default defineConfig({
         'dashboard-recovery': './dashboard/recovery.html',
         'dashboard-premium': './dashboard/premium.html',
         'dashboard-premium-subscribers': './dashboard/premium-subscribers.html',
+        'dashboard-payment-tests': './dashboard/payment-tests.html',
         'dashboard-affiliate': './dashboard/affiliate.html',
         'dashboard-agm': './dashboard/agm.html',
         'dashboard-pricing': './dashboard/pricing.html',
