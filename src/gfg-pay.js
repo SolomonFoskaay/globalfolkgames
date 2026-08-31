@@ -145,6 +145,15 @@ export async function pay(planKey) {
   let ataExists = false;
   try { await getAccount(conn, ata, 'confirmed', TOKEN_PROGRAM_ID); ataExists = true; } catch (e) { ataExists = false; }
 
+  // The treasury (platform) ATA must exist for the transfer to land. It is
+  // created by the platform sponsor; if it is somehow missing (fresh cluster
+  // swap before warm-up), fail clearly instead of an opaque InvalidAccountData.
+  let treasuryExists = false;
+  try { await getAccount(conn, treasuryAta, 'confirmed', TOKEN_PROGRAM_ID); treasuryExists = true; } catch (e) { treasuryExists = false; }
+  if (!treasuryExists) {
+    throw new Error('the platform payment wallet is still being prepared. Try again in a minute, or use the manual form so support can credit you.');
+  }
+
   const amountBase = BigInt(Math.round(plan.usdCents * 10000));
   const tx = new Transaction();
 
@@ -169,8 +178,19 @@ export async function pay(planKey) {
 
   const signed = await signWithDynamic(tx);
   const signature = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: true });
-  await conn.confirmTransaction(signature, 'confirmed');
-  saveTx({ plan: planKey, signature, at: Date.now(), points: plan.points, kind: plan.kind });
+  let failedOnChain = false;
+  try {
+    const conf = await conn.confirmTransaction(signature, 'confirmed');
+    if (conf && conf.value && conf.value.err) failedOnChain = true;
+  } catch (e) {
+    failedOnChain = true;
+  }
+  // ALWAYS record the signature so the user can find/report it later, even if
+  // the transfer failed on-chain (support can read it on the explorer).
+  saveTx({ plan: planKey, signature, at: Date.now(), points: plan.points, kind: plan.kind, failed: failedOnChain });
+  if (failedOnChain) {
+    throw new Error('the transfer was sent but failed on-chain. Your signature: ' + signature + '. Use the manual form (or Verify payment + credit) with this signature so support can help.');
+  }
   return { signature, amountBase: amountBase.toString(), plan: planKey, points: plan.points };
 }
 

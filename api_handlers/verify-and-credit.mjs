@@ -25,6 +25,7 @@ const { PublicKey, Connection } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT } from '../scripts/pay-config.mjs';
 import { handleCreditPremium } from '../scripts/delegate-relay.mjs';
+import { ensureTreasuryUsdcAta } from './../scripts/delegate-relay.mjs';
 
 const FRESHNESS_MS = 30 * 60 * 1000;    // payment must be < 30 min old
 const ATA_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
@@ -130,6 +131,11 @@ export async function verifyAndCredit({ owner, plan, txSignature }) {
   // makes the second credit a clean no-op (never double pay).
   const hash = createHash('sha256').update(String(txSignature)).digest();
   const creditRef = Math.abs(hash.readUInt32LE(0)) * 1000003 + (hash.readUInt32LE(4) % 1000003);
+
+  // Self-healing treasury: make sure our USDC receiving ATA exists (sponsor
+  // pays the one-time rent) before crediting, so this endpoint is robust even
+  // if the treasury address or cluster was switched (devnet <-> mainnet swap).
+  await ensureTreasuryUsdcAta();
 
   const result = await handleCreditPremium(oKey.toBase58(), p.points, creditRef, p.reason);
   return {

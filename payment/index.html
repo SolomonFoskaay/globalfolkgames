@@ -265,7 +265,8 @@
             renderRecentTx();
             precheck();
         } catch (e) {
-            showStatus('Payment did not credit: ' + (e.message || e) + '<br>Your money (if sent) is safe on-chain. Use the <a href="/subscription-paid/">manual form</a> with your transaction signature, or try again.', false);
+            renderRecentTx();
+            showStatus('Payment did not credit: ' + (e.message || e) + '<br>Your money (if sent) is safe on-chain, and the transaction is in <b>Your recent payments</b> below. Use the <a href="/subscription-paid/">manual form</a> (or the Verify box above) with that signature so support can credit you, or try again.', false);
         } finally {
             payBtn.disabled = false;
         }

@@ -19,8 +19,9 @@
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, SystemProgram, Transaction } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
+import { createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { BN } from 'bn.js';
 import './load-env.mjs'; // load .env (Alchemy key) before resolving the RPC chain
 import { baseRpcUrl, createConnection, sendMagicTx, routerUrl, getDelegationStatus, pickErRpcUrl, erRpcEndpoints, regionUrlForFqdn, ER_REGION_URLS } from '../src/gfg-rpc.js';
@@ -714,4 +715,34 @@ async function sendAndConfirmBase(conn, sponsor, transaction) {
   const sig = await sendMagicTx(conn, transaction, [sponsor], { skipPreflight: true });
   await conn.confirmTransaction({ signature: sig }, 'confirmed');
   return sig;
+}
+
+// Ensure the platform's USDC treasury ATA exists on the pay cluster.
+// The sponsor owns the receiving account; it pays the one-time rent so the
+// player's USDC transfer has a real destination to land on (a transfer to a
+// non-existent token account fails with InvalidAccountData). Idempotent.
+// Treasury + mint come from pay-config so a devnet->mainnet swap keeps one source.
+export async function ensureTreasuryUsdcAta() {
+  const { PAY_TREASURY_PUBKEY, USDC_MINT } = await import('./pay-config.mjs');
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const treasury = new PublicKey(PAY_TREASURY_PUBKEY);
+  const [ata] = PublicKey.findProgramAddressSync(
+    [treasury.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), new PublicKey(USDC_MINT).toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  const exists = await conn.getAccountInfo(ata).catch(() => null);
+  if (exists) return { ata: ata.toBase58(), created: false };
+  const tx = new Transaction();
+  tx.add(createAssociatedTokenAccountInstruction(
+    sponsor.publicKey, // payer
+    ata,               // associated token account
+    treasury,          // owner
+    new PublicKey(USDC_MINT),
+    TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+  ));
+  tx.recentBlockhash = (await conn.getLatestBlockhash('confirmed')).blockhash;
+  await sendAndConfirmBase(conn, sponsor, tx);
+  console.log(`[relay] created treasury USDC ATA ${ata.toBase58()} for ${treasury.toBase58()}`);
+  return { ata: ata.toBase58(), created: true };
 }
