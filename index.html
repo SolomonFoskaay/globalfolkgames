@@ -20,6 +20,7 @@
         <section class="onboarding-billboard">
             <h2>Preserving Global Native Games On-Chain</h2>
             <p>Play traditional local games from across the world, accumulate lifetime milestone points, and join a monthly Member Cup to share membership fees for real wins.</p>
+            <p style="margin-top:12px; font-size:0.85rem; color:#ddd;"><b class="gfg-stats-count" id="home-gamer-count">—</b> gamers already on the platform. Be one of them next.</p>
         </section>
 
         <!-- PLATFORM TABS: Games / Countries / Earn as Gamer (inline previews) -->
@@ -160,6 +161,22 @@
                             '<div style="font-size:1.9rem;">' + f[0] + '</div><div style="font-size:0.66rem; color:#bbb; margin-top:2px; max-width:76px;">' + f[1] + '</div></a>';
                     }).join('');
                 }).catch(function () { if (icons) icons.innerHTML = '<p class="hidden-note">Load the games catalog to see icons.</p>'; });
+            })();
+            // Fill the community gamer count on the hero (via the sitewide feed).
+            (function () {
+                var el = document.getElementById('home-gamer-count');
+                if (!el) return;
+                var doFill = function () {
+                    try {
+                        if (window.gfgCommunityCount && typeof window.gfgCommunityCount === 'function') {
+                            window.gfgCommunityCount().then(function (n) { if (n) el.textContent = Number(n).toLocaleString(); }).catch(function () { el.textContent = '—'; });
+                        } else {
+                            el.textContent = '—';
+                        }
+                    } catch (e) { el.textContent = '—'; }
+                };
+                setTimeout(doFill, 1500);
+                setInterval(doFill, 60000);
             })();
             show('games');
         });

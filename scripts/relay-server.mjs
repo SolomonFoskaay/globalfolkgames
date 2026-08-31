@@ -498,6 +498,39 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === 'GET' && req.url === '/api/community-stats') {
+    try {
+      const { deriveProfileHandle } = await import('./../scripts/handle.mjs');
+      const DYNAMIC_API_TOKEN = process.env.DYNAMIC_API_TOKEN || '';
+      const DYNAMIC_ENV_ID = process.env.DYNAMIC_ENV_ID || '';
+      const out = { count: 0 };
+      if (DYNAMIC_API_TOKEN && DYNAMIC_ENV_ID) {
+        const base = `https://app.dynamicauth.com/api/v0/environments/${DYNAMIC_ENV_ID}/users`;
+        let data = null;
+        for (const url of [`${base}?limit=1&ordering=-created_at`, `${base}?limit=5`]) {
+          try {
+            const resp = await fetch(url, { headers: { Authorization: `Bearer ${DYNAMIC_API_TOKEN}` } });
+            if (resp.ok) { data = await resp.json(); break; }
+          } catch (e) { /* try next */ }
+        }
+        if (data) {
+          if (typeof data.count === 'number') out.count = data.count;
+          const first = (data.users || [])[0];
+          if (first && first.id) {
+            out.latest = (deriveProfileHandle && deriveProfileHandle(first.id)) || null;
+            const created = first.createdAt || first.created_at;
+            if (created) { out.joinedAt = created; out.joinedMinutesAgo = Math.max(0, Math.round((Date.now() - new Date(created).getTime()) / 60000)); }
+          }
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60', ...cors });
+      res.end(JSON.stringify(out));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ count: 0 }));
+    }
+    return;
+  }
   if (req.method === 'GET' && req.url === '/api/pay-config') {
     try {
       const { publicPayConfig } = await import('./pay-config.mjs');

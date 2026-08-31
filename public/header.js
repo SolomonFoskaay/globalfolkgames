@@ -253,6 +253,45 @@
 
         document.body.insertAdjacentHTML('afterbegin', headerHTML);
 
+        if (!document.getElementById('gfg-community') && !gameName) {
+            const toast = document.createElement('div');
+            toast.id = 'gfg-community';
+            toast.className = 'gfg-community';
+            toast.setAttribute('aria-live', 'polite');
+            document.body.appendChild(toast);
+            let shown = false;
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'gfg-community-close';
+            closeBtn.setAttribute('aria-label', 'Dismiss');
+            closeBtn.textContent = '×';
+            closeBtn.onclick = function () { toast.classList.remove('show'); shown = false; };
+            const tryShow = function (text) {
+                if (shown) return;
+                toast.innerHTML = '';
+                toast.appendChild(closeBtn);
+                const span = document.createElement('span');
+                span.textContent = text;
+                toast.appendChild(span);
+                toast.classList.add('show');
+                shown = true;
+                setTimeout(function () { toast.classList.remove('show'); shown = false; }, 8000);
+            };
+            const maybeShow = function () {
+                try {
+                    fetch('/api/community-stats', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+                        if (!j || !j.latest || !j.count) return;
+                        if (j.joinedMinutesAgo != null && j.joinedMinutesAgo <= 30) {
+                            tryShow('🎮 Gamer ' + j.latest + ' just joined GlobalFolkGames');
+                        }
+                    }).catch(function () {});
+                } catch (e) {}
+            };
+            setTimeout(maybeShow, 6000);
+            // Refresh the counter on the page if it uses it.
+            window.gfgCommunityCount = function () {
+                try { return fetch('/api/community-stats', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) { return (j && j.count) || 0; }); } catch (e) { return Promise.resolve(0); }
+            };
+        }
         // Measure the global header's REAL rendered height and expose it as
         // --gfg-header-h. The header may sit on one row (desktop) or two
         // (mobile when brand + right side don't fit), and its height varies

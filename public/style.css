@@ -793,3 +793,52 @@ table {
 th, td {
   min-width: 0;
 }
+
+/* ===== COMMUNITY "just joined" TOAST (sitewide, owner 2026-08-31) =====
+   Small top-right corner toast: "Gamer GFG-XXXXXX just joined" — shows only
+   the public handle, never email/wallet. Auto-appears a few seconds after load
+   when a new player joined recently, auto-hides, dismissible with ×. */
+.gfg-community {
+  position: fixed;
+  top: 64px;
+  right: 14px;
+  z-index: 9980;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(88vw, 360px);
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(26,26,36,0.94);
+  border: 1px solid rgba(243,156,18,0.45);
+  color: #eee;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.gfg-community.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.gfg-community-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 22px;
+  cursor: pointer;
+}
+.gfg-community-close:hover { background: rgba(243,156,18,0.35); }
+
+/* Community count chips that read gfgCommunityCount() */
+.gfg-stats-count { color: #f87818; font-weight: 800; }
