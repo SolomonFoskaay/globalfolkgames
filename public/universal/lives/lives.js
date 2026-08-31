@@ -322,6 +322,9 @@
         // finished (it is idempotent per UTC day by the used counter).
         consume: consume,
         subscribe: subscribe,
+        // Milliseconds until the next lives reset (GMT+00 midnight). Lets any
+        // game show a live reset countdown in its lives bar.
+        msUntilReset: msUntilUtcMidnight,
         reset: function () {
             var s = slice();
             s.day = utcDayKey();

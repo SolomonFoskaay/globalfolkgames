@@ -385,6 +385,23 @@ canvas {
     transform-origin: 50% 50% 0;
 }
 
+/* Flat settled die (owner 2026-08-31): a plain 2D face shown once the die
+   locks onto the ER VRF result, so the number the player sees always matches
+   the number the game counts. Pips are drawn straight from the value. */
+.gfg-die-flat {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, #ffffff 0%, #f4f4f7 55%, #e8eaee 100%);
+    border: 1px solid #b8bdc6;
+    border-radius: 14%;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.9),
+                inset 0 -3px 5px rgba(0,0,0,0.12);
+    z-index: 2;
+}
+
 .gfg-die-face {
     position: absolute;
     top: 0;

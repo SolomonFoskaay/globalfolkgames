@@ -123,8 +123,9 @@
             </div>
 
             <!-- M10 lives + daily reward (module-driven slots, filled by /universal/lives/lives.js + daily-reward.js) -->
-            <div id="lives-reward-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; align-items: center; box-sizing: border-box;">
+            <div id="lives-reward-bar" style="display: flex; gap: 12px; font-size: 0.8rem; font-weight: 600; color: #ccc; background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.35); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; align-items: center; box-sizing: border-box; flex-wrap: wrap;">
                 <div title="Free-play lives today (refill at midnight GMT)">Lives: <span data-lives-left style="color:#2ecc71;">–</span>/<span data-lives-total style="color:#2ecc71;">–</span></div>
+                <div id="lives-timer-cell" title="Time until your next lives refill">Refill: <span id="lives-reset-countdown" style="color:#f87818; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
                 <div title="Daily reward for today (claim once)">Daily: <span data-daily-amount style="color:#f87818;">–</span>P <span data-daily-claimed style="color:#7838f8;">–</span></div>
                 <button id="claimDailyBtn" style="background: #f87818; color: #000; border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Claim daily</button>
             </div>
@@ -178,7 +179,7 @@
             <button id="lives-go-premium" onclick="window.location.href='/profile/upgrade.html'" style="width:100%; background:#f87818; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer;">See Premium benefits and upgrade</button>
             <div style="margin-top:8px; font-size:0.8rem; color:#bbb; line-height:1.5;">Or get <b style="color:#2ecc71;">UNLIMITED lives, 24h for $1</b> or <b style="color:#2ecc71;">72h for $2</b> (500P / 1,500P), no subscription needed.</div>
             <button id="lives-go-booster" onclick="window.location.href='/profile/booster.html'" style="width:100%; background:#2ecc71; color:#000; border:none; padding:13px 10px; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; margin-top:8px;">Get unlimited lives (24h $1 / 72h $2)</button>
-            <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives reset to 5 (or 10 for Premium) in <span id="lives-reset-countdown" style="color:#f87818; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
+            <div style="margin-top:10px; font-size:0.78rem; color:#888;">Lives refill at midnight (GMT) in <span id="overlay-countdown" style="color:#f87818; font-weight:700; font-variant-numeric:tabular-nums;">--:--:--</span></div>
         </div>
     </div>
 
@@ -262,24 +263,57 @@
     })();
 </script>
 
-    <!-- Ludo lab scripts (duplicate arena build) -->
+    <!-- Permanent lives timer on the game page (owner 2026-08-31): always visible
+         in the lives bar. Two states, switched every tick:
+           - booster/unlimited-lives active  -> show how long is left on the
+             unlimited window (24h or 72h) from the on-chain boosterActiveUntil.
+           - normal plan lives (L0 5 .. L3 20) -> show when the daily pool resets
+             (GMT+00 midnight), same for every plan.
+         So the player always knows how long the current lives state lasts. -->
     <script>
-    // Booster countdown on the game page: shows 0d:7h:48m while unlimited lives
-    // are active, ticking every second from the on-chain boosterActiveUntil.
     (function () {
-        var el = document.getElementById('lives-booster-timer');
-        setInterval(function () {
+        var resetEl = document.getElementById('lives-reset-countdown');
+        var overlayEl = document.getElementById('overlay-countdown');
+        // Re-locate each tick in case the DOM re-renders the bar.
+        function findTimer() { resetEl = document.getElementById('lives-reset-countdown'); overlayEl = document.getElementById('overlay-countdown'); }
+        function fmt2(n) { return n < 10 ? '0' + n : String(n); }
+        function boosterLeft() {
             try {
                 var pp = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
                 var until = Number(pp && pp.boosterActiveUntil ? pp.boosterActiveUntil : 0);
-                var diff = until - Date.now();
-                if (diff > 0) {
-                    var d = Math.floor(diff / 86400000);
-                    var h = Math.floor((diff % 86400000) / 3600000);
-                    var m = Math.floor((diff % 3600000) / 60000);
-                    if (el) { el.textContent = '♾ ' + d + 'd:' + h + 'h:' + m + 'm left'; el.style.display = 'inline-block'; }
-                } else if (el) { el.style.display = 'none'; }
-            } catch (e) { if (el) el.style.display = 'none'; }
+                if (until > Date.now()) return until - Date.now();
+            } catch (e) { /* ignore */ }
+            return 0;
+        }
+        function resetLeft() {
+            try {
+                if (window.gfgLives && typeof window.gfgLives.msUntilReset === 'function') {
+                    return Math.max(0, window.gfgLives.msUntilReset());
+                }
+            } catch (e) { /* ignore */ }
+            return 0;
+        }
+        setInterval(function () {
+            try {
+                findTimer();
+                if (!resetEl && !overlayEl) return;
+                var boost = boosterLeft();
+                if (boost > 0) {
+                    var d = Math.floor(boost / 86400000);
+                    var h = Math.floor((boost % 86400000) / 3600000);
+                    var m = Math.floor((boost % 3600000) / 60000);
+                    var txt = '♾ ' + d + 'd:' + fmt2(h) + 'h:' + fmt2(m) + 'm';
+                    if (resetEl) { resetEl.textContent = txt; resetEl.style.color = '#2ecc71'; resetEl.title = 'Unlimited lives active — how long it lasts'; }
+                } else {
+                    var r = resetLeft();
+                    var rh = Math.floor(r / 3600000);
+                    var rm = Math.floor((r % 3600000) / 60000);
+                    var rs = Math.floor((r % 60000) / 1000);
+                    var txt2 = fmt2(rh) + ':' + fmt2(rm) + ':' + fmt2(rs);
+                    if (resetEl) { resetEl.textContent = txt2; resetEl.style.color = '#f87818'; resetEl.title = 'Your daily lives refill at midnight (GMT)'; }
+                    if (overlayEl) { overlayEl.textContent = txt2; }
+                }
+            } catch (e) { /* ignore */ }
         }, 1000);
     })();
     </script>

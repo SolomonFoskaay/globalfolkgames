@@ -68,7 +68,7 @@
             {
                 heading: 'Discover',
                 items: [
-                    { label: 'Pricing', href: '/profile/subscription.html', match: 'pricing' },
+                    { label: 'Premium Plans', href: '/profile/subscription.html', match: 'pricing' },
                     { label: 'What’s New', href: '/changelog/', match: 'changelog' },
                     { label: 'About', href: '/about/', match: 'about' },
                     { label: 'Forum', href: '/forum/', match: 'forum' },

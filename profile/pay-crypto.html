@@ -41,15 +41,15 @@
 
         <div class="step"><div class="step-num">1</div><div class="step-body"><b>Get some crypto (the first-time step).</b><br>If you have never owned crypto, open an exchange (such as Binance, Coinbase, KuCoin, or any exchange available in your country), create an account, and buy a little <b>SOL</b> and the <b>USDC</b> you need. Already on crypto? Skip ahead - you can pay straight from any wallet you already have.</div></div>
         <div class="step"><div class="step-num">2</div><div class="step-body"><b>Copy your GlobalFolkGames wallet address.</b><br>Use the blue box above. <i>Important:</i> when you send from the exchange, paste this exact address and choose the network <b>Solana</b> at the destination. Choosing anything else (for example ERC-20 or BNB) sends your money to the wrong network and can be lost - so always pick Solana.</div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-body"><b>Send a little SOL first.</b><br>Send <b>at least 0.01 SOL (about $1-2)</b> to your GlobalFolkGames wallet. You only do this once - it pays the tiny network fees on your future game transactions. Without it, the chain cannot process your game moves.</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-body"><b>Then send the USDC for your plan or booster.</b><br>Send the exact <b>USDC</b> amount for what you want (Level 1 = $5, Level 2 = $10, Level 3 = $15, 24h booster = $1, 72h booster = $2) to the same wallet address, always on the <b>Solana</b> network. USDC stays equal to one dollar, so your payment is a fixed USD amount - never a fluctuating guess.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><b>Send a little SOL first.</b><br>Send <b>at least 0.01 SOL (about $1-2)</b> to your GlobalFolkGames wallet. You only do this once. Playing the games is fully free and gasless (the platform covers those network fees), so this little bit of SOL is only for things like withdrawing your earnings, renewing a plan, buying in-game items, or topping up premium points.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><b>Then send the USDC for your plan or booster.</b><br>Send <b>USDC</b> for exactly what you want to buy (a plan, or an unlimited-lives booster) to the same wallet address, always on the <b>Solana</b> network. USDC stays equal to one dollar, so your payment is a fixed USD amount - never a fluctuating guess. Check the <a href="/profile/subscription.html" style="color:#f87818;">premium plans page</a> for the exact amount each plan or booster costs.</div></div>
         <div class="step"><div class="step-num">5</div><div class="step-body"><b>Confirm your payment.</b><br>Go to the <a href="/subscription-paid/" style="color:#f87818;">confirmation page</a>, pick the plan you paid for, add your wallet address, and send it to support. They verify within 24 hours and credit the premium points on-chain to the wallet that paid.</div></div>
         <div class="step"><div class="step-num">6</div><div class="step-body"><b>Your wallet gets the points.</b><br>Only the wallet shown above can receive the points, so no one else can claim your payment. Once credited, activate your plan on the <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>.</div></div>
     </div>
 
     <div class="card">
         <b style="color:#f87818;">A note for total beginners:</b>
-        <p class="tip" style="margin:6px 0 0;">Yes, you will copy your wallet address to the exchange - that is normal and safe. The address is public (like a bank account number), so sharing it just tells people where to send you money. Your private key never leaves your wallet. Remember: when sending to this address, always choose the <b>Solana</b> network.</p>
+        <p class="tip" style="margin:6px 0 0;">Yes, you will copy your wallet address to the exchange - that is normal and safe. The address is public (like a bank account number), so sharing it just tells people where to send you money. Your private key never leaves your wallet. Remember: when sending to this address, always choose the <b>Solana</b> network, and always double-check that you copied the correct wallet address. Never type it by hand - a single wrong or missing character can send your funds to the wrong address, and unlike a bank, nobody (not the exchange, not GlobalFolkGames) can get them back once that happens.</p>
     </div>
 
     <a href="/profile/subscription.html" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:block;">← Back to plans</a>
@@ -59,34 +59,49 @@
 <script>
     if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({ brand:'👤 Profile', active:'subscription', sections:[{heading:'Overview', items:[{key:'home', label:'🏠 Profile home', href:'/profile/'}]},{heading:'Detail', items:[{key:'subscription', label:'💎 Premium subscription', href:'/profile/subscription.html'}]}]});
     (function () {
-        function loadWallet() {
+        var walletAddr = null;
+        function resolveAddr() {
+            try {
+                var w = (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || null;
+                if (w) {
+                    if (typeof w === 'string') return w;
+                    if (w.address) return String(w.address);
+                    if (w.publicKey && w.publicKey.toBase58) return w.publicKey.toBase58();
+                }
+                if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
+            } catch (e) { /* ignore */ }
+            return null;
+        }
+        function loadWallet(tries) {
+            tries = tries || 0;
             var el = document.getElementById('wallet-addr');
             var copyBtn = document.getElementById('wallet-copy');
             var copied = document.getElementById('wallet-copied');
             if (!el) return;
-            try {
-                var w = (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || null;
-                var addr = w ? (typeof w === 'string' ? w : (w.address ? String(w.address) : null)) : null;
-                if (!addr && window.currentProfile && window.currentProfile.solana_wallet) addr = String(window.currentProfile.solana_wallet);
-                if (!addr) {
-                    el.textContent = 'Sign in to load your wallet, then come back here.';
-                    el.style.color = '#f87818';
-                    return;
-                }
-                el.textContent = addr;
-                el.style.color = '#9fe8a8';
-                el.setAttribute('data-addr', addr);
-                if (copyBtn) copyBtn.onclick = function () {
-                    try {
-                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                            navigator.clipboard.writeText(addr).then(function(){ if (copied) copied.textContent = 'Copied!'; }, function(){ if (copied) copied.textContent = 'Select and copy manually.'; });
-                        } else if (copied) copied.textContent = 'Select and copy the address above.';
-                    } catch (e) {}
-                };
-            } catch (e) { /* ignore */ }
+            var addr = resolveAddr();
+            if (!addr) {
+                // Dynamic restores a silent session AFTER the page script runs;
+                // poll for ~18s so a logged-in user never sees "Sign in" here.
+                if (tries < 36) { setTimeout(function () { loadWallet(tries + 1); }, 500); return; }
+                var signedIn = !!(window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()));
+                el.textContent = signedIn ? 'Wallet is still loading. Open your Profile page and copy it from there.' : 'Please sign in above, then come back here.';
+                el.style.color = '#f87818';
+                return;
+            }
+            walletAddr = addr;
+            el.textContent = addr;
+            el.style.color = '#9fe8a8';
+            el.setAttribute('data-addr', addr);
+            if (copyBtn) copyBtn.onclick = function () {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(walletAddr).then(function(){ if (copied) copied.textContent = 'Copied!'; }, function(){ if (copied) copied.textContent = 'Select and copy manually.'; });
+                    } else if (copied) copied.textContent = 'Select and copy the address above.';
+                } catch (e) {}
+            };
         }
         loadWallet();
-        document.addEventListener('gfg:auth-changed', loadWallet);
+        if (typeof window.addEventListener === 'function') document.addEventListener('gfg:auth-changed', function(){ loadWallet(); });
     })();
 </script>
 </body>

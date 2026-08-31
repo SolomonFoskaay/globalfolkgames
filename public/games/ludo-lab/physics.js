@@ -381,6 +381,15 @@ function buildDice3dStage() {
             cube.appendChild(face);
         });
 
+        // Flat settle face: a plain 2D die that draws pips DIRECTLY from the ER
+        // VRF value. Shown only once the die locks onto the on-chain result, so
+        // the number the player sees is ALWAYS the number the game counts —
+        // no 3D orientation reading to get confused by.
+        const flat = document.createElement('div');
+        flat.className = 'gfg-die-flat';
+        flat.style.display = 'none';
+        die.appendChild(flat);
+
         die.appendChild(cube);
         stage.appendChild(die);
     }
@@ -413,7 +422,22 @@ function updateDice3dRender(dieEl, die, scale) {
     dieEl.style.setProperty('--pip-size', (Math.max(2.5, DICE_SIZE * scale * 0.16)).toFixed(1) + 'px');
 
     const cube = dieEl.querySelector('.gfg-die-cube');
+    const flat = dieEl.querySelector('.gfg-die-flat');
+    const settled = !!(die && die._settledExact && die.finalValue != null);
+    if (settled) {
+        // FLAT settle face (owner 2026-08-31): draw pips straight from the ER
+        // VRF value so the shown number is ALWAYS the counted number. No 3D
+        // rotation reading at all - the cube is hidden once the die locks.
+        if (flat) {
+            drawFlatDiceFace(flat, die.finalValue);
+            flat.style.display = 'block';
+        }
+        if (cube) cube.style.display = 'none';
+        return;
+    }
+    if (flat) flat.style.display = 'none';
     if (cube) {
+        cube.style.display = '';
         // Presentation (camera tilt so dice rest flat with their TOP face up,
         // plus a slight yaw) is applied AFTER the die's own orientation:
         // rotateY+rotateX then rotate3d. The pitch stays SHALLOW: a steep one
@@ -421,6 +445,26 @@ function updateDice3dRender(dieEl, die, scale) {
         // faces on display) instead of the VRF value face clearly on top.
         cube.style.transform = 'rotateY(12deg) rotateX(18deg) ' + quaternionToRotate3d(die.q || DICE_Q_IDENTITY());
     }
+}
+
+// Render the flat settled die with pips for the given face value (1-6). The
+// pip layout is the same table the cube uses, so a "3" shows exactly three
+// pips, etc. Idempotent: rebuilds only when the value changes.
+function drawFlatDiceFace(flatEl, value) {
+    if (!flatEl) return;
+    if (flatEl._flatValue === value) return;
+    flatEl._flatValue = value;
+    // Clear old pips but keep the shared background/border from CSS.
+    const old = flatEl.querySelectorAll('.gfg-pip');
+    for (let i = 0; i < old.length; i++) old[i].remove();
+    const pips = DICE_FACE_PIPS[value] || DICE_FACE_PIPS[1];
+    pips.forEach(([fx, fy]) => {
+        const pip = document.createElement('span');
+        pip.className = 'gfg-pip';
+        pip.style.left = (fx * 100).toFixed(1) + '%';
+        pip.style.top = (fy * 100).toFixed(1) + '%';
+        flatEl.appendChild(pip);
+    });
 }
 
 // Entry point called by the capture.js drawLudoLayout wrapper on every physics
