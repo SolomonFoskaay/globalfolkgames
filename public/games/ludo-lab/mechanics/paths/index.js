@@ -36,6 +36,13 @@ function isTokenInHomeYard(color, token) {
 }
 
 function isTokenMovable(color, token, index) {
+    // Anti-race guard (owner 2026-08-31): tokens may ONLY be moved after the
+    // dice have left the board (displayDiceOnBoard === false). While the dice
+    // are still showing, the tokens are NOT movable, so a player cannot fast-tap
+    // both rolls inside the ~3.5s dice window and force a double pass (skip the
+    // next player). The move/pass logic itself is untouched - this just removes
+    // the window that allowed the exploit.
+    if (typeof displayDiceOnBoard !== 'boolean' || displayDiceOnBoard) return false;
     if (color !== currentTurn || !isDiceRolled || currentTurnMoves.length === 0) return false;
 
     if (token.stepsWalked >= 57) return false;

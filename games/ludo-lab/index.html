@@ -302,8 +302,10 @@
                     var d = Math.floor(boost / 86400000);
                     var h = Math.floor((boost % 86400000) / 3600000);
                     var m = Math.floor((boost % 3600000) / 60000);
-                    var txt = '♾ ' + d + 'd:' + fmt2(h) + 'h:' + fmt2(m) + 'm';
+                    var s = Math.floor((boost % 60000) / 1000);
+                    var txt = '♾ ' + d + 'd:' + fmt2(h) + 'h:' + fmt2(m) + 'm:' + fmt2(s) + 's';
                     if (resetEl) { resetEl.textContent = txt; resetEl.style.color = '#2ecc71'; resetEl.title = 'Unlimited lives active — how long it lasts'; }
+                    if (overlayEl) { overlayEl.textContent = txt; overlayEl.style.color = '#2ecc71'; }
                 } else {
                     var r = resetLeft();
                     var rh = Math.floor(r / 3600000);

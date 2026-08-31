@@ -48,6 +48,10 @@ function handleInputInteraction(clientX, clientY) {
     if (playerProfiles[currentTurn].mode === 'computer') return;
 
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
+    // Anti-race guard (owner 2026-08-31): no token taps while the dice are
+    // still on the board. This is the same gate isTokenMovable now enforces,
+    // kept here so the click path can never bypass it (defense in depth).
+    if (typeof displayDiceOnBoard !== 'boolean' || displayDiceOnBoard) return;
 
     const rect = canvas.getBoundingClientRect();
     const mouseX = ((clientX - rect.left) / rect.width) * canvas.width;
