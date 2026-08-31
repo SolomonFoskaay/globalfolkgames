@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Earn Competitions | GlobalFolkGames</title>
-    <meta name="description" content="Join optional earn competitions: play within a window, climb the live Final-Points leaderboard and share real reward pools. Winners and payments are recorded on-chain.">
+    <title>Monthly Member Cup | GlobalFolkGames</title>
+    <meta name="description" content="Play your native games for real. Each month, members who win on a paid plan share 50% of that month's membership fees. On-chain dice. On-chain result.">
     <link rel="stylesheet" href="/style.css">
     <style>
         .tabrow { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
@@ -30,12 +30,26 @@
 <body>
     <main class="mobile-container dash-rail-content">
         <section class="onboarding-billboard">
-            <h2>🏆 Earn Competitions</h2>
+            <h1 style="margin:0; font-size:1.6rem; color:#fff; line-height:1.25;">Play the games. Keep the wins. Share the month.</h1>
+            <p class="auth-hint" style="margin-top:8px; line-height:1.6;">No videos. No followers. No streaming. Each month, members who actually win on a paid plan share 50% of that month&rsquo;s membership fees. You join by hand. You play your beloved native games like Ludo the way it is already played for generations. On-chain dice. On-chain result.</p>
+            <p style="margin-top:6px; font-size:0.8rem; color:#f87818; font-weight:800; letter-spacing:0.04em;">MONTHLY MEMBER CUP</p>
             <p class="auth-hint" id="comp-status" style="margin-top:8px;">Loading competitions...</p>
         </section>
 
         <!-- LIST VIEW -->
         <div id="list-view">
+            <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
+                <h3>Why this is not another play-to-earn</h3>
+                <p style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:6px 0 0;">Most apps that say &ldquo;get paid to play&rdquo; are either ad farms (pennies for installing someone else&rsquo;s game) or betting desks (you and a stranger lock cash, winner takes the pot). We are neither.</p>
+                <p style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:8px 0 0;">GlobalFolkGames pays from membership fees people already chose to pay, the same idea as a creator platform sharing subscription money - except your &ldquo;content&rdquo; is a finished native-game win, signed on-chain. You do not stake against the other player. You do not buy a loot box. You play Ludo, Ayo, Truco and the rest as they are played at home.</p>
+                <p style="color:var(--muted); font-size:0.86rem; line-height:1.7; margin:8px 0 0;">That is the product. The cup is how dedicated players get a slice of the table they help fill.</p>
+                <div class="cta-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+                    <a href="#ongoing" class="launch-btn onchain" style="text-align:center; text-decoration:none; flex:1; min-width:190px;" onclick="window.__goTab('ongoing')">See this month&rsquo;s cup</a>
+                    <a href="/games/" class="launch-btn" style="text-align:center; text-decoration:none; flex:1; min-width:190px; background:#1a1a24; border:1px solid #333; color:#bbb;">Play folk games free</a>
+                    <a href="/profile/subscription.html" class="launch-btn" style="text-align:center; text-decoration:none; flex:1; min-width:190px; background:transparent; border:1px solid var(--accent-purple); color:#bbb;">Upgrade to L1 to join</a>
+                </div>
+            </section>
+
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                 <input id="comp-search" style="flex:1; min-width:160px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#fff; font-size:0.85rem;" placeholder="Search by name or date (month/year)..." autocomplete="off">
                 <select id="comp-month" style="padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:#1a1a24; color:#fff;">
@@ -62,14 +76,77 @@
             <div id="detail-card"></div>
         </div>
 
-        <section class="game-card" style="margin-top:16px;">
-            <h3>How it works</h3>
+        <section class="game-card" style="margin-top:16px; border:1px solid var(--accent-purple, #7838f8);">
+            <h3>How the monthly Member Cup works</h3>
             <ol style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
-                <li><b style="color:#fff;">Enter a window</b> - be on one of the plans the competition allows and pay the small entry once.</li>
-                <li><b style="color:#fff;">Play inside the window</b> - only verified wins made while it is live count. It stops taking results the moment it ends.</li>
-                <li><b style="color:#fff;">Watch Final Points</b> - Total Points boosted live by your plan (Level 3 = 1.5x, Level 2 = 1x). Drop to the free plan and you go hidden until you resubscribe.</li>
-                <li><b style="color:#fff;">Top finishers share the pool</b> - winners are recorded on-chain and paid by the platform; each window's page shows the final board and paid status.</li>
+                <li><b style="color:#fff;">Play free whenever you want.</b> Wins still write to your ledger. Free play never shares membership fees.</li>
+                <li><b style="color:#fff;">Want this month&rsquo;s share?</b> Be on L1, L2, or L3 Early Backer, tick that you are 18+, and press Join on this month&rsquo;s cup. You are not auto-enrolled. Miss the button, miss the month.</li>
+                <li><b style="color:#fff;">Play completed games in the window.</b> First place is 100 pure game-win points. In a 4-player game, 2nd is 25, 3rd is 10, 4th is 0. Abandoned and reset games pay nothing. Computer, a friend on the same phone, or a stranger all count in this version - we care that you showed up and finished.</li>
+                <li><b style="color:#fff;">Hit 10,000 raw points before any boost.</b> That is about 100 first-place finishes in the 30-day window. Below 10,000 you stay on the public board. You do not enter the share.</li>
+                <li><b style="color:#fff;">Final Points = raw points &times; your plan.</b> L1 &times; 1.00. L2 &times; 1.25. L3 Early Backer &times; 1.50. Qualifiers split 50% of membership fees collected that same month, in proportion to Final Points.</li>
+                <li><b style="color:#fff;">Stay subscribed through the last day.</b> Let the plan lapse and you drop off the paid board until you renew inside the window. When the window closes, it closes. Payouts land in the embedded wallet 1 to 7 days later. Under $5 waits for the next month.</li>
             </ol>
+            <p style="color:#2ecc71; font-weight:700; font-size:0.85rem; margin-top:10px;">No second entry fee. Your plan is the ticket.</p>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>Who gets paid, in one screen</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:10px;">
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 14px;">
+                    <b style="color:#f87818;">On the board</b>
+                    <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin:6px 0 0;">Joined the cup, 18+, plan live. Everyone can see your points. This is pride.</p>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2ecc71; border-radius:10px; padding:12px 14px;">
+                    <b style="color:#2ecc71;">In the share</b>
+                    <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin:6px 0 0;">Same as above, and 10,000+ raw pure game-win points in this window. Only this group splits the 50%.</p>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 14px;">
+                    <b style="color:#888;">Not in the share</b>
+                    <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin:6px 0 0;">Free plan. Bonus / referral / daily-login points. Plan dropped mid-window and not renewed. Under 18. Did not press Join.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>What 50% actually means</h3>
+            <p style="color:var(--muted); font-size:0.85rem; line-height:1.7; margin:6px 0 0;">The share is not a prize we top up from a private pocket. If 40 people pay L1 this month, 50% of those fees is the cup. If 400 people pay, the cup is ten times that. You see the live pool number on the cup card when a window is open. After close, the same page shows who qualified, their Final Points, and the paid transaction.</p>
+            <p class="hidden-note" style="margin-top:8px;">Ads, lives packs, and cosmetic boards stay with the studio. Brand-sponsored side cups, when they exist, are separate and labelled.</p>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>This month vs later</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px;">
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 14px;">
+                    <b style="color:#f87818;">This version (now)</b>
+                    <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin:6px 0 0;">Ludo is live. Computer and friends count. The work is showing up every day and closing games. Dice and moves are already on-chain.</p>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2a2a36; border-radius:10px; padding:12px 14px;">
+                    <b style="color:#7838f8;">When online multiplayer and more games ship</b>
+                    <p style="color:var(--muted); font-size:0.82rem; line-height:1.6; margin:6px 0 0;">Ayo, Truco and the rest add more ways to earn the same 10,000. Separate tournaments will require rotating real humans - that is a different product, labelled as such.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>Rules that do not move</h3>
+            <ul style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
+                <li><b style="color:#fff;">18+ only for the cup.</b> You confirm it when you join. Cash countries may also need a simple age check before the first payout.</li>
+                <li><b style="color:#fff;">Pure game-win points only.</b> Sign-up gifts and referrals never count.</li>
+                <li><b style="color:#fff;">One account.</b> Ban ends the month for that account. No argument pool.</li>
+                <li><b style="color:#fff;">We do not take a cut of your match.</b> There is no player-vs-player stake.</li>
+                <li><b style="color:#fff;">Some countries will only see points, not cash,</b> until we can pay there cleanly. Play still works.</li>
+                <li><b style="color:#fff;">This is a member reward funded by subscriptions.</b> It is not a bet, a token casino, or a guaranteed income.</li>
+            </ul>
+        </section>
+
+        <section class="game-card" style="margin-top:16px;">
+            <h3>Questions</h3>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Is this gambling?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">No stake against another player. The month&rsquo;s membership fees fund a published ranking. If your country cannot take cash, you still play and rank.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Can I join late?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">Yes, until the window ends. Only wins inside the window count. 10,000 is 10,000 whether you start on day 1 or day 10.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">What if I only play vs computer?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">It counts for this monthly cup. Finish the game.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">What if I forget to tap Join?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">You play for the ledger and for fun. You do not share this month.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Why 10,000?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">So the 50% goes to people who lived on the board, not to a hundred accounts with one lucky game.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">When do I get paid?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">1-7 days after the month ends, to the same embedded wallet you use on the site.</p></details>
         </section>
     </main>
 
@@ -205,20 +282,38 @@
                 var slice = items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
                 renderTabs();
                 if (!items.length) {
-                    listBox.innerHTML = '<p class="empty">No ' + tab + ' competitions right now.</p>';
+                    if (tab === 'ongoing') {
+                        listBox.innerHTML = '<p class="empty">No cup is open this second. The next monthly Member Cup will sit here. Create a free account and play folk games like Ludo now so you already have the habit when the window opens.</p>';
+                    } else {
+                        listBox.innerHTML = '<p class="empty">No ' + tab + ' competitions right now.</p>';
+                    }
                     pagerEl.innerHTML = '';
                     return;
                 }
                 listBox.innerHTML = slice.map(function (c) {
                     var now = Date.now();
                     var endsH = Math.max(0, Math.floor((c.endsAt * 1000 - now) / 3600000));
-                    return '<div class="game-card comp-row" style="margin-bottom:10px;" onclick="window.__open(' + c.seq + ')">' +
+                    var startTxt = new Date(c.startsAt * 1000).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+                    var endTxt = new Date(c.endsAt * 1000).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+                    var isPast = tab === 'past' || c.status === 2;
+                    var pool = c.poolUsdCents != null ? '$' + (c.poolUsdCents / 100).toFixed(2) : 'see board';
+                    return '<div class="game-card" style="margin-bottom:10px;">' +
                         '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
                         '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
-                        (tab === 'ongoing' ? '<span style="color:#2ecc71; font-weight:800;">LIVE · ends in ' + endsH + 'h</span>' : tab === 'upcoming' ? '<span style="color:#7838f8; font-weight:700;">' + new Date(c.startsAt * 1000).toUTCString().slice(0, 11) + '</span>' : '<span style="color:#888;">' + STATUS[c.status] + '</span>') +
+                        (tab === 'ongoing' ? '<span style="color:#2ecc71; font-weight:800;">OPEN · ends in ' + endsH + 'h</span>' : tab === 'upcoming' ? '<span style="color:#7838f8; font-weight:700;">' + startTxt + '</span>' : '<span style="color:#888;">' + STATUS[c.status] + '</span>') +
                         '</div>' +
-                        '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">Pool <b style="color:#f87818;">$' + (c.poolUsdCents / 100).toFixed(2) + '</b> = ' + c.poolPoints + ' pts · entry ' + c.entryCost + 'P · needs ' + tierNeeds(c) + ' · ' + c.winnerCount + ' winners</p>' +
+                        '<p style="color:var(--muted); font-size:0.82rem; margin:6px 0 0;">' + startTxt + ' &rarr; ' + endTxt + ' &middot; <span style="color:#2ecc71; font-weight:800;">50%</span> of this month&rsquo;s membership fees &middot; Pool this month: <b style="color:#f87818;">' + pool + '</b>' + '</p>' +
+                        '<p style="color:#888; font-size:0.78rem; margin:4px 0 0;">Join cutoff: ' + endTxt + ' (last day of the window)</p>' +
+                        (isPast ? '<p style="color:#888; font-size:0.75rem; margin:4px 0 0;">Earlier format. New cups use the 10,000-point Member Cup rules above.</p>' : '') +
                         '<div class="prize-grid">' + prizeSlot(c).map(function (v, i) { return '<div class="prize"><b>' + v + '</b><span>#' + (i + 1) + '</span></div>'; }).join('') + '</div>' +
+                        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">' +
+                        (tab === 'past'
+                            ? '<button class="launch-btn onchain" style="flex:1; min-width:140px; text-align:center;" onclick="window.__open(' + c.seq + ')">View board</button>' +
+                              '<span style="flex:1; min-width:140px; text-align:center; background:#1a1a24; border:1px solid #333; color:#bbb; padding:10px 6px; border-radius:10px; font-size:0.82rem;">Qualified 10,000+ &middot; Paid / Paying</span>'
+                            : '<button class="launch-btn onchain" style="flex:1; min-width:140px; text-align:center;" onclick="window.__open(' + c.seq + ')">Join this cup</button>' +
+                              '<button class="launch-btn" style="flex:1; min-width:140px; text-align:center; background:#1a1a24; border:1px solid #333; color:#bbb;" onclick="window.__open(' + c.seq + ')">View board</button>' +
+                              '<a href="/profile/subscription.html" class="launch-btn" style="flex:1; min-width:140px; text-align:center; background:transparent; border:1px solid var(--accent-purple); color:#bbb;">Upgrade to join</a>') +
+                        '</div>' +
                         '</div>';
                 }).join('');
                 var pagesHtml = '<button onclick="window.__page(page-1)" ' + (page <= 1 ? 'disabled' : '') + '>Prev</button>' +
@@ -229,6 +324,12 @@
             }
 
             window.__page = function (p) { page = p; renderList(); };
+            window.__goTab = function (t) {
+                tab = t || 'ongoing'; page = 1;
+                tabsBox.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+                renderList();
+                try { var target = document.getElementById('list-view'); if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+            };
             window.__backToList = function () { history.replaceState(null, '', '/competitions/'); listView.style.display = ''; detailView.style.display = 'none'; window.__detailSeq = null; renderList(); };
 
             window.__open = function (seq) {
@@ -280,23 +381,32 @@
                 if (window.__enterLock && window.__enterLock[c.seq]) return;
                 var joined = window.gfgCompetitions && typeof window.gfgCompetitions.isEntered === 'function' && window.gfgCompetitions.isEntered(c);
                 if (joined) {
-                    holder.innerHTML = '<p style="color:#2ecc71; font-size:0.9rem; margin-top:12px; font-weight:700;">You have joined this competition. Wins inside the window now count for you.</p>';
+                    holder.innerHTML = '<p style="color:#2ecc71; font-size:0.9rem; margin-top:12px; font-weight:700;">You have joined this cup. Wins inside the window now count for you.</p>';
                     return;
                 }
                 var w = myWallet();
                 holder.innerHTML = !w
-                    ? '<p class="empty" style="margin-top:12px;">Sign in to enter this competition.</p>'
-                    : '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Enter this competition</button>';
+                    ? '<p class="empty" style="margin-top:12px;">Sign in to join this cup.</p>'
+                    : '<label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; cursor:pointer; font-size:0.85rem; color:#ddd;">' +
+                      '<input type="checkbox" id="age-ok-' + c.seq + '" style="margin-top:2px; width:18px; height:18px;">' +
+                      '<span>I am 18 or older and I want this month&rsquo;s Member Cup.</span></label>' +
+                      '<button class="launch-btn onchain" style="width:100%; margin-top:12px;" onclick="window.__enter(' + c.seq + ')">Join this cup</button>';
             }
             window.__enter = async function (seq) {
                 var c = (window.__comps || []).find(x => x.seq === seq);
                 var holder = document.getElementById('enter-' + seq);
-                holder.innerHTML = '<p class="hidden-note">Entering...</p>';
+                if (!holder) return;
+                var ageOk = document.getElementById('age-ok-' + seq);
+                if (!ageOk || !ageOk.checked) {
+                    holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Tick the 18+ box above (I am 18 or older and I want this month&rsquo;s Member Cup) to join. No checkbox, no join.</p>';
+                    return;
+                }
+                holder.innerHTML = '<p class="hidden-note">Joining...</p>';
                 var res = await window.gfgCompetitions.enter(c);
-                if (res.error === 'signin') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Sign in (top right) to enter this competition, then tap Enter again.</p>';
-                else if (res.error === 'tier') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Entry needs one of: ' + tierNeeds(c) + ' (Level 3 is ad-free too).</p>';
-                else if (res.error === 'insufficient') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Entry needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
-                else holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Entered. Wins inside the window now count toward the board.</p>';
+                if (res.error === 'signin') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Sign in (top right) to join this cup, then tap Join again.</p>';
+                else if (res.error === 'tier') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Joining needs one of: ' + tierNeeds(c) + '. Upgrade to L1 or higher on the <a href="/profile/subscription.html" style="color:#f87818;">Premium plans page</a>.</p>';
+                else if (res.error === 'insufficient') holder.innerHTML = '<p style="color:#e86818; font-size:0.85rem; margin-top:10px;">Joining needs ' + (res.cost || c.entryCost) + 'P of spendable (tried: ' + (res.tried || []).join(', ') + '), spent on-chain. Earn more points, get premium points, or top up first.</p>';
+                else holder.innerHTML = '<p style="color:#2ecc71; font-size:0.85rem; margin-top:10px;">Joined. Wins inside the window now count toward the board.</p>';
                 window.__enterLock = window.__enterLock || {};
                 window.__enterLock[seq] = true;
             };
