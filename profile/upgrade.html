@@ -18,8 +18,11 @@
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
             <h3>Your premium balance — direct on-chain check</h3>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 2 minutes (max 30 times per hour). Tap Refresh to check.</p>
-            <div id="upgrade-ledger"><p class="empty">Tap Refresh to load your live premium balance.</p></div>
+            <div style="background:#10241a; border:1px solid rgba(46,204,113,0.35); border-radius:10px; padding:10px 12px; font-size:0.8rem; color:#cde9d6; line-height:1.6; margin-bottom:10px;">
+                <b style="color:#2ecc71;">How this page works:</b> your balance loads from the chain automatically when the page opens. Once it shows, the Activate buttons below unlock and work immediately, no manual step needed. If the balance ever looks blank, tap <b>Refresh</b> below (once every 2 minutes) to reload it.
+            </div>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-bottom:10px;">This reads your premium ledger directly from the chain (not from cache), so you see the live value. To avoid overloading the RPC, you can refresh only once every 2 minutes (max 30 times per hour).</p>
+            <div id="upgrade-ledger"><p class="empty">Loading your premium balance...</p></div>
             <button id="refresh-premium" class="launch-btn onchain" style="margin-top:12px; width:100%;">Refresh premium balance (direct RPC)</button>
             <p id="refresh-hint" style="color:var(--muted); font-size:0.75rem; margin-top:6px; text-align:center;"></p>
         </section>
@@ -34,8 +37,9 @@
                 <button type="button" class="launch-btn" data-plan="2" onclick="window.__pickPlan(this,2)">Level 2 · 10,000P</button>
                 <button type="button" class="launch-btn" data-plan="3" onclick="window.__pickPlan(this,3)">Level 3 · 15,000P</button>
             </div>
+            <div style="font-size:0.78rem; color:#888; margin-bottom:8px; line-height:1.5;">Your balance loads automatically above. The Activate button unlocks only after a live balance shows here, so it never fails silently.</div>
             <button id="upgrade-btn" class="launch-btn onchain" style="width:100%;" disabled>Upgrade to Level 1 (cost 5,000P)</button>
-            <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits your premium points, come here, refresh, pick a plan and tap Upgrade to start your 30 days.</p>
+            <p style="color:var(--muted); font-size:0.75rem; margin-top:8px; text-align:center;">After support credits your premium points, come here, pick a plan and tap Upgrade to start your 30 days. If your points just arrived, tap Refresh above (once every 2 minutes).</p>
         </section>
 
         <section id="booster-card" class="game-card" style="border:1px solid #2ecc71;">
@@ -48,7 +52,8 @@
                 3. Refresh your balance, then tap the button here to activate your window of unlimited lives.
             </div>
             <div id="booster-status" style="font-size:0.85rem; color:var(--muted); margin-bottom:8px;"></div>
-            <div id="booster-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+            <div style="font-size:0.78rem; color:#888; margin-bottom:10px; line-height:1.5;">Both buttons need your balance loaded (automatic above). The correct one unlocks once it sees enough premium points, so you can't activate by mistake.</div>
+            <div id="booster-actions" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:8px;">
                 <button id="booster-btn-24" class="launch-btn onchain" style="flex:1; min-width:200px;">Activate 24h booster (500P)</button>
                 <button id="booster-btn-72" class="launch-btn onchain" style="flex:1; min-width:200px;">Activate 72h booster (1,500P)</button>
             </div>
@@ -88,7 +93,7 @@
             const actionMsg = document.getElementById('upgrade-action-msg');
 
             const REFRESH_KEY = 'gfg_upgrade_refresh_lock';
-            const LOCK_MS = 5 * 60 * 1000; // 5-minute recheck lock (owner 2026-08-23)
+            const LOCK_MS = 2 * 60 * 1000; // 2-minute manual-recheck lock (owner 2026-08-31)
 
             function canRefresh() {
                 try {
@@ -103,17 +108,18 @@
                     if (diff < LOCK_MS) {
                         const left = Math.ceil((LOCK_MS - diff)/60000);
                         refreshBtn.disabled = true;
-                        refreshHint.textContent = `Refresh locked — try again in ${left} minute${left!==1?'s':''} (max 12 times per hour to protect the RPC).`;
+                        refreshHint.textContent = `Refresh locked — try again in ${left} minute${left!==1?'s':''} (max 30 times per hour to protect the RPC).`;
                         setTimeout(updateRefreshLock, 60000);
                     } else {
                         refreshBtn.disabled = false;
-                        refreshHint.textContent = 'Ready to refresh (once every 5 minutes).';
+                        refreshHint.textContent = 'Ready to refresh (once every 2 minutes).';
                     }
                 } catch(e) {}
             }
             updateRefreshLock();
 
             let balanceChecked = false; // requires a fresh balance check before Upgrade unlocks
+            let autoLoadDone = false;   // true once the on-load RPC check lands/seeds
             const countdownEl = document.getElementById('upgrade-countdown');
             let activeUntil = 0;       // used by the live countdown interval
             function tickCountdown() {
@@ -161,9 +167,9 @@
                     countdownEl.style.display='block';
                     actionMsg.innerHTML = '<span style="color:#2ecc71;">You are on the Level ' + lvl + ' plan. The Upgrade button stays locked until this plan ends.</span>';
                 } else if (!balanceChecked) {
-                    // Must do a fresh balance check first (unlocks after tapping Refresh).
+                    // Balance not yet verified: keep Upgrade locked until a live read lands.
                     upgradeBtn.disabled = true;
-                    actionMsg.innerHTML = '<span style="color:#f87818;">Tap <b>Refresh</b> above (once every 2 minutes) to check your balance, then Upgrade unlocks.</span>';
+                    actionMsg.innerHTML = '<span style="color:#f87818;">Your balance is loading below (automatic on-chain check). If it stays blank, tap <b>Refresh</b> above (once every 2 minutes) — Upgrade unlocks after a live balance read.</span>';
                 } else if ((ledger.premiumSpendable||0) >= PLAN_COSTS[pick]) {
                     upgradeBtn.disabled = false;
                     actionMsg.innerHTML = '<span style="color:#2ecc71;">Balance checked — you have ' + spend + ' spendable. Tap Upgrade to start your 30-day Level ' + pick + ' plan.</span>';
@@ -174,12 +180,20 @@
                 tickCountdown();
                 if (ledger.premiumLifetime != null) {
                     statusEl.textContent = active? 'Level ' + lvl + ' active — your boost is running.' : ('Balance checked — ' + spend + ' spendable.')
-                        + (balanceChecked? '' : ' Tap Refresh for the live value.');
+                        + (balanceChecked? '' : ' Live balance loads automatically below; tap Refresh if it stays blank.');
                 }
             }
 
             refreshBtn.addEventListener('click', async () => {
                 if (!canRefresh()) { updateRefreshLock(); return; }
+                await loadLiveBalance('manual');
+            });
+
+            // Shared live-balance loader: reads the premium ledger directly from
+            // the chain via premiumPoints.fetch() (gasless, seeds the module cache
+            // that the Upgrade + booster buttons read). `mode` is 'auto' (page
+            // load, no lock) or 'manual' (Refresh button, sets the 2-min lock).
+            async function loadLiveBalance(mode) {
                 const wallet = (window.getDynamicSolanaWallet ? window.getDynamicSolanaWallet() : null) || (window.currentProfile ? window.currentProfile.solana_wallet : null);
                 let addr = wallet;
                 if (addr && typeof addr !== 'string') addr = addr.address || String(addr);
@@ -189,22 +203,22 @@
                     return;
                 }
                 refreshBtn.disabled = true;
-                refreshBtn.textContent = 'Checking on-chain...';
-                ledgerEl.innerHTML = '<p class="empty">Reading your premium ledger directly from the chain...</p>';
+                if (mode === 'manual') refreshBtn.textContent = 'Checking on-chain...';
+                if (!autoLoadDone && mode === 'auto') ledgerEl.innerHTML = '<p class="empty">Loading your live premium balance...</p>';
                 try {
-                    localStorage.setItem(REFRESH_KEY, String(Date.now()));
-                    updateRefreshLock();
-                    // Direct RPC — not from cache, to mitigate misuse we only allow via button and lock.
-                    // Use premiumPoints.fetch() so the module CACHE is seeded too — the Upgrade
-                    // button reads window.premiumPoints.get(), and without this it always sees 0
-                    // spendable and stays disabled even after the balance is shown.
+                    // Direct gasless RPC read (not cached) — this also fills the
+                    // module's cache so the Upgrade and booster buttons see it.
                     let ledger = null;
                     if (window.premiumPoints && typeof window.premiumPoints.fetch === 'function') {
                         ledger = await window.premiumPoints.fetch();
                     } else if (window.magicblockDice && window.magicblockDice.fetchPremiumPointsPdaFor) {
                         ledger = await window.magicblockDice.fetchPremiumPointsPdaFor(addr);
                     }
-                    balanceChecked = true; // a successful live check unlocks the Upgrade button
+                    balanceChecked = true; // a successful live check unlocks Upgrade + boosters
+                    if (mode === 'manual') {
+                        try { localStorage.setItem(REFRESH_KEY, String(Date.now())); } catch(e) {}
+                        updateRefreshLock();
+                    }
                     if (!ledger) {
                         // No account yet — show 0 (upgrade button stays disabled, tells to get premium)
                         renderPremiumCard({ premiumLifetime:0, premiumSpendable:0, subscriptionLevel:0, subscriptionActiveUntil:0, lastCreditPoints:0, lastCreditRef:'', lastCreditTs:0 });
@@ -216,33 +230,48 @@
                     ledgerEl.innerHTML = '<p class="empty">Could not read premium ledger (' + e.message + ').</p>';
                     statusEl.textContent = 'Could not load premium balance.';
                     refreshBtn.textContent = 'Refresh premium balance (direct RPC)';
-                    updateRefreshLock();
+                    if (mode === 'manual') updateRefreshLock();
+                } finally {
+                    refreshBtn.disabled = false;
+                    runBooster(24);
+                    runBooster(72);
+                    renderBooster();
                 }
-            });
+            }
 
-            // Also try to show cached value on first load without RPC
+            // Also try to show cached value on first load without RPC (so the card is
+            // never blank while the live read is in flight).
             try {
                 const pp = window.premiumPoints ? window.premiumPoints.get() : null;
                 if (pp && pp.premiumLifetime != null) {
                     renderPremiumCard(pp);
-                    statusEl.textContent = 'Showing cached premium balance — tap Refresh for live on-chain check.';
-                } else {
-                    statusEl.textContent = 'Tap Refresh to check your live premium balance (once every 5 minutes).';
+                    statusEl.textContent = 'Showing your balance — refreshing live on-chain value...';
                 }
             } catch(e) {}
 
-            // FIRST-VISIT AUTO-CHECK (owner 2026-08-23): load the live balance ONCE on
-            // arrival (when no recent check) so the plan/upgrade/booster controls are
-            // ready without knowing you have to tap Refresh. After that, the same
-            // 5-minute lock applies and the button is the only recheck trigger.
-            (function autoCheckOnce() {
+            // AUTO-LOAD ON ARRIVAL (owner 2026-08-31): fetch the live balance
+            // immediately when the page opens (no manual tap, no lock) and use the
+            // result to update the balance card, the Upgrade button and both booster
+            // buttons, so a user never has to refresh before activating. The manual
+            // Refresh button stays as a 2-minute-gated backup. Retries for ~10s to
+            // catch a wallet that takes a moment to restore.
+            (function autoLoad() {
                 try {
-                    if (!canRefresh()) return;
                     const signedIn = !!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())
                         || !!(window.currentUser)
                         || !!(window.currentProfile && window.currentProfile.solana_wallet);
                     if (!signedIn) return;
-                    setTimeout(function () { try { refreshBtn.click(); } catch (e) {} }, 450);
+                    let tries = 0;
+                    const attempt = function () {
+                        if (autoLoadDone) return;
+                        if (!(window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) && !(window.currentProfile && window.currentProfile.solana_wallet)) {
+                            if (tries++ < 16) setTimeout(attempt, 600); // ~10s budget for wallet restore
+                            return;
+                        }
+                        autoLoadDone = true;
+                        setTimeout(function () { try { loadLiveBalance('auto'); } catch (e) {} }, 350);
+                    };
+                    attempt();
                 } catch (e) { /* ignore */ }
             })();
 

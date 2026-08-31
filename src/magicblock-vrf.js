@@ -951,7 +951,7 @@ export async function activateBooster(hours = 24) {
   const regionUrl = await regionUrlFor(premiumPda);
 
   const sig = await withErRetry('activate_booster', async (ctx) => ctx.program.methods
-    .activateBooster(hours)
+    .activateBooster(new BN(hours))
     .accounts({
       premiumPoints: premiumPda,
       payer: wallet.publicKey,

@@ -14,8 +14,11 @@
         .step-num { background:#f87818; color:#000; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; flex-shrink:0; }
         .step-body { flex:1; font-size:0.88rem; color:#ddd; line-height:1.6; }
         .step-body b { color:#f87818; }
+        .step-body i { color:#9fe8a8; font-style:normal; }
         code, .mono { font-family:monospace; }
-        .addr { background:#1a1a24; border:1px solid #2a2a36; border-radius:8px; padding:10px; font-size:0.8rem; color:#9fe8a8; word-break:break-all; }
+        .addr { background:#1a1a24; border:1px solid #2a2a36; border-radius:8px; padding:10px; font-size:0.8rem; color:#9fe8a8; word-break:break-all; margin-top:4px; }
+        .copy-row { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+        .copy-btn2 { background:#2ecc71; color:#000; border:none; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; }
         .tip { font-size:0.78rem; color:#888; line-height:1.5; margin-top:6px; }
         a { color:#f87818; }
     </style>
@@ -23,25 +26,68 @@
 <body>
 <div class="page">
     <h1>Pay with crypto (USD only)</h1>
-    <p class="tip" style="margin:0 0 12px;">New to crypto? These five steps are all you need. You pay from your own GlobalFolkGames wallet, so support always knows it was you - only the wallet that paid gets the points.</p>
+    <p class="tip" style="margin:0 0 12px;">New to crypto? Follow the steps below. Your payment is tracked by your wallet address, so support always knows it was you - only the wallet that paid gets the points.</p>
 
     <div class="card">
-        <div class="step"><div class="step-num">1</div><div class="step-body"><b>Top up your wallet with a little SOL first.</b><br>Send <b>at least 0.01 SOL (about $1-2)</b> to your embedded Solana wallet on the site before you buy anything. You only do this once - it pays the tiny network fees on your future game transactions and renewals. Ask support (GlobalFolkGames@gmail.com) for your wallet address, or use the address shown on your profile.</div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-body"><b>Then fund it with USDC (or SOL).</b><br>For the actual plan or booster, send the needed <b>USDC</b> to the same wallet. USDC is the stable coin that stays equal to one US dollar, so your payment is a fixed USD amount - never a fluctuating guess.</div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-body"><b>Pay from the site, from your own wallet.</b><br>On this page you tap the exact plan you want and the site builds the payment from <b>your embedded wallet</b>. Because it pays from your own wallet, support always credits the correct account - no one else can claim your payment.</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-body"><b>Confirm your payment.</b><br>You are taken to the confirmation page. Pick the plan you paid, add your wallet address and payment signature, and send it to support.</div></div>
-        <div class="step"><div class="step-num">5</div><div class="step-body"><b>Points are credited to your wallet.</b><br>Support verifies within 24 hours and credits the premium points on-chain to the wallet that paid. Then you activate your plan or booster and play.</div></div>
+        <div style="background:#10241a; border:1px solid rgba(46,204,113,0.35); border-radius:10px; padding:12px 14px; font-size:0.8rem; color:#cde9d6; line-height:1.6; margin-bottom:14px;">
+            <b style="color:#2ecc71;">Your payment wallet (copy this)</b>
+            <div id="wallet-addr" class="addr">Sign in to load your wallet.</div>
+            <div class="copy-row">
+                <button id="wallet-copy" class="copy-btn2">Copy wallet address</button>
+                <span id="wallet-copied" style="font-size:0.78rem; color:#2ecc71;"></span>
+            </div>
+            <p class="tip" style="margin:8px 0 0;">This is your GlobalFolkGames wallet. It is the only wallet that can receive your payment and the only wallet the points will be credited to. If you do not see an address, open your <a href="/profile/" style="color:#2ecc71;">Profile page</a> and look for "Your on-chain wallet".</p>
+        </div>
+
+        <div class="step"><div class="step-num">1</div><div class="step-body"><b>Get some crypto (the first-time step).</b><br>If you have never owned crypto, open an exchange (such as Binance, Coinbase, KuCoin, or any exchange available in your country), create an account, and buy a little <b>SOL</b> and the <b>USDC</b> you need. Already on crypto? Skip ahead - you can pay straight from any wallet you already have.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><b>Copy your GlobalFolkGames wallet address.</b><br>Use the blue box above. <i>Important:</i> when you send from the exchange, paste this exact address and choose the network <b>Solana</b> at the destination. Choosing anything else (for example ERC-20 or BNB) sends your money to the wrong network and can be lost - so always pick Solana.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><b>Send a little SOL first.</b><br>Send <b>at least 0.01 SOL (about $1-2)</b> to your GlobalFolkGames wallet. You only do this once - it pays the tiny network fees on your future game transactions. Without it, the chain cannot process your game moves.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><b>Then send the USDC for your plan or booster.</b><br>Send the exact <b>USDC</b> amount for what you want (Level 1 = $5, Level 2 = $10, Level 3 = $15, 24h booster = $1, 72h booster = $2) to the same wallet address, always on the <b>Solana</b> network. USDC stays equal to one dollar, so your payment is a fixed USD amount - never a fluctuating guess.</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-body"><b>Confirm your payment.</b><br>Go to the <a href="/subscription-paid/" style="color:#f87818;">confirmation page</a>, pick the plan you paid for, add your wallet address, and send it to support. They verify within 24 hours and credit the premium points on-chain to the wallet that paid.</div></div>
+        <div class="step"><div class="step-num">6</div><div class="step-body"><b>Your wallet gets the points.</b><br>Only the wallet shown above can receive the points, so no one else can claim your payment. Once credited, activate your plan on the <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>.</div></div>
     </div>
 
     <div class="card">
         <b style="color:#f87818;">A note for total beginners:</b>
-        <p class="tip" style="margin:6px 0 0;">Crypto can feel unfamiliar at first, but this flow is made to be friendly: your wallet lives on the site, you don't copy long addresses into outside apps, and you only ever pay with stable USDC in USD amounts. The 0.01 SOL top-up in step 1 is just enough for the tiny network fees, so future moves and renewals cost you almost nothing.</p>
+        <p class="tip" style="margin:6px 0 0;">Yes, you will copy your wallet address to the exchange - that is normal and safe. The address is public (like a bank account number), so sharing it just tells people where to send you money. Your private key never leaves your wallet. Remember: when sending to this address, always choose the <b>Solana</b> network.</p>
     </div>
 
     <a href="/profile/subscription.html" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:block;">← Back to plans</a>
 </div>
 <script src="/global_header.js"></script>
 <script src="/dash-nav.js"></script>
-<script> if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({ brand:'👤 Profile', active:'subscription', sections:[{heading:'Overview', items:[{key:'home', label:'🏠 Profile home', href:'/profile/'}]},{heading:'Detail', items:[{key:'subscription', label:'💎 Premium subscription', href:'/profile/subscription.html'}]}]}); </script>
+<script>
+    if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({ brand:'👤 Profile', active:'subscription', sections:[{heading:'Overview', items:[{key:'home', label:'🏠 Profile home', href:'/profile/'}]},{heading:'Detail', items:[{key:'subscription', label:'💎 Premium subscription', href:'/profile/subscription.html'}]}]});
+    (function () {
+        function loadWallet() {
+            var el = document.getElementById('wallet-addr');
+            var copyBtn = document.getElementById('wallet-copy');
+            var copied = document.getElementById('wallet-copied');
+            if (!el) return;
+            try {
+                var w = (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || null;
+                var addr = w ? (typeof w === 'string' ? w : (w.address ? String(w.address) : null)) : null;
+                if (!addr && window.currentProfile && window.currentProfile.solana_wallet) addr = String(window.currentProfile.solana_wallet);
+                if (!addr) {
+                    el.textContent = 'Sign in to load your wallet, then come back here.';
+                    el.style.color = '#f87818';
+                    return;
+                }
+                el.textContent = addr;
+                el.style.color = '#9fe8a8';
+                el.setAttribute('data-addr', addr);
+                if (copyBtn) copyBtn.onclick = function () {
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(addr).then(function(){ if (copied) copied.textContent = 'Copied!'; }, function(){ if (copied) copied.textContent = 'Select and copy manually.'; });
+                        } else if (copied) copied.textContent = 'Select and copy the address above.';
+                    } catch (e) {}
+                };
+            } catch (e) { /* ignore */ }
+        }
+        loadWallet();
+        document.addEventListener('gfg:auth-changed', loadWallet);
+    })();
+</script>
 </body>
 </html>

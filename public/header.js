@@ -68,6 +68,7 @@
             {
                 heading: 'Discover',
                 items: [
+                    { label: 'Pricing', href: '/profile/subscription.html', match: 'pricing' },
                     { label: 'What’s New', href: '/changelog/', match: 'changelog' },
                     { label: 'About', href: '/about/', match: 'about' },
                     { label: 'Forum', href: '/forum/', match: 'forum' },
@@ -233,10 +234,10 @@
             <header class="gfg-header">
                 <div class="gfg-header-left">
                     <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span> <span class="gfg-beta">Beta</span></a>
+                    <span id="active-tier-badge" class="gfg-tier-badge" style="display:none; padding:1px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; white-space:nowrap;"></span>
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
                 <div class="gfg-header-right">
-                    <span id="active-tier-badge" class="gfg-tier-badge" style="display:none; padding:1px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; white-space:nowrap; margin-right:6px;"></span>
                     <div class="gfg-user-pill" id="gfg-user-pill">
                         <span id="display-points">⭐ 0 Pts</span>
                     </div>

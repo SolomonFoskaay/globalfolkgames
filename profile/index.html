@@ -23,7 +23,7 @@
                 <li><a href="/profile/points.html" style="color:#f87818;">Points and level</a> (local + global on-chain ledgers)</li>
                 <li><a href="/profile/upgrade.html" style="color:#f87818;">Upgrade subscription</a> (check premium balance live and upgrade)</li>
                 <li><a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> (buy premium points)</li>
-                <li><a href="/profile/affiliate.html" style="color:#f87818;">Affiliate earnings</a> (referral link + 15% on-chain earnings)</li>
+                <li><a href="/profile/affiliate.html" style="color:#f87818;">Affiliate earnings</a> (referral link + 20% on-chain earnings)</li>
                 <li><a href="/profile/activity.html" style="color:#f87818;">On-chain activity</a> (every roll and reward, verifiable)</li>
             </ul>
         </section>
@@ -73,15 +73,19 @@
 
             // Resolve the connected wallet the same way the changelog and header
             // do, so the profile always reflects the signed-in chain identity.
+            // Normalizes to a STRING address (Dynamic may return an object with
+            // an `.address` property, which would render as "[object Object]").
             function currentWallet() {
                 try {
+                    let addr = null;
                     if (window.getDynamicSolanaWallet) {
                         const w = window.getDynamicSolanaWallet();
-                        if (w) return w;
+                        if (w) addr = (typeof w === 'string') ? w : (w.address ? String(w.address) : null);
                     }
-                    if (window.currentProfile && window.currentProfile.solana_wallet) {
-                        return window.currentProfile.solana_wallet;
+                    if (!addr && window.currentProfile && window.currentProfile.solana_wallet) {
+                        addr = String(window.currentProfile.solana_wallet);
                     }
+                    return addr;
                 } catch (e) { /* ignore */ }
                 return null;
             }
@@ -113,9 +117,13 @@
             function renderWallet() {
                 const addr = currentWallet();
                 if (!addr) {
-                    walletAddrEl.textContent = 'No wallet connected yet.';
-                    if (window.currentUser) {
-                        walletCopyMsg.textContent = 'Wallet still restoring, pull to refresh.';
+                    if (window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())) {
+                        walletAddrEl.textContent = 'Wallet still restoring...';
+                        walletCopyMsg.textContent = 'Your wallet is loading. If it stays here, tap Copy after it appears.';
+                        walletChip.title = 'Wallet is loading';
+                    } else {
+                        walletAddrEl.textContent = 'No wallet connected yet.';
+                        walletCopyMsg.textContent = 'Sign in above to see your wallet address.';
                     }
                     return;
                 }
@@ -133,15 +141,17 @@
 
                         // Re-render the wallet when auth changes (sign-in / sign-out on the
             // same page) or the header refreshes the session.
-            render();
+            const safeRender = function () { try { if (typeof render === 'function') render(); } catch (e) { /* ignore */ } };
+            safeRender();
+            renderWallet();
             if (window.refreshAuthHeader) {
                 window.refreshAuthHeader().then(() => {
-                    render();
+                    safeRender();
                     renderWallet();
-                }).catch(() => render());
+                }).catch(() => { safeRender(); renderWallet(); });
             }
             if (typeof window.addEventListener === 'function') {
-                window.addEventListener('gfg:auth-changed', () => render());
+                window.addEventListener('gfg:auth-changed', () => { safeRender(); renderWallet(); });
             }
 
             // Dynamic restores a silent session AFTER DOMContentLoaded; a bounded
@@ -150,8 +160,8 @@
             // header already shows the user as signed in.
             let walletPoll = 0;
             (function pollWallet() {
-                if (currentWallet()) { render(); renderWallet(); return; }
-                if (walletPoll++ < 24) setTimeout(pollWallet, 600); // ~15s budget
+                if (currentWallet()) { safeRender(); renderWallet(); return; }
+                if (walletPoll++ < 36) setTimeout(pollWallet, 500); // ~18s budget
             })();
         });
     </script>
