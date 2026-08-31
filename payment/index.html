@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay with USDC · GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background:#0f0f13; }
+        .page { max-width:720px; margin:0 auto; padding:32px 16px 60px; }
+        .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+        h1 { font-size:1.3rem; margin:0 0 6px; color:#fff; }
+        .tip { font-size:0.78rem; color:#888; line-height:1.5; margin-top:6px; }
+        a { color:#f87818; }
+        .plan-btn { display:flex; justify-content:space-between; align-items:center; width:100%; background:#1a1a24; border:1px solid #333; color:#fff; border-radius:10px; padding:12px 14px; margin:8px 0; font-size:0.9rem; cursor:pointer; }
+        .plan-btn.selected { border-color:#2ecc71; background:#10241a; }
+        .plan-btn .price { color:#2ecc71; font-weight:800; }
+        .pay-btn { width:100%; background:#f87818; color:#000; border:none; border-radius:10px; padding:14px 10px; font-size:1rem; font-weight:800; cursor:pointer; margin-top:12px; }
+        .pay-btn:disabled { opacity:0.5; cursor:not-allowed; }
+        .status { font-size:0.85rem; line-height:1.6; margin-top:12px; padding:10px 12px; border-radius:8px; background:#1a1a24; border:1px solid #333; }
+        .status.ok { border-color:#2ecc71; color:#cde9d6; }
+        .status.err { border-color:#e74c3c; color:#f3b4ad; }
+        .ok-txt { color:#2ecc71; font-weight:800; }
+        .mono { font-family:monospace; word-break:break-all; }
+        .wallet-box { background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px; font-size:0.8rem; color:#9fe8a8; word-break:break-all; }
+        .crypto-guide { font-size:0.8rem; color:#bbb; line-height:1.6; margin-top:8px; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>Pay for premium points (auto-credited)</h1>
+    <p class="tip" style="margin:0 0 12px;">You pay with your own GlobalFolkGames wallet. As soon as the payment lands, your premium points are credited automatically - no waiting for a manual check. If anything goes wrong, the manual submit form is still here as a backup.</p>
+
+    <div class="card">
+        <b style="color:#2ecc71;">Your payment wallet</b>
+        <div id="wallet-box" class="wallet-box" style="margin-top:6px;">Loading your embedded wallet...</div>
+        <p class="tip">Make sure this wallet has a little SOL (for the transfer fee) plus the USDC it needs. Not sure how? Follow the <a href="/profile/pay-crypto.html">crypto guide</a>.</p>
+    </div>
+
+    <div class="card">
+        <b style="color:#f87818;">What are you paying for? (pick one)</b>
+        <div id="plan-list"></div>
+        <button id="pay-btn" class="pay-btn" disabled>Pay with my GlobalFolkGames wallet</button>
+        <div id="status" class="status" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+        <b style="color:#f87818;">Already paid? Verify and get credited now</b>
+        <input id="verify-sig" type="text" placeholder="Paste your transaction signature here" autocomplete="off" style="width:100%; box-sizing:border-box; background:#1a1a24; border:1px solid #333; color:#fff; border-radius:8px; padding:11px 12px; margin-top:6px; font-family:monospace;">
+        <button id="verify-btn" class="pay-btn" style="background:#2ecc71; margin-top:8px;">Verify payment + credit points</button>
+        <div id="verify-status" class="status" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+        <b style="color:#f87818;">Need a human?</b>
+        <p class="crypto-guide">If the automatic credit ever fails (network hiccup, or you'd rather be guided), use the <a href="/subscription-paid/">manual confirmation form</a> - pick what you paid for, add your transaction signature, and support credits you manually. It's the same points either way.</p>
+    </div>
+
+    <a href="/profile/subscription.html" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:block;">← Back to plans</a>
+</div>
+<script src="/global_header.js"></script>
+<script src="/dash-nav.js"></script>
+<script type="module">
+    // window.gfgPay is booted here (dynamic import keeps @solana/spl-token out
+    // of every page's bundle; only this payment page needs it).
+    import('/src/gfg-pay.js').then((m) => { if (m.initGfgPay) m.initGfgPay(); });
+
+    const payBtn = document.getElementById('pay-btn');
+    const verifySig = document.getElementById('verify-sig');
+    const verifyBtn = document.getElementById('verify-btn');
+    const status = document.getElementById('status');
+    const verifyStatus = document.getElementById('verify-status');
+    let selected = null;
+    let plans = [];
+
+    function showStatus(msg, ok) {
+        status.style.display = 'block';
+        status.className = 'status ' + (ok ? 'ok' : 'err');
+        status.innerHTML = msg;
+    }
+    function showVerifyStatus(msg, ok) {
+        verifyStatus.style.display = 'block';
+        verifyStatus.className = 'status ' + (ok ? 'ok' : 'err');
+        verifyStatus.innerHTML = msg;
+    }
+
+    function gpayReady() {
+        return !!(window.gfgPay && typeof window.gfgPay.payAndVerify === 'function');
+    }
+
+    function urlPlan() {
+        try { return new URLSearchParams(window.location.search).get('plan'); } catch (e) { return null; }
+    }
+
+    async function refreshWallet() {
+        try {
+            const gpay = window.gfgPay;
+            const addr = (gpay && typeof gpay.connectedWallet === 'function') ? gpay.connectedWallet() : null;
+            const box = document.getElementById('wallet-box');
+            if (addr) { box.textContent = addr; box.style.color = '#9fe8a8'; box.title = addr; }
+            else { box.textContent = 'Sign in above (top right), then return here.'; box.style.color = '#f87818'; }
+        } catch (e) { /* ignore */ }
+    }
+
+    async function init() {
+        // gfgPay may boot a moment after global_header's chain; poll briefly.
+        for (let i = 0; i < 20 && !gpayReady(); i++) await new Promise((r) => setTimeout(r, 250));
+        try {
+            const gpay = window.gfgPay;
+            plans = (gpay && typeof gpay.plans === 'function') ? gpay.plans() : [];
+            const list = document.getElementById('plan-list');
+            if (!plans.length) { list.innerHTML = '<div class="status err">Payment not ready yet (wallet module missing).</div>'; return; }
+            list.innerHTML = plans.map((p) =>
+                '<button type="button" class="plan-btn" data-key="' + p.key + '" id="plan-' + p.key + '">' +
+                '<span><b>' + p.label + '</b><br><span style="color:#bbb;font-size:0.78rem;">' + p.points.toLocaleString() + ' premium points</span></span>' +
+                '<span class="price">$' + (p.usdCents / 100).toFixed(2) + '</span>' +
+                '</button>'
+            ).join('');
+            list.querySelectorAll('.plan-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    selected = btn.dataset.key;
+                    list.querySelectorAll('.plan-btn').forEach((b) => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    payBtn.disabled = !window.gfgPay || !window.gfgPay.connectedWallet();
+                });
+            });
+            // Pre-select the plan the plans/booster pages linked with (?plan=).
+            const pre = urlPlan();
+            const preBtn = pre && document.getElementById('plan-' + pre);
+            if (preBtn) {
+                selected = pre;
+                preBtn.classList.add('selected');
+                payBtn.disabled = !window.gfgPay || !window.gfgPay.connectedWallet();
+            }
+            refreshWallet();
+            if (!window.gfgPay || !window.gfgPay.connectedWallet()) { payBtn.disabled = true; showStatus('Sign in first (top right), then pick a plan.', false); }
+            else showStatus('Pick a plan above, then tap Pay. Your points credit automatically once the transfer lands.', true);
+        } catch (e) {
+            showStatus('Could not load plans: ' + (e.message || e), false);
+        }
+    }
+
+    payBtn.addEventListener('click', async () => {
+        if (!selected) { showStatus('Pick a plan first.', false); return; }
+        if (!gpayReady()) { showStatus('Payment module still loading. Try again in a moment.', false); return; }
+        payBtn.disabled = true;
+        showStatus('Building your USDC payment from your wallet... signing (you may get a Dynamic email) and sending. Please wait.', true);
+        try {
+            // Pay from the embedded wallet, then auto-verify + credit server-side.
+            const res = await window.gfgPay.payAndVerify(selected);
+            showStatus('Payment verified and <b class="ok-txt">' + res.points.toLocaleString() + ' premium points credited</b> on-chain. Next: activate your ' + res.plan + ' on the <a href="/profile/upgrade.html">Upgrade page</a>.', true);
+        } catch (e) {
+            showStatus('Payment did not credit: ' + (e.message || e) + '<br>Your money (if sent) is safe on-chain. Use the <a href="/subscription-paid/">manual form</a> with your transaction signature, or try again.', false);
+        } finally {
+            payBtn.disabled = false;
+        }
+    });
+
+    verifyBtn.addEventListener('click', async () => {
+        const sig = (verifySig.value || '').trim();
+        if (!gpayReady()) { showVerifyStatus('Payment module still loading. Try again in a moment.', false); return; }
+        if (!sig) { showVerifyStatus('Paste the transaction signature you got after paying.', false); return; }
+        if (!selected) { showVerifyStatus('Pick the plan you paid for above first.', false); return; }
+        verifyBtn.disabled = true;
+        showVerifyStatus('Verifying your payment on-chain...', true);
+        try {
+            const res = await window.gfgPay.verify(selected, sig);
+            showVerifyStatus('Payment verified! <b class="ok-txt">' + res.points.toLocaleString() + ' premium points credited</b>. Activate on the <a href="/profile/upgrade.html">Upgrade page</a>.', true);
+        } catch (e) {
+            showVerifyStatus('Verification failed: ' + (e.message || e) + '. If you really paid, use the <a href="/subscription-paid/">manual form</a> so support can credit you.', false);
+        } finally {
+            verifyBtn.disabled = false;
+        }
+    });
+
+    document.addEventListener('gfg:auth-changed', refreshWallet);
+    init();
+</script>
+</body>
+</html>

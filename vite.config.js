@@ -59,6 +59,7 @@ export default defineConfig({
         'profile-affiliate': './profile/affiliate.html',
         'profile-activity': './profile/activity.html',
         'subscription-paid': './subscription-paid/index.html',
+        payment: './payment/index.html',
         dashboard: './dashboard/index.html',
         'dashboard-ops': './dashboard/ops.html',
         'dashboard-endpoints': './dashboard/endpoints.html',

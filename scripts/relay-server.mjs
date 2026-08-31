@@ -29,6 +29,7 @@ import { ensureTally, createCompetition, closeCompetition, cancelCompetition, se
 } from './competitions-relay.mjs';
 import { addWin, addEntry, hasEntry } from './competitions-wins.mjs';
 import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
+import { verifyAndCredit as verifyAndCreditVerifier } from '../api_handlers/verify-and-credit.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -285,6 +286,21 @@ const server = createServer(async (req, res) => {
       console.error('activate-premium error:', e.message);
       res.writeHead(500, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/verify-and-credit') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { owner, plan, txSignature } = JSON.parse(body || '{}');
+      const result = await verifyAndCreditVerifier({ owner, plan, txSignature });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('verify-and-credit error:', e.message);
+      res.writeHead(400, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
     }
     return;
   }
