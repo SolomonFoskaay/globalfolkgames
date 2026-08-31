@@ -20,18 +20,34 @@
         <p class="hint" style="color:var(--muted); font-size:0.85rem; margin:0 0 12px;">Staff-only: the devnet copy of the automated premium-point payment flow, preserved for testing. The user-facing version runs on <b style="color:#2ecc71;">mainnet</b>.</p>
         <div class="net-bar">
             <span>Testing on:</span>
-            <a href="/payment/?net=devnet" class="net-chip net-devnet" style="text-decoration:none;">DEVNET (test)</a>
+            <a href="/payment/?net=devnet" id="devnet-link" class="net-chip net-devnet" style="text-decoration:none;">DEVNET (test)</a>
             <a href="/payment/" class="net-chip net-mainnet" style="text-decoration:none;">MAINNET (live users)</a>
+        </div>
+        <div style="margin:10px 0;" id="token-box">
+            <label style="font-size:0.8rem; color:#bbb; display:block; margin-bottom:4px;">Operator token (needed to test the devnet CREDIT step)</label>
+            <input id="op-token" type="password" placeholder="Paste GFG_OPERATOR_TOKEN to enable devnet credit tests" style="width:100%; box-sizing:border-box; padding:9px 10px; border-radius:8px; border:1px solid #333; background:#1a1a24; color:#fff; font-size:0.82rem;">
+            <p class="hint" style="color:#888; font-size:0.75rem; margin:6px 0 0;">Devnet USDC is free test money, so a random player must never be able to turn it into real points. Credits on devnet are gated behind this operator token. Without it, you can run the payment UI but the credit step will refuse. Do not share this token.</p>
         </div>
         <div class="hint" style="color:#888; font-size:0.8rem; margin-bottom:12px;">
             Devnet uses test USDC (Circle faucet) - nothing real moves. Open the devnet link in a new tab to run a full test payment: fund your embedded wallet with test SOL + USDC, pick a plan, pay, and confirm the points credit server-side.
         </div>
-        <iframe class="auto-frame" src="/payment/?net=devnet" title="Payment auto test (devnet)"></iframe>
+        <iframe id="pay-frame" class="auto-frame" src="/payment/?net=devnet" title="Payment auto test (devnet)"></iframe>
     </main>
     <script src="/global_header.js"></script>
     <script src="/dash-nav.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            var tokenInput = document.getElementById('op-token');
+            var frame = document.getElementById('pay-frame');
+            var devnetLink = document.getElementById('devnet-link');
+            function refreshSrc() {
+                var t = encodeURIComponent((tokenInput.value || '').trim());
+                var base = '/payment/?net=devnet' + (t ? '&token=' + t : '');
+                if (frame) frame.src = base;
+                if (devnetLink) devnetLink.href = base;
+            }
+            if (tokenInput) tokenInput.addEventListener('input', refreshSrc);
+            refreshSrc();
             if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({
                 brand: '🛡 Dashboard',
                 active: 'payment-tests',

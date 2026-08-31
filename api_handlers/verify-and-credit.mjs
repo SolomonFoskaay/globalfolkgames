@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import pkg from '@solana/web3.js';
 const { PublicKey, Connection } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT, PAY_ACCEPTED_DESTINATIONS } from '../scripts/pay-config.mjs';
+import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT, PAY_ACCEPTED_DESTINATIONS, PAY_NETWORK } from '../scripts/pay-config.mjs';
 import { handleCreditPremium } from '../scripts/delegate-relay.mjs';
 import { ensureTreasuryUsdcAta } from './../scripts/delegate-relay.mjs';
 
@@ -81,7 +81,7 @@ function ataFor(ownerKey) {
   )[0];
 }
 
-export async function verifyAndCredit({ owner, plan, txSignature }) {
+export async function verifyAndCredit({ owner, plan, txSignature, token }) {
   if (!owner || typeof owner !== 'string') throw new Error('missing "owner" wallet');
   let oKey;
   try { oKey = new PublicKey(owner); } catch (e) { throw new Error('invalid owner wallet address'); }
@@ -91,6 +91,25 @@ export async function verifyAndCredit({ owner, plan, txSignature }) {
   if (!p) throw new Error('unknown plan "' + plan + '"');
   if (!txSignature || typeof txSignature !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,96}$/.test(txSignature)) {
     throw new Error('invalid transaction signature');
+  }
+
+  // ANTI-EXPLOIT GATE (owner 2026-08-31): DEVNET can be used to credit the
+  // (devnet) premium ledger with FREE test USDC. Random players must NEVER be
+  // able to trigger that. If the configured payment network is devnet, only an
+  // operator holding GFG_OPERATOR_TOKEN may verify+credit (the admin test
+  // flow). Production faces mainnet, which requires real USDC, so no token is
+  // needed there. The server NEVER trusts the client's ?net= - it reads the
+  // config here. If devnet and no valid token -> refuse before any credit.
+  const expected = process.env.GFG_OPERATOR_TOKEN;
+  if (PAY_NETWORK === 'devnet') {
+    const okToken = expected && expected.length >= 16 && token && String(token) === expected;
+    if (!okToken) {
+      throw new Error('devnet payments are test-only: they are gated behind the operator token so free test USDC can never buy points on the live site.');
+    }
+  }
+  if (PAY_NETWORK === 'mainnet' && expected && expected.length >= 16 && token && String(token) !== expected) {
+    // If a token is supplied on mainnet it must be correct; otherwise ignore.
+    throw new Error('unauthorized operator token');
   }
 
   const endpoints = payRpcEndpoints();
@@ -175,6 +194,7 @@ export default async function handler(req, res) {
       owner: body.owner,
       plan: body.plan,
       txSignature: body.txSignature,
+      token: body.token,
     });
     res.status(200).json(result);
   } catch (e) {

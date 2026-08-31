@@ -226,10 +226,12 @@ export async function pay(planKey) {
 
 export async function verify(planKey, txSignature) {
   const wallet = connectedWallet();
+  let token;
+  try { token = new URLSearchParams(window.location.search).get('token') || undefined; } catch (e) { token = undefined; }
   const res = await fetch('/api/verify-and-credit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner: wallet, plan: planKey, txSignature }),
+    body: JSON.stringify({ owner: wallet, plan: planKey, txSignature, token }),
   });
   const data = await res.json().catch(() => ({ error: 'bad response' }));
   if (!res.ok || !data.ok) throw new Error(data.error || 'verification failed');

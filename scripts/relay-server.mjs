@@ -293,8 +293,8 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { owner, plan, txSignature } = JSON.parse(body || '{}');
-      const result = await verifyAndCreditVerifier({ owner, plan, txSignature });
+      const { owner, plan, txSignature, token } = JSON.parse(body || '{}');
+      const result = await verifyAndCreditVerifier({ owner, plan, txSignature, token });
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify(result));
     } catch (e) {
