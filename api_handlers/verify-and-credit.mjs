@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import pkg from '@solana/web3.js';
 const { PublicKey, Connection } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT } from '../scripts/pay-config.mjs';
+import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT, PAY_ACCEPTED_DESTINATIONS } from '../scripts/pay-config.mjs';
 import { handleCreditPremium } from '../scripts/delegate-relay.mjs';
 import { ensureTreasuryUsdcAta } from './../scripts/delegate-relay.mjs';
 
@@ -64,7 +64,11 @@ function parseUsdcTransfer(tx) {
 
 async function fetchTransaction(rpcUrl, txSignature) {
   const conn = new Connection(rpcUrl, 'confirmed');
-  return conn.getTransaction(txSignature, {
+  // Use getParsedTransaction (jsonParsed encoding) so SPL token instructions
+  // come back with `.parsed` (type/info). Plain getTransaction returns raw
+  // base64 instruction data with no `.parsed`, which made the verifier always
+  // report 'No USDC transfer found' even for a successful payment.
+  return conn.getParsedTransaction(txSignature, {
     commitment: 'confirmed',
     maxSupportedTransactionVersion: 0,
   });
@@ -115,10 +119,16 @@ export async function verifyAndCredit({ owner, plan, txSignature }) {
 
   const ownerAta = ataFor(oKey);
   const treasuryAta = ataFor(new PublicKey(PAY_TREASURY_PUBKEY));
+  // Accepted destinations: the current treasury (NFT wallet) + grace-period
+  // destinations from before the wallet swap, so older payments still credit.
+  const acceptedDest = [treasuryAta.toBase58()];
+  for (const d of (PAY_ACCEPTED_DESTINATIONS || [])) {
+    acceptedDest.push(ataFor(new PublicKey(d)).toBase58());
+  }
 
   if (transfer.mint && transfer.mint !== USDC_MINT) throw new Error('payment is not the expected USDC mint');
   if (transfer.source !== ownerAta.toBase58()) throw new Error("sender is not this account's payment wallet");
-  if (transfer.destination !== treasuryAta.toBase58()) throw new Error('payment did not go to the platform treasury');
+  if (acceptedDest.indexOf(transfer.destination) === -1) throw new Error('payment did not go to a platform treasury wallet');
 
   const expectedBase = usdcBaseForCents(p.usdCents);
   const paidBase = transfer.amountBase;

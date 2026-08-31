@@ -43,7 +43,7 @@ import { signTransaction } from '@dynamic-labs-sdk/solana';
 const PAY_RPC = 'https://api.devnet.solana.com';
 const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // devnet (swap with mainnet USDC)
 const USDC_DECIMALS = 6;
-const TREASURY = '5ec9bYwVJVSfM3xnrzpg9jkoepX58pY1tWoGDsMdhdTQ'; // platform USDC receiver
+const TREASURY = 'Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3'; // funds wallet (NFT wallet, owner 2026-08-31)
 const ATA_PROGRAM = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 const SOL_FEE_LAMPORTS = 10000; // ~0.00001 SOL reserve for the transfer fee (devnet/mainnet tiny)
 

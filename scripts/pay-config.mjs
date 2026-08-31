@@ -13,7 +13,14 @@
 // client and verifier both read /api/pay-config). Devnet USDC is test money;
 // mainnet USDC is real — the credit amount is always the plan's points.
 export const PAY_TREASURY_PUBKEY =
-  process.env.GFG_PAY_TREASURY || '5ec9bYwVJVSfM3xnrzpg9jkoepX58pY1tWoGDsMdhdTQ'; // sponsor (devnet); set env for mainnet
+  process.env.GFG_PAY_TREASURY || 'Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3'; // NFT wallet (owner 2026-08-31): all funds land here for now
+
+// Grace-period funding destinations the verifier also accepts (besides the
+// NFT wallet) so payments sent before the swap still auto-credit. Includes the
+// former sponsor treasury used at launch.
+export const PAY_ACCEPTED_DESTINATIONS = [
+  '5ec9bYwVJVSfM3xnrzpg9jkoepX58pY1tWoGDsMdhdTQ', // prior sponsor treasury (payments before 2026-08-31 swap)
+];
 
 export const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // devnet USDC (Circle faucet)
 export const USDC_DECIMALS = 6;
