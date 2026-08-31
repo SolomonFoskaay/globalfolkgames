@@ -253,6 +253,29 @@
 
         document.body.insertAdjacentHTML('afterbegin', headerHTML);
 
+        // SITEWIDE BACK-TO-TOP (owner 2026-08-31): one auto button that appears
+        // after scrolling, floats bottom-right on every page. Runs on a window
+        // scroll (passive) so long marketing/content pages are one tap from the
+        // top - no per-page work needed.
+        if (!document.getElementById('gfg-back-top')) {
+            const backTop = document.createElement('a');
+            backTop.id = 'gfg-back-top';
+            backTop.className = 'gfg-back-top';
+            backTop.href = '#';
+            backTop.setAttribute('aria-label', 'Back to top');
+            backTop.textContent = '↑';
+            document.body.appendChild(backTop);
+            const onScroll = function () {
+                try { backTop.classList.toggle('show', (window.scrollY || document.documentElement.scrollTop) > 360); } catch (e) {}
+            };
+            backTop.addEventListener('click', function (e) {
+                e.preventDefault();
+                try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e2) { window.scrollTo(0, 0); }
+            });
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        }
+
         // Measure the global header's REAL rendered height and expose it as
         // --gfg-header-h. The header may sit on one row (desktop) or two
         // (mobile when brand + right side don't fit), and its height varies

@@ -21,8 +21,10 @@
         .counter { font-size:0.95rem; color:#fff; font-weight:800; margin-top:10px; }
         .counter small { color:#888; font-weight:600; }
         .tiny { font-size:0.78rem; color:#888; line-height:1.5; margin-top:8px; }
-        .badge-wrap { text-align:center; margin:14px 0 4px; }
-        .badge-img { max-width:220px; width:100%; border-radius:14px; border:1px solid rgba(155,89,182,0.5); }
+        .badge-wrap { text-align:center; margin:14px 0 4px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+        .badge-img { max-width:200px; width:100%; border-radius:14px; border:1px solid rgba(155,89,182,0.5); }
+        .badge-img.tall { max-width:140px; }
+        a { overflow-wrap:anywhere; word-break:break-word; }
         .mt { margin-top:10px; }
     </style>
 </head>
@@ -33,7 +35,7 @@
     <h1>A hundred people who help this reach Mainnet</h1>
 
     <div class="card">
-        <div class="badge-wrap"><img class="badge-img" src="/media/early-backer-badge.png" alt="GlobalFolkGames Early Backer badge"></div>
+        <div class="badge-wrap"><img class="badge-img" src="/media/early-backer-crown.gif" alt="GlobalFolkGames Early Backer badge - Crown"></div>
         <p class="body mt">GlobalFolkGames is already playable in beta. Ludo works. Dice and results already live on-chain. The monthly Member Cup is published. What is not free is the next step: taking the same experience to Solana Mainnet and then sponsoring gas so ordinary players can keep playing without a wallet drama every turn.</p>
         <p class="body mt">That jump is why this collection exists. There are only one hundred Early Backer passes. This is not a ten-thousand-image drop dressed up as a community. It is a small set of seats for people who are willing to take a real risk on a young project that might still fail, because without that kind of support the Mainnet move may simply not happen.</p>
         <p class="body mt">The mint price is 2.00 SOL. That number is not a teaser and it is not a joke. Lifetime access on the site, a 1.50&times; cup multiplier after you still qualify by playing, a numbered seat, and the money to stand up Mainnet and keep games gasless is what you are buying. We cannot look after those costs for less and still leave the collection small enough that the badge means something.</p>
@@ -78,9 +80,19 @@
         <p class="body mt">If a milestone slips, this page should say so in ordinary language. We would rather look slow than fictional.</p>
     </div>
 
+    <div class="card" style="border:1px solid #2ecc71;">
+        <h2 style="color:#fff; font-size:1.15rem; margin:0 0 6px;">Mint straight to your GlobalFolkGames wallet</h2>
+        <p class="body">The fastest path on beta: fund your embedded wallet here on the site with the 2.00 SOL it needs, then mint on this site so the Early Backer pass lands in the wallet attached to your account. That wallet signature is what the L3 Early Backer unlock checks later, so landing the NFT here makes everything line up by itself.</p>
+        <p class="body mt"><b>Your wallet on GlobalFolkGames</b></p>
+        <div class="wallet-box" style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; font-size:0.82rem; color:#9fe8a8; word-break:break-all; margin-top:4px;" id="backer-wallet">Load your wallet by signing in above, then return here.</div>
+        <p class="body mt">1. Tap the button below to open the official mint.<br>2. Set the recipient wallet to the address above (your embedded wallet).<br>3. Send the 2.00 SOL from that same embedded wallet, so the pass is born in it.</p>
+        <a class="mint-btn" id="backer-mint-btn" href="https://www.launchmynft.io/collections/Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3/LIJPiyym1JdfxMrkXKpx" target="_blank" rel="noopener noreferrer">Mint on LaunchMyNFT</a>
+        <p class="body mt">Alternative, equally valid: mint on LaunchMyNFT with any wallet you control, then transfer the pass into the embedded wallet above. As long as the embedded wallet holds the NFT, your L3 Early Backer unlock will find it. If you ever need support, the wallet address above plus your mint transaction is all we ask for.</p>
+    </div>
+
     <div class="card">
         <h2 style="color:#fff; font-size:1.15rem; margin:0 0 6px;">Two short steps</h2>
-        <p class="body">Mint on LaunchMyNFT with a Solana wallet you control, at 2.00 SOL plus the small network fee the chain asks for. That is the only official mint.</p>
+        <p class="body">The mint itself is 2.00 SOL plus the small network fee, whichever of the two paths above you pick. This is the only official mint.</p>
         <p class="body mt">Then open GlobalFolkGames, sign in with the email you want as your lifetime account, and connect that same wallet. Until we see the NFT on a linked wallet we cannot attach L3 to a profile. The collection can exist on-chain and your cup boost can still be off if those two are not introduced to each other.</p>
         <p class="body mt">If you mint from an exchange-connected flow and later cannot prove the wallet, write to support with the transaction and the email. We would rather fix a messy mint than leave a backer without the plan they paid for.</p>
         <p class="body mt">Eighteen and older only, same line as the Member Cup.</p>
@@ -118,6 +130,35 @@
 </div>
 <script src="/global_header.js"></script>
 <script src="/dash-nav.js"></script>
-<script> if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({ brand:'⭐ Early Backers', active:'backers', sections:[{heading:'Backers', items:[{key:'backers', label:'⭐ Early Backers', href:'/backers/'},{key:'competitions', label:'🏆 Member Cup', href:'/competitions/'}]}]}); </script>
+<script>
+    if (window.GFG_DASH_NAV) window.GFG_DASH_NAV.render({ brand:'⭐ Early Backers', active:'backers', sections:[{heading:'Backers', items:[{key:'backers', label:'⭐ Early Backers', href:'/backers/'},{key:'competitions', label:'🏆 Member Cup', href:'/competitions/'}]}]});
+
+    // Fill the "your wallet" box with the signed-in embedded wallet so a backer
+    // knows exactly which address must end up holding the NFT.
+    (function () {
+        var box = document.getElementById('backer-wallet');
+        function resolveAddr() {
+            try {
+                var w = (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || null;
+                if (w) {
+                    if (typeof w === 'string') return w;
+                    if (w.address) return String(w.address);
+                    if (w.publicKey && w.publicKey.toBase58) return w.publicKey.toBase58();
+                }
+                if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
+            } catch (e) { /* ignore */ }
+            return null;
+        }
+        function fill() {
+            if (!box) return;
+            var addr = resolveAddr();
+            if (addr) { box.textContent = addr; box.style.color = '#9fe8a8'; }
+            else if (window.currentUser) { box.textContent = 'Wallet still loading...'; box.style.color = '#f87818'; }
+            else { box.textContent = 'Load your wallet by signing in above, then return here.'; box.style.color = '#f87818'; }
+        }
+        fill();
+        if (typeof window.addEventListener === 'function') document.addEventListener('gfg:auth-changed', fill);
+    })();
+</script>
 </body>
 </html>

@@ -767,3 +767,61 @@ body {
   overflow-y: auto;
 }
 
+
+/* ===== MOBILE: NEVER HORIZONTAL-SCROLL =====
+   Long words, explorer links, tx signatures and tables must wrap or shrink
+   inside their cards instead of breaking the page into endless left/right
+   scroll (owner 2026-08-31). Applied sitewide so every page inherits it. */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+img, video, iframe, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+a, p, li, td, th, code, input, textarea, pre, .mono, .wallet-box, .addr {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+th, td {
+  min-width: 0;
+}
+
+/* ===== SITEWIDE BACK-TO-TOP (auto, one button on every page) =====
+   Injected by header.js, so it appears without per-page work. Hides until the
+   user scrolls down; floats bottom-right and never overlaps the header. */
+.gfg-back-top {
+  position: fixed;
+  right: 14px;
+  bottom: 16px;
+  z-index: 9999;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(243,156,18,0.6);
+  background: rgba(26,26,36,0.9);
+  color: #f87818;
+  font-size: 1.3rem;
+  line-height: 44px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+}
+.gfg-back-top.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.gfg-back-top:hover { background: rgba(243,156,18,0.2); }
