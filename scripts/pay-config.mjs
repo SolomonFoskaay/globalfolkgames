@@ -33,14 +33,21 @@ export function payPlan(key) {
 }
 
 // RPC endpoints the VERIFIER uses to read the payment transaction on the pay
-// cluster. Devnet reuses the project's devnet base endpoints; mainnet uses
-// public mainnet RPCs (swap here for an API-key'd one if you prefer).
+// cluster. IMPORTANT: the MagicBlock devnet ROUTER cannot serve getTransaction
+// (it answers ER ops + getBalance only, not archive tx reads), so the verifier
+// must hit a real BASE devnet RPC first. `GFG_DEVNET_RPC` (Alchemy) is used
+// when present (server env), then public devnet. SWAP TO MAINNET: replace this
+// list with mainnet RPCs (e.g. your Alchemy/Helius mainnet endpoint first).
 export function payRpcEndpoints() {
-  return [
-    'https://devnet-router.magicblock.app',
-    'https://solana-devnet.api.onfinality.io/public',
+  const out = [];
+  try {
+    if (typeof process !== 'undefined' && process.env?.GFG_DEVNET_RPC) out.push(process.env.GFG_DEVNET_RPC);
+  } catch (e) { /* not a node env */ }
+  out.push(
     'https://api.devnet.solana.com',
-  ];
+    'https://solana-devnet.api.onfinality.io/public'
+  );
+  return out;
 }
 
 // USDC base units for a price in USD cents ($1 = 1_000_000 base).

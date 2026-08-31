@@ -34,12 +34,23 @@
     <div class="card">
         <b style="color:#2ecc71;">Your payment wallet</b>
         <div id="wallet-box" class="wallet-box" style="margin-top:6px;">Loading your embedded wallet...</div>
-        <p class="tip">Make sure this wallet has a little SOL (for the transfer fee) plus the USDC it needs. Not sure how? Follow the <a href="/profile/pay-crypto.html">crypto guide</a>.</p>
+        <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; font-size:0.85rem;">
+            <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:8px 12px;">
+                <div style="font-size:0.72rem; color:#888;">SOL (for the fee)</div>
+                <div id="bal-sol" style="color:#f87818; font-weight:800;">—</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #333; border-radius:8px; padding:8px 12px;">
+                <div style="font-size:0.72rem; color:#888;">USDC (for the plan)</div>
+                <div id="bal-usdc" style="color:#7838f8; font-weight:800;">—</div>
+            </div>
+        </div>
+        <p class="tip">You need a little SOL for the one-time transfer fee, plus the USDC to pay. Your balances are checked automatically and shown above. Not sure how to add funds? Follow the <a href="/profile/pay-crypto.html">crypto guide</a>.</p>
     </div>
 
     <div class="card">
         <b style="color:#f87818;">What are you paying for? (pick one)</b>
         <div id="plan-list"></div>
+        <div id="precheck" class="status err" style="display:none;"></div>
         <button id="pay-btn" class="pay-btn" disabled>Pay with my GlobalFolkGames wallet</button>
         <div id="status" class="status" style="display:none;"></div>
     </div>
@@ -54,6 +65,12 @@
     <div class="card">
         <b style="color:#f87818;">Need a human?</b>
         <p class="crypto-guide">If the automatic credit ever fails (network hiccup, or you'd rather be guided), use the <a href="/subscription-paid/">manual confirmation form</a> - pick what you paid for, add your transaction signature, and support credits you manually. It's the same points either way.</p>
+    </div>
+
+    <div class="card">
+        <b style="color:#2ecc71;">Your recent payments (kept on this device)</b>
+        <div id="recent-tx" class="crypto-guide" style="margin-top:6px;">No payments found yet on this device.</div>
+        <p class="tip">Your most recent payment signatures are saved here so you can find them later (for support, verification, or checking on the block explorer). Each one opens on the <a href="https://explorer.solana.com/?cluster=devnet" target="_blank" rel="noopener noreferrer">Solana explorer</a> in a new tab.</p>
     </div>
 
     <a href="/profile/subscription.html" class="launch-btn onchain" style="text-align:center; text-decoration:none; display:block;">← Back to plans</a>
@@ -92,6 +109,19 @@
         try { return new URLSearchParams(window.location.search).get('plan'); } catch (e) { return null; }
     }
 
+    let balSol = null, balUsdc = null;
+    const SOL_FEE_LAMPORTS = 10000;
+
+    function fmtSol(lamports) {
+        if (lamports == null) return '—';
+        const sol = lamports / 1e9;
+        return sol < 1 ? sol.toPrecision(3) : sol.toFixed(4);
+    }
+    function fmtUsdc(base) {
+        if (base == null) return '—';
+        return (base / 1e6).toFixed(2);
+    }
+
     async function refreshWallet() {
         try {
             const gpay = window.gfgPay;
@@ -99,7 +129,87 @@
             const box = document.getElementById('wallet-box');
             if (addr) { box.textContent = addr; box.style.color = '#9fe8a8'; box.title = addr; }
             else { box.textContent = 'Sign in above (top right), then return here.'; box.style.color = '#f87818'; }
+            await loadBalances();
+            renderRecentTx();
+            await precheck();
         } catch (e) { /* ignore */ }
+    }
+
+    async function loadBalances() {
+        const solEl = document.getElementById('bal-sol');
+        const usdcEl = document.getElementById('bal-usdc');
+        try {
+            const gpay = window.gfgPay;
+            if (!gpay || typeof gpay.balances !== 'function' || !gpay.connectedWallet()) {
+                if (solEl) solEl.textContent = '—';
+                if (usdcEl) usdcEl.textContent = '—';
+                return;
+            }
+            const b = await gpay.balances();
+            balSol = b.sol;
+            balUsdc = b.usdc;
+            if (solEl) solEl.textContent = fmtSol(b.sol) + ' SOL';
+            if (usdcEl) usdcEl.textContent = fmtUsdc(b.usdc) + ' USDC';
+            if (b.sol != null && b.sol < SOL_FEE_LAMPORTS) solEl.style.color = '#e74c3c';
+            else solEl.style.color = '#f87818';
+            if (b.usdc != null && b.usdc < 1) usdcEl.style.color = '#e74c3c';
+            else usdcEl.style.color = '#7838f8';
+        } catch (e) {
+            if (solEl) solEl.textContent = '—';
+            if (usdcEl) usdcEl.textContent = '—';
+        }
+    }
+
+    // Pre-check: enable the Pay button ONLY when the wallet has enough SOL
+    // (for the transfer fee) AND enough USDC (for the chosen plan). Never fail
+    // silently - say exactly what's missing.
+    async function precheck() {
+        const precheckEl = document.getElementById('precheck');
+        const gpay = window.gfgPay;
+        if (!gpay) { payBtn.disabled = true; return; }
+        const wallet = gpay.connectedWallet();
+        if (!wallet) {
+            payBtn.disabled = true;
+            if (precheckEl) { precheckEl.style.display = 'block'; precheckEl.textContent = 'Sign in first (top right), then pick a plan.'; }
+            return;
+        }
+        if (!selected) {
+            payBtn.disabled = true;
+            if (precheckEl) { precheckEl.style.display = 'block'; precheckEl.textContent = 'Pick a plan above to check your payment readiness.'; }
+            return;
+        }
+        payBtn.disabled = true;
+        if (precheckEl) precheckEl.style.display = 'block';
+        try {
+            const r = await gpay.enoughFor(selected);
+            if (r.ok) {
+                payBtn.disabled = false;
+                if (precheckEl) { precheckEl.className = 'status ok'; precheckEl.textContent = 'Good to go: enough SOL for the fee and enough USDC for ' + r.planLabel + '. Tap Pay to finish.'; }
+            } else {
+                const parts = [];
+                if (r.missing.indexOf('usdc') !== -1) parts.push('not enough USDC for ' + (r.planLabel || 'that plan') + ' (you have ' + fmtUsdc(r.usdc) + ' USDC, needed $' + ((r.needUsdc||0)/1e6).toFixed(2) + ')');
+                if (r.missing.indexOf('sol') !== -1) parts.push('SOL balance is too low for the one-time transfer fee (you have ' + fmtSol(r.sol) + ' SOL, a fraction of a cent is enough)');
+                precheckEl.className = 'status err';
+                precheckEl.textContent = 'Can\'t pay yet: ' + (parts.join('; ') || 'balance not available').replace('Can\'t pay yet:  balance not available', 'Could not read your balances yet - refresh below.');
+            }
+        } catch (e) {
+            if (precheckEl) { precheckEl.className = 'status err'; precheckEl.textContent = 'Could not check your balance: ' + (e.message || e) + '. Refresh the page and try again.'; }
+        }
+    }
+
+    function renderRecentTx() {
+        const el = document.getElementById('recent-tx');
+        if (!el) return;
+        const gpay = window.gfgPay;
+        const txs = (gpay && typeof gpay.lastTx === 'function') ? gpay.lastTx() : [];
+        if (!txs.length) { el.textContent = 'No payments found yet on this device.'; return; }
+        el.innerHTML = txs.map((t) =>
+            '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">' +
+            '<span style="font-size:0.78rem; color:#bbb;">' + (t.plan||'?') + ' · ' + (t.points||0).toLocaleString() + ' pts</span>' +
+            '<a href="https://explorer.solana.com/tx/' + t.signature + '?cluster=devnet" target="_blank" rel="noopener noreferrer" style="font-size:0.72rem; color:#2ecc71; word-break:break-all;">' +
+            (t.signature||'').slice(0,16) + '… ↗</a>' +
+            '</div>'
+        ).join('');
     }
 
     async function init() {
@@ -121,7 +231,7 @@
                     selected = btn.dataset.key;
                     list.querySelectorAll('.plan-btn').forEach((b) => b.classList.remove('selected'));
                     btn.classList.add('selected');
-                    payBtn.disabled = !window.gfgPay || !window.gfgPay.connectedWallet();
+                    precheck();
                 });
             });
             // Pre-select the plan the plans/booster pages linked with (?plan=).
@@ -130,11 +240,9 @@
             if (preBtn) {
                 selected = pre;
                 preBtn.classList.add('selected');
-                payBtn.disabled = !window.gfgPay || !window.gfgPay.connectedWallet();
             }
             refreshWallet();
-            if (!window.gfgPay || !window.gfgPay.connectedWallet()) { payBtn.disabled = true; showStatus('Sign in first (top right), then pick a plan.', false); }
-            else showStatus('Pick a plan above, then tap Pay. Your points credit automatically once the transfer lands.', true);
+            renderRecentTx();
         } catch (e) {
             showStatus('Could not load plans: ' + (e.message || e), false);
         }
@@ -143,12 +251,19 @@
     payBtn.addEventListener('click', async () => {
         if (!selected) { showStatus('Pick a plan first.', false); return; }
         if (!gpayReady()) { showStatus('Payment module still loading. Try again in a moment.', false); return; }
+        // Final safety pre-check right before sending (balances may have changed).
+        try {
+            const r = await window.gfgPay.enoughFor(selected);
+            if (!r.ok) { precheck(); showStatus('Your balance changed: the pre-check no longer passes. See the message above.', false); return; }
+        } catch (e) { /* still attempt pay */ }
         payBtn.disabled = true;
         showStatus('Building your USDC payment from your wallet... signing (you may get a Dynamic email) and sending. Please wait.', true);
         try {
             // Pay from the embedded wallet, then auto-verify + credit server-side.
             const res = await window.gfgPay.payAndVerify(selected);
             showStatus('Payment verified and <b class="ok-txt">' + res.points.toLocaleString() + ' premium points credited</b> on-chain. Next: activate your ' + res.plan + ' on the <a href="/profile/upgrade.html">Upgrade page</a>.', true);
+            renderRecentTx();
+            precheck();
         } catch (e) {
             showStatus('Payment did not credit: ' + (e.message || e) + '<br>Your money (if sent) is safe on-chain. Use the <a href="/subscription-paid/">manual form</a> with your transaction signature, or try again.', false);
         } finally {
