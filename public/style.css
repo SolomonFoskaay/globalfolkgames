@@ -771,12 +771,17 @@ body {
 /* ===== MOBILE: NEVER HORIZONTAL-SCROLL =====
    Long words, explorer links, tx signatures and tables must wrap or shrink
    inside their cards instead of breaking the page into endless left/right
-   scroll (owner 2026-08-31). Applied sitewide so every page inherits it. */
-html, body {
+   scroll (owner 2026-08-31). Applied sitewide so every page inherits it.
+   NOTE: intentionally applies overflow-x only to body, NOT html - setting it
+   on html is a known iOS scroll-trap for flex body pages (the game pages use
+   body { display:flex; min-height:100vh; overflow-y:auto }, which must keep
+   vertical scroll alive). Canvas is excluded so game boards keep their exact
+   sizing. */
+body {
   overflow-x: hidden;
   max-width: 100%;
 }
-img, video, iframe, canvas, svg {
+img, video, iframe, svg {
   max-width: 100%;
   height: auto;
 }

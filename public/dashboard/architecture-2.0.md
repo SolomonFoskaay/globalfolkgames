@@ -11,7 +11,7 @@ Scope: a gasless, **fully on-chain**, people-to-people native-game arena. Earn =
 
 ## 1. M1 v2 — Game core with multiplayer
 - Rebuild M1 around **multiplayer** while keeping the M2 result seam: every game emits `publishGameResult` exactly as today.
-- Modes (per game): **Solo** (you vs computer/human seats, free, points only) and **Multiplayer** (abbreviated 2mp, 3mp, 4mp... = the number of HUMAN wallets in the match, earn-capable). There are NOT two versions of a game: the single game build powers both - Solo just has no money+AGM attached. Per-game seat capacity is dynamic (Ludo supports 2-seat or 4-seat; Monopoly 5-8 seats; etc.), so '2p/4p' (seat count within Ludo) is never confused with 'mp' (how many humans).
+- Modes (per game): **Solo** (you vs computer/human seats, free, points only) and **Multiplayer** (abbreviated 2mp, 3mp, 4mp... = the number of HUMAN wallets in the match, earn-capable). There are NOT two versions of a game: the single game build powers both - Solo just has no money+AGM attached. Per-game seat capacity is dynamic (Ludo supports 2-seat or 4-seat; Truco 4-seat; etc.), so '2p/4p' (seat count within Ludo) is never confused with 'mp' (how many humans).
 - Earn fill rules: an earn match fills 2..N human wallets via AGM; if not enough humans accept within the window, the remaining SEATS get a labelled (Computer) seat only when the mode is P2C-allowed (player can reject).
 - Deterministic game logic + **on-chain board/move state** for any match that involves value (could be heavy; we ship move-hashes + committed board snapshots at checkpoints; final settlement on-chain). Confirm with MagicBlock ER limits during build (see §9).
 - Turn clocks + match time caps enforced by the program/time service (§4).

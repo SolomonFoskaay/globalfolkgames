@@ -210,6 +210,6 @@ Real test numbers on-chain: pot $10, fee $1, payout $9, winner seat 0. One numbe
 
 **5. Turn clocks (arc2m1b).** Every seat gets a timer so nobody can stall a match forever. Real test: a seat with a 2-second turn stopped moving, got 3 timeout strikes, and was FORFEITED. Its attempt to claim the win was rejected, and the healthy seat finished and won. Solo play never uses these clocks, so free casual games stay exactly as they are today.
 
-**6. The board (arc2m1a).** Moves are committed on-chain as hashes, so the whole match can be replayed and proven. The board knows money and seats; the game decides the rules. This is why a future game (Monopoly, Ayo Olopon) plugs in by picking a gameId, not by being rewritten.
+**6. The board (arc2m1a).** Moves are committed on-chain as hashes, so the whole match can be replayed and proven. The board knows money and seats; the game decides the rules. This is why a future game (Truco, Ayo Olopon) plugs in by picking a gameId, not by being rewritten.
 
 In short: tickets (orders) -> match -> play on a provable board with timers -> lock the pot -> cut the 10% fee -> pay the 90% winner. Every step is on Solana, gasless for the player, and testable on devnet before any real money is involved.

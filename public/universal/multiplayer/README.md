@@ -9,7 +9,7 @@ this rail never knows about money.
 The multiplayer plumbing is identical for every game: create + delegate a
 match, commit each player's move gasless on the ER, listen for opponent moves,
 enforce turn clocks + forfeit, finish and emit the seam. It never interprets a
-move, so Ludo, Ayo Olopon or Monopoly all reuse the SAME rail. Each game only
+move, so Ludo, Ayo Olopon or Truco all reuse the SAME rail. Each game only
 supplies a small ADAPTER (what a move means in that game).
 
 This is the same pattern as the result seam (50 games -> one `publishGameResult`).
