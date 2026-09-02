@@ -132,6 +132,27 @@
       }
     },
     {
+      "slug": "Gyan Chaupar",
+      "name": "Gyan Chaupar (Moksha-Patamu)",
+      "emoji": "🤼",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "India",
+          "flag": "🇮🇳"
+        }
+      ],
+      "history": "A traditional, spiritual cross-and-circle board game of karma and reincarnation.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 1800,
+        "resultModel": "score"
+      }
+    },
+    {
       "slug": "kabaddi",
       "name": "Kabaddi",
       "emoji": "🤼",
@@ -153,8 +174,8 @@
       }
     },
     {
-      "slug": "monopoly",
-      "name": "Monopoly",
+      "slug": "euchre",
+      "name": "Euchre",
       "emoji": "🏠",
       "status": "soon",
       "origins": [
@@ -163,7 +184,7 @@
           "flag": "🇺🇸"
         }
       ],
-      "history": "Derived from The Landlord's Game and commercialized in the 1930s.",
+      "history": "A 19th-century trick-taking card game that became a staple of Midwestern culture.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 8,
@@ -174,8 +195,8 @@
       }
     },
     {
-      "slug": "scrabble",
-      "name": "Scrabble",
+      "slug": "spades",
+      "name": "Spades",
       "emoji": "🔤",
       "status": "soon",
       "origins": [
@@ -184,7 +205,7 @@
           "flag": "🇺🇸"
         }
       ],
-      "history": "The iconic Depression-era word-building board game.",
+      "history": "A 1930s trick-taking card game that became a staple of American culture.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -195,8 +216,8 @@
       }
     },
     {
-      "slug": "cornhole",
-      "name": "Cornhole",
+      "slug": "chunkey",
+      "name": "Chunkey",
       "emoji": "🎯",
       "status": "soon",
       "origins": [
@@ -205,7 +226,7 @@
           "flag": "🇺🇸"
         }
       ],
-      "history": "A classic American backyard lawn bean-bag tossing game.",
+      "history": "A traditional Native American game of skill and chance played with rolling stone disks.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -216,26 +237,26 @@
       }
     },
     {
-      "slug": "jogo-do-bicho",
-      "name": "Jogo do Bicho",
-      "emoji": "🦁",
+      "slug": "plum-stone",
+      "name": "Plum-stone (bowl dice)",
+      "emoji": "🎯",
       "status": "soon",
       "origins": [
         {
-          "country": "Brazil",
-          "flag": "🇧🇷"
+          "country": "United States",
+          "flag": "🇺🇸"
         }
       ],
-      "history": "A deeply rooted 19th-century animal-themed lottery system.",
+      "history": "A traditional American game played with a bowl and four marked dice.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
-        "turnModel": "move",
-        "turnSecs": 60,
-        "matchSecs": 1800,
-        "resultModel": "ranked"
+        "turnModel": "round",
+        "turnSecs": 0,
+        "matchSecs": 1200,
+        "resultModel": "score"
       }
-    },
+    },        
     {
       "slug": "truco",
       "name": "Truco",
@@ -258,8 +279,29 @@
       }
     },
     {
-      "slug": "futevolei",
-      "name": "Futevolei (Footvolley)",
+      "slug": "buraco-canastra",
+      "name": "Buraco / Canastra",
+      "emoji": "🦁",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Brazil",
+          "flag": "🇧🇷"
+        }
+      ],
+      "history": "A 20th-century Brazilian card game of melding and scoring, a variant of Rummy.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "domino",
+      "name": "Dominó",
       "emoji": "🏐",
       "status": "soon",
       "origins": [
@@ -403,28 +445,7 @@
         "matchSecs": 1800,
         "resultModel": "ranked"
       }
-    },
-    {
-      "slug": "mensch",
-      "name": "Mensch aergere dich nicht",
-      "emoji": "🎲",
-      "status": "soon",
-      "origins": [
-        {
-          "country": "Germany",
-          "flag": "🇩🇪"
-        }
-      ],
-      "history": "The iconic Man, Don't Get Angry cross-and-circle game.",
-      "rules": {
-        "minSeats": 2,
-        "maxSeats": 4,
-        "turnModel": "move",
-        "turnSecs": 60,
-        "matchSecs": 1800,
-        "resultModel": "ranked"
-      }
-    },
+    },    
     {
       "slug": "skat",
       "name": "Skat",
@@ -447,8 +468,29 @@
       }
     },
     {
-      "slug": "catan",
-      "name": "The Settlers of Catan",
+      "slug": "doppelkopf",
+      "name": "Doppelkopf",
+      "emoji": "🎲",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Germany",
+          "flag": "🇩🇪"
+        }
+      ],
+      "history": "The German 4-player trick-taking card game with a unique partnership system.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "muhle",
+      "name": "Mühle",
       "emoji": "🏝️",
       "status": "soon",
       "origins": [
@@ -457,7 +499,7 @@
           "flag": "🇩🇪"
         }
       ],
-      "history": "The acclaimed board game that launched the Eurogame revolution.",
+      "history": "The classic German abstract strategy board game of forming mills.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -531,8 +573,8 @@
       }
     },
     {
-      "slug": "royal-ludo",
-      "name": "Royal Ludo",
+      "slug": "uckers",
+      "name": "Uckers",
       "emoji": "👑",
       "status": "soon",
       "origins": [
@@ -541,7 +583,7 @@
           "flag": "🇬🇧"
         }
       ],
-      "history": "The commercialized, patented 1896 version of Pachisi.",
+      "history": "Historically played by Navy on ships, a cross-and-circle board game similar to Ludo.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -552,8 +594,8 @@
       }
     },
     {
-      "slug": "pub-darts",
-      "name": "Pub Darts",
+      "slug": "nine-mens-morris",
+      "name": "Nine Men's Morris",
       "emoji": "🎯",
       "status": "soon",
       "origins": [
@@ -562,7 +604,7 @@
           "flag": "🇬🇧"
         }
       ],
-      "history": "Traditional precision target tossing popular in British pubs.",
+      "history": "A traditional abstract strategy board game dating back to the Roman Empire.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -592,28 +634,7 @@
         "matchSecs": 1800,
         "resultModel": "ranked"
       }
-    },
-    {
-      "slug": "petanque",
-      "name": "Petanque",
-      "emoji": "⛳",
-      "status": "soon",
-      "origins": [
-        {
-          "country": "France",
-          "flag": "🇫🇷"
-        }
-      ],
-      "history": "A traditional Southern French outdoor sport of tossing heavy metal boules near a target ball.",
-      "rules": {
-        "minSeats": 2,
-        "maxSeats": 4,
-        "turnModel": "move",
-        "turnSecs": 60,
-        "matchSecs": 1800,
-        "resultModel": "ranked"
-      }
-    },
+    },    
     {
       "slug": "belote",
       "name": "Belote",
@@ -647,6 +668,48 @@
         }
       ],
       "history": "The historic prototype for modern roll-and-move racing board games.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "tarot",
+      "name": "Tarot (French 78-card)",
+      "emoji": "⛳",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "France",
+          "flag": "🇫🇷"
+        }
+      ],
+      "history": "A traditional French trick-taking card game played with a 78-card Tarot deck.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "petanque",
+      "name": "Petanque",
+      "emoji": "⛳",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "France",
+          "flag": "🇫🇷"
+        }
+      ],
+      "history": "A traditional Southern French outdoor sport of tossing heavy metal boules near a target ball.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
@@ -700,7 +763,7 @@
     },
     {
       "slug": "whon",
-      "name": "Whon",
+      "name": "Whon (Nigerian Whot)",
       "emoji": "🃏",
       "status": "soon",
       "origins": [
@@ -773,6 +836,27 @@
         }
       ],
       "history": "An ancient Egyptian game mimicking a coiled snake and a journey through the underworld.",
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 4,
+        "turnModel": "move",
+        "turnSecs": 60,
+        "matchSecs": 1800,
+        "resultModel": "ranked"
+      }
+    },
+    {
+      "slug": "seega",
+      "name": "Seega",
+      "emoji": "🐍",
+      "status": "soon",
+      "origins": [
+        {
+          "country": "Egypt",
+          "flag": "🇪🇬"
+        }
+      ],
+      "history": "An ancient Egyptian abstract strategy board game of capturing pieces.",
       "rules": {
         "minSeats": 2,
         "maxSeats": 4,
