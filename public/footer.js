@@ -20,7 +20,7 @@
             'background:rgba(15,14,45,0.55); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);' +
             'border-top:1px solid rgba(255,255,255,0.08); text-align:center; color:#ddd;');
         f.innerHTML =
-            '<a href="/" style="font-size:0.95rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-decoration:none;"><span style="color:#f87818;">Global</span><span style="color:#7838f8;">Folk</span><span style="color:#f87818;">Games</span></a>' +
+            '<a href="/" style="font-size:0.95rem; font-weight:800; color:#fff; letter-spacing:0.02em; text-decoration:none;"><span style="color:#f87818;">Global</span><span style="color:#7838f8;">Folk</span><span style="color:#f87818;">Games</span><span style="color:#7838f8;">.</span><span style="color:#f87818;">fun</span></a>' +
             '<div style="margin-top:4px; font-size:0.72rem; color:#bbb;">\u00A9 2026 - Till Date \u00B7 Preserving native games on-chain \u00B7 <span style="color:#f87818; font-weight:800;">Beta</span></div>' +
             '<div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:0.78rem;">' +
             '<a href="/about/" style="color:#f87818; text-decoration:none;">About</a>' +

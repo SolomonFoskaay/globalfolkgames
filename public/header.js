@@ -137,7 +137,7 @@
             <div id="gfg-drawer-scrim" class="gfg-drawer-scrim"></div>
             <aside id="gfg-drawer" class="gfg-drawer" aria-hidden="true">
                 <div class="gfg-drawer-head">
-                    <span class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span> <span class="gfg-beta">Beta</span></span>
+                    <span class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames.fun logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span><span class="brand-purple">.</span><span class="brand-orange">fun</span> <span class="gfg-beta">Beta</span></span>
                     <button id="gfg-drawer-close" class="gfg-drawer-close" aria-label="Close menu">×</button>
                 </div>
                 <nav class="gfg-drawer-nav" id="gfg-drawer-nav">
@@ -233,7 +233,7 @@
         const headerHTML = `
             <header class="gfg-header">
                 <div class="gfg-header-left">
-                    <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span> <span class="gfg-beta">Beta</span></a>
+                    <a href="/" class="gfg-brand"><img class="gfg-logo" src="/media/logo.png" alt="GlobalFolkGames.fun logo"> <span class="brand-orange">Global</span><span class="brand-purple">Folk</span><span class="brand-orange">Games</span><span class="brand-purple">.</span><span class="brand-orange">fun</span> <span class="gfg-beta">Beta</span></a>
                     <span id="active-tier-badge" class="gfg-tier-badge" style="display:none; padding:1px 8px; border-radius:999px; font-size:0.68rem; font-weight:800; white-space:nowrap;"></span>
                     ${gameName ? `<span class="gfg-game-tag">${gameName}</span>` : ''}
                 </div>
@@ -249,9 +249,29 @@
                 <span class="b-text"><b>You can become an Early Backer.</b>&nbsp; 100 seats, lifetime L3, and you help this reach Mainnet.</span>
                 <span class="b-cta">See how →</span>
             </a>
+            <a href="/backers/" class="gfg-backer-banner-bottom" aria-label="Become an Early Backer">
+                <span class="b-emoji">🧡</span>
+                <span class="b-text"><b>You can become an Early Backer.</b>&nbsp; 100 seats, lifetime L3, and you help this reach Mainnet.</span>
+                <span class="b-cta">See how →</span>
+            </a>
         `;
 
         document.body.insertAdjacentHTML('afterbegin', headerHTML);
+
+        // EARLY BACKER BOTTOM BANNER CYCLE (owner 2026-08-31):
+        // show for 8s -> hide for 30s -> reappear, forever. Not user-cancellable
+        // on purpose (it vanishes on its own), so it never goes stale but also
+        // never overstays. Reduces banner-blindness by reappearing on a rhythm.
+        (function () {
+            var pop = document.querySelector('.gfg-backer-banner-bottom');
+            if (!pop) return;
+            var showMs = 8000;   // stays visible long enough to read + tap
+            var hideMs = 30000;  // gone long enough to not feel intrusive
+            var shown = false;
+            function show(){ if (shown) return; shown = true; pop.classList.add('show'); setTimeout(hide, showMs); }
+            function hide(){ pop.classList.remove('show'); shown = false; setTimeout(show, hideMs); }
+            setTimeout(show, 4000); // first appearance shortly after load
+        })();
 
         if (!document.getElementById('gfg-community') && !gameName) {
             const toast = document.createElement('div');

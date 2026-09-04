@@ -27,9 +27,6 @@
 
     <div id="game-arena-wrapper">
 
-        <!-- Native Educational Text Display Line -->
-        <div id="ludo-log">Setup players below then click "Start Arena Match" to lock choices.</div>
-
         <!-- M12 arc2m12a/c: multiplayer join/create bar (free, game-agnostic rail) -->
         <div id="mp-bar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.78rem;">
             <span style="color:#f87818; font-weight:800;">Multiplayer</span>
@@ -90,6 +87,10 @@
         <div id="board-frame">
             <canvas id="ludoCanvas" width="600" height="600"></canvas>
         </div>
+
+        <!-- Native Educational Text Display Line (moved: between board and dice
+             so the live game log stays in viewport while playing) -->
+        <div id="ludo-log" style="margin-top:6px;">Setup players below then click "Start Arena Match" to lock choices.</div>
 
         <!-- Persistent Control Center Layout -->
         <div id="dice-container">

@@ -91,6 +91,48 @@ body {
 .gfg-backer-banner .b-cta { color: #f87818; font-weight: 800; white-space: nowrap; flex-shrink: 0; }
 .gfg-backer-banner:hover .b-cta { text-decoration: underline; }
 
+/* ===== EARLY BACKER BOTTOM STICKY BANNER (sitewide, owner 2026-08-31) =====
+   Duplicate of the top banner, fixed at the bottom of the viewport, cycling
+   show -> hold -> hide -> pause -> reappear forever. Never cancellable by the
+   user (it disappears on its own) and re-captures attention on any page when
+   it comes back, so the Early Backer mint stays visible as it is important to
+   the project. */
+.gfg-backer-banner-bottom {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9960;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(90deg, rgba(155,89,182,0.92), rgba(15,15,19,0.96), rgba(243,156,18,0.90));
+    border-top: 1px solid rgba(243,156,18,0.45);
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.82rem;
+    min-height: 42px;
+    box-sizing: border-box;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.45);
+    opacity: 0;
+    transform: translateY(100%);
+    transition: opacity .4s ease, transform .4s ease;
+    pointer-events: none;
+}
+.gfg-backer-banner-bottom.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.gfg-backer-banner-bottom .b-emoji { font-size: 1.05rem; flex-shrink: 0; }
+.gfg-backer-banner-bottom .b-text { flex: 1; color: #fff; line-height: 1.4; }
+.gfg-backer-banner-bottom .b-text b { color: #ffe1a1; }
+.gfg-backer-banner-bottom .b-cta { color: #ffe1a1; font-weight: 800; white-space: nowrap; flex-shrink: 0; }
+.gfg-backer-banner-bottom:hover .b-cta { text-decoration: underline; }
+/* Keep the back-to-top button above the bottom banner so it stays usable. */
+#gfg-backtop { bottom: 56px; }
+
 .gfg-header-right {
     display: flex;
     align-items: center;
