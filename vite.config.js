@@ -24,7 +24,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        ludo: './games/ludo/index.html',
         'ludo-lab': './games/ludo-lab/index.html',
         changelog: './changelog/index.html',
         'changelog-admin': './changelog/admin.html',

@@ -58,7 +58,7 @@ function decodePlayerDice(data) {
 }
 
 // ---- C) Web2 local dice ------------------------------------------------
-// What the game does for AI turns today (public/games/ludo/mechanics/actions/
+// What the game does for AI turns today (public/games/ludo-lab/mechanics/actions/
 // dice.js): one Math.random per face. Also time a "full local turn" path with
 // an animation-friendly yield (like rAF would naturally impose ~one frame).
 function web2Local() {
