@@ -27,6 +27,12 @@
 
     <div id="game-arena-wrapper">
 
+        <!-- MP MODE TAB: SinglePlayer (existing) | MultiPlayer (lobby) -->
+        <div id="mp-mode-tabs" style="display:flex; gap:8px; margin-bottom:8px;">
+            <button id="mp-tab-single" class="mode-btn active" onclick="window.mpSetMode('single')" style="flex:1;">SinglePlayer</button>
+            <button id="mp-tab-multi" class="mode-btn" onclick="window.mpSetMode('multi')" style="flex:1;">MultiPlayer</button>
+        </div>
+
         <!-- M12 arc2m12a/c: multiplayer join/create bar (free, game-agnostic rail) -->
         <div id="mp-bar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.78rem;">
             <span style="color:#f87818; font-weight:800;">Multiplayer</span>
@@ -359,9 +365,51 @@
         mpSetStatus('joining ' + code + '...');
         a.join(1, code.trim(), 1).then(function (r) {
             if (!r) { mpSetStatus('join failed (check code)'); return; }
-            mpSetStatus('JOINED · I am RED');
+            mpSetStatus('JOINED · I am RED · waiting for host to start');
         });
     };
+    </script>
+    <script>
+    // ===== SinglePlayer | MultiPlayer MODE TAB (additive; core game untouched) ====
+    // Toggles which setup the arena shows. SinglePlayer = the existing 2P/4P +
+    // seat picker exactly as today. MultiPlayer = the create/join lobby on top of
+    // the same seats. Starting a match locks everything via the game's own
+    // setupConfigurationLocked (set by initiateArenaMatch), so no new-locks logic,
+    // and the multiplayer rail begin() fires on start so the board goes live.
+    (function () {
+        var mode = 'single';
+        function el(id) { return document.getElementById(id); }
+        function setMode(m) {
+            mode = m;
+            var bar = el('mp-bar');
+            var setup = el('player-setup-panel');
+            var singleTab = el('mp-tab-single');
+            var multiTab = el('mp-tab-multi');
+            if (bar) bar.style.display = (m === 'multi') ? 'flex' : 'none';
+            // The seat picker stays visible in BOTH modes; in multiplayer it is
+            // the seat display / "you pick your seat". Existing setup untouched.
+            if (setup) setup.style.display = '';
+            if (singleTab) singleTab.classList.toggle('active', m === 'single');
+            if (multiTab) multiTab.classList.toggle('active', m === 'multi');
+        }
+        window.mpSetMode = function (m) { setMode(m); };
+        // Begin the multiplayer board when the host starts the game. Soft-fail:
+        // if the rail isn't active this is a no-op (Solo path).
+        var _origStart = window.initiateArenaMatch;
+        if (typeof _origStart === 'function') {
+            window.initiateArenaMatch = function () {
+                try {
+                    var a = window.gfgLudoAdapter;
+                    if (a && typeof a.isActive === 'function' && a.isActive()) {
+                        if (typeof a.begin === 'function') a.begin();
+                    }
+                } catch (e) { /* soft */ }
+                return _origStart.apply(this, arguments);
+            };
+        }
+        // Default to SinglePlayer with the existing setup panel active.
+        setMode('single');
+    })();
     </script>
 </body>
 </html>

@@ -123,6 +123,16 @@
     function ref() { return matchRef; }
     function seat() { return mySeat; }
 
+    // HOST-ONLY: begin the live match (status 0 -> 1), locking out new joins.
+    function begin() {
+        if (!active || !matchRef) return Promise.resolve({ okay: false, error: 'not in a match' });
+        if (mySeat !== 0) return Promise.resolve({ okay: false, error: 'only the host can start' });
+        return rail().begin({ gameId: 1, matchRef: matchRef }).then(function (r) {
+            if (r && r.okay) log('match begun');
+            return r;
+        });
+    }
+
     // called by the game after a real LOCAL move: commit the move gasless
     function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex) {
         if (!active || !matchRef) return;
@@ -147,7 +157,7 @@
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
 
-    window.gfgLudoAdapter = { start: start, join: join, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

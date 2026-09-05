@@ -128,9 +128,19 @@
         return r && r.ok ? r : null;
     }
 
+    // ---- begin (host starts the live match; status 0 -> 1, no more joins) ----
+    async function begin(move) {
+        var gameId = (move && move.gameId) || GAME;
+        var ref = move && move.matchRef;
+        if (!ref) return { okay: false, error: 'no matchRef' };
+        var r = await api('begin', { game: gameId, matchRef: ref });
+        return r && r.ok ? { okay: true, started: !!r.started } : { okay: false, error: r.error };
+    }
+
     window.gfgMultiplayer = {
         create: create,
         join: join,
+        begin: begin,
         commitMove: commitMove,
         subscribe: subscribe,
         finish: finish,
