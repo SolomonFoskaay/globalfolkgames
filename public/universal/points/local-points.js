@@ -217,12 +217,60 @@
         if (cfg.reasons.win2nd && user.position === 2) reason = cfg.reasons.win2nd;
         if (cfg.reasons.win3rd && user.position === 3) reason = cfg.reasons.win3rd;
         return {
+            seat: user.seat,
+            identity: user.identity != null ? String(user.identity) : null,
             gameTag: cfg.gameTag,
             points: points,
             reason: reason,
             position: user.position,
             at: Date.now(),
         };
+    }
+
+    // MULTIPLAYER: every 'user' seat earns at its OWN position. Solo (one user)
+    // returns a single-element array, behaviour identical to computeAward.
+    function computeAwards(env) {
+        var cfg = configFor(env.gameId);
+        if (!cfg) return [];
+        var n = env.players.length;
+        var mode = n <= 2 ? 2 : 4;
+        var table = cfg.positions[mode] || cfg.positions[4] || {};
+        var out = [];
+        for (var i = 0; i < env.players.length; i++) {
+            var p = env.players[i];
+            if (!p || p.actor !== 'user') continue;   // house/local never earn
+            if (typeof p.position !== 'number') continue;
+            // A user seat must carry (or inherit) a real identity to bank.
+            var id = (p.identity != null && p.identity !== '' ) ? String(p.identity) : resolveUserIdentityFallback();
+            if (!id) continue;
+            var points = table[p.position] || 0;
+            if (points <= 0) continue;
+            var reason = cfg.reasons.win1st;
+            if (cfg.reasons.win2nd && p.position === 2) reason = cfg.reasons.win2nd;
+            if (cfg.reasons.win3rd && p.position === 3) reason = cfg.reasons.win3rd;
+            out.push({
+                seat: p.seat,
+                identity: id,
+                gameTag: cfg.gameTag,
+                points: points,
+                reason: reason,
+                position: p.position,
+                at: Date.now(),
+            });
+        }
+        return out;
+    }
+
+    // Fallback identity for a user seat without an explicit wallet (Solo path).
+    function resolveUserIdentityFallback() {
+        try {
+            if (window.currentProfile && window.currentProfile.solana_wallet) return window.currentProfile.solana_wallet;
+            if (window.getDynamicSolanaWallet) {
+                var w = window.getDynamicSolanaWallet();
+                if (w) return (typeof w === 'string') ? w : (w.address || null);
+            }
+        } catch (e) { /* ignore */ }
+        return null;
     }
 
     // Match-ref from the proof signature (first 8 bytes as u64) — matches the

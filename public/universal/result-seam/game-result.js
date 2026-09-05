@@ -22,7 +22,11 @@
 //                                       //   'local' = a local human not bound to an account
 //         position: 1,                  // ranked games: 1st..nth (null for score games)
 //         score: 100,                   // score-based games: numeric result (null for ranked)
-//         identity: <wallet>|null       // resolved by the bus when actor==='user'
+//         identity: <wallet>|null       // 'user' seats: explicit wallet if the
+//                                       //   game supplied one (multiplayer), else
+//                                       //   the signed-in wallet (Solo). Never the
+//                                       //   handle/email; used by M3/M4 crediting.
+//         handle: <GFG-X>|null           // optional public display id, never email/wallet.
 //       }, …
 //     ],
 //     proof: {                          // OPTIONAL on-chain proof-of-play
@@ -95,7 +99,10 @@
                 actor,
                 position: hasPosition ? p.position : null,
                 score: hasScore ? p.score : null,
-                identity: actor === 'user' ? resolveUserIdentity() : null,
+                identity: actor === 'user'
+                    ? (p.identity ? String(p.identity) : resolveUserIdentity())
+                    : null,
+                handle: p.handle ? String(p.handle) : null,
             };
             return out;
         });
