@@ -34,7 +34,7 @@
     function log() { try { console.log.apply(console, ['[MP]'].concat(Array.prototype.slice.call(arguments))); } catch (e) {} }
 
     function api(action, body) {
-        return fetch('/api/agm', {
+        return fetch('/api/multiplayer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(Object.assign({ action: action }, body || {})),
@@ -53,7 +53,7 @@
     async function create(opts) {
         opts = opts || {};
         var matchRef = Date.now();
-        var r = await api('board-start', {
+        var r = await api('create', {
             game: GAME,
             matchRef: matchRef,
             players: opts.players || [],
@@ -90,7 +90,7 @@
         var ref = move && move.matchRef;
         var seat = (move && typeof move.seat === 'number') ? move.seat : 0;
         if (!ref) return Promise.resolve({ okay: false, error: 'no matchRef' });
-        return api('board-commit', { game: gameId, matchRef: ref, seat: seat, moveCommit: Array.isArray(moveHash) ? moveHash : hash32(moveHash) });
+        return api('commit', { game: gameId, matchRef: ref, seat: seat, moveCommit: Array.isArray(moveHash) ? moveHash : hash32(moveHash) });
     }
 
     // ---- subscribe: poll the board on the ER for opponent moves ----
@@ -100,7 +100,7 @@
         var stop = false;
         (function loop() {
             if (stop) return;
-            api('board-state', { game: GAME, matchRef: matchRef }).then(function (s) {
+            api('state', { game: GAME, matchRef: matchRef }).then(function (s) {
                 if (stop) return;
                 if (s && s.ok) {
                     if (s.move_count !== seen) {
@@ -119,12 +119,12 @@
         var gameId = (move && move.gameId) || GAME;
         var ref = move && move.matchRef;
         if (!ref) return { okay: false, error: 'no matchRef' };
-        var r = await api('board-finish', { game: gameId, matchRef: ref, winnerSeat: winnerSeat });
+        var r = await api('finish', { game: gameId, matchRef: ref, winnerSeat: winnerSeat });
         return r && r.ok ? { okay: true, sig: r.sig } : { okay: false, error: r.error };
     }
 
     async function state(matchRef) {
-        var r = await api('board-state', { game: GAME, matchRef: matchRef });
+        var r = await api('state', { game: GAME, matchRef: matchRef });
         return r && r.ok ? r : null;
     }
 

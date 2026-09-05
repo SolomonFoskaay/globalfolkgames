@@ -621,6 +621,41 @@ const server = createServer(async (req, res) => {
   }
   // Arc2 AGM lobby route (delegates to the shared handler module; body passed
   // through as an object so the handler's own JSON parse sees a string).
+  if (req.method === 'POST' && req.url === '/api/multiplayer') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { action, game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl } = JSON.parse(body || '{}');
+      const { dispatch } = await import('./multiplayer-relay.mjs');
+      const r = await dispatch(action, { game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(r));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/multiplayer') {
+    try {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const action = (url.searchParams.get('action') || '').toString();
+      const { dispatch } = await import('./multiplayer-relay.mjs');
+      const r = await dispatch(action, {
+        game: Number(url.searchParams.get('game')), matchRef: Number(url.searchParams.get('matchRef') || url.searchParams.get('match_ref')),
+        seats: Number(url.searchParams.get('seats')), seat: Number(url.searchParams.get('seat')),
+        winnerSeat: Number(url.searchParams.get('winnerSeat')), moveCommit: url.searchParams.get('moveCommit'),
+        regionUrl: url.searchParams.get('regionUrl'), stakeUsdCents: Number(url.searchParams.get('stakeUsdCents') || 0) || 0,
+        turnSecs: Number(url.searchParams.get('turnSecs') || 60) || 60, maxMatchSecs: Number(url.searchParams.get('maxMatchSecs') || 3600) || 3600,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(r));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
   if (req.url === '/api/agm' || (req.url || '').startsWith('/api/agm/')) {
     let body = '';
     for await (const chunk of req) body += chunk;

@@ -146,7 +146,18 @@ export async function boardStart({ game, matchRef, players, seats, stakeUsdCents
     const info = await conn.getAccountInfo(pda).catch(() => null);
     let created = false;
     if (!info) {
-      const tx = await prog.methods.startMatch(game, new BN(matchRef), players.map(p => new PublicKey(p)), seats, new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
+      // The program requires at least 2 players on the board (max MAX_MP).
+      // The rail's create/join model knows only the CREATOR up front (the joiner
+      // shows up later), so pad the board with the sponsor as a placeholder
+      // seat. Real seat identity/locking is a later multiplayer milestone; this
+      // keeps create on-chain-valid today while Solo/free play is untouched.
+      const sponsorKey = sponsor.publicKey;
+      let list = (Array.isArray(players) ? players : []).map((p) => {
+        try { return new PublicKey(p); } catch (e) { return sponsorKey; }
+      });
+      while (list.length < Math.max(2, Number(seats) || 2)) list.push(sponsorKey);
+      list = list.slice(0, 8);
+      const tx = await prog.methods.startMatch(game, new BN(matchRef), list, Math.max(list.length, Number(seats) || 2), new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
         .accounts({ payer: sponsor.publicKey, board: pda, systemProgram: SystemProgram.programId }).transaction();
       await sendTx(tx);
       created = true;
