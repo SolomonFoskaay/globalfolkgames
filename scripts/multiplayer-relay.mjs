@@ -31,6 +31,7 @@ import { fileURLToPath } from 'url';
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
 const BOARD_SEED = Buffer.from('gfgboard');
+const CLOCK_SEED = Buffer.from('gfgclock');
 const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 const ER_VALIDATOR_ID = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57'); // AS region pin
 const MAX_MP = 8;
@@ -153,18 +154,38 @@ export async function boardCreate({ game, matchRef, seats, stakeUsdCents, turnSe
   }
 }
 
-// Host pressed "Start Match": flip status 0 -> 1 (one-time, base path like begin).
+// Host pressed "Start Match": flip status 0 -> 1 (begin_match), then initialize
+// the clock ledger (start_match_clocks requires status 1). One-time base path.
 export async function boardBegin({ game, matchRef }) {
   try {
     const pda = boardPda(game, matchRef);
     const st = await boardState({ game, matchRef });
     if (st && st.ok && st.status !== 0) return { ok: true, note: 'already-started', pda: pda.toBase58() };
+    // begin_match: status 0 -> 1
     const meth = prog.methods.beginMatch(game, new BN(matchRef)).accounts({ signer: sponsor.publicKey, board: pda });
     const tx = await meth.transaction();
     tx.feePayer = sponsor.publicKey;
     const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
     await conn.confirmTransaction({ signature: sig }, 'confirmed');
-    return { ok: true, sig, started: true, pda: pda.toBase58() };
+    // start_match_clocks: clock ledger for the begun board (status 1). Best-effort:
+    // a clock-init error must never block starting the live game.
+    let clocksSig = null, clocksErr = null;
+    try {
+      const clockSeed = Buffer.from('gfgclock');
+      const [clockPda] = PublicKey.findProgramAddressSync(
+        [clockSeed, Buffer.from([game]), new BN(matchRef).toArrayLike(Buffer, 'le', 8)], PROGRAM
+      );
+      const m2 = prog.methods.startMatchClocks(game, new BN(matchRef))
+        .accounts({ signer: sponsor.publicKey, board: pda, clock: clockPda, systemProgram: SystemProgram.programId });
+      const tx2 = await m2.transaction();
+      tx2.feePayer = sponsor.publicKey;
+      const sig2 = await sendMagicTx(conn, tx2, [sponsor], { skipPreflight: true });
+      await conn.confirmTransaction({ signature: sig2 }, 'confirmed');
+      clocksSig = sig2;
+    } catch (ce) {
+      clocksErr = (ce && ce.message) || String(ce);
+    }
+    return { ok: true, sig, clocksSig, clocksErr, started: true, pda: pda.toBase58() };
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
