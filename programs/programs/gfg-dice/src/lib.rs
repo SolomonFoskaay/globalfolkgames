@@ -115,8 +115,10 @@ pub const COMP2_SEED: &[u8] = b"gfgcomp2";        // M7 competition instance [gf
 pub const GFGWIN_SEED: &[u8] = b"gfgwin";         // M7 winner record [gfgwin, comp, rank]
 pub const MAX_GAMES: usize = 4;
 pub const MAX_WINNERS: usize = 16;
-pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board
+pub const MATCHBOARD_SEED: &[u8] = b"gfgboard";   // Arc2 M1 D: on-chain match board (v1, legacy)
+pub const MATCHBOARD2_SEED: &[u8] = b"gfgboard2"; // M12: multiplayer match board (v2: seat-authority + handles + turn)
 pub const MAX_MP: usize = 8;                      // max human seats per earn match
+pub const HANDLE_SLOT: usize = 24;                // per-seat sitewide handle width (matches ProfileHandle rule 5..24)
 pub const CLOCK_SEED: &[u8] = b"gfgclock";          // Arc2 M1B: per-seat turn clocks + forfeits
 pub const DEFAULT_TIMEOUT_CAP: u8 = 3;              // timeout_seat triggers foreclosure at 3 stalls
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
@@ -429,11 +431,11 @@ pub mod gfg_dice {
 
     /// Delegates the arc2m1 MATCH BOARD PDA into an ER session (base layer,
     /// sponsor/relay pays) so `begin_match`/`commit_move`/`finish_match` run
-    /// GASLESS on the ER. Mirrors `delegate_result`; seed [gfgboard, game, match_ref].
+    /// GASLESS on the ER. Mirrors `delegate_result`; seed [gfgboard2, game, match_ref].
     pub fn delegate_board(ctx: Context<DelegateBoardInput>, game: u8, match_ref: u64) -> Result<()> {
         ctx.accounts.delegate_board(
             &ctx.accounts.payer,
-            &[MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+            &[MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
             DelegateConfig {
                 // Optionally set a specific validator from the first remaining account
                 validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
@@ -1411,7 +1413,7 @@ pub mod gfg_dice {
         turn_secs: u64,
         max_match_secs: u64,
     ) -> Result<()> {
-        require!(players.len() >= 2 && players.len() <= MAX_MP, PointsError::InvalidCompetition);
+        require!(players.len() >= 1 && players.len() <= MAX_MP, PointsError::InvalidCompetition);
         require!(seats >= players.len() as u8 && seats as usize <= MAX_MP, PointsError::InvalidCompetition);
         require!(game > 0, PointsError::InvalidCompetition);
         // stake 0 = Solo/free match (board records facts only, reward-neutral);
@@ -1419,15 +1421,17 @@ pub mod gfg_dice {
         // rewards - it only stores the stake for downstream modules to read.
         require!(turn_secs > 0 && max_match_secs > 0, PointsError::InvalidCompetition);
         let b = &mut ctx.accounts.board;
-        b.version = 1u8;
+        b.version = 2u8;
         b.game = game;
         b.match_ref = match_ref;
         b.status = 0u8;
-        let mut ps = [ctx.accounts.payer.key(); MAX_MP];
+        let mut ps = [Pubkey::default(); MAX_MP];
         for (i, p) in players.iter().enumerate() { ps[i] = *p; }
         b.players = ps;
         b.player_count = players.len() as u8;
         b.seats = seats;
+        b.handles = [[0u8; HANDLE_SLOT]; MAX_MP];
+        b.current_turn = 255u8; // none yet
         b.stake_usd_cents = stake_usd_cents;
         b.seat_pot_usd_cents = stake_usd_cents.checked_mul(seats as u64).ok_or(PointsError::Overflow)?;
         b.turn_secs = turn_secs;
@@ -1441,18 +1445,82 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// M12 join_match: a player joins a free seat on the board (gasless ER,
+    /// PLAYER session key signs). Registers the joiner's REAL wallet into the
+    /// seat + their sitewide handle. Requires the match to still be open
+    /// (status 0); the host opens the board via start_match with seat 0 already
+    /// taken and the rest open. Re-joins are idempotent (same seat + same
+    /// signer may refresh the handle).
+    pub fn join_match(
+        ctx: Context<JoinMatchCtx>,
+        game: u8,
+        match_ref: u64,
+        seat: u8,
+        handle: String,
+    ) -> Result<()> {
+        let h = handle.trim();
+        require!(h.len() >= 5 && h.len() <= 24, PointsError::InvalidHandle);
+        let valid = h.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        require!(valid, PointsError::InvalidHandle);
+
+        let b = &mut ctx.accounts.board;
+        require!(b.game == game, PointsError::InvalidCompetition);
+        require!(b.match_ref == match_ref, PointsError::InvalidCompetition);
+        require!(b.status == 0, PointsError::NotOpen);
+        require!((seat as usize) < b.seats as usize, PointsError::RankOutOfRange);
+
+        let sk = ctx.accounts.signer.key();
+        // A wallet sits in exactly ONE seat: if the signer already occupies a
+        // different seat (switching), free it first; joining into a seat that
+        // belongs to a DIFFERENT wallet is forbidden.
+        let mut already_holder = false;
+        let mut switch_from = None;
+        for (i, p) in b.players.iter().enumerate() {
+            if p == &sk {
+                if i as u8 == seat {
+                    already_holder = true; // refresh handle, same seat
+                } else {
+                    switch_from = Some(i); // switch: free the old seat
+                }
+            }
+        }
+        if let Some(old) = switch_from {
+            b.players[old] = Pubkey::default();
+        }
+        let cur = b.players[seat as usize];
+        require!(cur == Pubkey::default() || already_holder, PointsError::NotSeatAuthority);
+        if cur == Pubkey::default() {
+            b.player_count = b.player_count.saturating_add(1);
+        }
+        b.players[seat as usize] = sk;
+
+        let mut hbuf = [0u8; HANDLE_SLOT];
+        let hb = h.as_bytes();
+        hbuf[..hb.len()].copy_from_slice(hb);
+        b.handles[seat as usize] = hbuf;
+        b.last_turn_ts[seat as usize] = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
     pub fn begin_match(ctx: Context<BeginMatchCtx>, game: u8, match_ref: u64) -> Result<()> {
         require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
         let b = &mut ctx.accounts.board;
         require!(b.status == 0, PointsError::NotOpen);
-        b.status = 1;
+        // All seats must be filled by real wallets before the match begins
+        // (M12 seat-authority board; computer seats are filled by the host).
+        require!(b.player_count == b.seats, PointsError::NotSettled);
+        // Only the seat-0 holder (the host) may start the match.
+        require!(b.players[0] == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
+        b.current_turn = 0u8;
         b.started_at = Clock::get()?.unix_timestamp;
+        b.status = 1;
         Ok(())
     }
 
-    /// Commit one hashed move from a seat (gasless on the ER). Caps the turn:
-    /// if a seat exceeds its turn_secs, any other seat may take over the next
-    /// move (no stalling); max_match_secs is enforced at finish.
+    /// Commit one hashed move from a seat (gasless on the ER). SEAT AUTHORITY:
+    /// the signer MUST be the exact wallet registered to that seat (join_match
+    /// / start_match recorded it), so a wrong device can never commit another
+    /// player's seat. Records current_turn + the 32-byte move checkpoint.
     pub fn commit_move(
         ctx: Context<CommitMoveCtx>,
         game: u8,
@@ -1465,8 +1533,10 @@ pub mod gfg_dice {
         let b = &mut ctx.accounts.board;
         require!(b.status == 1, PointsError::NotOpen);
         require!(seat < b.player_count, PointsError::RankOutOfRange);
+        require!(b.players[seat as usize] == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
         b.last_move_commit = move_commit;
         b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        b.current_turn = seat;
         b.last_turn_ts[seat as usize] = now;
         Ok(())
     }
@@ -1478,6 +1548,8 @@ pub mod gfg_dice {
         require!(b.status == 1, PointsError::NotOpen);
         require!(winner_seat < b.player_count, PointsError::RankOutOfRange);
         require!(now - b.started_at <= b.max_match_secs as i64, PointsError::StillRunning); // time cap
+        // Only a seat holder (the winner's device / a joined player) may finish.
+        require!(b.players.iter().take(b.player_count as usize).any(|p| p == &ctx.accounts.signer.key()), PointsError::NotSeatAuthority);
         b.status = 2;
         b.winner_seat = winner_seat;
         b.finished_at = now;
@@ -1950,8 +2022,12 @@ pub struct MarkWinnerPaidCtx<'info> {
     pub winner: Account<'info, WinnerRecord>,
 }
 
-/// Context for `start_match` (Arc2 M1 D). Board seed [gfgboard, game, match_ref].
-/// game + match_ref are instruction args; the creator (lobby/payer) is the gate.
+// ===== M12 entry: v3 match board (gfgboard2) contexts =====
+// The v3 board lives on seed prefix gfgboard2 so the new seat-authority +
+// handles + turn layout never touches the legacy v1 test boards (gfgboard).
+
+/// Context for `start_match` (M12). Board seed [gfgboard2, game, match_ref].
+/// game + match_ref are instruction args; the host (payer) is seat 0.
 #[derive(Accounts)]
 #[instruction(game: u8, match_ref: u64, players: Vec<Pubkey>, seats: u8, stake_usd_cents: u64, turn_secs: u64, max_match_secs: u64)]
 pub struct StartMatchCtx<'info> {
@@ -1961,11 +2037,22 @@ pub struct StartMatchCtx<'info> {
         init,
         payer = payer,
         space = 8 + std::mem::size_of::<MatchBoard>(),
-        seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
+        seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()],
         bump
     )]
     pub board: Account<'info, MatchBoard>,
     pub system_program: Program<'info, System>,
+}
+
+/// Context for `join_match`: the JOINER signs (gasless ER), registering their
+/// real wallet + sitewide handle into a free seat.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64, seat: u8, handle: String)]
+pub struct JoinMatchCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
 }
 
 /// Context for `begin_match`.
@@ -1974,7 +2061,7 @@ pub struct StartMatchCtx<'info> {
 pub struct BeginMatchCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
 }
 
@@ -1984,7 +2071,7 @@ pub struct BeginMatchCtx<'info> {
 pub struct CommitMoveCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
 }
 
@@ -1994,7 +2081,7 @@ pub struct CommitMoveCtx<'info> {
 pub struct FinishMatchCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
 }
 
@@ -2004,7 +2091,7 @@ pub struct FinishMatchCtx<'info> {
 pub struct MatchClockCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
     #[account(
         init_if_needed,
@@ -2025,7 +2112,7 @@ pub struct MatchClockCtx<'info> {
 pub struct MatchClockExistingCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
     #[account(
         mut,
@@ -2456,7 +2543,7 @@ pub struct CommitAndUndelegateResultInput<'info> {
 
 /// Context for `delegate_board`: moves a MATCH BOARD PDA into an ER session so
 /// `begin_match`/`commit_move`/`finish_match` run gasless. The PDA's real seeds
-/// [gfgboard, game, match_ref] are passed to `delegate_board(...)`. Additive
+/// [gfgboard2, game, match_ref] are passed to `delegate_board(...)`. Additive
 /// (arc2m1a G0).
 #[delegate]
 #[derive(Accounts)]
@@ -2476,7 +2563,7 @@ pub struct DelegateBoardInput<'info> {
 pub struct CommitAndUndelegateBoardInput<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, seeds = [MATCHBOARD_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
 }
 
@@ -2650,18 +2737,25 @@ pub struct CompetitionTally {
 }
 
 /// Arc2 M1 (item D): on-chain match board for MULTIPLAYER (earn) matches.
-/// Commit-hashed move checkpoints + turn/max clocks + finish winner, so any
-/// earn game's match is provable and replayable. Additive; no effect on any
-/// existing account layout.
+/// M12 multiplayer match board v2 (seed gfgboard2). One per match, delegated
+/// to the ER so all match writes run gasless. v2 is the seat-AUTHORITY board:
+/// start_match locks the host + open seats; join_match fills each free seat
+/// with the joiner's REAL wallet + sitewide handle; begin requires all seats
+/// full (host signs); commit_move requires signer == players[seat] so the
+/// wrong device can never commit another player's seat; current_turn records
+/// whose move it is for the game-agnostic rail. Game-agnostic: the board
+/// stores opaque 32-byte move commits + a turn cursor, never game rules.
 #[account]
 pub struct MatchBoard {
-    pub version: u8,             // 1 = current
+    pub version: u8,             // 2 = current (v1 seed gfgboard, untouched)
     pub game: u8,                // M1 source_code (1 = ludo, ...)
     pub match_ref: u64,          // lobby-generated unique id
     pub status: u8,              // 0 locked (awaiting players), 1 in_progress, 2 finished
     pub players: [Pubkey; MAX_MP],
-    pub player_count: u8,        // how many HUMAN wallets are in
+    pub player_count: u8,        // seats actually joined (host-only create -> 1)
     pub seats: u8,               // total seats (humans + computer fill)
+    pub handles: [[u8; HANDLE_SLOT]; MAX_MP], // per-seat sitewide handle (ASCII, zero-padded)
+    pub current_turn: u8,        // 255 = none yet (game decides turn order)
     pub stake_usd_cents: u64,    // each side's stake
     pub seat_pot_usd_cents: u64, // pot = stake * seats  (flat 10% fee at finish)
     pub turn_secs: u64,
@@ -2977,6 +3071,8 @@ pub enum PointsError {
     NotOpen,
     #[msg("competition is not funded")]
     NotFunded,
+    #[msg("only the exact seat owner may do this (M12 seat authority)")]
+    NotSeatAuthority,
     #[msg("competition is not settled")]
     NotSettled,
     #[msg("competition still running (ends_at not reached)")]

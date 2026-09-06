@@ -128,12 +128,26 @@
     }
 
     // ---- multiplayer session ----
+    function resolveHost() {
+        try {
+            if (window.getDynamicSolanaWallet && typeof window.getDynamicSolanaWallet === 'function') {
+                var w = window.getDynamicSolanaWallet();
+                if (w && w.publicKey) return String(w.publicKey);
+            }
+        } catch (e) { /* soft */ }
+        try {
+            var d = window.magicblockDice;
+            if (d && d.available && typeof d.available === 'function' && d.available() && d.pointsPda) return null;
+        } catch (e) { /* soft */ }
+        return null;
+    }
+
     function start(gameId, players, seats, turnSecs, maxSecs, chosenSeat) {
         if (!rail()) { log('rail not loaded'); return Promise.resolve(null); }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
         seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
-        return rail().create({ gameId: gameId || 1, players: players || [], seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
-            if (!r.okay) { log('create failed', r.error); return null; }
+        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
+            if (!r.okay) { log('create failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Create failed: ' + r.error); return null; }
             active = true;
             matchRef = r.matchRef;
             lastCount = -1;
@@ -141,10 +155,17 @@
             unsub = rail().subscribe(matchRef, function (s) {
                 try {
                     if (!s || typeof s.move_count !== 'number') return;
+                    rememberSeats(s);
+                    // Begin/finish transitions are surfaced (status/winner fire
+                    // too now), but we only act on NEW moves for the opponent.
+                    if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
+                        try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
+                        if (!window.__mpJoinedStarted) {
+                            window.__mpJoinedStarted = true;
+                            try { if (typeof window.initiateArenaMatch === "function") window.initiateArenaMatch(); } catch (e) {}
+                        }
+                    }
                     if (s.move_count === lastCount) return;
-                    // New on-chain commit: decode the OPPONENT's move from the
-                    // board's last_move_commit (the actual committed bytes), NOT
-                    // a local variable, so a real 2-device match propagates.
                     var mv = decodeMove(s.last_move_commit);
                     lastCount = s.move_count;
                     if (mv && mv.seat !== mySeat) {
@@ -166,15 +187,26 @@
         if (!rail()) return Promise.resolve(null);
         // Joiner seat count: match the lobby room's seat count when available.
         try { if (window.__mpRoom && window.__mpRoom.seats === 4) seatCount = 4; } catch (e) {}
-        return rail().join(gameId || 1, code).then(function (r) {
-            if (!r.okay) { log('join failed', r.error); return null; }
+        var handle = '';
+        try { if (window.__mpHandle && typeof window.__mpHandle === 'function') handle = window.__mpHandle() || ''; } catch (e) {}
+        return rail().join(gameId || 1, code, (typeof chosenSeat === 'number') ? chosenSeat : undefined, handle).then(function (r) {
+            if (!r.okay) { log('join failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Join failed: ' + r.error); return null; }
             active = true;
             matchRef = r.matchRef;
-            mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 1;
+            // mySeat comes from the on-chain join result (the free seat chosen).
+            mySeat = (typeof r.seat === 'number') ? r.seat : ((typeof chosenSeat === 'number') ? chosenSeat : 1);
             lastCount = -1;
             unsub = rail().subscribe(matchRef, function (s) {
                 try {
                     if (!s || typeof s.move_count !== 'number') return;
+                    rememberSeats(s);
+                    if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
+                        try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
+                        if (!window.__mpJoinedStarted) {
+                            window.__mpJoinedStarted = true;
+                            try { if (typeof window.initiateArenaMatch === "function") window.initiateArenaMatch(); } catch (e) {}
+                        }
+                    }
                     if (s.move_count === lastCount) return;
                     var mv = decodeMove(s.last_move_commit);
                     lastCount = s.move_count;
@@ -197,6 +229,18 @@
     function ref() { return matchRef; }
     function seat() { return mySeat; }
     function color() { return colorOf(mySeat); }
+    // On-chain identity (wallet + handle) per seat, populated from the board
+    // state so the UI + M2 seam can display "You - <handle>" vs "<handle>".
+    var seatWallets = [];  // index -> wallet base58 (or empty)
+    var seatHandles = [];  // index -> sitewide handle
+    function rememberSeats(s) {
+        try {
+            if (s && Array.isArray(s.players)) seatWallets = s.players.slice();
+            if (s && Array.isArray(s.handles)) seatHandles = s.handles.slice();
+        } catch (e) { /* soft */ }
+    }
+    function players() { return seatWallets.slice(); }
+    function handles() { return seatHandles.slice(); }
 
     // MULTIPLAYER SEAT BINDING: this device controls `mySeat` (mode 'human' +
     // isUser so the "You" seat is the local player). Every OTHER active seat is
@@ -227,11 +271,14 @@
     }
 
     // HOST-ONLY: begin the live match (status 0 -> 1), locking out new joins.
+    // The host MUST be players[0] (resolved at create); the rail signs the
+    // begin with THIS device's session key (program enforces seat 0 authority).
     function begin() {
         if (!active || !matchRef) return Promise.resolve({ okay: false, error: 'not in a match' });
         if (mySeat !== 0) return Promise.resolve({ okay: false, error: 'only the host can start' });
         return rail().begin({ gameId: 1, matchRef: matchRef }).then(function (r) {
             if (r && r.okay) log('match begun');
+            else if (r && r.error) { log('begin failed', r.error); if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Start failed: ' + r.error); }
             return r;
         });
     }
@@ -251,16 +298,16 @@
         if (!active || !matchRef) return;
         active = false;
         var refObj = { gameId: 1, matchRef: matchRef };
-        rail().finish(refObj, (typeof winnerSeat === 'number') ? winnerSeat : seatOf(window.finishOrder && window.finishOrder[0])).then(function (r) {
+        var ws = (typeof winnerSeat === 'number') ? winnerSeat : seatOf(window.finishOrder && window.finishOrder[0]);
+        rail().finish(refObj, ws).then(function (r) {
             if (!(r && r.okay)) log('finish skipped', (r && r.error) || '');
+            if (unsub) { unsub(); unsub = null; }
         });
-        if (unsub) unsub();
-        unsub = null;
     }
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, rememberSeats: rememberSeats, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

@@ -784,6 +784,90 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
   return (typeof sig === 'string' && sig) ? sig : (sig && (sig.signature || sig.txSig)) || null;
 }
 
+// ===== M12 — multiplayer match board (gfgboard2) gasless ER writes =====
+// The board is created + delegated by the relay (sponsor) at create time, so
+// these only resolve the hosting region, wait for pickup, and SUBMIT signed by
+// the PLAYER's session key (0 SOL, gasless). Every one is soft-fail by design.
+function boardPdaFor(game, matchRef) {
+  const refBuf = new BN(String(matchRef)).toArrayLike(Buffer, 'le', 8);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('gfgboard2'), Buffer.from([Number(game)]), refBuf],
+    new PublicKey(config.programId),
+  );
+}
+
+function toBytes32(a) {
+  const out = new Uint8Array(32);
+  if (Array.isArray(a)) {
+    for (let i = 0; i < 32 && i < a.length; i++) out[i] = Number(a[i]) & 0xff;
+  }
+  return out;
+}
+
+// A player (owner of a seat) registers their wallet + sitewide handle into an
+// open seat. Gasless ER write, PLAYER session key signs. Returns {ok, seat}.
+export async function joinBoardMatch(game, matchRef, seat, handle) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the join.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  await withErRetry('join_match', async (eCtx) => eCtx.program.methods
+    .joinMatch(game, new BN(matchRef), seat, String(handle || ''))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, seat };
+}
+
+// The HOST begins the live match (status 0 -> 1). Requires the signer to be
+// players[0] (seat-authority), so only the host's device can start. Gasless.
+export async function beginBoardMatch(game, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign begin.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('begin_match', async (eCtx) => eCtx.program.methods
+    .beginMatch(game, new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+// A player commits their seat's move (32-byte commit) gasless. The program
+// verifies signer == players[seat], so the wrong device is rejected on-chain.
+export async function commitBoardMove(game, matchRef, seat, moveCommit) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the move.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const bytes = Array.from(toBytes32(moveCommit));
+  const sig = await withErRetry('commit_move', async (eCtx) => eCtx.program.methods
+    .commitMove(game, new BN(matchRef), seat, bytes)
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+// A seat holder finalizes the match with a winner seat. Gasless.
+export async function finishBoardMatch(game, matchRef, winnerSeat) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign finish.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('finish_match', async (eCtx) => eCtx.program.methods
+    .finishMatch(game, new BN(matchRef), winnerSeat)
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
 function pointsPdaFor(gameTag, payerPubkey) {
   return PublicKey.findProgramAddressSync(
     [POINTS_SEED, Buffer.from(gameTag, 'utf8'), payerPubkey.toBytes()],
@@ -1154,6 +1238,20 @@ export function initMagicBlockDice() {
     // sourceCode: u8 enum identifying the game/source. points/reason/matchRef mirror M3.
     async recordGlobalPoints(kind, sourceCode, points, reason, matchRef) {
       return recordGlobalPoints(kind, sourceCode, points, reason, matchRef);
+    },
+
+    // ===== M12 — multiplayer match board (gasless ER, player session key) =====
+    joinBoardMatch(game, matchRef, seat, handle) {
+      return joinBoardMatch(game, matchRef, seat, handle);
+    },
+    beginBoardMatch(game, matchRef) {
+      return beginBoardMatch(game, matchRef);
+    },
+    commitBoardMove(game, matchRef, seat, moveCommit) {
+      return commitBoardMove(game, matchRef, seat, moveCommit);
+    },
+    finishBoardMatch(game, matchRef, winnerSeat) {
+      return finishBoardMatch(game, matchRef, winnerSeat);
     },
 
     // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.

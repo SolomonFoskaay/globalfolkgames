@@ -99,9 +99,14 @@
                 actor,
                 position: hasPosition ? p.position : null,
                 score: hasScore ? p.score : null,
-                identity: actor === 'user'
-                    ? (p.identity ? String(p.identity) : resolveUserIdentity())
-                    : null,
+                // Identity flows through for EVERY seat when the game supplied
+                // it (M12 ships the on-chain seat -> wallet map in the envelope).
+                // A 'user' seat with no explicit identity falls back to the
+                // signed-in wallet. 'house'/'local' seats without an explicit
+                // identity stay anonymous (null).
+                identity: p.identity
+                    ? String(p.identity)
+                    : (actor === 'user' ? resolveUserIdentity() : null),
                 handle: p.handle ? String(p.handle) : null,
             };
             return out;

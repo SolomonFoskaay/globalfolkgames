@@ -132,10 +132,41 @@
     };
 
     function publishSeamResult() {
-        const proofSig = typeof window.getLastProofRollSignature === 'function'
-            ? window.getLastProofRollSignature() : null;
+    const proofSig = typeof window.getLastProofRollSignature === 'function'
+        ? window.getLastProofRollSignature() : null;
 
-        const players = finishOrder.map(color => ({
+    // M12: when a multiplayer match is active, the adapter knows the on-chain
+    // seat -> wallet + handle map. Attach it so M3/M4 can credit EVERY human
+    // seat to its own wallet (not just "whoever is signed in here"). Solo/
+    // single-player keeps its exact previous behavior (no identity override).
+    let mpWallets = null, mpHandles = null;
+    try {
+        const a = window.gfgLudoAdapter;
+        if (a && typeof a.isActive === 'function' && a.isActive()) {
+            if (typeof a.players === 'function') mpWallets = a.players();
+            if (typeof a.handles === 'function') mpHandles = a.handles();
+        }
+    } catch (e) { /* soft */ }
+
+    const players = finishOrder.map(color => {
+        // Multiplayer: map finish-order colours onto their on-chain seat index
+        // (Ludo seat order = green, yellow, blue, red; 2P active order = green,
+        // red). Attach the seat's REAL wallet + handle when known; the actor
+        // stays 'user' if THIS device controls that seat, else 'local'.
+        let identity = null, handle = null;
+        if (mpWallets) {
+            try {
+                const order = (typeof window.getActiveSeats === 'function')
+                    ? window.getActiveSeats()
+                    : ['green', 'yellow', 'blue', 'red'];
+                const si = order.indexOf(color);
+                if (si >= 0) {
+                    if (mpWallets[si]) identity = mpWallets[si];
+                    if (mpHandles && mpHandles[si]) handle = mpHandles[si];
+                }
+            } catch (e) { /* soft */ }
+        }
+        return {
             seat: color,
             actor: (window.playerProfiles[color] && window.playerProfiles[color].isUser === true)
                 ? 'user'
@@ -143,7 +174,10 @@
                     ? 'local'
                     : 'house',
             position: finishOrder.indexOf(color) + 1,
-        }));
+            identity,
+            handle,
+        };
+    });
 
         const result = {
             gameId: 'ludo',

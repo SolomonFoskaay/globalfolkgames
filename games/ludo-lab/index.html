@@ -51,7 +51,11 @@
             <div id="mp-joined-count" style="color:#f87818; font-weight:800; flex:1;">—</div>
             <div id="mp-lobby-seats" style="display:flex; gap:6px; flex-basis:100%; flex-wrap:wrap;"></div>
             <button id="mp-start-btn" onclick="window.mpStartLobby()" style="display:none; background:#2ecc71; color:#000; border:none; padding:8px 14px; border-radius:8px; font-weight:800; cursor:pointer; margin-top:4px; flex:1;">Start Match</button>
+            <div id="mp-error-banner" style="display:none; flex-basis:100%; background:rgba(231,76,60,0.15); border:1px solid #e74c3c; color:#ff8a80; border-radius:8px; padding:6px 10px; font-size:0.78rem; font-weight:700;"></div>
         </div>
+
+        <!-- Multiplayer live status line (MP errors + rail progress, phone-visible) -->
+        <div id="mp-status" style="color:#f87818; font-size:0.75rem; min-height:1.1em; margin-bottom:8px; font-weight:600;"></div>
 
         <!-- Anti-Cheat Tournament Setup Panel Matrix -->
         <div id="player-setup-panel">
@@ -364,6 +368,19 @@
     //     the existing game start (locks via setupConfigurationLocked).
     //   - Display uses the sitewide GFG handle (never email/wallet).
     window.mpSetStatus = function (text) { var el = document.getElementById('mp-status'); if (el) el.textContent = text || ''; };
+    // MP rail errors land in this phone-visible banner (M12 error surfacing).
+    try {
+        window.addEventListener('gfg:mp-error', function (ev) {
+            var b = document.getElementById('mp-error-banner');
+            if (b) {
+                var d = ev && ev.detail;
+                b.textContent = 'Multiplayer: ' + ((d && d.error) || 'something went wrong');
+                b.style.display = 'block';
+                clearTimeout(window.__mpErrT);
+                window.__mpErrT = setTimeout(function () { b.style.display = 'none'; }, 8000);
+            }
+        });
+    } catch (e) { /* soft */ }
     window.__mpHandle = function () { try { if (window.gfgReferral && typeof window.gfgReferral.handle === 'function') return window.gfgReferral.handle(); } catch (e) {} return null; };
     window.__mpLobby = function () { return window.gfgMultiplayer && typeof window.gfgMultiplayer.lobby === 'function' ? window.gfgMultiplayer.lobby : null; };
     window.__mpActive = function () { try { var a = window.gfgLudoAdapter; return !!(a && typeof a.isActive === 'function' && a.isActive() && typeof a.ref === 'function' && a.ref()); } catch (e) { return false; } };
@@ -405,9 +422,9 @@
         var code = document.getElementById('mp-code') ? document.getElementById('mp-code').getAttribute('data-code') : null;
         var myHandle = window.__mpHandle();
         var room = window.__mpRoom;
-        var func = window.__mpLobby();
-        if (!code || !myHandle || !room || !func) return;
-        // send seat switch to the lobby
+        if (!code || !myHandle || !room) return;
+        // Remember the on-chain seat so join re-targets it; then notify the lobby.
+        try { window.__mpSeatPick = seat; } catch (e) {}
         var body = { game: 1, action: 'lobby-seat', code: code, handle: myHandle, seat: seat };
         fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             .then(function (r) { return r.json(); })
@@ -477,15 +494,19 @@
         if (!myHandle) { window.mpSetStatus('sign in first (top right) to get your gamer id'); return; }
         window.mpSetStatus('joining ' + code + '...');
         var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
-        a.join(1, codeUp, 1).then(function (r) {
+        // Seat matching the lobby pick (0-based over the room's seats); when the
+        // player hasn't picked, the rail auto-selects the first free seat.
+        var picked = null;
+        try { if (window.__mpSeatPick !== undefined && window.__mpSeatPick !== null && window.__mpSeatPick >= 0) picked = window.__mpSeatPick; } catch (e) {}
+        a.join(1, codeUp, picked === null ? undefined : picked).then(function (r) {
             if (!r) { window.mpSetStatus('join failed (check code)'); return; }
-            var codeUp2 = String(r.matchRef || ''); // rail join returns matchRef; lobby keys by code
             var codeEl = document.getElementById('mp-code');
             // The lobby is keyed by the on-chain code string = base36(matchRef). 
             // The joiner entered that same string, so keep it.
             var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
             var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
             if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
+            if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
             // Enter the lobby room for that code (seat = first free or specific)
             var body = { game: 1, action: 'lobby-join', code: joinedCodeUp, handle: myHandle };
             fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -508,9 +529,8 @@
     window.mpStartLobby = function () {
         var code = document.getElementById('mp-code') ? document.getElementById('mp-code').getAttribute('data-code') : null;
         var myHandle = window.__mpHandle();
-        var func = window.__mpLobby();
         var room = window.__mpRoom;
-        if (!code || !myHandle || !room || !func) return;
+        if (!code || !myHandle || !room) return;
         var body = { game: 1, action: 'lobby-start', code: code, handle: myHandle };
         return fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             .then(function (r) { return r.json(); })

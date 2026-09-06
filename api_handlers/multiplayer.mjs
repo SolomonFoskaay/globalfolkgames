@@ -24,6 +24,7 @@ export default async function handler(req, res) {
     const r = await dispatch(action, {
       game: Number(body.game ?? body.get?.('game')),
       matchRef: Number(body.matchRef ?? body.get?.('mathRef') ?? body.get?.('match_ref')),
+      host: (body.host ?? body.get?.('host')) || null,
       seats: Number(body.seats ?? body.get?.('seats')),
       stakeUsdCents: Number(body.stakeUsdCents ?? body.get?.('stakeUsdCents') ?? 0) || 0,
       turnSecs: Number(body.turnSecs ?? body.get?.('turnSecs') ?? 60) || 60,

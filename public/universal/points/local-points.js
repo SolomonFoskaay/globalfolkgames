@@ -360,8 +360,13 @@
     // retries idempotent) and, if every attempt errored, re-reads the ledger in
     // case the write actually landed (e.g. a confirm-timeout false failure).
     async function bank(env) {
-        var award = computeAward(env);
-        if (!award) return null;
+        // MULTIPLAYER-AWARE: computeAwards returns one award per 'user' seat
+        // (each device's own seat). On a device hosting exactly one user seat
+        // this is identical to computeAward; it also banks every user seat when
+        // a single device legitimately carries multiple user seats.
+        var awards = computeAwards(env);
+        if (!awards || !awards.length) return null;
+        var award = awards[0];
         lastSeenAward = award;
         var proofSig = env.proof && env.proof.signature;
         if (!proofSig) {
@@ -423,11 +428,22 @@
                     position: award.position,
                     reason: award.reason,
                     matchRef: matchRef,
+                    identity: award.identity || null,
                     at: Date.now(),
                 };
-                console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat) — ' + (sig || 'no sig'));
+                console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat' + (award.identity ? ' ' + award.identity : '') + ') — ' + (sig || 'no sig'));
                 var ledger = await refreshLedger(award.gameTag, true);
                 notify(award.gameTag, ledger, lastAward);
+                // Multi-seat: bank the remaining user seats too (each to its own
+                // wallet-hosted device; on one device hosting several, the first
+                // is the local user and further seats are processed best-effort).
+                for (var k = 1; k < awards.length; k++) {
+                    try {
+                        await window.magicblockDice.recordPoints(
+                            awards[k].gameTag, awards[k].points, awards[k].reason, matchRef + k,
+                        );
+                    } catch (e) { /* soft */ }
+                }
                 return sig || null;
             } catch (e) {
                 lastErr = (e && (e.message || e)) || String(e);

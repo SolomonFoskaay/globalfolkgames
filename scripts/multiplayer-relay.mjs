@@ -30,7 +30,7 @@ import { fileURLToPath } from 'url';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
-const BOARD_SEED = Buffer.from('gfgboard');
+const BOARD_SEED = Buffer.from('gfgboard2'); // M12 seat-authority board (v2)
 const CLOCK_SEED = Buffer.from('gfgclock');
 const DELEGATION_PROGRAM_ID = new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh');
 const ER_VALIDATOR_ID = new PublicKey('MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57'); // AS region pin
@@ -99,7 +99,7 @@ async function waitBoardPickup(pda, timeoutMs = 8000) {
     try {
       const c = createConnection(url, 'confirmed', 8000);
       const info = await c.getAccountInfo(pda);
-      if (info && info.owner.toBase58() === PROGRAM.toBase58() && info.data.length >= 430) return url;
+      if (info && info.owner.toBase58() === PROGRAM.toBase58() && info.data.length >= 623) return url;
     } catch (e) { /* keep polling */ }
     await sleep(600);
   }
@@ -126,20 +126,27 @@ async function boardSignerSend(method, pda, opts = {}) {
 
 // ---- actions ------------------------------------------------------------------
 
-// Create + delegate + begin a match. `players` may be empty/partial: the board
-// program requires >=2 players, and create happens before joiners are known, so
-// the creator's seat is filled with the sponsor as a placeholder (real seat
-// identity/locking is a later milestone). begin is skipped here; it happens on
-// the host's "Start Match" via boardStart_match.
-export async function boardCreate({ game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs }) {
+// Create + delegate + begin a match. The board is created with the HOST's real
+// wallet seated at seat 0 (seat-authority board, v2); the remaining seats stay
+// open (Pubkey::default) and joiners fill them via join_match (gasless ER,
+// joiner session key signs). The relay only creates + delegates (base), and
+// begin happens on the host device via the ER (begin_match requires the seat-0
+// holder's signature, so it can never be relay-forged).
+export async function boardCreate({ game, matchRef, seats, host, stakeUsdCents, turnSecs, maxMatchSecs }) {
   try {
     const pda = boardPda(game, matchRef);
     const info = await conn.getAccountInfo(pda).catch(() => null);
     let created = false;
     if (!info) {
       const seatCount = Math.min(MAX_MP, Math.max(2, Number(seats) || 2));
+      // players[0] = the host's real wallet; the rest default (open seats the
+      // program fills via join_match). Guarantees the board can never be
+      // created with a lower bound below the host.
       const list = [];
-      for (let i = 0; i < seatCount; i++) list.push(sponsor.publicKey);
+      const hostKey = (host && (() => { try { return new PublicKey(host); } catch (e) { return null; } })()) || null;
+      for (let i = 0; i < seatCount; i++) {
+        list.push(hostKey && i === 0 ? hostKey : PublicKey.default);
+      }
       const tx = await prog.methods.startMatch(game, new BN(matchRef), list, seatCount, new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
         .accounts({ payer: sponsor.publicKey, board: pda, systemProgram: SystemProgram.programId }).transaction();
       tx.feePayer = sponsor.publicKey;
@@ -154,38 +161,18 @@ export async function boardCreate({ game, matchRef, seats, stakeUsdCents, turnSe
   }
 }
 
-// Host pressed "Start Match": flip status 0 -> 1 (begin_match), then initialize
-// the clock ledger (start_match_clocks requires status 1). One-time base path.
+// Host pressed "Start Match". The actual on-chain begin_match is signed by the
+// HOST (players[0], seat-authority) from the browser as a gasless ER write, so
+// this relay helper is only a VALIDATION + read: it confirms the board exists,
+// is still open, and returns the facts the host's begin call needs. On Vercel
+// the shared test-flow uses this to know "everyone is in".
 export async function boardBegin({ game, matchRef }) {
   try {
     const pda = boardPda(game, matchRef);
     const st = await boardState({ game, matchRef });
-    if (st && st.ok && st.status !== 0) return { ok: true, note: 'already-started', pda: pda.toBase58() };
-    // begin_match: status 0 -> 1
-    const meth = prog.methods.beginMatch(game, new BN(matchRef)).accounts({ signer: sponsor.publicKey, board: pda });
-    const tx = await meth.transaction();
-    tx.feePayer = sponsor.publicKey;
-    const sig = await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true });
-    await conn.confirmTransaction({ signature: sig }, 'confirmed');
-    // start_match_clocks: clock ledger for the begun board (status 1). Best-effort:
-    // a clock-init error must never block starting the live game.
-    let clocksSig = null, clocksErr = null;
-    try {
-      const clockSeed = Buffer.from('gfgclock');
-      const [clockPda] = PublicKey.findProgramAddressSync(
-        [clockSeed, Buffer.from([game]), new BN(matchRef).toArrayLike(Buffer, 'le', 8)], PROGRAM
-      );
-      const m2 = prog.methods.startMatchClocks(game, new BN(matchRef))
-        .accounts({ signer: sponsor.publicKey, board: pda, clock: clockPda, systemProgram: SystemProgram.programId });
-      const tx2 = await m2.transaction();
-      tx2.feePayer = sponsor.publicKey;
-      const sig2 = await sendMagicTx(conn, tx2, [sponsor], { skipPreflight: true });
-      await conn.confirmTransaction({ signature: sig2 }, 'confirmed');
-      clocksSig = sig2;
-    } catch (ce) {
-      clocksErr = (ce && ce.message) || String(ce);
-    }
-    return { ok: true, sig, clocksSig, clocksErr, started: true, pda: pda.toBase58() };
+    if (!st || !st.ok) return { ok: false, error: (st && st.error) || 'board not found', pda: pda.toBase58() };
+    if (st.status !== 0) return { ok: true, note: 'already-started', pda: pda.toBase58(), status: st.status };
+    return { ok: true, ready: st.player_count >= st.seats, open: st.player_count, of: st.seats, pda: pda.toBase58(), status: st.status };
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
@@ -233,13 +220,21 @@ export async function boardState({ game, matchRef }) {
     const info = await c.getAccountInfo(pda).catch(() => null);
     if (!info) return { ok: false, error: 'board not found' };
     const d = info.data;
-    if (d.length < 430) return { ok: false, error: 'board too small' };
+    if (d.length < 623) return { ok: false, error: 'board too small' };
     const playerCount = d[275];
     const players = [];
     for (let i = 0; i < Math.min(MAX_MP, playerCount); i++) {
       const s = d.subarray(19 + i * 32, 51 + i * 32);
       if (s.every(b => b === 0)) continue;
       try { players.push(new PublicKey(s).toBase58()); } catch (e) {}
+    }
+    // handles[8][24] @277..468; current_turn @469
+    const handles = [];
+    for (let i = 0; i < Math.min(MAX_MP, d[276]); i++) {
+      const bs = d.subarray(277 + i * 24, 301 + i * 24);
+      let end = bs.indexOf(0);
+      if (end === -1) end = bs.length;
+      handles.push(Buffer.from(bs.subarray(0, end)).toString('utf8'));
     }
     return {
       ok: true,
@@ -251,15 +246,18 @@ export async function boardState({ game, matchRef }) {
       players,
       player_count: d[275],
       seats: d[276],
-      stake_usd_cents: Number(d.readBigUInt64LE(277)),
-      seat_pot_usd_cents: Number(d.readBigUInt64LE(285)),
-      turn_secs: Number(d.readBigUInt64LE(293)),
-      max_match_secs: Number(d.readBigUInt64LE(301)),
-      started_at: Number(d.readBigInt64LE(309)),
-      move_count: Number(d.readBigUInt64LE(381)),
+      handles,
+      current_turn: d[469],
+      stake_usd_cents: Number(d.readBigUInt64LE(470)),
+      seat_pot_usd_cents: Number(d.readBigUInt64LE(478)),
+      turn_secs: Number(d.readBigUInt64LE(486)),
+      max_match_secs: Number(d.readBigUInt64LE(494)),
+      started_at: Number(d.readBigInt64LE(502)),
+      move_count: Number(d.readBigUInt64LE(574)),
       // last_move_commit is the 32-byte move hash immediately after move_count.
-      last_move_commit: Array.from(d.subarray(389, 421)),
-      winner_seat: d[429],
+      last_move_commit: Array.from(d.subarray(582, 614)),
+      finished_at: Number(d.readBigInt64LE(614)),
+      winner_seat: d[622],
       region: url,
     };
   } catch (e) {
@@ -280,7 +278,7 @@ function toBytes32(hexOrStr) {
 // ---- public dispatch (used by api_handlers/multiplayer.mjs) -------------------
 export async function dispatch(action, b) {
   switch (action) {
-    case 'create': return boardCreate({ game: Number(b.game), matchRef: Number(b.matchRef), seats: Number(b.seats), stakeUsdCents: Number(b.stakeUsdCents) || 0, turnSecs: Number(b.turnSecs) || 60, maxMatchSecs: Number(b.maxMatchSecs) || 3600 });
+    case 'create': return boardCreate({ game: Number(b.game), matchRef: Number(b.matchRef), seats: Number(b.seats), host: b.host, stakeUsdCents: Number(b.stakeUsdCents) || 0, turnSecs: Number(b.turnSecs) || 60, maxMatchSecs: Number(b.maxMatchSecs) || 3600 });
     case 'begin': return boardBegin({ game: Number(b.game), matchRef: Number(b.matchRef) });
     case 'join': return boardJoin({ game: Number(b.game), matchRef: Number(b.matchRef) });
     case 'commit': return boardCommit({ game: Number(b.game), matchRef: Number(b.matchRef), seat: Number(b.seat), moveCommit: b.moveCommit, regionUrl: b.regionUrl });
