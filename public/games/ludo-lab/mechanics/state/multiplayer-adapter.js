@@ -168,7 +168,7 @@
                         try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
                         if (!window.__mpJoinedStarted) {
                             window.__mpJoinedStarted = true;
-                            try { if (typeof window.initiateArenaMatch === "function") window.initiateArenaMatch(); } catch (e) {}
+                            try { var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
                         }
                     }
                     if (s.move_count === lastCount) return;
@@ -218,7 +218,7 @@
                         try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
                         if (!window.__mpJoinedStarted) {
                             window.__mpJoinedStarted = true;
-                            try { if (typeof window.initiateArenaMatch === "function") window.initiateArenaMatch(); } catch (e) {}
+                            try { var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
                         }
                     }
                     if (s.move_count === lastCount) return;
@@ -326,8 +326,17 @@
     }
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
+    // After a pre-start seat switch the rail already re-joined on-chain; this
+    // just updates this device's seat index so the turn gate + colour mapping
+    // match the new seat. No re-subscribe (the existing one keeps polling).
+    function setMySeat(seat) {
+        if (typeof seat === 'number' && seat >= 0) mySeat = seat;
+        if (typeof window.mpRenderLobby === 'function') {
+            try { window.__mpPollLobby(); } catch (e) { /* soft */ }
+        }
+    }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, rememberSeats: rememberSeats, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

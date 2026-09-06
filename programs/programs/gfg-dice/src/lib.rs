@@ -1428,7 +1428,11 @@ pub mod gfg_dice {
         let mut ps = [Pubkey::default(); MAX_MP];
         for (i, p) in players.iter().enumerate() { ps[i] = *p; }
         b.players = ps;
-        b.player_count = players.len() as u8;
+        // player_count = the REAL non-default wallets seated at create (the
+        // host). Free seats (Pubkey::default) never count; join_match fills +
+        // counts them. begin_match requires player_count == seats, so a seat
+        // can never be 'full' with no wallet behind it.
+        b.player_count = ps.iter().take(seats as usize).filter(|p| **p != Pubkey::default()).count() as u8;
         b.seats = seats;
         b.handles = [[0u8; HANDLE_SLOT]; MAX_MP];
         b.current_turn = 255u8; // none yet
@@ -1489,10 +1493,10 @@ pub mod gfg_dice {
         }
         let cur = b.players[seat as usize];
         require!(cur == Pubkey::default() || already_holder, PointsError::NotSeatAuthority);
-        if cur == Pubkey::default() {
-            b.player_count = b.player_count.saturating_add(1);
-        }
         b.players[seat as usize] = sk;
+        // Recompute player_count from the players array so seat-switches never
+        // drift it (count only non-default seats, capped at seats).
+        b.player_count = b.players.iter().take(b.seats as usize).filter(|p| **p != Pubkey::default()).count() as u8;
 
         let mut hbuf = [0u8; HANDLE_SLOT];
         let hb = h.as_bytes();

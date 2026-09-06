@@ -139,14 +139,13 @@ export async function boardCreate({ game, matchRef, seats, host, stakeUsdCents, 
     let created = false;
     if (!info) {
       const seatCount = Math.min(MAX_MP, Math.max(2, Number(seats) || 2));
-      // players[0] = the host's real wallet; the rest default (open seats the
-      // program fills via join_match). Guarantees the board can never be
-      // created with a lower bound below the host.
-      const list = [];
+      // players[0] = the host's real wallet ONLY. Remaining seats are left open
+      // (default) and joiners fill them via join_match. Passing seatCount
+      // default-filled entries made player_count == seats immediately, so
+      // join_match pushed it over and begin_match failed "competition is not
+      // settled". player_count must equal the REAL seated wallets.
       const hostKey = (host && (() => { try { return new PublicKey(host); } catch (e) { return null; } })()) || null;
-      for (let i = 0; i < seatCount; i++) {
-        list.push(hostKey && i === 0 ? hostKey : PublicKey.default);
-      }
+      const list = hostKey ? [hostKey] : [];
       const tx = await prog.methods.startMatch(game, new BN(matchRef), list, seatCount, new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
         .accounts({ payer: sponsor.publicKey, board: pda, systemProgram: SystemProgram.programId }).transaction();
       tx.feePayer = sponsor.publicKey;
