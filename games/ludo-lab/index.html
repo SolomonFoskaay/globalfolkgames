@@ -422,7 +422,21 @@
         if (!code || !myHandle) return;
         fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: 1, action: 'lobby-state', code: code }) })
             .then(function (r) { return r.json(); })
-            .then(function (j) { if (j && j.ok) { window.__mpRoom = j; window.mpRenderLobby(j, myHandle); } })
+            .then(function (j) {
+                if (j && j.ok) {
+                    window.__mpRoom = j;
+                    window.mpRenderLobby(j, myHandle);
+                    // When the HOST starts the match, the JOINER device must also
+                    // start its own local board (same real game) so both devices
+                    // run the match together. Guarded so it starts exactly once.
+                    if (j.started && !window.__mpJoinedStarted) {
+                        window.__mpJoinedStarted = true;
+                        if (typeof window.initiateArenaMatch === 'function') {
+                            try { window.initiateArenaMatch(); } catch (e) { /* soft */ }
+                        }
+                    }
+                } else if (j && j.error) { window.__mpJoinedStarted = false; }
+            })
             .catch(function () {});
     };
 
@@ -560,6 +574,12 @@
                 try {
                     var a = window.gfgLudoAdapter;
                     if (a && typeof a.isActive === 'function' && a.isActive()) {
+                        // Force the game mode to match the multiplayer seat
+                        // count (2P: green+red) so BOTH devices run the same
+                        // seat config before the board locks.
+                        if (typeof window.__mpMode === 'function' && typeof window.selectMatchMode === 'function') {
+                            try { window.selectMatchMode(window.__mpMode() === 2 ? '2p' : '4p'); } catch (e) { /* soft */ }
+                        }
                         if (typeof a.begin === 'function') a.begin();
                     }
                 } catch (e) { /* soft */ }
@@ -575,10 +595,10 @@ updateSeatButtons();
                 var a = window.gfgLudoAdapter;
                 if (!a || typeof a.isActive !== 'function' || !a.isActive()) return false;
                 if (typeof setupConfigurationLocked === 'boolean' && !setupConfigurationLocked) return false;
-                var s = typeof a.seat === 'function' ? a.seat() : -1;
-                var order = ['green', 'yellow', 'blue', 'red'];
-                var curIdx = order.indexOf(window.currentTurn || '');
-                return curIdx !== s; // current seat != mine -> remote turn
+                // My device rolls ONLY when it is MY color's turn. Any other
+                // turn (including the remote seat's) is awaited from the rail.
+                var mine = (typeof a.color === 'function') ? a.color() : '';
+                return !mine || window.currentTurn !== mine;
             } catch (e) { return false; }
         };
         window.mpEnsurePoll();

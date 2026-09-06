@@ -19,24 +19,37 @@
     var active = false;
     var matchRef = 0;
     var mySeat = -1;          // which seat index this device controls
+    var seatCount = 2;        // multiplayer seat count (2 = green,red; 4 = all)
     var unsub = null;
     var lastCount = -1;
     var dimmed = false;       // true to ignore opponent turns until they move
 
     function log() { try { console.log.apply(console, ['[MP/LUDO]'].concat(Array.prototype.slice.call(arguments))); } catch (e) {} }
     function rail() { return window.gfgMultiplayer; }
-    function seatOf(color) { var o = ['green','yellow','blue','red']; var i = o.indexOf(color || 'green'); return i >= 0 ? i : 0; }
-    function colorOf(i) { return ['green','yellow','blue','red'][i] || 'green'; }
+    // Seat index -> Ludo color follows the MULTIPLAYER seat count (2P =
+    // green+red, 4P = all four), NOT the (possibly not-yet-locked) game mode.
+    // Both devices derive the same order from the same seat count, so the
+    // committed seat byte is unambiguous.
+    function activeOrder() {
+        if (seatCount === 4) return ['green', 'yellow', 'blue', 'red'];
+        return ['green', 'red'];
+    }
+    function seatOf(color) { var o = activeOrder(); var i = o.indexOf(color || 'green'); return i >= 0 ? i : 0; }
+    function colorOf(i) { var o = activeOrder(); return o[i] || 'green'; }
 
-    // encode a move into a 32-byte array (positional; opponent replays it)
-    function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex) {
+    // encode a move into a 32-byte array (positional; opponent replays it).
+    // byte0 seat, byte1 die1, byte2 die2, byte3 tokenIndex, byte4 fromPath,
+    // byte5 toPath, byte6 final stepsWalked (authoritative; lets the remote
+    // device replay the home lane + finish exactly like the local move did).
+    function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         var m = [0, 0, 0, 0, 0, 0, 0, 0];
         for (var i = 0; i < 32; i++) m[i] = 0;
         m[0] = seatOf(window.currentTurn || 'green');
-        m[1] = die1 & 0xff; m[2] = die2 & 0xff;
+        m[1] = (typeof die1 === 'number' ? die1 : 0) & 0xff; m[2] = (typeof die2 === 'number' ? die2 : 0) & 0xff;
         m[3] = tokenIndex & 0xff;
-        m[4] = (fromPathIndex & 0xff); m[5] = (toPathIndex & 0xff);
-        m[6] = Math.min(120, (window.moveCount || 0)) & 0xff;
+        m[4] = (fromPathIndex & 0xff);
+        m[5] = (typeof toPathIndex === 'number' ? toPathIndex : fromPathIndex) & 0xff;
+        m[6] = (typeof toStepsWalked === 'number' && toStepsWalked > 0 ? toStepsWalked : 0) & 0xff;
         return m;
     }
 
@@ -44,40 +57,81 @@
     function decodeMove(bytes) {
         if (!bytes || bytes.length < 7) return null;
         try {
-            return { seat: bytes[0], die1: bytes[1], die2: bytes[2], tokenIndex: bytes[3], fromPathIndex: bytes[4], toPathIndex: bytes[5] };
+            return {
+                seat: bytes[0],
+                die1: bytes[1],
+                die2: bytes[2],
+                tokenIndex: bytes[3],
+                fromPathIndex: bytes[4],
+                toPathIndex: bytes[5],
+                toStepsWalked: bytes[6] || 0,
+            };
         } catch (e) { return null; }
     }
 
-    // apply an opponent's decoded move to the local board (deterministic)
+    // apply an opponent's decoded move to the local board (deterministic).
+    // Mirrors movement.js: home lane (stepsWalked>=52) renders via pathIndex
+    // -2 + per-color lane offsets, and 57 fires checkForMatchWinner so the
+    // LOSING device also sees the ceremony + finish, exactly like the local
+    // win path. Returns true when this move finished the opponent.
     function applyMove(move) {
+        var won = false;
         try {
             var col = colorOf(move.seat);
             var toks = (window.tokens && window.tokens[col]) || [];
-            var path = (window.COMMON_PATH || []);
             var token = toks[move.tokenIndex];
-            if (!token) return;
+            if (!token) return false;
             // Shared dice: mirror the committed roll onto this device so both
             // screens show the same dice the remote player rolled.
-            if (typeof window.lastDiceRoll1 === 'number') window.lastDiceRoll1 = move.die1 || window.lastDiceRoll1;
-            if (typeof window.lastDiceRoll2 === 'number') window.lastDiceRoll2 = move.die2 || window.lastDiceRoll2;
+            if (typeof window.lastDiceRoll1 === 'number' && move.die1 > 0) window.lastDiceRoll1 = move.die1;
+            if (typeof window.lastDiceRoll2 === 'number' && move.die2 > 0) window.lastDiceRoll2 = move.die2;
             var box1 = document.getElementById('val-d1');
             var box2 = document.getElementById('val-d2');
             var tot = document.getElementById('val-total');
-            if (box1) box1.innerText = move.die1 || '—';
-            if (box2) box2.innerText = move.die2 || '—';
-            if (tot && move.die1 && move.die2) tot.innerText = '= Total: ' + (move.die1 + move.die2);
-            var idx = move.toPathIndex;
-            if (path[idx]) { token.pathIndex = idx; token.c = path[idx].c; token.r = path[idx].r; token.stepsWalked = idx; }
+            if (box1) box1.innerText = move.die1 > 0 ? move.die1 : '—';
+            if (box2) box2.innerText = move.die2 > 0 ? move.die2 : '—';
+            if (tot && move.die1 > 0 && move.die2 > 0) tot.innerText = '= Total: ' + (move.die1 + move.die2);
+
+            var sw = move.toStepsWalked > 0 ? move.toStepsWalked : (token.stepsWalked || 0);
+            token.stepsWalked = sw;
+            if (sw >= 52) {
+                // Home lane: identical layout rules to movement.js.
+                token.pathIndex = -2;
+                var laneOffset = sw - 51;
+                if (col === 'green') { token.c = laneOffset; token.r = 7; }
+                else if (col === 'yellow') { token.c = 7; token.r = laneOffset; }
+                else if (col === 'blue') { token.c = 14 - laneOffset; token.r = 7; }
+                else if (col === 'red') { token.c = 7; token.r = 14 - laneOffset; }
+                if (sw === 57) {
+                    won = true;
+                    if (typeof window.checkForMatchWinner === 'function') {
+                        try { window.checkForMatchWinner(col); } catch (e) { /* soft */ }
+                    }
+                }
+            } else {
+                var path = (window.COMMON_PATH || []);
+                var idx = move.toPathIndex;
+                if (path[idx]) { token.pathIndex = idx; token.c = path[idx].c; token.r = path[idx].r; }
+            }
+            // Replicate captures deterministically: the landing square decides
+            // whether an opponent token is sent home, and both devices share the
+            // same pre-move board, so the same mechanic reproduces the capture
+            // (including the capture-completes-circuit 57 fast-track + win).
+            if (typeof checkCaptureMechanic === 'function') {
+                try { checkCaptureMechanic(token, move.tokenIndex, toks); } catch (e) { /* soft */ }
+            }
             if (typeof window.drawLudoLayout === 'function') window.drawLudoLayout();
             if (typeof window.saveGameStateToStorage === 'function') window.saveGameStateToStorage();
-            log('applied opponent move seat=' + move.seat + ' tokens=' + move.tokenIndex + ' die=' + move.die1 + '+' + move.die2 + ' -> path ' + move.toPathIndex);
+            log('applied opponent move seat=' + move.seat + ' tokens=' + move.tokenIndex + ' die=' + move.die1 + '+' + move.die2 + ' steps=' + sw + (won ? ' WINNER' : ''));
         } catch (e) { log('apply err ' + e.message); }
+        return won || (token.stepsWalked >= 57);
     }
 
     // ---- multiplayer session ----
     function start(gameId, players, seats, turnSecs, maxSecs, chosenSeat) {
         if (!rail()) { log('rail not loaded'); return Promise.resolve(null); }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
+        seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
         return rail().create({ gameId: gameId || 1, players: players || [], seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
             if (!r.okay) { log('create failed', r.error); return null; }
             active = true;
@@ -94,20 +148,24 @@
                     var mv = decodeMove(s.last_move_commit);
                     lastCount = s.move_count;
                     if (mv && mv.seat !== mySeat) {
-                        applyMove(mv);
+                        var won = applyMove(mv);
                         dimmed = false;
-                        if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        // Do not auto-pass after a winning move: checkForMatchWinner
+                        // already ended the match + showed the ceremony.
+                        if (!won && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
                     }
                 } catch (e) { log('listen err ' + e.message); }
             });
             log('match created code=' + r.code + ' ref=' + matchRef + ' mySeat=' + mySeat);
-            bindSeats(['green', 'red']);
+            bindSeats();
             return r;
         });
     }
 
     function join(gameId, code, chosenSeat) {
         if (!rail()) return Promise.resolve(null);
+        // Joiner seat count: match the lobby room's seat count when available.
+        try { if (window.__mpRoom && window.__mpRoom.seats === 4) seatCount = 4; } catch (e) {}
         return rail().join(gameId || 1, code).then(function (r) {
             if (!r.okay) { log('join failed', r.error); return null; }
             active = true;
@@ -121,14 +179,16 @@
                     var mv = decodeMove(s.last_move_commit);
                     lastCount = s.move_count;
                     if (mv && mv.seat !== mySeat) {
-                        applyMove(mv);
+                        var won = applyMove(mv);
                         dimmed = false;
-                        if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        // Do not auto-pass after a winning move: checkForMatchWinner
+                        // already ended the match + showed the ceremony.
+                        if (!won && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
                     }
                 } catch (e) {}
             });
             log('joined ref=' + matchRef + ' mySeat=' + mySeat);
-            bindSeats(['green', 'red']);
+            bindSeats();
             return r;
         });
     }
@@ -136,6 +196,7 @@
     function isActive() { return active; }
     function ref() { return matchRef; }
     function seat() { return mySeat; }
+    function color() { return colorOf(mySeat); }
 
     // MULTIPLAYER SEAT BINDING: this device controls `mySeat` (mode 'human' +
     // isUser so the "You" seat is the local player). Every OTHER active seat is
@@ -147,8 +208,8 @@
     function bindSeats(activeColors) {
         try {
             if (!window.playerProfiles) return;
-            var me = colorOf(mySeat);
-            var act = (activeColors && activeColors.length) ? activeColors : ['green', 'red'];
+            var me = color();
+            var act = (activeColors && activeColors.length) ? activeColors : activeOrder();
             act.forEach(function (c) {
                 if (!window.playerProfiles[c]) return;
                 if (c === me) {
@@ -176,9 +237,9 @@
     }
 
     // called by the game after a real LOCAL move: commit the move gasless
-    function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex) {
+    function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         if (!active || !matchRef) return;
-        var bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex);
+        var bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
         try { window._mpLatestCommit = bytes; } catch (e) {}
         var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.currentTurn || 'green') };
         rail().commitMove(refObj, bytes).then(function (r) {
@@ -199,7 +260,7 @@
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

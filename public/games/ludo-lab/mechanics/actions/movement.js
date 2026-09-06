@@ -208,7 +208,8 @@ function processTokenMovementExecution(selectedTokenIndex) {
                 lastDiceRoll2 || 0,
                 selectedTokenIndex,
                 (currentPiece._prevPath === undefined ? 0 : currentPiece._prevPath),
-                currentPiece.pathIndex
+                currentPiece.pathIndex,
+                currentPiece.stepsWalked
             );
         } catch (e) { /* soft */ }
     }
