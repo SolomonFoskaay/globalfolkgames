@@ -45,103 +45,132 @@
     function seatOf(color) { var o = activeOrder(); var i = o.indexOf(color || 'green'); return i >= 0 ? i : 0; }
     function colorOf(i) { var o = activeOrder(); return o[i] || 'green'; }
 
-    // encode a move into a 32-byte array (positional; opponent replays it).
-    // byte0 seat, byte1 die1, byte2 die2, byte3 tokenIndex, byte4 fromPath,
-    // byte5 toPath, byte6 final stepsWalked (authoritative; lets the remote
-    // device replay the home lane + finish exactly like the local move did).
-    function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
-        var m = [0, 0, 0, 0, 0, 0, 0, 0];
-        for (var i = 0; i < 32; i++) m[i] = 0;
-        m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
-        m[1] = (typeof die1 === 'number' ? die1 : 0) & 0xff; m[2] = (typeof die2 === 'number' ? die2 : 0) & 0xff;
-        m[3] = tokenIndex & 0xff;
-        m[4] = (fromPathIndex & 0xff);
-        m[5] = (typeof toPathIndex === 'number' ? toPathIndex : fromPathIndex) & 0xff;
-        m[6] = (typeof toStepsWalked === 'number' && toStepsWalked > 0 ? toStepsWalked : 0) & 0xff;
-        return m;
-    }
+    // ---- BOARD SNAPSHOT COMMIT (the single shared board) ----
+// The commit is a full BOARD STATE, not a single move. byte0 seat, byte1 die1,
+// byte2 die2, bytes3..18 = each token's stepsWalked (0..57) in the fixed
+// order green[0..3], yellow[0..3], blue[0..3], red[0..3], byte19 = whose turn
+// (colorOf index). Both devices therefore reconstruct the ENTIRE board from the
+// same 32 bytes - identical positions, dice, and turn by construction. The
+// game's own rendering (pathIndex/c/r) is derived from stepsWalked exactly like
+// movement.js does, so the board always matches.
+var SNAPSHOT_COLORS = ['green', 'yellow', 'blue', 'red'];
 
-    // decode a 32-byte commit into a move object
-    function decodeMove(bytes) {
-        if (!bytes || bytes.length < 7) return null;
-        try {
-            return {
-                seat: bytes[0],
-                die1: bytes[1],
-                die2: bytes[2],
-                tokenIndex: bytes[3],
-                fromPathIndex: bytes[4],
-                toPathIndex: bytes[5],
-                toStepsWalked: bytes[6] || 0,
-            };
-        } catch (e) { return null; }
+function snapshotFromTokens() {
+    var sw = [];
+    for (var c = 0; c < 4; c++) {
+        var col = SNAPSHOT_COLORS[c];
+        var toks = (window.tokens && window.tokens[col]) || [];
+        for (var t = 0; t < 4; t++) {
+            sw.push(toks[t] ? (Number(toks[t].stepsWalked) || 0) : 0);
+        }
     }
+    return sw;
+}
 
-    // apply an opponent's decoded move to the local board (deterministic).
-    // Mirrors movement.js: home lane (stepsWalked>=52) renders via pathIndex
-    // -2 + per-color lane offsets, and 57 fires checkForMatchWinner so the
-    // LOSING device also sees the ceremony + finish, exactly like the local
-    // win path. Returns true when this move finished the opponent.
-    function applyMove(move) {
-        var won = false;
-        try {
-            var col = colorOf(move.seat);
-            var toks = (window.tokens && window.tokens[col]) || [];
-            var token = toks[move.tokenIndex];
-            // Board not initialized yet (the local game hasn't started). Return
-            // "not-ready" so the subscriber does NOT advance lastCount, letting
-            // the same commit be re-applied once the board is up.
-            if (!token || !window.tokens) return 'not-ready';
-            // Shared dice: mirror the committed roll onto this device so both
-            // screens show the same dice the remote player rolled.
-            if (typeof window.lastDiceRoll1 === 'number' && move.die1 > 0) window.lastDiceRoll1 = move.die1;
-            if (typeof window.lastDiceRoll2 === 'number' && move.die2 > 0) window.lastDiceRoll2 = move.die2;
-            var box1 = document.getElementById('val-d1');
-            var box2 = document.getElementById('val-d2');
-            var tot = document.getElementById('val-total');
-            if (box1) box1.innerText = move.die1 > 0 ? move.die1 : '—';
-            if (box2) box2.innerText = move.die2 > 0 ? move.die2 : '—';
-            if (tot && move.die1 > 0 && move.die2 > 0) tot.innerText = '= Total: ' + (move.die1 + move.die2);
-            // Mirror the remote dice as PHYSICAL cubes too (not just the text
-            // boxes) so both screens show the same dice the remote rolled.
-            if (move.die1 > 0 && move.die2 > 0 && typeof window.showRemoteDice === 'function') {
-                try { window.showRemoteDice(move.die1, move.die2); } catch (e) { /* soft */ }
-            }
+// encode the WHOLE board into a 32-byte commit (positional; the remote device
+// reconstructs it exactly). Called AFTER a real local move has been applied.
+function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
+    var m = [];
+    for (var i = 0; i < 32; i++) m[i] = 0;
+    m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
+    m[1] = (typeof die1 === 'number' ? die1 : 0) & 0xff;
+    m[2] = (typeof die2 === 'number' ? die2 : 0) & 0xff;
+    var sw = snapshotFromTokens();
+    for (var s = 0; s < 16 && s < sw.length; s++) m[3 + s] = (sw[s] & 0xff);
+    // byte19 = the AUTHORITATIVE next turn (color index), computed here from the
+    // SAME rule the game uses (mirroring resolveTurnEndAfterMoves): double-six
+    // keeps this seat, anything else passes to the next active seat. This is
+    // committed so the receiving phone just shows it - no local derivation.
+    var me = m[0];
+    var d6 = (m[1] === 6 && m[2] === 6);
+    m[19] = d6 ? me : ((me + 1) % (seatCount === 4 ? 4 : 2));
+    return m;
+}
 
-            var sw = move.toStepsWalked > 0 ? move.toStepsWalked : (token.stepsWalked || 0);
-            token.stepsWalked = sw;
-            if (sw >= 52) {
-                // Home lane: identical layout rules to movement.js.
-                token.pathIndex = -2;
-                var laneOffset = sw - 51;
-                if (col === 'green') { token.c = laneOffset; token.r = 7; }
-                else if (col === 'yellow') { token.c = 7; token.r = laneOffset; }
-                else if (col === 'blue') { token.c = 14 - laneOffset; token.r = 7; }
-                else if (col === 'red') { token.c = 7; token.r = 14 - laneOffset; }
-                if (sw === 57) {
-                    won = true;
-                    if (typeof window.checkForMatchWinner === 'function') {
-                        try { window.checkForMatchWinner(col); } catch (e) { /* soft */ }
-                    }
-                }
-            } else {
-                var path = (window.COMMON_PATH || []);
-                var idx = move.toPathIndex;
-                if (path[idx]) { token.pathIndex = idx; token.c = path[idx].c; token.r = path[idx].r; }
-            }
-            // Replicate captures deterministically: the landing square decides
-            // whether an opponent token is sent home, and both devices share the
-            // same pre-move board, so the same mechanic reproduces the capture
-            // (including the capture-completes-circuit 57 fast-track + win).
-            if (typeof checkCaptureMechanic === 'function') {
-                try { checkCaptureMechanic(token, move.tokenIndex, toks); } catch (e) { /* soft */ }
-            }
-            if (typeof window.drawLudoLayout === 'function') window.drawLudoLayout();
-            if (typeof window.saveGameStateToStorage === 'function') window.saveGameStateToStorage();
-            log('applied opponent move seat=' + move.seat + ' tokens=' + move.tokenIndex + ' die=' + move.die1 + '+' + move.die2 + ' steps=' + sw + (won ? ' WINNER' : ''));
-        } catch (e) { log('apply err ' + e.message); }
-        return won || (token.stepsWalked >= 57);
+// decode a 32-byte commit into a full board snapshot
+function decodeMove(bytes) {
+    if (!bytes || bytes.length < 3) return null;
+    try {
+        var sw = [];
+        for (var i = 0; i < 16; i++) sw.push(bytes[3 + i] || 0);
+        return {
+            seat: bytes[0],
+            die1: bytes[1],
+            die2: bytes[2],
+            steps: sw,
+            turnSeat: (bytes[19] !== undefined) ? bytes[19] : bytes[0],
+        };
+    } catch (e) { return null; }
+}
+
+// Reconstruct the ENTIRE board from a committed snapshot (deterministic).
+// Mirrors movement.js exactly: stepsWalked<52 -> COMMON_PATH[stepsWalked];
+// 52..56 -> home lane (pathIndex -2 + per-color offsets); 57 -> finished.
+function positionToken(token, sw, color, tIdx) {
+    token.stepsWalked = sw;
+    if (sw >= 52) {
+        token.pathIndex = -2;
+        var laneOffset = sw - 51;
+        if (color === 'green') { token.c = laneOffset; token.r = 7; }
+        else if (color === 'yellow') { token.c = 7; token.r = laneOffset; }
+        else if (color === 'blue') { token.c = 14 - laneOffset; token.r = 7; }
+        else if (color === 'red') { token.c = 7; token.r = 14 - laneOffset; }
+    } else if (sw > 0) {
+        // Same global COMMON_PATH as movement.js (classic-script shared scope).
+        var CP = (typeof COMMON_PATH !== 'undefined') ? COMMON_PATH : null;
+        if (CP && CP[sw]) { token.pathIndex = sw; token.c = CP[sw].c; token.r = CP[sw].r; }
+    } else {
+        // In home yard (stepsWalked 0 = on its yard slot): restore the yard cell.
+        token.pathIndex = -1;
+        var HY = (typeof HOME_YARDS !== 'undefined') ? HOME_YARDS : null;
+        if (HY && HY[color] && HY[color][tIdx]) { token.c = HY[color][tIdx].c; token.r = HY[color][tIdx].r; }
     }
+}
+
+// apply a committed snapshot to the local board (deterministic).
+// Returns true when the move finished the opponent; 'not-ready' if board is up.
+function applyMove(move) {
+    var won = false;
+    try {
+        if (!window.tokens) return 'not-ready';
+        // Reconstruct EVERY token from the snapshot - no move replay needed.
+        var anyMissing = false;
+        for (var c = 0; c < 4; c++) {
+            var col = SNAPSHOT_COLORS[c];
+            var toks = window.tokens[col] || [];
+            for (var t = 0; t < 4; t++) {
+                if (!toks[t]) { anyMissing = true; continue; }
+                var swv = move.steps ? move.steps[c * 4 + t] : 0;
+                positionToken(toks[t], swv, col, t);
+            }
+        }
+        if (anyMissing) return 'not-ready';
+        // Shared dice: mirror the committed roll onto this device so both
+        // screens show the same dice the remote player rolled.
+        if (move.die1 > 0 && move.die2 > 0 && typeof window.showRemoteDice === 'function') {
+            try { window.showRemoteDice(move.die1, move.die2); } catch (e) { /* soft */ }
+        }
+        // Fire wins deterministically: any token at 57 after the snapshot is a
+        // finished seat (the snapshot is the truth, so we can see it directly).
+        var finishedAny = false;
+        for (var c2 = 0; c2 < 4; c2++) {
+            var col2 = SNAPSHOT_COLORS[c2];
+            var toks2 = window.tokens[col2] || [];
+            var allHome = true;
+            for (var t2 = 0; t2 < 4; t2++) {
+                if (!(toks2[t2] && toks2[t2].stepsWalked >= 57)) allHome = false;
+            }
+            if (allHome && typeof window.checkForMatchWinner === 'function') {
+                try { window.checkForMatchWinner(col2); } catch (e) { /* soft */ }
+                finishedAny = true;
+            }
+        }
+        if (typeof window.drawLudoLayout === 'function') window.drawLudoLayout();
+        if (typeof window.saveGameStateToStorage === 'function') window.saveGameStateToStorage();
+        log('applied snapshot seat=' + move.seat + ' die=' + move.die1 + '+' + move.die2 + (finishedAny ? ' (finish detected)' : ''));
+    } catch (e) { log('apply err ' + e.message); }
+    return won || finishedAny;
+}
 
     // ---- multiplayer session ----
     function resolveHost() {
@@ -305,8 +334,13 @@
             if (s.current_turn === 255) return null; // none yet -> host rolls first
             var order = activeOrder();
             if (!order || order.length < 2) return null;
-            // Replicate the commit: which seat moved + what it rolled.
+            // The commit carries the committing device's AUTHORITATIVE next turn
+            // (byte19) + the full board snapshot. Prefer it - no derivation on
+            // the receiving phone. Fall back to the d6 rule from the dice.
             var mv = decodeMove(s.last_move_commit);
+            if (mv && typeof mv.turnSeat === 'number' && mv.turnSeat < order.length) {
+                return order[mv.turnSeat % order.length];
+            }
             var seatThatMoved = (mv && typeof mv.seat === 'number') ? mv.seat : s.current_turn;
             var d6 = !!(mv && ((mv.die1 > 0 && mv.die1 === 6) && (mv.die2 > 0 && mv.die2 === 6)));
             if (d6) return order[seatThatMoved % order.length]; // same seat again
