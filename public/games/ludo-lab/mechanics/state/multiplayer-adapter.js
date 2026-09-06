@@ -176,7 +176,7 @@
                         try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
                         if (!window.__mpJoinedStarted) {
                             window.__mpJoinedStarted = true;
-                            try { var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
+                            try { if (typeof window.__mpSyncSeats === "function" && typeof s.seats === "number") window.__mpSyncSeats(s.seats); var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
                         }
                     }
                     if (s.move_count === lastCount) return;
@@ -226,7 +226,7 @@
                         try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
                         if (!window.__mpJoinedStarted) {
                             window.__mpJoinedStarted = true;
-                            try { var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
+                            try { if (typeof window.__mpSyncSeats === "function" && typeof s.seats === "number") window.__mpSyncSeats(s.seats); var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
                         }
                     }
                     if (s.move_count === lastCount) return;

@@ -537,6 +537,17 @@
             // run together. Guarded so it starts exactly once.
             if (s.status === 1 && !window.__mpJoinedStarted) {
                 window.__mpJoinedStarted = true;
+                // CRITICAL: the JOINER must run the SAME active-seat order as the
+                // host BEFORE its local board starts. The host's wrapper forces
+                // selectMatchMode('2p'/'4p'); bypassing the wrapper on the joiner
+                // left the default 4-seat turn order (green->yellow->blue->red) on
+                // this device, so it never reached RED while the host waited on
+                // RED. Derive the mode from the board's seat count (same source).
+                try {
+                    if (typeof window.selectMatchMode === 'function' && typeof window.__mpMode === 'function') {
+                        window.selectMatchMode(window.__mpMode() === 2 ? '2p' : '4p');
+                    }
+                } catch (e) { /* soft */ }
                 // The JOINER starts via the ORIGINAL start (host-only gate
                 // would reject them; the host already began on-chain).
                 var starter = (window.__mpOrigStart && typeof window.__mpOrigStart === 'function') ? window.__mpOrigStart : window.initiateArenaMatch;
@@ -752,6 +763,13 @@
         window.__mpSyncSeats = function (n) {
             var v = (n === 2 || n === 4) ? n : seats;
             if (v !== seats) { seats = v; updateSeatButtons(); }
+            // Force the game to the SAME active-seat mode as the host, so the
+            // on-chain seat order and the Ludo turn order agree on every device.
+            try {
+                if (typeof window.selectMatchMode === 'function') {
+                    window.selectMatchMode(v === 2 ? '2p' : '4p');
+                }
+            } catch (e) { /* soft */ }
         };
         function setMode(m) {
             mode = m;
