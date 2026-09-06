@@ -5,6 +5,14 @@
 
 // Core Variable Definitions
 let currentTurn = 'green';
+
+// M12 multiplayer: the game's turn is a global LEXICAL `let` (not on window),
+// so `window.currentTurn` was always undefined. That made the multiplayer dice
+// guard (gfgRemoteTurn, dice.js) block EVERY roll on both devices
+// ("Waiting for the remote player's move") and the adapter's commit encoding
+// default to green. Expose the live value through a safe getter instead.
+window.getGameCurrentTurn = function () { return currentTurn; };
+
 let lastDiceRoll1 = 0;
 let lastDiceRoll2 = 0;
 let isDiceRolled = false;

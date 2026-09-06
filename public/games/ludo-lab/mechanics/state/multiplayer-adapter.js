@@ -52,7 +52,7 @@
     function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         var m = [0, 0, 0, 0, 0, 0, 0, 0];
         for (var i = 0; i < 32; i++) m[i] = 0;
-        m[0] = seatOf(window.currentTurn || 'green');
+        m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
         m[1] = (typeof die1 === 'number' ? die1 : 0) & 0xff; m[2] = (typeof die2 === 'number' ? die2 : 0) & 0xff;
         m[3] = tokenIndex & 0xff;
         m[4] = (fromPathIndex & 0xff);
@@ -316,7 +316,7 @@
         if (!active || !matchRef) return;
         var bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
         try { window._mpLatestCommit = bytes; } catch (e) {}
-        var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.currentTurn || 'green') };
+        var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green')) };
         rail().commitMove(refObj, bytes).then(function (r) {
             if (!(r && r.ok)) log('move commit skipped', (r && r.error) || '');
         });

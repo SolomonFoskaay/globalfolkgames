@@ -540,7 +540,13 @@
                 // The JOINER starts via the ORIGINAL start (host-only gate
                 // would reject them; the host already began on-chain).
                 var starter = (window.__mpOrigStart && typeof window.__mpOrigStart === 'function') ? window.__mpOrigStart : window.initiateArenaMatch;
-                try { starter.apply(window, []); } catch (e) { /* soft */ }
+                try {
+                    starter.apply(window, []);
+                    if (typeof window.mpSetStatus === 'function') {
+                        var seatNo = (typeof window.__mpJoinedSeat === 'number') ? (window.__mpJoinedSeat + 1) : '';
+                        window.mpSetStatus('Match is LIVE' + (seatNo ? ' - you are Seat ' + seatNo : '') + '. Wait for the host to roll, then it is your turn.');
+                    }
+                } catch (e) { /* soft */ }
             }
         });
     };
@@ -822,7 +828,15 @@
                     var p = a.begin();
                     if (p && typeof p.then === 'function') {
                         return p.then(function (r) {
-                            if (r && r.okay) return _origStart.apply(window, arguments);
+                            if (r && r.okay) {
+                                var started = _origStart.apply(window, arguments);
+                                // Clear the stale "starting..." status once the
+                                // board is genuinely live.
+                                if (typeof window.mpSetStatus === 'function') {
+                                    window.mpSetStatus('Match is LIVE - your turn to play!');
+                                }
+                                return started;
+                            }
                             if (typeof window.mpSetStatus === 'function') {
                                 window.mpSetStatus('Start failed: ' + ((r && r.error) || 'on-chain begin rejected the start'));
                             }
@@ -852,7 +866,8 @@ updateSeatButtons();
                 // My device rolls ONLY when it is MY color's turn. Any other
                 // turn (including the remote seat's) is awaited from the rail.
                 var mine = (typeof a.color === 'function') ? a.color() : '';
-                return !mine || window.currentTurn !== mine;
+                var curTurn = (typeof window.getGameCurrentTurn === 'function') ? window.getGameCurrentTurn() : (window.currentTurn || '');
+                return !mine || curTurn !== mine;
             } catch (e) { return false; }
         };
         window.mpEnsurePoll();
