@@ -10,7 +10,7 @@
 //     callback landed on US, unseen by the AS/EU poll -> "Timeout waiting for
 //     callback result" (reproduced in E3: roll on AS of a US-pinned account
 //     NEVER landed).
-//   - Region-aware targeting (src/magicblock-vrf.js) fixed the client: every
+//   - Region-aware targeting (src/magicblock-er-vrf.js) fixed the client: every
 //     write+poll now resolves the account's hosting region from the Router and
 //     targets it. That made US-pinned accounts work WHILE US answers, but US
 //     intermittently returns "-32005 client temporarily banned".

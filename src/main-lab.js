@@ -1,7 +1,7 @@
 // src/main-lab.js
-// Ludo-lab entry (the architecture build). Same boot as src/main.js but loads
-// the ER-named SDK (src/magicblock-er-vrf.js) instead of the legacy
-// src/magicblock-vrf.js. /ludo keeps the legacy entry untouched.
+// Ludo-lab entry (the architecture build). Same boot as src/main.js — both use
+// the ER-named SDK (src/magicblock-er-vrf.js). The legacy pure-VRF module
+// (src/magicblock-vrf.js) was removed with /ludo; ER VRF is the ONLY path.
 
 // ===== Developer console safety warning (site-wide) =====
 // Shown once when a player opens the developer tools, like Dynamic's own

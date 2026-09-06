@@ -1,4 +1,8 @@
 // src/main.js
+// Site-wide bootstrap: Dynamic auth + the MagicBlock EPHEMERAL ROLLUP VRF SDK
+// (src/magicblock-er-vrf.js). Games and sites use ONE SDK now — the legacy
+// pure/VRF module (magicblock-vrf.js) was removed with the /ludo page; every
+// dice roll is ER VRF (gasless free queue) by design.
 
 // ===== Developer console safety warning (site-wide) =====
 // Shown once when a player opens the developer tools, like Dynamic's own
@@ -15,8 +19,8 @@
 })();
 
 import './dynamic-auth.js';
-import './magicblock-vrf.js';
-import { initMagicBlockDice } from './magicblock-vrf.js';
+import './magicblock-er-vrf.js';
+import { initMagicBlockDice } from './magicblock-er-vrf.js';
 import { GFG_DICE } from './gfg-dice-config.js';
 
 // Expose the dice module on window (requires the Dynamic client to be ready).
@@ -25,9 +29,9 @@ initMagicBlockDice();
 // Activate provably-fair dice only when the gfg-dice program is deployed.
 if (GFG_DICE.programId && GFG_DICE.idl && window.magicblockDice) {
   window.magicblockDice.configure(GFG_DICE);
-  console.log('[VRF] MagicBlock VRF dice configured:', GFG_DICE.programId);
+  console.log('[VRF] MagicBlock ER VRF dice configured:', GFG_DICE.programId);
 } else {
   console.log('[VRF] gfg-dice not configured yet — Ludo will use local rolls');
 }
 
-console.log('Vite + Dynamic auth layer loaded');
+console.log('Vite + Dynamic auth layer loaded (ER VRF SDK)');

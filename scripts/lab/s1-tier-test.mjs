@@ -34,7 +34,7 @@ function loadSponsor() {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// matchRefFromSignature() from src/magicblock-vrf.js — first 8 bytes as u64.
+// matchRefFromSignature() from src/magicblock-er-vrf.js — first 8 bytes as u64.
 function matchRefFromSignature(sig) {
   if (!sig) return new BN(0);
   try {

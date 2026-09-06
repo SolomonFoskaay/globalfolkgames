@@ -9,7 +9,7 @@
 // third-party provider key / public RPCs when the Router is unreachable.
 //
 // Consumers:
-//   - the gfg-dice client (src/magicblock-vrf.js, src/gfg-dice-config.js)
+//   - the gfg-dice client (src/magicblock-er-vrf.js, src/gfg-dice-config.js)
 //   - the sponsor relay (scripts/delegate-relay.mjs)
 //   - the lab harnesses (scripts/lab/*, er-test.mjs)
 //

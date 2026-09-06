@@ -240,9 +240,11 @@
             var p = env.players[i];
             if (!p || p.actor !== 'user') continue;   // house/local never earn
             if (typeof p.position !== 'number') continue;
-            // A user seat must carry (or inherit) a real identity to bank.
-            var id = (p.identity != null && p.identity !== '' ) ? String(p.identity) : resolveUserIdentityFallback();
-            if (!id) continue;
+            // Identity is optional: it flows through when the game shipped the
+            // on-chain seat -> wallet map (M12), but the actual bank ALWAYS
+            // signs with THIS device's session key (per-device crediting), so a
+            // solo 'user' seat without an explicit identity still banks.
+            var id = (p.identity != null && p.identity !== '') ? String(p.identity) : resolveUserIdentityFallback();
             var points = table[p.position] || 0;
             if (points <= 0) continue;
             var reason = cfg.reasons.win1st;

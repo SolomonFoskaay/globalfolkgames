@@ -2,7 +2,7 @@
 // M3 — reproduction of the EXACT browser write path that a win triggers:
 //   payer = the player's session key with 0 SOL (gasless on the ER),
 //   playerAuthority = the same key,
-//   via Anchor program.methods...rpc() on the ER RPC (like src/magicblock-vrf.js
+//   via Anchor program.methods...rpc() on the ER RPC (like src/magicblock-er-vrf.js
 //   recordPoints does) — NOT sponsor-as-payer via sendMagicTx (which is what
 //   the earlier harnesses used).
 // If this fails, we have reproduced the user's "no reward" bug on-chain.
