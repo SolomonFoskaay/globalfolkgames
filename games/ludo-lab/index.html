@@ -421,23 +421,33 @@
     };
     // Sitewide handle: the real GFG-XXXXXX derived from Dynamic's stable user id
     // (same source public/universal/point-sources/referral.js uses). NEVER a
-    // wallet-derived pseudo id. Referral may load a moment after the page, so
-    // fall back to deriving it directly here when the module isn't up yet.
+    // wallet-derived pseudo id, and NEVER null for a signed-in user - fall back
+    // to the deterministic derive (referral + identity are lazily loaded by the
+    // header, so also consult currentProfile/currentUser).
     window.__mpHandle = function () {
         try {
             if (window.gfgReferral && typeof window.gfgReferral.handle === 'function') {
                 var h = window.gfgReferral.handle();
-                if (h && window.isValidProfileHandle && window.isValidProfileHandle(h)) return String(h);
+                if (h && (!window.isValidProfileHandle || window.isValidProfileHandle(h))) return String(h);
             }
         } catch (e) { /* soft */ }
-        // Direct derive: same deterministic GFG-XXXXXX path, no fabrication.
         try {
-            if (window.deriveProfileHandle && typeof window.deriveProfileHandle === 'function' && window.getDynamicUser && typeof window.getDynamicUser === 'function') {
+            if (window.getDynamicUser && typeof window.getDynamicUser === 'function') {
                 var u = window.getDynamicUser();
                 var id = u && (u.dynamicId || u.userId || u.id);
-                if (id) {
+                if (id && window.deriveProfileHandle && typeof window.deriveProfileHandle === 'function') {
                     var dh = window.deriveProfileHandle(id);
-                    if (dh) return String(dh);
+                    if (dh && (dh.length >= 5)) return String(dh);
+                }
+            }
+        } catch (e) { /* soft */ }
+        // currentUser is the reliable signed-in marker; derive from its id.
+        try {
+            if (window.currentUser && (window.currentUser.dynamicId || window.currentUser.id)) {
+                var cid = window.currentUser.dynamicId || window.currentUser.id;
+                if (window.deriveProfileHandle && typeof window.deriveProfileHandle === 'function') {
+                    var ch = window.deriveProfileHandle(String(cid));
+                    if (ch && (ch.length >= 5)) return String(ch);
                 }
             }
         } catch (e) { /* soft */ }
@@ -616,28 +626,29 @@
         var a = window.gfgLudoAdapter;
         if (!a) { window.mpSetStatus('rail not loaded'); return; }
         var seats = (typeof window.__mpMode === 'function') ? window.__mpMode() : 4;
-        // Wait briefly for the wallet session (auth settles a moment after the
-        // page opens; single-player requests sign-in the same way otherwise).
+        // SIGN-IN GATE = the SAME test single-player uses (window.currentUser).
+        // Never tell a signed-in player 'sign in first' just because the wallet
+        // is still settling after page open.
+        var signedIn = !!(window.currentUser && (window.currentUser.dynamicId || window.currentUser.id));
+        if (!signedIn) {
+            window.mpSetStatus('sign in first (top right) to play');
+            if (typeof window.openDynamicLogin === 'function') { try { window.openDynamicLogin(); } catch (e) {} }
+            return;
+        }
+        // Wait briefly for the wallet session (auth settles after open).
         var wallet = window.__mpWallet();
         if (!wallet) {
             window.mpSetStatus('loading your wallet session...');
-            var deadline = Date.now() + 2500;
+            var deadline = Date.now() + 3000;
             (function poll() {
                 wallet = window.__mpWallet();
                 if (wallet) return doCreate();
                 if (Date.now() < deadline) { setTimeout(poll, 200); return; }
-                handleCreateGate();
+                window.mpSetStatus('wallet session still loading - tap Create again in a second');
             })();
-        } else { doCreate(); }
-        function handleCreateGate() {
-            var w2 = window.__mpWallet();
-            if (!w2 && window.currentUser && !window.currentUser.dynamicId && !window.currentUser.id) {
-                window.mpSetStatus('sign in first (top right) to play');
-                if (typeof window.openDynamicLogin === 'function') { try { window.openDynamicLogin(); } catch (e) {} }
-                return;
-            }
-            window.mpSetStatus('sign in first (top right) so your wallet can host the match');
+            return;
         }
+        doCreate();
         function doCreate() {
             window.mpSetStatus('creating ' + seats + '-seat match...');
             a.start(1, [], seats, 60, 3600, 0).then(function (r) {
@@ -671,16 +682,25 @@
         if (!a) { window.mpSetStatus('rail not loaded'); return; }
         var code = (document.getElementById('mp-join-code') || {}).value || '';
         if (!code) { window.mpSetStatus('enter a code'); return; }
+        // SIGN-IN GATE = the SAME test single-player uses (window.currentUser).
+        // A signed-in player must never be told 'sign in first' just because the
+        // Solana wallet/handle isn't queryable at this instant on the phone.
+        var signedIn = !!(window.currentUser && (window.currentUser.dynamicId || window.currentUser.id));
+        if (!signedIn) {
+            window.mpSetStatus('sign in first (top right) to play');
+            if (typeof window.openDynamicLogin === 'function') { try { window.openDynamicLogin(); } catch (e) {} }
+            return;
+        }
         var wallet = window.__mpWallet();
         if (!wallet) {
             // Wait briefly for the wallet session (auth settles after open).
             window.mpSetStatus('loading your wallet session...');
-            var deadline = Date.now() + 2500;
+            var deadline = Date.now() + 3000;
             (function poll() {
                 wallet = window.__mpWallet();
                 if (wallet) return doJoin();
                 if (Date.now() < deadline) { setTimeout(poll, 200); return; }
-                window.mpSetStatus('sign in first (top right) so your wallet can join');
+                window.mpSetStatus('wallet session still loading - tap Join again in a second');
             })();
             return;
         }
