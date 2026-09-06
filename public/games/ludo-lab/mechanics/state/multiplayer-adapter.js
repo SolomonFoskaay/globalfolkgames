@@ -26,11 +26,19 @@
 
     function log() { try { console.log.apply(console, ['[MP/LUDO]'].concat(Array.prototype.slice.call(arguments))); } catch (e) {} }
     function rail() { return window.gfgMultiplayer; }
-    // Seat index -> Ludo color follows the MULTIPLAYER seat count (2P =
-    // green+red, 4P = all four), NOT the (possibly not-yet-locked) game mode.
-    // Both devices derive the same order from the same seat count, so the
-    // committed seat byte is unambiguous.
+    // Seat index -> Ludo color: the game's ACTIVE colour order is the source of
+    // truth (the board the game actually plays). When the game is configured
+    // (activeSeats set via the colour picker), seat i == activeSeats[i], so the
+    // on-chain seat and the colour picker are the SAME thing. Before the game
+    // locks, fall back to a deterministic order from the seat count (2P:
+    // green,red; 4P: all four) so both devices agree on the committed byte.
     function activeOrder() {
+        try {
+            if (typeof window.getActiveSeats === 'function') {
+                var a = window.getActiveSeats();
+                if (a && a.length >= 2) return a.slice(0, Math.min(a.length, 4));
+            }
+        } catch (e) { /* soft */ }
         if (seatCount === 4) return ['green', 'yellow', 'blue', 'red'];
         return ['green', 'red'];
     }
@@ -327,16 +335,18 @@
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
     // After a pre-start seat switch the rail already re-joined on-chain; this
-    // just updates this device's seat index so the turn gate + colour mapping
-    // match the new seat. No re-subscribe (the existing one keeps polling).
+    // updates this device's seat index so the turn gate + colour mapping match
+    // the new seat, and re-binds the game seats ('You' moves to the new colour).
+    // No re-subscribe (the existing one keeps polling).
     function setMySeat(seat) {
         if (typeof seat === 'number' && seat >= 0) mySeat = seat;
+        bindSeats();
         if (typeof window.mpRenderLobby === 'function') {
             try { window.__mpPollLobby(); } catch (e) { /* soft */ }
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

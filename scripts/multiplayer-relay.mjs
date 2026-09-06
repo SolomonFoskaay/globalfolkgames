@@ -99,7 +99,7 @@ async function waitBoardPickup(pda, timeoutMs = 8000) {
     try {
       const c = createConnection(url, 'confirmed', 8000);
       const info = await c.getAccountInfo(pda);
-      if (info && info.owner.toBase58() === PROGRAM.toBase58() && info.data.length >= 623) return url;
+      if (info && info.owner.toBase58() === PROGRAM.toBase58() && info.data.length >= 655) return url;
     } catch (e) { /* keep polling */ }
     await sleep(600);
   }
@@ -219,7 +219,7 @@ export async function boardState({ game, matchRef }) {
     const info = await c.getAccountInfo(pda).catch(() => null);
     if (!info) return { ok: false, error: 'board not found' };
     const d = info.data;
-    if (d.length < 623) return { ok: false, error: 'board too small' };
+    if (d.length < 655) return { ok: false, error: 'board too small' };
     const seats = d[276];
     // SEAT-INDEXED players/handles (index 0..seats-1; '' = free seat). The
     // page renders seats by index, so the array must never compress zero slots.
@@ -259,6 +259,8 @@ export async function boardState({ game, matchRef }) {
       last_move_commit: Array.from(d.subarray(582, 614)),
       finished_at: Number(d.readBigInt64LE(614)),
       winner_seat: d[622],
+      // creator: appended v3 field (offset 623..654) - the host wallet.
+      creator: new PublicKey(d.subarray(623, 655)).toBase58(),
       region: url,
     };
   } catch (e) {

@@ -419,18 +419,27 @@
         } catch (e) { /* soft */ }
         return null;
     };
-    // Sitewide handle: prefer the referral module, else a stable wallet-derived
-    // pseudo-handle so the JOIN can always carry a valid on-chain handle.
+    // Sitewide handle: the real GFG-XXXXXX derived from Dynamic's stable user id
+    // (same source public/universal/point-sources/referral.js uses). NEVER a
+    // wallet-derived pseudo id. Referral may load a moment after the page, so
+    // fall back to deriving it directly here when the module isn't up yet.
     window.__mpHandle = function () {
         try {
             if (window.gfgReferral && typeof window.gfgReferral.handle === 'function') {
                 var h = window.gfgReferral.handle();
-                if (h) return String(h);
+                if (h && window.isValidProfileHandle && window.isValidProfileHandle(h)) return String(h);
             }
         } catch (e) { /* soft */ }
+        // Direct derive: same deterministic GFG-XXXXXX path, no fabrication.
         try {
-            var addr = window.__mpWallet();
-            if (addr) return 'gf' + addr.slice(-11); // pseudo gf<…> 13 chars, valid handle charset
+            if (window.deriveProfileHandle && typeof window.deriveProfileHandle === 'function' && window.getDynamicUser && typeof window.getDynamicUser === 'function') {
+                var u = window.getDynamicUser();
+                var id = u && (u.dynamicId || u.userId || u.id);
+                if (id) {
+                    var dh = window.deriveProfileHandle(id);
+                    if (dh) return String(dh);
+                }
+            }
         } catch (e) { /* soft */ }
         return null;
     };
@@ -542,8 +551,14 @@
     window.__mpPopulateSeats = function (s) {
         try {
             if (!s || !Array.isArray(s.players)) return;
+            // Seat i == colour order[i]; derive from the game's active seats so
+            // the on-chain seat and the colour picker are the SAME reference.
             var order = ['green', 'yellow', 'blue', 'red'];
+            try { if (window.gfgLudoAdapter && typeof window.gfgLudoAdapter.activeOrder === 'function') { var o = window.gfgLudoAdapter.activeOrder(); if (o && o.length) order = o; } } catch (e) { /* soft */ }
             var mine = window.__mpWallet();
+            // Build one option list per colour slot: the seat occupant (You-<id>
+            // or <id>) + Human + Computer, mirroring how single-player lets you
+            // move the 'You' seat. Auto-select the occupant.
             for (var c = 0; c < order.length; c++) {
                 var color = order[c];
                 if ((s.seats || 2) <= c) break;
@@ -552,34 +567,26 @@
                 var wallet = s.players[c] || '';
                 var handle = (s.handles && s.handles[c]) || '';
 
-                // Remove any remote-player option previously appended here so we
-                // never stack duplicates across polls (each render rebuilds it).
+                // Remove any remote-player option previously appended (rebuild).
                 var stale = [];
                 for (var oi = 0; oi < sel.options.length; oi++) {
                     if (String(sel.options[oi].value || '').indexOf('mp_') === 0) stale.push(sel.options[oi]);
                 }
                 for (var si = 0; si < stale.length; si++) { try { sel.removeChild(stale[si]); } catch (e) {} }
 
+                var isMine = !!wallet && !!mine && wallet === mine;
                 if (!wallet) {
-                    // Free seat: keep the first option as the default "You".
+                    // Free seat: option 0 = "You" (they could sit here), so they
+                    // can freely switch pre-start. Human/Computer stay as-is.
                     if (sel.options[0]) sel.options[0].text = 'You';
                     if (sel.options.length) { try { sel.value = sel.options[0].value; } catch (e) {} }
                     continue;
                 }
-                var isMine = !!wallet && !!mine && wallet === mine;
-                if (isMine) {
-                    // MY seat: label the first option "You - <handle>", keep 'you'.
-                    if (sel.options[0]) sel.options[0].text = 'You - ' + (handle || wallet.slice(0, 8));
-                    if (sel.options.length) { try { sel.value = sel.options[0].value; } catch (e) {} }
-                } else {
-                    // Remote player's seat: APPEND a 4th option with their id and
-                    // AUTO-SELECT it, so the creator sees "You - <id>" vs "<id>".
-                    var o = document.createElement('option');
-                    o.value = 'mp_' + wallet;
-                    o.text = handle || ('Player ' + (c + 1));
-                    sel.appendChild(o);
-                    try { sel.value = o.value; } catch (e) {}
-                }
+                // Occupied seat: label option 0 with the occupant's identity and
+                // auto-select it. For MY seat that's "You - <id>"; for a remote
+                // player it's their <id>, again as option 0 (single source).
+                if (sel.options[0]) sel.options[0].text = (isMine ? 'You - ' : '') + (handle || wallet.slice(0, 8));
+                try { sel.value = sel.options[0].value; } catch (e) {}
             }
         } catch (e) { /* soft */ }
     };
@@ -662,24 +669,40 @@
         }
         doJoin();
         function doJoin() {
-            window.mpSetStatus('joining ' + code + '...');
-            var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
-            // On-chain join (gasless, joiner's wallet + handle land in a free seat).
+            // Wait for the REAL GFG-XXXXXX handle too - the on-chain join stores
+            // it as the seat's identity. Never join with a null/fake handle.
             var handle = window.__mpHandle();
-            a.join(1, codeUp, undefined, handle).then(function (r) {
-                if (!r) { window.mpSetStatus('join failed (check code)'); return; }
-                var codeEl = document.getElementById('mp-code');
-                var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
-                var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
-                if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
-                if (typeof window.mpShowCreated === 'function') window.mpShowCreated();
-                if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
-                window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
-                window.__mpRoom = null;
-                if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
-                window.__mpPollLobby();
-                window.mpSetStatus('Joined ' + joinedCodeUp + ' · Seat ' + ((typeof r.seat === 'number') ? (r.seat + 1) : '?') + ' · waiting for host to start.');
-            });
+            if (!handle) {
+                window.mpSetStatus('loading your player id...');
+                var hdeadline = Date.now() + 3000;
+                (function hpoll() {
+                    handle = window.__mpHandle();
+                    if (handle) return doJoinInner();
+                    if (Date.now() < hdeadline) { setTimeout(hpoll, 200); return; }
+                    window.mpSetStatus('could not resolve your player id yet - try again in a second');
+                })();
+                return;
+            }
+            doJoinInner();
+            function doJoinInner() {
+                window.mpSetStatus('joining ' + code + '...');
+                var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
+                // On-chain join (gasless, joiner's wallet + handle land in a free seat).
+                a.join(1, codeUp, undefined, handle).then(function (r) {
+                    if (!r) { window.mpSetStatus('join failed (check code)'); return; }
+                    var codeEl = document.getElementById('mp-code');
+                    var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
+                    var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
+                    if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
+                    if (typeof window.mpShowCreated === 'function') window.mpShowCreated();
+                    if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
+                    window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
+                    window.__mpRoom = null;
+                    if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
+                    window.__mpPollLobby();
+                    window.mpSetStatus('Joined ' + joinedCodeUp + ' · Seat ' + ((typeof r.seat === 'number') ? (r.seat + 1) : '?') + ' · waiting for host to start.');
+                });
+            }
         }
     };
 

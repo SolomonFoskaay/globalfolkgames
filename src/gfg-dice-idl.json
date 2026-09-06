@@ -6480,6 +6480,10 @@
           {
             "name": "winner_seat",
             "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
           }
         ]
       }

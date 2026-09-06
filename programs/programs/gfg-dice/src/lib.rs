@@ -1421,13 +1421,20 @@ pub mod gfg_dice {
         // rewards - it only stores the stake for downstream modules to read.
         require!(turn_secs > 0 && max_match_secs > 0, PointsError::InvalidCompetition);
         let b = &mut ctx.accounts.board;
-        b.version = 2u8;
+        b.version = 3u8;
         b.game = game;
         b.match_ref = match_ref;
         b.status = 0u8;
         let mut ps = [Pubkey::default(); MAX_MP];
         for (i, p) in players.iter().enumerate() { ps[i] = *p; }
         b.players = ps;
+        // CREATOR = the first (host) wallet seated at create. Identified by
+        // WALLET, never by seat: the creator can switch seats freely without
+        // losing the right to begin, and an invited player auto-seated at seat0
+        // after such a move can never become the creator. begin_match requires
+        // signer == creator, and join_match never lets a seat-holder take
+        // another's occupied seat.
+        b.creator = ps[0];
         // player_count = the REAL non-default wallets seated at create (the
         // host). Free seats (Pubkey::default) never count; join_match fills +
         // counts them. begin_match requires player_count == seats, so a seat
@@ -1513,8 +1520,11 @@ pub mod gfg_dice {
         // All seats must be filled by real wallets before the match begins
         // (M12 seat-authority board; computer seats are filled by the host).
         require!(b.player_count == b.seats, PointsError::NotSettled);
-        // Only the seat-0 holder (the host) may start the match.
-        require!(b.players[0] == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
+        // Only the CREATOR (the wallet that opened the match) may begin.
+        // Creator is wallet-bound, never seat-bound: the creator can switch
+        // seats freely without transferring authority, and an invited player
+        // accidentally seating at seat 0 can never become the creator.
+        require!(b.creator == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
         b.current_turn = 0u8;
         b.started_at = Clock::get()?.unix_timestamp;
         b.status = 1;
@@ -2751,7 +2761,7 @@ pub struct CompetitionTally {
 /// stores opaque 32-byte move commits + a turn cursor, never game rules.
 #[account]
 pub struct MatchBoard {
-    pub version: u8,             // 2 = current (v1 seed gfgboard, untouched)
+    pub version: u8,             // 3 = current (creator-by-wallet; v1/v2 seeds untouched)
     pub game: u8,                // M1 source_code (1 = ludo, ...)
     pub match_ref: u64,          // lobby-generated unique id
     pub status: u8,              // 0 locked (awaiting players), 1 in_progress, 2 finished
@@ -2770,6 +2780,7 @@ pub struct MatchBoard {
     pub last_move_commit: [u8; 32],
     pub finished_at: i64,
     pub winner_seat: u8,         // 0..player_count-1, 255 = none yet
+    pub creator: Pubkey,         // v3: the host wallet (never seat-bound). begin requires signer == creator, so switching seats never transfers creator authority.
 }
 
 /// Arc2 M1B: per-seat turn clocks + timeout record for a match. Additive to the
