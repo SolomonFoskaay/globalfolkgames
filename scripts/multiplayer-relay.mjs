@@ -25,7 +25,8 @@ import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { baseRpcUrl, createConnection, sendMagicTx, getDelegationStatus, regionUrlForFqdn, pickErRpcUrl } from '../src/gfg-rpc.js';
 import { loadSponsor } from './delegate-relay.mjs';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readFileSync as _rfs } from 'fs';
+import { fileURLToPath } from 'url';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
@@ -262,6 +263,161 @@ export async function dispatch(action, b) {
     case 'commit': return boardCommit({ game: Number(b.game), matchRef: Number(b.matchRef), seat: Number(b.seat), moveCommit: b.moveCommit, regionUrl: b.regionUrl });
     case 'state': return boardState({ game: Number(b.game), matchRef: Number(b.matchRef) });
     case 'finish': return boardFinish({ game: Number(b.game), matchRef: Number(b.matchRef), winnerSeat: Number(b.winnerSeat), regionUrl: b.regionUrl });
+    case 'lobby-create': return lobbyCreate(b);
+    case 'lobby-join': return lobbyJoin(b);
+    case 'lobby-seat': return lobbySeat(b);
+    case 'lobby-leave': return lobbyLeave(b);
+    case 'lobby-start': return lobbyStart(b);
+    case 'lobby-state': return lobbyState(b);
     default: return { ok: false, error: 'unknown multiplayer action: ' + action };
   }
+}
+
+// =====================================================
+// LOBBY REGISTRY (game-agnostic, additive)
+// A tiny room store keyed by the match CODE so every device in the same match
+// sees the same lobby: who joined, which seat each took, and when the host
+// starts. This is PRESENCE metadata only (seats/picks/started) - the actual
+// game moves + results stay 100% on-chain via the board rail above. Works for
+// any future game (2P/4P/6P/8P) because seats are just a number.
+//
+// Persistence: a JSON file on the relay disk when writable (local dev); on
+// Vercel (read-only fs) it is per-instance + memory, which is fine for a short
+// lobby (matches live minutes, not days). Everything is soft-fail.
+// =====================================================
+const LOBBY_FILE = fileURLToPath(new URL('./.gfg-mp-lobby.json', import.meta.url));
+let lobbyStore = null;
+function loadLobby() {
+  if (lobbyStore) return lobbyStore;
+  try { lobbyStore = existsSync(LOBBY_FILE) ? JSON.parse(_rfs(LOBBY_FILE, 'utf8')) : {}; }
+  catch (e) { lobbyStore = {}; }
+  return lobbyStore;
+}
+function saveLobby() {
+  try { writeFileSync(LOBBY_FILE, JSON.stringify(lobbyStore, null, 2)); } catch (e) { /* read-only (Vercel): skip */ }
+}
+function roomKey(game, code) { return String(game) + ':' + String(code).toUpperCase(); }
+function codeOf(b) { return String(b && b.code || '').trim().toUpperCase(); }
+
+// Create a lobby room for a created match code. `handle` is the public GFG
+// sitewide name (never email/wallet); the creator auto-takes seat 0.
+function lobbyCreate(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const seats = Math.min(8, Math.max(2, Number(b.seats) || 2));
+  if (!code) return { ok: false, error: 'lobby: missing code' };
+  const store = loadLobby();
+  const key = roomKey(game, code);
+  if (store[key]) return { ok: false, error: 'lobby: a room with this code already exists' };
+  const creatorHandle = String(b.handle || 'Host').slice(0, 24);
+  const players = [];
+  for (let i = 0; i < seats; i++) {
+    players.push(i === 0 ? { seat: i, handle: creatorHandle, host: true } : { seat: i, handle: null });
+  }
+  store[key] = { game, code, seats, players, started: false, createdAt: Date.now(), seatLocked: false };
+  saveLobby();
+  return { ok: true, code, seats, players, started: false };
+}
+
+// Place a player at `seat` (or first free seat). Handles both: an existing
+// player switching seats (clear old slot, occupy new) and a brand-new join.
+function placePlayer(room, handle, seat) {
+  const old = room.players.find(p => p.handle === handle);
+  if (old && old.host) return { ok: true, note: 'host' };
+  let target = Number.isInteger(seat) && seat >= 0 && seat < room.seats ? seat : null;
+  if (target == null) target = room.players.findIndex(p => !p.handle && (!old || old.seat !== p.seat));
+  if (target < 0) return { ok: false, error: 'lobby: room is full' };
+  if (!old) {
+    // New joiner: occupy the free seat.
+    if (room.players[target] && room.players[target].handle) return { ok: false, error: 'lobby: that seat is taken' };
+    room.players = room.players.map((p, i) => i === target ? { seat: i, handle, host: false } : p);
+    return { ok: true };
+  }
+  // Existing player moving: free their old seat, take the new one.
+  if (target !== old.seat && room.players[target] && room.players[target].handle) {
+    return { ok: false, error: 'lobby: that seat is taken' };
+  }
+  room.players = room.players.map((p, i) => {
+    if (i === old.seat && i !== target) return { seat: i, handle: null, host: false };
+    if (i === target) return { seat: i, handle, host: !!old.host };
+    return p;
+  });
+  return { ok: true };
+}
+
+// Join a room by code: adds the player to the seat they pick (no auto-assign
+// beyond the first free seat when none given; the UI always picks). The host is
+// auto-seated at 0 on create and never "joins".
+function lobbyJoin(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const handle = String(b.handle || 'Player').slice(0, 24);
+  const store = loadLobby();
+  const key = roomKey(game, code);
+  const room = store[key];
+  if (!room) return { ok: false, error: 'lobby: no room with that code' };
+  if (room.started) return { ok: false, error: 'match already started - no new joins' };
+  const r = placePlayer(room, handle, Number(b.seat));
+  if (!r.ok) return r;
+  saveLobby();
+  return { ok: true, code: room.code, seats: room.seats, players: room.players, started: room.started };
+}
+
+// Pick/switch seat before start (same placement logic, explicit seat).
+function lobbySeat(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const handle = String(b.handle || '').trim();
+  if (!handle) return { ok: false, error: 'lobby: handle required' };
+  const seat = Number(b.seat);
+  if (!Number.isInteger(seat) || seat < 0) return { ok: false, error: 'lobby: invalid seat' };
+  const store = loadLobby();
+  const room = store[roomKey(game, code)];
+  if (!room) return { ok: false, error: 'lobby: no room' };
+  if (room.started) return { ok: false, error: 'match already started - seats locked' };
+  if (seat >= room.seats) return { ok: false, error: 'lobby: seat out of range (pick ' + room.seats + ' seats)' };
+  const r = placePlayer(room, handle, seat);
+  if (!r.ok) return r;
+  saveLobby();
+  return { ok: true, code: room.code, seats: room.seats, players: room.players, started: room.started };
+}
+
+function lobbyLeave(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const handle = String(b.handle || '');
+  const store = loadLobby();
+  const key = roomKey(game, code);
+  const room = store[key];
+  if (!room) return { ok: false, error: 'lobby: no room' };
+  const wasHost = room.players.find(p => p.handle === handle && p.host);
+  if (wasHost) { delete store[key]; saveLobby(); return { ok: true, removed: true }; }
+  room.players = room.players.map(p => p.handle === handle ? { seat: p.seat, handle: null, host: false } : p);
+  saveLobby();
+  return { ok: true, removed: false };
+}
+
+function lobbyStart(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const store = loadLobby();
+  const room = store[roomKey(game, code)];
+  if (!room) return { ok: false, error: 'lobby: no room' };
+  if (!room.players.some(p => p.host && p.handle === String(b.handle || ''))) {
+    return { ok: false, error: 'lobby: only the host can start' };
+  }
+  const freeCount = room.players.filter(p => !p.handle).length;
+  if (freeCount > 0) return { ok: false, error: 'lobby: waiting for players (' + freeCount + ' free seat' + (freeCount === 1 ? '' : 's') + ')' };
+  room.started = true;
+  saveLobby();
+  return { ok: true, code: room.code, seats: room.seats, players: room.players, started: true };
+}
+
+function lobbyState(b) {
+  const game = Number(b.game) || 1;
+  const code = codeOf(b);
+  const store = loadLobby();
+  const room = store[roomKey(game, code)];
+  if (!room) return { ok: false, error: 'lobby: no room' };
+  return { ok: true, code: room.code, game: room.game, seats: room.seats, players: room.players, started: room.started };
 }

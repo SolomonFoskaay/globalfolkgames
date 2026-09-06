@@ -625,9 +625,9 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { action, game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl } = JSON.parse(body || '{}');
+      const { action, game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl, code, handle } = JSON.parse(body || '{}');
       const { dispatch } = await import('./multiplayer-relay.mjs');
-      const r = await dispatch(action, { game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl });
+      const r = await dispatch(action, { game, matchRef, seats, stakeUsdCents, turnSecs, maxMatchSecs, seat, winnerSeat, moveCommit, regionUrl, code, handle });
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify(r));
     } catch (e) {
