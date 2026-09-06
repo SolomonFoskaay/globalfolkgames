@@ -170,6 +170,7 @@
                 try {
                     if (!s || typeof s.move_count !== 'number') return;
                     rememberSeats(s);
+                    syncTurnFromBoard(s);
                     // Begin/finish transitions are surfaced (status/winner fire
                     // too now), but we only act on NEW moves for the opponent.
                     if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
@@ -222,6 +223,7 @@
                 try {
                     if (!s || typeof s.move_count !== 'number') return;
                     rememberSeats(s);
+                    syncTurnFromBoard(s);
                     if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
                         try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
                         if (!window.__mpJoinedStarted) {
@@ -269,6 +271,38 @@
     }
     function players() { return seatWallets.slice(); }
     function handles() { return seatHandles.slice(); }
+
+    // BOARD-SYNCED TURN: the on-chain board stores current_turn = the seat that
+    // JUST moved. The displayed turn on BOTH devices is therefore the NEXT seat
+    // in the active order - derived from the solitary on-chain value, never from
+    // a device-local guess. This is what makes every phone show the SAME turn.
+    // current_turn is 255 (none yet) or a committed seat index.
+    function turnFromBoard(s) {
+        try {
+            if (!s || typeof s.current_turn !== 'number') return null;
+            if (s.current_turn === 255) return null; // none yet (host will roll green)
+            var order = activeOrder();
+            if (!order || order.length < 2) return null;
+            var next = (s.current_turn + 1) % order.length;
+            return order[next];
+        } catch (e) { return null; }
+    }
+    // Force the local game onto the board-synced turn (display indicator + the
+    // lexical `currentTurn` the rolls read). No-op when already on it.
+    function syncTurnFromBoard(s) {
+        var c = turnFromBoard(s);
+        if (!c) return false;
+        var got = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
+        if (got === c) return true;
+        if (window.setGameCurrentTurn) { try { window.setGameCurrentTurn(c); } catch (e) {} }
+        var ti = document.getElementById('turn-indicator');
+        if (ti) {
+            var cm = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
+            ti.innerText = c.charAt(0).toUpperCase() + c.slice(1) + "'s Turn";
+            ti.style.color = cm[c] || '#2ecc71';
+        }
+        return true;
+    }
 
     // MULTIPLAYER SEAT BINDING: this device controls `mySeat` (mode 'human' +
     // isUser so the "You" seat is the local player). Every OTHER active seat is

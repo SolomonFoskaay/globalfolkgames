@@ -12,6 +12,16 @@ let currentTurn = 'green';
 // ("Waiting for the remote player's move") and the adapter's commit encoding
 // default to green. Expose the live value through a safe getter instead.
 window.getGameCurrentTurn = function () { return currentTurn; };
+// Setter used by the multiplayer sync: the turn is advanced from the single
+// on-chain board (current_turn), never from a device's guessed local sequence,
+// so every phone converges on the same turn.
+window.setGameCurrentTurn = function (color) {
+    if (ALL_SEATS.indexOf(color) === -1) return;
+    currentTurn = color;
+    if (typeof displayEducationalLog === 'function') {
+        displayEducationalLog(`${(color || '').toUpperCase()}'s turn — on-chain ${color} (board-synced).`);
+    }
+};
 
 let lastDiceRoll1 = 0;
 let lastDiceRoll2 = 0;

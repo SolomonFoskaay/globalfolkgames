@@ -1525,7 +1525,11 @@ pub mod gfg_dice {
         // seats freely without transferring authority, and an invited player
         // accidentally seating at seat 0 can never become the creator.
         require!(b.creator == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
-        b.current_turn = 0u8;
+        // current_turn stays 255 (none yet): the SEAT THAT JUST MOVED is unused
+        // until the first commit. Both devices therefore derive the displayed
+        // turn uniformly as "the seat AFTER current_turn" - at begin it is none
+        // yet, so the game's natural first turn (Green) plays. commit_move sets
+        // current_turn = the seat that moved, making the next turn unambiguous.
         b.started_at = Clock::get()?.unix_timestamp;
         b.status = 1;
         Ok(())

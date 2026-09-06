@@ -765,9 +765,12 @@
             if (v !== seats) { seats = v; updateSeatButtons(); }
             // Force the game to the SAME active-seat mode as the host, so the
             // on-chain seat order and the Ludo turn order agree on every device.
+            // ONLY before the match locks: selectMatchMode errors once the game
+            // is live, and we must never spam that error on a live match.
             try {
                 if (typeof window.selectMatchMode === 'function') {
-                    window.selectMatchMode(v === 2 ? '2p' : '4p');
+                    var locked = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked;
+                    if (!locked) window.selectMatchMode(v === 2 ? '2p' : '4p');
                 }
             } catch (e) { /* soft */ }
         };
