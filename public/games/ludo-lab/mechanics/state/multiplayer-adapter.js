@@ -80,7 +80,10 @@
             var col = colorOf(move.seat);
             var toks = (window.tokens && window.tokens[col]) || [];
             var token = toks[move.tokenIndex];
-            if (!token) return false;
+            // Board not initialized yet (the local game hasn't started). Return
+            // "not-ready" so the subscriber does NOT advance lastCount, letting
+            // the same commit be re-applied once the board is up.
+            if (!token || !window.tokens) return 'not-ready';
             // Shared dice: mirror the committed roll onto this device so both
             // screens show the same dice the remote player rolled.
             if (typeof window.lastDiceRoll1 === 'number' && move.die1 > 0) window.lastDiceRoll1 = move.die1;
@@ -167,13 +170,21 @@
                     }
                     if (s.move_count === lastCount) return;
                     var mv = decodeMove(s.last_move_commit);
-                    lastCount = s.move_count;
                     if (mv && mv.seat !== mySeat) {
-                        var won = applyMove(mv);
+                        var applied = applyMove(mv);
+                        if (applied === 'not-ready') {
+                            // Board not up yet: don't advance lastCount - the
+                            // next poll retries this same commit.
+                            dimmed = false;
+                            return;
+                        }
+                        lastCount = s.move_count;
                         dimmed = false;
                         // Do not auto-pass after a winning move: checkForMatchWinner
                         // already ended the match + showed the ceremony.
-                        if (!won && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        if (!applied && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                    } else {
+                        lastCount = s.move_count;
                     }
                 } catch (e) { log('listen err ' + e.message); }
             });
@@ -209,15 +220,21 @@
                     }
                     if (s.move_count === lastCount) return;
                     var mv = decodeMove(s.last_move_commit);
-                    lastCount = s.move_count;
                     if (mv && mv.seat !== mySeat) {
-                        var won = applyMove(mv);
+                        var applied = applyMove(mv);
+                        if (applied === 'not-ready') {
+                            dimmed = false;
+                            return;
+                        }
+                        lastCount = s.move_count;
                         dimmed = false;
                         // Do not auto-pass after a winning move: checkForMatchWinner
                         // already ended the match + showed the ceremony.
-                        if (!won && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        if (!applied && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                    } else {
+                        lastCount = s.move_count;
                     }
-                } catch (e) {}
+                } catch (e) { /* soft */ }
             });
             log('joined ref=' + matchRef + ' mySeat=' + mySeat);
             bindSeats();

@@ -37,15 +37,15 @@
         <div id="mp-bar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.78rem;">
             <span style="color:#f87818; font-weight:800;">Multiplayer</span>
             <span style="color:#bbb; font-size:0.72rem;">seats</span>
-            <button id="mp-mode-2p" style="background:#1a1a24;color:#bbb;border:1px solid #333;" onclick="window.__mpSetSeats(2)">2</button>
-            <button id="mp-mode-4p" style="background:#f87818;color:#000;border:1px solid #f87818;" onclick="window.__mpSetSeats(4)">4</button>
-            <span style="width:4px;"></span>
-            <button id="mp-create" onclick="window.mpCreateMatch()" style="background:#7838f8; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Create match</button>
-            <input id="mp-join-code" placeholder="enter code" style="width:130px; font-family:monospace;" />
-            <button id="mp-join" onclick="window.mpJoinMatch()" style="background:#2ecc71; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Join</button>
+            <button id="mp-mode-2p" onclick="window.__mpSetSeats(2)" style="min-width:64px; min-height:44px; width:44%; box-sizing:border-box; background:#1a1a24;color:#bbb;border:1px solid #333;border-radius:8px; font-size:1rem; font-weight:800;">2</button>
+            <button id="mp-mode-4p" onclick="window.__mpSetSeats(4)" style="min-width:64px; min-height:44px; width:44%; box-sizing:border-box; background:#f87818;color:#000;border:1px solid #f87818;border-radius:8px; font-size:1rem; font-weight:800;">4</button>
+            <span style="width:100%;"></span>
+            <button id="mp-create" onclick="window.mpCreateMatch()" style="min-height:46px; flex:1; background:#7838f8; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.95rem;">Create match</button>
+            <input id="mp-join-code" placeholder="enter code" style="min-height:46px; flex:1; min-width:0; width:auto; font-family:monospace;" />
+            <button id="mp-join" onclick="window.mpJoinMatch()" style="min-height:46px; flex:1; background:#2ecc71; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.95rem;">Join</button>
             <span style="width:4px;"></span>
             <b id="mp-code" data-code="" style="color:#2ecc71; font-size:0.9rem; letter-spacing:0.08em;"></b>
-            <button id="mp-copy-link" onclick="window.mpCopyLink()" style="display:none; background:#1a1a24; color:#f87818; border:1px solid #f87818; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.72rem;">Copy share link</button>
+            <button id="mp-copy-link" onclick="window.mpCopyLink()" style="display:none; min-height:44px; background:#1a1a24; color:#f87818; border:1px solid #f87818; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.72rem;">Copy share link</button>
         </div>
         <div id="mp-lobby-box" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:#12121a; border:1px solid #2a2a36; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.8rem;">
             <div id="mp-joined-count" style="color:#f87818; font-weight:800; flex:1;">—</div>
@@ -357,16 +357,23 @@
     <!-- Ludo ADAPTER for the rail (reference for other games). -->
     <script src="/games/ludo-lab/mechanics/state/multiplayer-adapter.js"></script>
     <script>
-    // ============ M12 arc2m12c: coordinated multiplayer lobby ============
-    // Model:
-    //   - 2P / 4P is chosen FIRST (locks seat capacity); then Create makes a
-    //     code AND a lobby room. Join by code adds the caller to a seat they
-    //     pick; they can switch seats freely until the host starts.
-    //   - Every device polls lobby-state on the same code, so everyone sees the
-    //     same board live (who is sitting, seat switches).
-    //   - Host presses Start: lobby-start (seats locked, no more joins) then
-    //     the existing game start (locks via setupConfigurationLocked).
-    //   - Display uses the sitewide GFG handle (never email/wallet).
+    // ============ M12 arc2m12c: coordinated multiplayer LOBBY ============
+    // Model (board-as-room — NO serverless lobby JSON, so create/join/start
+    // never depend on a Vercel instance):
+    //   - The gfgboard2 on-chain account IS the room: it stores seats, the
+    //     real wallets + handles of everyone in it, and status (0 open →
+    //     1 live). The page polls it via the rail (relay reads the chain),
+    //     so every device sees the same board no matter which instance
+    //     served any given request.
+    //   - Create -> rail create (relay/sponsor creates+delegates the board,
+    //     host seated at 0). Code = base36(matchRef), shared as a ?mp= link.
+    //   - Join -> rail join calls joinMatch gasless ON-CHAIN (joiner's wallet
+    //     + handle land in a free seat). Rendered from board state.
+    //   - Start -> host signs begin_match gasless (begin requires all seats
+    //     filled + host = seat 0, so it cannot fire early or be forged).
+    //   - Seats show the sitewide handle: "You - <handle>" on your own seat,
+    //     "<handle>" on others. Sign-in gate = a real wallet session, not the
+    //     (lazily-loaded) handle module.
     window.mpSetStatus = function (text) { var el = document.getElementById('mp-status'); if (el) el.textContent = text || ''; };
     // MP rail errors land in this phone-visible banner (M12 error surfacing).
     try {
@@ -381,107 +388,140 @@
             }
         });
     } catch (e) { /* soft */ }
-    window.__mpHandle = function () { try { if (window.gfgReferral && typeof window.gfgReferral.handle === 'function') return window.gfgReferral.handle(); } catch (e) {} return null; };
-    window.__mpLobby = function () { return window.gfgMultiplayer && typeof window.gfgMultiplayer.lobby === 'function' ? window.gfgMultiplayer.lobby : null; };
+    window.__mpWallet = function () {
+        try {
+            if (window.getDynamicSolanaWallet && typeof window.getDynamicSolanaWallet === 'function') {
+                var w = window.getDynamicSolanaWallet();
+                if (w && w.publicKey) return String(w.publicKey);
+            }
+            if (window.magicblockDice && typeof window.magicblockDice.available === 'function' && window.magicblockDice.available()) {
+                var list = window.__mpWalletCache;
+                if (list) return list;
+            }
+        } catch (e) { /* soft */ }
+        return null;
+    };
+    // Sitewide handle: prefer the referral module, else a stable wallet-derived
+    // pseudo-handle so the JOIN can always carry a valid on-chain handle.
+    window.__mpHandle = function () {
+        try {
+            if (window.gfgReferral && typeof window.gfgReferral.handle === 'function') {
+                var h = window.gfgReferral.handle();
+                if (h) return String(h);
+            }
+        } catch (e) { /* soft */ }
+        try {
+            var addr = window.__mpWallet();
+            if (addr) return 'gf' + addr.slice(-11); // pseudo gf<…> 13 chars, valid handle charset
+        } catch (e) { /* soft */ }
+        return null;
+    };
     window.__mpActive = function () { try { var a = window.gfgLudoAdapter; return !!(a && typeof a.isActive === 'function' && a.isActive() && typeof a.ref === 'function' && a.ref()); } catch (e) { return false; } };
 
-    // Render the seat grid (2 or 4 seats) from the current lobby state.
-    window.mpRenderLobby = function (room, myHandle) {
+    // Render the seat grid (2 or 4 seats) from the ON-CHAIN board state.
+    // `s` = rail.state() result: {players:[wallet...], handles:[...], seats,
+    // player_count, status, winner_seat}. My wallet identifies "You".
+    window.mpRenderLobby = function (s, myHandle) {
         var host = document.getElementById('mp-lobby-seats');
-        if (!host || !room) return;
-        if (!room.players || !room.seats) { host.innerHTML = '<div class="hidden-note">Loading lobby...</div>'; return; }
+        if (!host) return;
+        if (!s || !Array.isArray(s.players)) { host.innerHTML = '<div class="hidden-note">Loading board...</div>'; return; }
+        var myWallet = window.__mpWallet();
         var cards = [];
-        for (var i = 0; i < room.seats; i++) {
-            var p = room.players.find(function (x) { return x.seat === i; }) || { seat: i, handle: null };
-            var name = p.handle ? (p.handle === myHandle ? 'You' : p.handle) : 'empty';
-            var yours = p.handle === myHandle;
-            var taken = !!p.handle && !yours;
+        var joined = 0;
+        for (var i = 0; i < (s.seats || 2); i++) {
+            var wallet = s.players[i] || '';
+            var handle = (s.handles && s.handles[i]) || '';
+            var occupied = !!wallet;
+            if (occupied) joined++;
+            var yours = !!wallet && !!myWallet && wallet === myWallet;
+            var label = occupied ? (yours ? 'You - ' + (handle || '…') : (handle || 'Player')) : 'empty';
             cards.push(
-                '<button type="button" class="mode-btn" ' + (yours ? 'style="background:#2ecc71;color:#000;border-color:#2ecc71;"' : taken ? 'style="background:#333;color:#888;"' : 'style="background:#1a1a24;color:#bbb;"') +
-                ' onclick="window.mpPickSeat(' + i + ')" ' + (taken ? 'disabled' : '') + '>' +
-                '<b>Seat ' + (i + 1) + '</b> · <span>' + (yours ? 'You' : (p.handle || 'empty')) + '</span></button>'
+                '<button type="button" class="mode-btn" style="min-height:52px; ' +
+                (yours ? 'background:#2ecc71;color:#000;border-color:#2ecc71;' : occupied ? 'background:#333;color:#eee;' : 'background:#1a1a24;color:#bbb;') +
+                '">' +
+                '<b>Seat ' + (i + 1) + '</b> · <span>' + label + '</span></button>'
             );
         }
         host.innerHTML = cards.join('');
         var countEl = document.getElementById('mp-joined-count');
         if (countEl) {
-            var joined = room.players.filter(function (p) { return p.handle; }).length;
-            countEl.textContent = joined + '/' + room.seats + ' joined' + (room.started ? ' · STARTED' : '');
-            countEl.style.color = room.started ? '#2ecc71' : '#f87818';
+            var started = s.status === 1;
+            countEl.textContent = joined + '/' + (s.seats || 2) + ' joined' + (started ? ' · LIVE' : '');
+            countEl.style.color = started ? '#2ecc71' : '#f87818';
         }
         var startBtn = document.getElementById('mp-start-btn');
         if (startBtn) {
-            var hostIsMe = room.players.find(function (p) { return p.host && p.handle === myHandle; });
-            startBtn.style.display = hostIsMe ? 'inline-block' : 'none';
-            startBtn.disabled = room.started || joined < room.seats;
-            startBtn.textContent = room.started ? 'Started' : (joined < room.seats ? 'Start (' + joined + '/' + room.seats + ' waiting)' : 'Start Match');
+            var mineIsHost = (window.gfgLudoAdapter && typeof window.gfgLudoAdapter.seat === 'function' && window.gfgLudoAdapter.seat() === 0);
+            var ready = joined >= (s.seats || 2) && !started;
+            startBtn.style.display = mineIsHost ? 'inline-block' : 'none';
+            startBtn.disabled = !ready;
+            startBtn.textContent = started ? 'Live' : (!ready ? 'Start (' + joined + '/' + (s.seats || 2) + ' in)' : 'Start Match');
         }
     };
 
-    window.mpPickSeat = function (seat) {
-        var code = document.getElementById('mp-code') ? document.getElementById('mp-code').getAttribute('data-code') : null;
-        var myHandle = window.__mpHandle();
-        var room = window.__mpRoom;
-        if (!code || !myHandle || !room) return;
-        // Remember the on-chain seat so join re-targets it; then notify the lobby.
-        try { window.__mpSeatPick = seat; } catch (e) {}
-        var body = { game: 1, action: 'lobby-seat', code: code, handle: myHandle, seat: seat };
-        fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-            .then(function (r) { return r.json(); })
-            .then(function (j) { if (j && j.ok) { window.__mpRoom = j; window.mpRenderLobby(j, myHandle); } else if (j && j.error) window.mpSetStatus(j.error); })
-            .catch(function () {});
-    };
-
-    // Poll the lobby every ~1.2s so every device stays in sync.
+    // Poll the ON-CHAIN board through the rail (relay reads the chain) - the
+    // canonical room state. No lobby JSON, so it works on any Vercel instance.
     window.__mpPollLobby = function () {
         var code = document.getElementById('mp-code') ? document.getElementById('mp-code').getAttribute('data-code') : null;
-        var myHandle = window.__mpHandle();
-        if (!code || !myHandle) return;
-        fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: 1, action: 'lobby-state', code: code }) })
-            .then(function (r) { return r.json(); })
-            .then(function (j) {
-                if (j && j.ok) {
-                    window.__mpRoom = j;
-                    window.mpRenderLobby(j, myHandle);
-                    // When the HOST starts the match, the JOINER device must also
-                    // start its own local board (same real game) so both devices
-                    // run the match together. Guarded so it starts exactly once.
-                    if (j.started && !window.__mpJoinedStarted) {
-                        window.__mpJoinedStarted = true;
-                        if (typeof window.initiateArenaMatch === 'function') {
-                            try { window.initiateArenaMatch(); } catch (e) { /* soft */ }
-                        }
-                    }
-                } else if (j && j.error) { window.__mpJoinedStarted = false; }
-            })
-            .catch(function () {});
+        var ref = window.__mpRefOf ? window.__mpRefOf(code) : 0;
+        if (!ref) return;
+        var rail = window.gfgMultiplayer;
+        if (!rail || typeof rail.state !== 'function') return;
+        rail.state(ref).then(function (s) {
+            if (!s) return;
+            // Adopt the HOST's seat count from the board so a 2P room is never
+            // mis-read as 4P on the joiner (selectMatchMode seeds from seats).
+            if (s.seats && typeof window.__mpSyncSeats === 'function') {
+                try { window.__mpSyncSeats(s.seats); } catch (e) { /* soft */ }
+            }
+            window.mpRenderLobby(s, window.__mpHandle());
+            // When the host begins, the board flips status 0->1: the JOINER
+            // device must start its own local board (same real game) so both
+            // run together. Guarded so it starts exactly once.
+            if (s.status === 1 && !window.__mpJoinedStarted) {
+                window.__mpJoinedStarted = true;
+                if (typeof window.initiateArenaMatch === 'function') {
+                    try { window.initiateArenaMatch(); } catch (e) { /* soft */ }
+                }
+            }
+        });
+    };
+
+    window.__mpRefOf = function (code) {
+        try { var v = parseInt(String(code || '').toLowerCase(), 36); return (v && v > 0) ? v : 0; } catch (e) { return 0; }
     };
 
     window.mpCreateMatch = function () {
         var a = window.gfgLudoAdapter;
         if (!a) { window.mpSetStatus('rail not loaded'); return; }
         var seats = (typeof window.__mpMode === 'function') ? window.__mpMode() : 4;
-        var myHandle = window.__mpHandle();
-        if (!myHandle) { window.mpSetStatus('sign in first (top right) to get your gamer id'); return; }
+        var wallet = window.__mpWallet();
+        if (!wallet) { window.mpSetStatus('sign in first (top right) so your wallet can host the match'); return; }
         window.mpSetStatus('creating ' + seats + '-seat match...');
-        // rail create (on-chain board) then lobby create for that same matchRef code
+        // rail create: relay/sponsor creates + delegates the ON-CHAIN board
+        // (host = this device's wallet, seat 0). No lobby JSON.
         a.start(1, [], seats, 60, 3600, 0).then(function (r) {
             if (!r) { window.mpSetStatus('create failed (see console)'); return; }
             var code = String(r.code || '').toUpperCase();
             var codeEl = document.getElementById('mp-code');
             if (codeEl) { codeEl.textContent = code; codeEl.setAttribute('data-code', code); }
-            // register the lobby room so others can join + pick seats
-            var body = { game: 1, action: 'lobby-create', code: code, seats: seats, handle: myHandle };
-            fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-                .then(function (rr) { return rr.json(); })
-                .then(function (j) {
-                    window.mpSetStatus('CODE: ' + code + ' · share it. Waiting for players.');
-                    if (j && j.ok) { window.__mpRoom = j; if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll(); window.mpRenderLobby(j, myHandle); }
-                    else if (j && j.error) window.mpSetStatus(j.error);
-                })
-                .catch(function () {});
-            // log allowance for host-start wiring
+            window.__mpCreatedCode = code;
             window.__mpHost = true;
+            // The host is already seated at 0 (relay put the wallet there).
+            // Register the host's handle on-chain too, and start polling the
+            // board so seats render live.
+            var handle = window.__mpHandle();
+            if (handle && typeof a.join === 'function' && window.gfgMultiplayer) {
+                window.gfgMultiplayer.join(1, code, 0, handle).then(function (jr) {
+                    if (jr && jr.okay) { /* host handle recorded */ }
+                    else { /* handle optional; board create already seated the wallet */ }
+                });
+            }
+            window.mpSetStatus('CODE: ' + code + ' · share it. Waiting for players.');
+            window.__mpRoom = null;
+            if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
+            window.__mpPollLobby();
+            return r;
         });
     };
 
@@ -490,61 +530,40 @@
         if (!a) { window.mpSetStatus('rail not loaded'); return; }
         var code = (document.getElementById('mp-join-code') || {}).value || '';
         if (!code) { window.mpSetStatus('enter a code'); return; }
-        var myHandle = window.__mpHandle();
-        if (!myHandle) { window.mpSetStatus('sign in first (top right) to get your gamer id'); return; }
+        var wallet = window.__mpWallet();
+        if (!wallet) { window.mpSetStatus('sign in first (top right) so your wallet can join'); return; }
         window.mpSetStatus('joining ' + code + '...');
         var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
-        // Seat matching the lobby pick (0-based over the room's seats); when the
-        // player hasn't picked, the rail auto-selects the first free seat.
-        var picked = null;
-        try { if (window.__mpSeatPick !== undefined && window.__mpSeatPick !== null && window.__mpSeatPick >= 0) picked = window.__mpSeatPick; } catch (e) {}
-        a.join(1, codeUp, picked === null ? undefined : picked).then(function (r) {
+        // On-chain join (gasless, joiner's wallet + handle land in a free seat).
+        var handle = window.__mpHandle();
+        a.join(1, codeUp, undefined, handle).then(function (r) {
             if (!r) { window.mpSetStatus('join failed (check code)'); return; }
             var codeEl = document.getElementById('mp-code');
-            // The lobby is keyed by the on-chain code string = base36(matchRef). 
-            // The joiner entered that same string, so keep it.
             var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
             var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
             if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
             if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
-            // Enter the lobby room for that code (seat = first free or specific)
-            var body = { game: 1, action: 'lobby-join', code: joinedCodeUp, handle: myHandle };
-            fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-                .then(function (rr) { return rr.json(); })
-                .then(function (j) {
-                    if (j && j.ok) {
-                        window.__mpRoom = j;
-                        if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
-                        window.mpRenderLobby(j, myHandle);
-                        window.mpSetStatus('Joined ' + joinedCodeUp + ' · pick or switch your seat.');
-                    } else if (j && j.error) window.mpSetStatus(j.error);
-                })
-                .catch(function () {});
+            window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
+            window.__mpRoom = null;
+            if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
+            window.__mpPollLobby();
+            window.mpSetStatus('Joined ' + joinedCodeUp + ' · Seat ' + ((typeof r.seat === 'number') ? (r.seat + 1) : '?') + ' — waiting for host to start.');
         });
     };
 
-    // Host: when the real game start button is pressed, first lock the lobby
-    // (no more joins), then start the game (existing lock).
-    // (the tab script below wires initiateArenaMatch -> begin + this)
+    // Host: when "Start Match" is pressed, begin the on-chain board (host signs
+    // gasless) + the local game. The wrapped initiateArenaMatch calls
+    // adapter.begin() -> rail.begin() -> host-signed begin_match; the program
+    // rejects it unless every seat is a real wallet (not settled) with host at
+    // seat 0, so early starts are impossible and the error is visible.
     window.mpStartLobby = function () {
         var code = document.getElementById('mp-code') ? document.getElementById('mp-code').getAttribute('data-code') : null;
-        var myHandle = window.__mpHandle();
-        var room = window.__mpRoom;
-        if (!code || !myHandle || !room) return;
-        var body = { game: 1, action: 'lobby-start', code: code, handle: myHandle };
-        return fetch('/api/multiplayer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-            .then(function (r) { return r.json(); })
-            .then(function (j) {
-                if (j && j.ok) {
-                    window.mpSetStatus('Match locked. Everyone is in · STARTING NOW.');
-                    window.__mpRoom = j;
-                    // call the existing game start (locks setup, begins dice loop)
-                    if (typeof window.initiateArenaMatch === 'function') window.initiateArenaMatch();
-                    return { ok: true };
-                }
-                window.mpSetStatus((j && j.error) || 'cannot start yet');
-                return { ok: false };
-            });
+        if (!code) { window.mpSetStatus('start failed: no match code'); return; }
+        window.mpSetStatus('Starting match...');
+        if (typeof window.initiateArenaMatch === 'function') {
+            try { window.initiateArenaMatch(); } catch (e) { /* soft */ }
+        }
+        return { ok: true };
     };
     </script>
     <script>
@@ -567,16 +586,36 @@
         }
         window.__mpSetSeats = function (n) { seats = (n === 2) ? 2 : 4; updateSeatButtons(); };
         window.__mpMode = function () { return seats; };
+        // Adopt the HOST's seat count (from the on-chain board) so every device
+        // in a room renders + starts the same 2P/4P configuration.
+        window.__mpSyncSeats = function (n) {
+            var v = (n === 2 || n === 4) ? n : seats;
+            if (v !== seats) { seats = v; updateSeatButtons(); }
+        };
         function setMode(m) {
             mode = m;
             var bar = el('mp-bar');
             var box = el('mp-lobby-box');
             var setup = el('player-setup-panel');
+            var startMatchBtn = el('startMatchBtn');
             var singleTab = el('mp-tab-single');
             var multiTab = el('mp-tab-multi');
             if (bar) bar.style.display = (m === 'multi') ? 'flex' : 'none';
             if (box) box.style.display = (m === 'multi') ? 'flex' : 'none';
-            if (setup) setup.style.display = '';
+            // DECOUPLED BOARDS: in MultiPlayer the single-player setup panel is
+            // hidden entirely (no confusing 2P/4P + colour toggles). The MP
+            // board starts from the lobby's Start button. SinglePlayer keeps
+            // exactly the old panel + Start button.
+            if (setup) setup.style.display = (m === 'multi') ? 'none' : '';
+            if (startMatchBtn && typeof setupConfigurationLocked !== 'boolean') {
+                // startMatchBtn visibility stays as the game sets it; only hide
+                // it in the MP tab BEFORE the match locks.
+            }
+            if (startMatchBtn && m === 'multi' && typeof setupConfigurationLocked === 'boolean' && setupConfigurationLocked === false) {
+                startMatchBtn.style.display = 'none';
+            } else if (startMatchBtn && m === 'single') {
+                startMatchBtn.style.display = '';
+            }
             if (singleTab) singleTab.classList.toggle('active', m === 'single');
             if (multiTab) multiTab.classList.toggle('active', m === 'multi');
         }
@@ -644,6 +683,7 @@ updateSeatButtons();
         var shared = window.mpSharedCode();
         if (shared) {
             setMode('multi');
+            window.__mpRoom = null;
             var joinInput = el('mp-join-code');
             if (joinInput) joinInput.value = shared.toUpperCase().replace(/\s+/g, '');
             setTimeout(function () {
@@ -673,7 +713,9 @@ updateSeatButtons();
                 return _origReset.apply(this, arguments);
             };
         }
-        setMode('single');
+        // Default to SinglePlayer ONLY when the visitor didn't come via a
+        // share link — a link visitor must land on the MultiPlayer board.
+        if (!shared) setMode('single');
     })();
     </script>
 </body>
