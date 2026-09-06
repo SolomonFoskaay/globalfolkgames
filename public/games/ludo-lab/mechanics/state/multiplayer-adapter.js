@@ -405,15 +405,38 @@ function applyMove(move) {
         });
     }
 
-    // called by the game after a real LOCAL move: commit the move gasless
+    // called by the game after a real LOCAL move: commit the move gasless.
+    // SURFACES the result visibly (status line + log) so a silent on-chain
+    // failure is never hidden - the user can see if a commit is being rejected.
     function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         if (!active || !matchRef) return;
         var bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
         try { window._mpLatestCommit = bytes; } catch (e) {}
+        log('committing move bytes=' + bytes.join(','));
         var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green')) };
-        rail().commitMove(refObj, bytes).then(function (r) {
-            if (!(r && r.ok)) log('move commit skipped', (r && r.error) || '');
-        });
+        var attempts = 0;
+        var commitLoop = function () {
+            attempts++;
+            rail().commitMove(refObj, bytes).then(function (r) {
+                if (r && r.ok) {
+                    log('move committed on-chain seat=' + refObj.seat + ' sig=' + (r.sig || ''));
+                } else {
+                    var err = (r && r.error) || 'no result';
+                    log('move commit attempt ' + attempts + ' FAILED: ' + err);
+                    if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
+                    // Loud, visible, never silent: the roller must know the move
+                    // did NOT go to the shared board.
+                    if (typeof window.mpSetStatus === 'function') {
+                        window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your move is not shared yet');
+                    }
+                    try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
+                }
+            }).catch(function (e) {
+                log('move commit attempt ' + attempts + ' threw: ' + (e && e.message));
+                if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
+            });
+        };
+        commitLoop();
     }
 
     function onFinish(winnerSeat) {
