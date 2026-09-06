@@ -566,7 +566,21 @@
                 return _origStart.apply(this, arguments);
             };
         }
-        updateSeatButtons();
+updateSeatButtons();
+        // Remote-turn gate: true when a multiplayer match is active AND the
+        // current seat is not the one this device controls (so we wait for the
+        // remote player's committed roll+move instead of rolling locally).
+        window.gfgRemoteTurn = function () {
+            try {
+                var a = window.gfgLudoAdapter;
+                if (!a || typeof a.isActive !== 'function' || !a.isActive()) return false;
+                if (typeof setupConfigurationLocked === 'boolean' && !setupConfigurationLocked) return false;
+                var s = typeof a.seat === 'function' ? a.seat() : -1;
+                var order = ['green', 'yellow', 'blue', 'red'];
+                var curIdx = order.indexOf(window.currentTurn || '');
+                return curIdx !== s; // current seat != mine -> remote turn
+            } catch (e) { return false; }
+        };
         window.mpEnsurePoll();
         // Share link (includes both code and ?mp= so the receiver auto-joins).
         window.mpCopyLink = function () {
@@ -607,7 +621,6 @@
         }
         // RESET GATE (multiplayer): a live multiplayer match can only end by
         // finishing - no angry mid-game reset. Solo remains exactly as today.
-        var _origReset = window.triggerManualArenaReset;
         if (typeof _origReset === 'function') {
             window.triggerManualArenaReset = function () {
                 var a = window.gfgLudoAdapter;

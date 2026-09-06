@@ -248,6 +248,17 @@ async function rollDiceEngine(source) {
 
     if (typeof matchOver !== 'undefined' && matchOver) return;
 
+    // MULTIPLAYER GUARD (additive; solo unaffected): when a multiplayer match is
+    // active and it is the REMOTE seat's turn (not our seat), do not roll here -
+    // the remote player rolls + commits that roll; this device waits for the
+    // commit and applies it. Prevents two devices from rolling divergent dice.
+    try {
+        if (typeof window.gfgRemoteTurn === 'function' && window.gfgRemoteTurn()) {
+            displayEducationalLog("Waiting for the remote player's move...");
+            return;
+        }
+    } catch (e) { /* soft */ }
+
     if (isGamePaused) {
         displayEducationalLog("PAUSED: Match is suspended. Click 'Resume' to continue.");
         return;

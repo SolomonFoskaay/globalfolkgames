@@ -257,6 +257,8 @@ export async function boardState({ game, matchRef }) {
       max_match_secs: Number(d.readBigUInt64LE(301)),
       started_at: Number(d.readBigInt64LE(309)),
       move_count: Number(d.readBigUInt64LE(381)),
+      // last_move_commit is the 32-byte move hash immediately after move_count.
+      last_move_commit: Array.from(d.subarray(389, 421)),
       winner_seat: d[429],
       region: url,
     };

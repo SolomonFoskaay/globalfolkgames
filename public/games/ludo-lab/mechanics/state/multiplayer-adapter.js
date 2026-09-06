@@ -56,11 +56,21 @@
             var path = (window.COMMON_PATH || []);
             var token = toks[move.tokenIndex];
             if (!token) return;
+            // Shared dice: mirror the committed roll onto this device so both
+            // screens show the same dice the remote player rolled.
+            if (typeof window.lastDiceRoll1 === 'number') window.lastDiceRoll1 = move.die1 || window.lastDiceRoll1;
+            if (typeof window.lastDiceRoll2 === 'number') window.lastDiceRoll2 = move.die2 || window.lastDiceRoll2;
+            var box1 = document.getElementById('val-d1');
+            var box2 = document.getElementById('val-d2');
+            var tot = document.getElementById('val-total');
+            if (box1) box1.innerText = move.die1 || '—';
+            if (box2) box2.innerText = move.die2 || '—';
+            if (tot && move.die1 && move.die2) tot.innerText = '= Total: ' + (move.die1 + move.die2);
             var idx = move.toPathIndex;
             if (path[idx]) { token.pathIndex = idx; token.c = path[idx].c; token.r = path[idx].r; token.stepsWalked = idx; }
             if (typeof window.drawLudoLayout === 'function') window.drawLudoLayout();
             if (typeof window.saveGameStateToStorage === 'function') window.saveGameStateToStorage();
-            log('applied opponent move seat=' + move.seat + ' token=' + move.tokenIndex + ' -> path ' + move.toPathIndex);
+            log('applied opponent move seat=' + move.seat + ' tokens=' + move.tokenIndex + ' die=' + move.die1 + '+' + move.die2 + ' -> path ' + move.toPathIndex);
         } catch (e) { log('apply err ' + e.message); }
     }
 
@@ -76,19 +86,22 @@
             dimmed = false;
             unsub = rail().subscribe(matchRef, function (s) {
                 try {
-                    if (s.move_count !== lastCount) {
-                        lastCount = s.move_count;
-                        // decode the LATEST commit (opponent's move) if it's not ours
-                        var mv = decodeMove(window._mpLatestCommit);
-                        if (mv && mv.seat !== mySeat && typeof window.currentTurn === 'string' && seatOf(window.currentTurn) === mv.seat) {
-                            applyMove(mv);
-                            dimmed = false;
-                            if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
-                        }
+                    if (!s || typeof s.move_count !== 'number') return;
+                    if (s.move_count === lastCount) return;
+                    // New on-chain commit: decode the OPPONENT's move from the
+                    // board's last_move_commit (the actual committed bytes), NOT
+                    // a local variable, so a real 2-device match propagates.
+                    var mv = decodeMove(s.last_move_commit);
+                    lastCount = s.move_count;
+                    if (mv && mv.seat !== mySeat) {
+                        applyMove(mv);
+                        dimmed = false;
+                        if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
                     }
                 } catch (e) { log('listen err ' + e.message); }
             });
             log('match created code=' + r.code + ' ref=' + matchRef + ' mySeat=' + mySeat);
+            bindSeats(['green', 'red']);
             return r;
         });
     }
@@ -103,18 +116,19 @@
             lastCount = -1;
             unsub = rail().subscribe(matchRef, function (s) {
                 try {
-                    if (s.move_count !== lastCount) {
-                        lastCount = s.move_count;
-                        var mv = decodeMove(window._mpLatestCommit);
-                        if (mv && mv.seat !== mySeat) {
-                            applyMove(mv);
-                            dimmed = false;
-                            if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
-                        }
+                    if (!s || typeof s.move_count !== 'number') return;
+                    if (s.move_count === lastCount) return;
+                    var mv = decodeMove(s.last_move_commit);
+                    lastCount = s.move_count;
+                    if (mv && mv.seat !== mySeat) {
+                        applyMove(mv);
+                        dimmed = false;
+                        if (typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
                     }
                 } catch (e) {}
             });
             log('joined ref=' + matchRef + ' mySeat=' + mySeat);
+            bindSeats(['green', 'red']);
             return r;
         });
     }
@@ -122,6 +136,34 @@
     function isActive() { return active; }
     function ref() { return matchRef; }
     function seat() { return mySeat; }
+
+    // MULTIPLAYER SEAT BINDING: this device controls `mySeat` (mode 'human' +
+    // isUser so the "You" seat is the local player). Every OTHER active seat is
+    // set to remote-human (mode 'human', isUser false): it is controlled by its
+    // own device, never by local AI, and gfgRemoteTurn blocks local rolls for
+    // it. Solo is untouched because this only runs when the rail is active.
+    // The game objects (ping turn/seat pickers) are not rewritten - we only
+    // nudge the runtime seat modes the AI engine consults.
+    function bindSeats(activeColors) {
+        try {
+            if (!window.playerProfiles) return;
+            var me = colorOf(mySeat);
+            var act = (activeColors && activeColors.length) ? activeColors : ['green', 'red'];
+            act.forEach(function (c) {
+                if (!window.playerProfiles[c]) return;
+                if (c === me) {
+                    window.playerProfiles[c].mode = 'human';
+                    window.playerProfiles[c].isUser = true;
+                } else {
+                    // Remote seats show as human (never computer/AI), but are
+                    // marked NOT the signed-in user so they never earn as 'user'
+                    // on THIS device (their own device earns for them).
+                    window.playerProfiles[c].mode = 'human';
+                    window.playerProfiles[c].isUser = false;
+                }
+            });
+        } catch (e) { /* soft */ }
+    }
 
     // HOST-ONLY: begin the live match (status 0 -> 1), locking out new joins.
     function begin() {
