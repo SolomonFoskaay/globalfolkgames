@@ -61,7 +61,7 @@ function snapshotFromTokens() {
         var col = SNAPSHOT_COLORS[c];
         var toks = (window.tokens && window.tokens[col]) || [];
         for (var t = 0; t < 4; t++) {
-            sw.push(toks[t] ? (Number(toks[t].stepsWalked) || 0) : 0);
+            sw.push(toks[t] && typeof toks[t].stepsWalked === 'number' ? (Number(toks[t].stepsWalked) || 0) : 0);
         }
     }
     return sw;
@@ -410,31 +410,49 @@ function applyMove(move) {
     // failure is never hidden - the user can see if a commit is being rejected.
     function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         if (!active || !matchRef) return;
-        var bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
+        var bytes;
+        try {
+            bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
+        } catch (e) {
+            log('encodeMove THREW: ' + (e && e.message));
+            if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Commit encode error: ' + (e && e.message));
+            return;
+        }
         try { window._mpLatestCommit = bytes; } catch (e) {}
         log('committing move bytes=' + bytes.join(','));
         var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green')) };
         var attempts = 0;
         var commitLoop = function () {
             attempts++;
-            rail().commitMove(refObj, bytes).then(function (r) {
-                if (r && r.ok) {
-                    log('move committed on-chain seat=' + refObj.seat + ' sig=' + (r.sig || ''));
-                } else {
-                    var err = (r && r.error) || 'no result';
-                    log('move commit attempt ' + attempts + ' FAILED: ' + err);
-                    if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
-                    // Loud, visible, never silent: the roller must know the move
-                    // did NOT go to the shared board.
-                    if (typeof window.mpSetStatus === 'function') {
-                        window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your move is not shared yet');
-                    }
-                    try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
+            var settled = false;
+            var settleSuccess = function (sig) {
+                if (settled) return; settled = true;
+                log('move committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
+                if (typeof window.mpSetStatus === 'function') {
+                    window.mpSetStatus('Move committed on-chain - shared with the other player.');
                 }
-            }).catch(function (e) {
-                log('move commit attempt ' + attempts + ' threw: ' + (e && e.message));
+            };
+            var settleFail = function (err) {
+                if (settled) return; settled = true;
+                log('move commit attempt ' + attempts + ' FAILED: ' + err);
                 if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
+                // Loud, visible, never silent: the roller must know the move
+                // did NOT go to the shared board.
+                if (typeof window.mpSetStatus === 'function') {
+                    window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your move is not shared yet');
+                }
+                try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
+            };
+            rail().commitMove(refObj, bytes).then(function (r) {
+                // Rail returns {okay:true, sig} on success (NOT .ok).
+                if (r && r.okay) settleSuccess(r.sig);
+                else settleFail((r && r.error) || 'no result');
+            }).catch(function (e) {
+                settleFail((e && e.message) || String(e));
             });
+            // Hard timeout so a hung on-chain call can never freeze the turn
+            // silently (it becomes a visible banner instead).
+            setTimeout(function () { settleFail('timed out (no response after 14s)'); }, 14000);
         };
         commitLoop();
     }
