@@ -43,6 +43,9 @@ function clearPersistedState() {
     try { localStorage.removeItem(PERSISTENCE_KEY); } catch (e) {}
     try { localStorage.removeItem(PERSISTENCE_HASH_KEY); } catch (e) {}
 }
+// Expose for the multiplayer adapter: a stale SOLO save must never resurrect
+// divergent local state inside a shared multiplayer match.
+window.clearPersistedState = clearPersistedState;
 
 // ---------------------------------------------------------------------------
 // Pending on-chain push queue ("backup plan with a tamper-proof hash").

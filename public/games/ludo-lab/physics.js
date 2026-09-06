@@ -502,3 +502,25 @@ function renderPhysicalDiceCubes() {
         updateDice3dRender(dies[i], physicalDice[i], scale);
     }
 }
+
+// M12 multiplayer: mirror a REMOTE player's committed dice onto THIS device's
+// board (physical cubes + the val-d1/d2/total text). The remote device rolled
+// on-chain and committed die1/die2; we show the same numbers here so both
+// phones "see" the same dice. Soft-fail: only renders if the 3D path is up.
+window.showRemoteDice = function (die1, die2) {
+    try {
+        displayDiceOnBoard = true;
+        isDiceRolled = true;
+        physicalDice = [
+            { x: 200, y: 260, vx: 0, vy: 0, value: die1, finalValue: die1, q: [1, 0, 0, 0] },
+            { x: 310, y: 300, vx: 0, vy: 0, value: die2, finalValue: die2, q: [1, 0, 0, 0] }
+        ];
+        var d1 = document.getElementById('val-d1');
+        var d2 = document.getElementById('val-d2');
+        var tt = document.getElementById('val-total');
+        if (d1) d1.innerText = die1;
+        if (d2) d2.innerText = die2;
+        if (tt) tt.innerText = '= Total: ' + (die1 + die2);
+        if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
+    } catch (e) { /* soft */ }
+};

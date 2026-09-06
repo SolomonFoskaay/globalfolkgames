@@ -22,6 +22,19 @@ window.setGameCurrentTurn = function (color) {
         displayEducationalLog(`${(color || '').toUpperCase()}'s turn — on-chain ${color} (board-synced).`);
     }
 };
+// Reset the per-turn roll flags so a newly-synced turn can roll cleanly (used
+// by the multiplayer adapter AFTER applying a remote commit - the turn was
+// already advanced from the board, so we only clear the stale roll state).
+window.resetTurnForRoll = function () {
+    isDiceRolled = false;
+    hasRolledThisTurn = false;
+    displayDiceOnBoard = false;
+    lastDiceRoll1 = 0;
+    lastDiceRoll2 = 0;
+    currentTurnMoves = [];
+    consecutiveDoubleSixes = 0;
+    if (typeof hideVerifyLink === 'function') hideVerifyLink();
+};
 
 let lastDiceRoll1 = 0;
 let lastDiceRoll2 = 0;
@@ -292,7 +305,11 @@ function initiateArenaMatch() {
     // exhausted (refill at GMT+00). The gate reads window.gfgLives (loaded on
     // every page via the header); when the module is absent (dev page without
     // the header) play is NOT blocked.
-    if (typeof window.gfgLives === 'object' && window.gfgLives && typeof window.gfgLives.get === 'function') {
+    // MULTIPLAYER EXEMPTION: a player who JOINED a live multiplayer match is not
+    // gated by their own lives — the host already consumed the entry life and
+    // the invited device must start its board to mirror the shared game.
+    const mpJoined = !!(window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive());
+    if (!mpJoined && typeof window.gfgLives === 'object' && window.gfgLives && typeof window.gfgLives.get === 'function') {
         const lives = window.gfgLives.get();
         if (lives && lives.livesLeft <= 0) {
             const mins = Math.ceil((lives.resetsInMs || 0) / 60000);

@@ -102,6 +102,11 @@
             if (box1) box1.innerText = move.die1 > 0 ? move.die1 : '—';
             if (box2) box2.innerText = move.die2 > 0 ? move.die2 : '—';
             if (tot && move.die1 > 0 && move.die2 > 0) tot.innerText = '= Total: ' + (move.die1 + move.die2);
+            // Mirror the remote dice as PHYSICAL cubes too (not just the text
+            // boxes) so both screens show the same dice the remote rolled.
+            if (move.die1 > 0 && move.die2 > 0 && typeof window.showRemoteDice === 'function') {
+                try { window.showRemoteDice(move.die1, move.die2); } catch (e) { /* soft */ }
+            }
 
             var sw = move.toStepsWalked > 0 ? move.toStepsWalked : (token.stepsWalked || 0);
             token.stepsWalked = sw;
@@ -158,6 +163,9 @@
 
     function start(gameId, players, seats, turnSecs, maxSecs, chosenSeat) {
         if (!rail()) { log('rail not loaded'); return Promise.resolve(null); }
+        // A live multiplayer match is shared - a stale SOLO save on this device
+        // must never resurrect divergent local turn/token state.
+        if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
         seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
         return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
@@ -192,9 +200,14 @@
                         }
                         lastCount = s.move_count;
                         dimmed = false;
-                        // Do not auto-pass after a winning move: checkForMatchWinner
-                        // already ended the match + showed the ceremony.
-                        if (!applied && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        // The board-synced turn was already set by
+                        // syncTurnFromBoard (same seat on double-six, else next
+                        // seat). Do NOT call passTurnSequence here - that would
+                        // advance AGAIN off a device-local guess and skip RED.
+                        // Just reset the roll flags so the new turn can roll.
+                        try {
+                            if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
+                        } catch (e) { /* soft */ }
                     } else {
                         lastCount = s.move_count;
                     }
@@ -208,6 +221,9 @@
 
     function join(gameId, code, chosenSeat) {
         if (!rail()) return Promise.resolve(null);
+        // A live multiplayer match is shared - a stale SOLO save on this device
+        // must never resurrect divergent local turn/token state.
+        if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
         // Joiner seat count: match the lobby room's seat count when available.
         try { if (window.__mpRoom && window.__mpRoom.seats === 4) seatCount = 4; } catch (e) {}
         var handle = '';
@@ -241,9 +257,12 @@
                         }
                         lastCount = s.move_count;
                         dimmed = false;
-                        // Do not auto-pass after a winning move: checkForMatchWinner
-                        // already ended the match + showed the ceremony.
-                        if (!applied && typeof window.passTurnSequence === 'function') setTimeout(function(){ try { window.passTurnSequence(); } catch(e){} }, 600);
+                        // Board-synced turn already set by syncTurnFromBoard; do
+                        // NOT passTurnSequence again (avoids the double-advance
+                        // that skipped RED). Reset roll flags for the new turn.
+                        try {
+                            if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
+                        } catch (e) { /* soft */ }
                     } else {
                         lastCount = s.move_count;
                     }
@@ -272,19 +291,26 @@
     function players() { return seatWallets.slice(); }
     function handles() { return seatHandles.slice(); }
 
-    // BOARD-SYNCED TURN: the on-chain board stores current_turn = the seat that
-    // JUST moved. The displayed turn on BOTH devices is therefore the NEXT seat
-    // in the active order - derived from the solitary on-chain value, never from
-    // a device-local guess. This is what makes every phone show the SAME turn.
-    // current_turn is 255 (none yet) or a committed seat index.
+    // BOARD-SYNCED TURN + MOVE: the on-chain board is the single source of
+    // truth. Commit writes store: seat that moved, its dice, and the board's
+    // current_turn (= the seat that last moved). BOTH devices derive the next
+    // turn from the SAME committed data - never a local guess:
+    //   - double-six roll (up to 3 in a row) -> the SAME seat rolls again;
+    //   - anything else -> the NEXT seat in the active order.
+    // This makes the display turn, the dice values, and whose roll it is
+    // identical on every phone, because they all come from the same bytes.
     function turnFromBoard(s) {
         try {
             if (!s || typeof s.current_turn !== 'number') return null;
-            if (s.current_turn === 255) return null; // none yet (host will roll green)
+            if (s.current_turn === 255) return null; // none yet -> host rolls first
             var order = activeOrder();
             if (!order || order.length < 2) return null;
-            var next = (s.current_turn + 1) % order.length;
-            return order[next];
+            // Replicate the commit: which seat moved + what it rolled.
+            var mv = decodeMove(s.last_move_commit);
+            var seatThatMoved = (mv && typeof mv.seat === 'number') ? mv.seat : s.current_turn;
+            var d6 = !!(mv && ((mv.die1 > 0 && mv.die1 === 6) && (mv.die2 > 0 && mv.die2 === 6)));
+            if (d6) return order[seatThatMoved % order.length]; // same seat again
+            return order[(seatThatMoved + 1) % order.length];
         } catch (e) { return null; }
     }
     // Force the local game onto the board-synced turn (display indicator + the
