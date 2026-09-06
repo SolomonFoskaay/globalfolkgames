@@ -34,18 +34,21 @@
         </div>
 
         <!-- M12 arc2m12a/c: multiplayer join/create bar (free, game-agnostic rail) -->
-        <div id="mp-bar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.78rem;">
-            <span style="color:#f87818; font-weight:800;">Multiplayer</span>
-            <span style="color:#bbb; font-size:0.72rem;">seats</span>
-            <button id="mp-mode-2p" onclick="window.__mpSetSeats(2)" style="min-width:64px; min-height:44px; width:44%; box-sizing:border-box; background:#1a1a24;color:#bbb;border:1px solid #333;border-radius:8px; font-size:1rem; font-weight:800;">2</button>
-            <button id="mp-mode-4p" onclick="window.__mpSetSeats(4)" style="min-width:64px; min-height:44px; width:44%; box-sizing:border-box; background:#f87818;color:#000;border:1px solid #f87818;border-radius:8px; font-size:1rem; font-weight:800;">4</button>
-            <span style="width:100%;"></span>
-            <button id="mp-create" onclick="window.mpCreateMatch()" style="min-height:46px; flex:1; background:#7838f8; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.95rem;">Create match</button>
-            <input id="mp-join-code" placeholder="enter code" style="min-height:46px; flex:1; min-width:0; width:auto; font-family:monospace;" />
-            <button id="mp-join" onclick="window.mpJoinMatch()" style="min-height:46px; flex:1; background:#2ecc71; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.95rem;">Join</button>
-            <span style="width:4px;"></span>
-            <b id="mp-code" data-code="" style="color:#2ecc71; font-size:0.9rem; letter-spacing:0.08em;"></b>
-            <button id="mp-copy-link" onclick="window.mpCopyLink()" style="display:none; min-height:44px; background:#1a1a24; color:#f87818; border:1px solid #f87818; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.72rem;">Copy share link</button>
+        <div id="mp-bar" style="display:flex; flex-direction:column; gap:8px; align-items:stretch; background:#1a1a24; border:1px solid #333; border-radius:10px; padding:10px; margin-bottom:10px; font-size:0.8rem;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
+                <span style="color:#f87818; font-weight:800; white-space:nowrap;">Multiplayer</span>
+                <span class="mode-label" style="color:#bbb; font-size:0.72rem; white-space:nowrap;">seats</span>
+                <button id="mp-mode-2p" class="mode-btn" onclick="window.__mpSetSeats(2)">2</button>
+                <button id="mp-mode-4p" class="mode-btn active" onclick="window.__mpSetSeats(4)">4</button>
+                <button id="mp-create" onclick="window.mpCreateMatch()" class="mode-btn" style="background:#7838f8; color:#fff; border-color:#7838f8; flex:1; white-space:nowrap;">Create match</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
+                <input id="mp-join-code" placeholder="enter code" style="min-height:40px; flex:1; min-width:0; font-family:monospace; box-sizing:border-box;" />
+                <button id="mp-join" onclick="window.mpJoinMatch()" class="mode-btn" style="background:#2ecc71; color:#000; border-color:#2ecc71; white-space:nowrap;">Join</button>
+                <b id="mp-code" data-code="" style="color:#2ecc71; font-size:0.85rem; letter-spacing:0.06em; white-space:nowrap;"></b>
+                <button id="mp-copy-link" onclick="window.mpCopyLink()" style="display:none; min-height:40px; background:#1a1a24; color:#f87818; border:1px solid #f87818; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.72rem; white-space:nowrap;">Copy share link</button>
+            </div>
+        </div>
         </div>
         <div id="mp-lobby-box" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:#12121a; border:1px solid #2a2a36; border-radius:10px; padding:8px 10px; margin-bottom:10px; font-size:0.8rem;">
             <div id="mp-joined-count" style="color:#f87818; font-weight:800; flex:1;">—</div>
@@ -388,15 +391,25 @@
             }
         });
     } catch (e) { /* soft */ }
+    // The single-player game gates on window.currentUser; the MP gate reuses the
+    // SAME proven auth state. getDynamicSolanaWallet() returns the wallet
+    // ADDRESS as a plain string (src/dynamic-auth.js), so never call .publicKey
+    // on it - accept the string, an object, or currentProfile.solana_wallet.
     window.__mpWallet = function () {
         try {
             if (window.getDynamicSolanaWallet && typeof window.getDynamicSolanaWallet === 'function') {
                 var w = window.getDynamicSolanaWallet();
+                if (typeof w === 'string' && w) return w;
                 if (w && w.publicKey) return String(w.publicKey);
+                if (w && w.address) return String(w.address);
             }
-            if (window.magicblockDice && typeof window.magicblockDice.available === 'function' && window.magicblockDice.available()) {
-                var list = window.__mpWalletCache;
-                if (list) return list;
+        } catch (e) { /* soft */ }
+        try {
+            if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
+        } catch (e) { /* soft */ }
+        try {
+            if (window.currentUser && (window.currentUser.dynamicId || window.currentUser.id)) {
+                if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
             }
         } catch (e) { /* soft */ }
         return null;
@@ -475,6 +488,7 @@
                 try { window.__mpSyncSeats(s.seats); } catch (e) { /* soft */ }
             }
             window.mpRenderLobby(s, window.__mpHandle());
+            window.__mpPopulateSeats(s);
             // When the host begins, the board flips status 0->1: the JOINER
             // device must start its own local board (same real game) so both
             // run together. Guarded so it starts exactly once.
@@ -487,6 +501,33 @@
         });
     };
 
+    // Mirror the on-chain players into the shared setup panel dropdowns so the
+    // MP seats show real identities ("You - <handle>" / "<handle>") between the
+    // colour toggles - MP-only, single-player UI is untouched.
+    window.__mpPopulateSeats = function (s) {
+        try {
+            if (!s || !Array.isArray(s.players)) return;
+            var order = ['green', 'yellow', 'blue', 'red'];
+            var mine = window.__mpWallet();
+            for (var c = 0; c < order.length; c++) {
+                var color = order[c];
+                if ((s.seats || 2) <= c) break;
+                var sel = document.getElementById('type-' + color);
+                if (!sel || !sel.options || sel.options.length < 1) continue;
+                var wallet = s.players[c] || '';
+                var handle = (s.handles && s.handles[c]) || '';
+                var isMine = !!wallet && !!mine && wallet === mine;
+                var label = isMine ? ('You - ' + (handle || wallet.slice(0, 8))) : (handle ? handle : sel.options[0].text);
+                var opt = sel.options[0];
+                opt.text = label;
+                if (sel.options.length >= 2) {
+                    var setVal = wallet ? (isMine ? 'you' : sel.options[1].value) : sel.options[0].value;
+                    if (sel.value !== setVal) sel.value = setVal;
+                }
+            }
+        } catch (e) { /* soft */ }
+    };
+
     window.__mpRefOf = function (code) {
         try { var v = parseInt(String(code || '').toLowerCase(), 36); return (v && v > 0) ? v : 0; } catch (e) { return 0; }
     };
@@ -495,34 +536,54 @@
         var a = window.gfgLudoAdapter;
         if (!a) { window.mpSetStatus('rail not loaded'); return; }
         var seats = (typeof window.__mpMode === 'function') ? window.__mpMode() : 4;
+        // Wait briefly for the wallet session (auth settles a moment after the
+        // page opens; single-player requests sign-in the same way otherwise).
         var wallet = window.__mpWallet();
-        if (!wallet) { window.mpSetStatus('sign in first (top right) so your wallet can host the match'); return; }
-        window.mpSetStatus('creating ' + seats + '-seat match...');
-        // rail create: relay/sponsor creates + delegates the ON-CHAIN board
-        // (host = this device's wallet, seat 0). No lobby JSON.
-        a.start(1, [], seats, 60, 3600, 0).then(function (r) {
-            if (!r) { window.mpSetStatus('create failed (see console)'); return; }
-            var code = String(r.code || '').toUpperCase();
-            var codeEl = document.getElementById('mp-code');
-            if (codeEl) { codeEl.textContent = code; codeEl.setAttribute('data-code', code); }
-            window.__mpCreatedCode = code;
-            window.__mpHost = true;
-            // The host is already seated at 0 (relay put the wallet there).
-            // Register the host's handle on-chain too, and start polling the
-            // board so seats render live.
-            var handle = window.__mpHandle();
-            if (handle && typeof a.join === 'function' && window.gfgMultiplayer) {
-                window.gfgMultiplayer.join(1, code, 0, handle).then(function (jr) {
-                    if (jr && jr.okay) { /* host handle recorded */ }
-                    else { /* handle optional; board create already seated the wallet */ }
-                });
+        if (!wallet) {
+            window.mpSetStatus('loading your wallet session...');
+            var deadline = Date.now() + 2500;
+            (function poll() {
+                wallet = window.__mpWallet();
+                if (wallet) return doCreate();
+                if (Date.now() < deadline) { setTimeout(poll, 200); return; }
+                handleCreateGate();
+            })();
+        } else { doCreate(); }
+        function handleCreateGate() {
+            var w2 = window.__mpWallet();
+            if (!w2 && window.currentUser && !window.currentUser.dynamicId && !window.currentUser.id) {
+                window.mpSetStatus('sign in first (top right) to play');
+                if (typeof window.openDynamicLogin === 'function') { try { window.openDynamicLogin(); } catch (e) {} }
+                return;
             }
-            window.mpSetStatus('CODE: ' + code + ' · share it. Waiting for players.');
-            window.__mpRoom = null;
-            if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
-            window.__mpPollLobby();
-            return r;
-        });
+            window.mpSetStatus('sign in first (top right) so your wallet can host the match');
+        }
+        function doCreate() {
+            window.mpSetStatus('creating ' + seats + '-seat match...');
+            a.start(1, [], seats, 60, 3600, 0).then(function (r) {
+                if (!r) { window.mpSetStatus('create failed (see console)'); return; }
+                var code = String(r.code || '').toUpperCase();
+                var codeEl = document.getElementById('mp-code');
+                if (codeEl) { codeEl.textContent = code; codeEl.setAttribute('data-code', code); }
+                window.__mpCreatedCode = code;
+                window.__mpHost = true;
+                // The host is already seated at 0 (relay put the wallet there).
+                // Register the host's handle on-chain too, and start polling the
+                // board so seats render live.
+                var handle = window.__mpHandle();
+                if (handle && typeof a.join === 'function' && window.gfgMultiplayer) {
+                    window.gfgMultiplayer.join(1, code, 0, handle).then(function (jr) {
+                        if (jr && jr.okay) { /* host handle recorded */ }
+                        else { /* handle optional; board create already seated the wallet */ }
+                    });
+                }
+                window.mpSetStatus('CODE: ' + code + ' · share it. Waiting for players.');
+                window.__mpRoom = null;
+                if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
+                window.__mpPollLobby();
+                return r;
+            });
+        }
     };
 
     window.mpJoinMatch = function () {
@@ -531,24 +592,38 @@
         var code = (document.getElementById('mp-join-code') || {}).value || '';
         if (!code) { window.mpSetStatus('enter a code'); return; }
         var wallet = window.__mpWallet();
-        if (!wallet) { window.mpSetStatus('sign in first (top right) so your wallet can join'); return; }
-        window.mpSetStatus('joining ' + code + '...');
-        var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
-        // On-chain join (gasless, joiner's wallet + handle land in a free seat).
-        var handle = window.__mpHandle();
-        a.join(1, codeUp, undefined, handle).then(function (r) {
-            if (!r) { window.mpSetStatus('join failed (check code)'); return; }
-            var codeEl = document.getElementById('mp-code');
-            var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
-            var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
-            if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
-            if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
-            window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
-            window.__mpRoom = null;
-            if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
-            window.__mpPollLobby();
-            window.mpSetStatus('Joined ' + joinedCodeUp + ' · Seat ' + ((typeof r.seat === 'number') ? (r.seat + 1) : '?') + ' — waiting for host to start.');
-        });
+        if (!wallet) {
+            // Wait briefly for the wallet session (auth settles after open).
+            window.mpSetStatus('loading your wallet session...');
+            var deadline = Date.now() + 2500;
+            (function poll() {
+                wallet = window.__mpWallet();
+                if (wallet) return doJoin();
+                if (Date.now() < deadline) { setTimeout(poll, 200); return; }
+                window.mpSetStatus('sign in first (top right) so your wallet can join');
+            })();
+            return;
+        }
+        doJoin();
+        function doJoin() {
+            window.mpSetStatus('joining ' + code + '...');
+            var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
+            // On-chain join (gasless, joiner's wallet + handle land in a free seat).
+            var handle = window.__mpHandle();
+            a.join(1, codeUp, undefined, handle).then(function (r) {
+                if (!r) { window.mpSetStatus('join failed (check code)'); return; }
+                var codeEl = document.getElementById('mp-code');
+                var joinedCode = (document.getElementById('mp-join-code') || {}).value || code;
+                var joinedCodeUp = joinedCode.trim().toUpperCase().replace(/\s+/g, '');
+                if (codeEl) { codeEl.textContent = joinedCodeUp; codeEl.setAttribute('data-code', joinedCodeUp); }
+                if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
+                window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
+                window.__mpRoom = null;
+                if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
+                window.__mpPollLobby();
+                window.mpSetStatus('Joined ' + joinedCodeUp + ' · Seat ' + ((typeof r.seat === 'number') ? (r.seat + 1) : '?') + ' · waiting for host to start.');
+            });
+        }
     };
 
     // Host: when "Start Match" is pressed, begin the on-chain board (host signs
@@ -596,26 +671,15 @@
             mode = m;
             var bar = el('mp-bar');
             var box = el('mp-lobby-box');
-            var setup = el('player-setup-panel');
-            var startMatchBtn = el('startMatchBtn');
             var singleTab = el('mp-tab-single');
             var multiTab = el('mp-tab-multi');
             if (bar) bar.style.display = (m === 'multi') ? 'flex' : 'none';
             if (box) box.style.display = (m === 'multi') ? 'flex' : 'none';
-            // DECOUPLED BOARDS: in MultiPlayer the single-player setup panel is
-            // hidden entirely (no confusing 2P/4P + colour toggles). The MP
-            // board starts from the lobby's Start button. SinglePlayer keeps
-            // exactly the old panel + Start button.
-            if (setup) setup.style.display = (m === 'multi') ? 'none' : '';
-            if (startMatchBtn && typeof setupConfigurationLocked !== 'boolean') {
-                // startMatchBtn visibility stays as the game sets it; only hide
-                // it in the MP tab BEFORE the match locks.
-            }
-            if (startMatchBtn && m === 'multi' && typeof setupConfigurationLocked === 'boolean' && setupConfigurationLocked === false) {
-                startMatchBtn.style.display = 'none';
-            } else if (startMatchBtn && m === 'single') {
-                startMatchBtn.style.display = '';
-            }
+            // The single-player setup panel (2P/4P + colour toggles + player
+            // dropdowns) stays VISIBLE in BOTH modes and is populated with the
+            // on-chain players in MP. The Start Arena Match button stays too -
+            // in MP it starts the on-chain board through the adapter wrapper.
+            // (Nothing here hides the setup panel or the Start button.)
             if (singleTab) singleTab.classList.toggle('active', m === 'single');
             if (multiTab) multiTab.classList.toggle('active', m === 'multi');
         }
@@ -639,6 +703,23 @@
                         if (typeof window.__mpMode === 'function' && typeof window.selectMatchMode === 'function') {
                             try { window.selectMatchMode(window.__mpMode() === 2 ? '2p' : '4p'); } catch (e) { /* soft */ }
                         }
+                        // Surface a clear "waiting for players" message instead
+                        // of the program's terse 'competition is not settled'.
+                        try {
+                            if (window.gfgMultiplayer && typeof window.gfgMultiplayer.state === 'function') {
+                                var code = document.getElementById('mp-code');
+                                var cd = code ? code.getAttribute('data-code') : '';
+                                var ref = window.__mpRefOf ? window.__mpRefOf(cd) : 0;
+                                if (ref) window.gfgMultiplayer.state(ref).then(function (st) {
+                                    if (!st || st.status === 1) return;
+                                    var seats = st.seats || 2;
+                                    var joined = (st.players || []).filter(Boolean).length;
+                                    if (joined < seats && typeof window.mpSetStatus === 'function') {
+                                        window.mpSetStatus('Waiting for ' + (seats - joined) + ' more player' + ((seats - joined) === 1 ? '' : 's') + ' to join (R ' + joined + '/' + seats + ')');
+                                    }
+                                });
+                            }
+                        } catch (e) { /* soft */ }
                         if (typeof a.begin === 'function') a.begin();
                     }
                 } catch (e) { /* soft */ }

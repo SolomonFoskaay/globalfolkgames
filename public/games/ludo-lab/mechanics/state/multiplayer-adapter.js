@@ -132,15 +132,18 @@
 
     // ---- multiplayer session ----
     function resolveHost() {
+        // getDynamicSolanaWallet() returns the wallet ADDRESS as a plain string
+        // (src/dynamic-auth.js), so accept string/object + profile fallbacks.
         try {
             if (window.getDynamicSolanaWallet && typeof window.getDynamicSolanaWallet === 'function') {
                 var w = window.getDynamicSolanaWallet();
+                if (typeof w === 'string' && w) return w;
                 if (w && w.publicKey) return String(w.publicKey);
+                if (w && w.address) return String(w.address);
             }
         } catch (e) { /* soft */ }
         try {
-            var d = window.magicblockDice;
-            if (d && d.available && typeof d.available === 'function' && d.available() && d.pointsPda) return null;
+            if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
         } catch (e) { /* soft */ }
         return null;
     }

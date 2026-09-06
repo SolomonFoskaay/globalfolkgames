@@ -221,16 +221,18 @@ export async function boardState({ game, matchRef }) {
     if (!info) return { ok: false, error: 'board not found' };
     const d = info.data;
     if (d.length < 623) return { ok: false, error: 'board too small' };
-    const playerCount = d[275];
+    const seats = d[276];
+    // SEAT-INDEXED players/handles (index 0..seats-1; '' = free seat). The
+    // page renders seats by index, so the array must never compress zero slots.
     const players = [];
-    for (let i = 0; i < Math.min(MAX_MP, playerCount); i++) {
+    for (let i = 0; i < Math.min(MAX_MP, seats); i++) {
       const s = d.subarray(19 + i * 32, 51 + i * 32);
-      if (s.every(b => b === 0)) continue;
-      try { players.push(new PublicKey(s).toBase58()); } catch (e) {}
+      if (s.every(b => b === 0)) { players.push(''); continue; }
+      try { players.push(new PublicKey(s).toBase58()); } catch (e) { players.push(''); }
     }
     // handles[8][24] @277..468; current_turn @469
     const handles = [];
-    for (let i = 0; i < Math.min(MAX_MP, d[276]); i++) {
+    for (let i = 0; i < Math.min(MAX_MP, seats); i++) {
       const bs = d.subarray(277 + i * 24, 301 + i * 24);
       let end = bs.indexOf(0);
       if (end === -1) end = bs.length;
