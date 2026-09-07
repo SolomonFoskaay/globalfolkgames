@@ -94,7 +94,9 @@ function snapshotFromTokens() {
 
 // encode the WHOLE board into a 32-byte commit. byte0 seat, byte1-2 dice,
 // bytes3..18 = tokenEncode positions (real board cells), byte19 = next turn.
-function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
+// `advance`: true only on the turn-pass commit (real move commits stay on the
+// current seat so a mid-turn snapshot NEVER flips the turn to the opponent).
+function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, advance) {
     var m = [];
     for (var i = 0; i < 32; i++) m[i] = 0;
     m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
@@ -103,6 +105,10 @@ function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsW
     var sw = snapshotFromTokens();
     for (var s = 0; s < 16 && s < sw.length; s++) m[3 + s] = (sw[s] & 0xff);
     var me = m[0];
+    if (!advance) {
+        m[19] = me; // mid-turn (dice + move snapshots): turn does NOT move yet
+        return m;
+    }
     var d6 = (m[1] === 6 && m[2] === 6);
     m[19] = d6 ? me : ((me + 1) % (seatCount === 4 ? 4 : 2));
     return m;
@@ -251,6 +257,7 @@ function applyMove(move) {
                         }
                     }
                     if (s.move_count === lastCount) return;
+                    if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
                     var mv = decodeMove(s.last_move_commit);
                     if (mv && mv.seat !== mySeat) {
                         var applied = applyMove(mv);
@@ -310,6 +317,7 @@ function applyMove(move) {
                         }
                     }
                     if (s.move_count === lastCount) return;
+                    if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
                     var mv = decodeMove(s.last_move_commit);
                     if (mv && mv.seat !== mySeat) {
                         var applied = applyMove(mv);
@@ -446,40 +454,9 @@ function applyMove(move) {
 // double-roll turn with two token moves produces a single commit carrying the
 // final board. This fixes: too many tiny commits, and the old race where the
 // first rolled value committed alone and the player lost their second move.
-function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
+function commitSnapshot(bytes, label) {
     if (!active || !matchRef) return;
-    movedThisTurn = true;
-    try {
-        window._mpLatestCommit = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
-    } catch (e) {
-        log('encodeMove THREW: ' + (e && e.message));
-    }
-}
-
-    // ONE commit per turn-end (bundled). Called by resolveTurnEndAfterMoves's pass
-// branch: after ALL the turn's token moves are done (or zero moves), this sends
-// the FINAL board snapshot + the next turn. On the local roller's device this
-// is the single tx for the whole turn - no per-token commits, no race where a
-// first dice value commits alone and steals the turn.
-function onPassTurn() {
-    if (!active || !matchRef) return;
-    if (!window.tokens) return;
-    var bytes;
-    try {
-        bytes = (movedThisTurn && window._mpLatestCommit)
-            ? window._mpLatestCommit
-            : encodeMove(0, 0, 0, 0, 0, 0);
-    } catch (e) {
-        log('pass encode THREW: ' + (e && e.message));
-        return;
-    }
-    // Reset the per-turn flag so the NEXT turn can record its moves again.
-    movedThisTurn = false;
-    try { window._mpPassCommit = bytes; } catch (e) {}
-    log('committing TURN bytes=' + bytes.join(','));
-    // Commit seat = bytes[0] (what encodeMove wrote from the real current turn).
-    // Never re-derive seatOf separately - a mid-turn sync could return the wrong
-    // seat and the program would reject the write (NotSeatAuthority).
+    if (!bytes || !bytes.length) return;
     var refObj = { gameId: 1, matchRef: matchRef, seat: bytes[0] & 0xff };
     var attempts = 0;
     var commitLoop = function () {
@@ -487,18 +464,12 @@ function onPassTurn() {
         var settled = false;
         var settleSuccess = function (sig) {
             if (settled) return; settled = true;
-            log('turn committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
-            if (typeof window.mpSetStatus === 'function') {
-                window.mpSetStatus('Turn committed on-chain - shared with the other player.');
-            }
+            log(label + ' committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
         };
         var settleFail = function (err) {
             if (settled) return; settled = true;
-            log('turn commit attempt ' + attempts + ' FAILED: ' + err);
+            log(label + ' commit attempt ' + attempts + ' FAILED: ' + err);
             if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
-            if (typeof window.mpSetStatus === 'function') {
-                window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your turn is not shared yet');
-            }
             try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
         };
         rail().commitMove(refObj, bytes).then(function (r) {
@@ -512,7 +483,56 @@ function onPassTurn() {
     commitLoop();
 }
 
-    function onFinish(winnerSeat) {
+// LIVE dice commit: when the local player rolls, immediately push a snapshot
+// (byte19 = current seat, advance=false) so the opponent sees the dice + board
+// in real time, BEFORE any token moves. The turn is NOT advanced.
+function onDiceRoll(die1, die2) {
+    if (!active || !matchRef) return;
+    if (!die1 || !die2) return;
+    if (!window.tokens) return;
+    var bytes = encodeMove(die1, die2, 0, 0, 0, 0, false);
+    try { window._mpLatestDice = bytes; } catch (e) {}
+    commitSnapshot(bytes, 'dice');
+}
+
+// Called after each REAL local token move. Each move is committed live with
+// advance=false so the opponent sees THIS token move on their board right now,
+// but the turn does NOT flip until onPassTurn. (Old bug fixed: committing never
+// ends the turn early / steals the second dice value.)
+function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
+    if (!active || !matchRef) return;
+    movedThisTurn = true;
+    var bytes;
+    try {
+        bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, false);
+    } catch (e) {
+        log('encodeMove THREW: ' + (e && e.message));
+        return;
+    }
+    try { window._mpLatestCommit = bytes; } catch (e) {}
+    commitSnapshot(bytes, 'move');
+}
+
+// The ONE advance=true commit per turn-end: after ALL this turn's token moves
+// (or zero moves on a non-6 roll), send the final board + byte19 = next seat so
+// the opponent's turn flips. Single tx per turn; never ends the turn early.
+function onPassTurn() {
+    if (!active || !matchRef) return;
+    if (!window.tokens) return;
+    var bytes;
+    try {
+        // Re-encode the CURRENT board with advance=true (turn passes now).
+        bytes = encodeMove(0, 0, 0, 0, 0, 0, true);
+    } catch (e) {
+        log('pass encode THREW: ' + (e && e.message));
+        return;
+    }
+    movedThisTurn = false;
+    try { window._mpPassCommit = bytes; } catch (e) {}
+    commitSnapshot(bytes, 'turn');
+}
+
+function onFinish(winnerSeat) {
         if (!active || !matchRef) return;
         active = false;
         var refObj = { gameId: 1, matchRef: matchRef };
@@ -536,7 +556,7 @@ function onPassTurn() {
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

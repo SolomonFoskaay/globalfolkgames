@@ -95,7 +95,7 @@ function getSolanaWalletAccount() {
     const sol = accounts.find(w => w.chain === 'SOL' && w.address);
     return sol ? { walletAccount: sol, publicKey: new PublicKey(sol.address) } : null;
   } catch (e) {
-    console.warn('[VRF] Could not read Solana wallet account', e);
+    console.warn('[ER VRF] Could not read Solana wallet account', e);
     return null;
   }
 }
@@ -154,11 +154,11 @@ async function resolvedRegionUrl(pda) {
       if (!url) {
         // Delegated but fqdn not mapped yet: do not cache, so a later poll can
         // re-resolve as the region metadata propagates.
-        console.warn(`[VRF] ${key.slice(0, 8)}... delegated with unmapped fqdn '${st.fqdn}' - will re-resolve`);
+        console.warn(`[ER VRF] ${key.slice(0, 8)}... delegated with unmapped fqdn '${st.fqdn}' - will re-resolve`);
         return null;
       }
       regionUrlCache.set(key, url);
-      console.log(`[VRF] ${key.slice(0, 8)}... pinned to region ${url}`);
+      console.log(`[ER VRF] ${key.slice(0, 8)}... pinned to region ${url}`);
       return url;
     }
   } catch (e) {
@@ -212,25 +212,25 @@ async function withErRetry(labelOrFn, maybeFn, opts = {}) {
     const url = pinnedUrl || currentErUrl();
     const ctx = getErProgramFor(url);
     if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
-    console.log(`[VRF] ER write '${label}' attempt ${attempt + 1}/2 -> submitting on region ${url}`);
+    console.log(`[ER VRF] ER write '${label}' attempt ${attempt + 1}/2 -> submitting on region ${url}`);
     try {
       const out = await fn(ctx);
       markErRpcSuccess(url);
-      console.log(`[VRF] ER write '${label}' CONFIRMED on region ${url}:`, (typeof out === 'string') ? out : out);
+      console.log(`[ER VRF] ER write '${label}' CONFIRMED on region ${url}:`, (typeof out === 'string') ? out : out);
       return out;
     } catch (e) {
       lastErr = e;
       if (!isErNetworkError(e)) {
-        console.error(`[VRF] ER write '${label}' failed (NOT an RPC outage - surfaced to the caller):`, e.message);
+        console.error(`[ER VRF] ER write '${label}' failed (NOT an RPC outage - surfaced to the caller):`, e.message);
         throw e;
       }
       if (pinnedUrl) {
         // Account lives on this region: same-region retry only.
-        console.warn(`[VRF] ER write '${label}' network error on pinned region ${url} (${e.message}) - retrying SAME region.`);
+        console.warn(`[ER VRF] ER write '${label}' network error on pinned region ${url} (${e.message}) - retrying SAME region.`);
         erConns.delete(url);
         continue;
       }
-      console.warn(`[VRF] ER write '${label}' network error on region ${url} (${e.message}) - rotating regions.`);
+      console.warn(`[ER VRF] ER write '${label}' network error on region ${url} (${e.message}) - rotating regions.`);
       const next = rotateErRpc(url);
       erConns.delete(url); // drop the dead endpoint's cached connection
       if (attempt === 0 && next !== url) continue;
@@ -251,12 +251,12 @@ function getErProgramFor(url) {
   const walletAdapter = {
     publicKey: wallet.publicKey,
     async signTransaction(transaction) {
-      console.log(`[VRF] Wallet signature REQUESTED (Dynamic 'tx signed' email fires here) for ${wallet.publicKey.toBase58()}`);
+      console.log(`[ER VRF] Wallet signature REQUESTED (Dynamic 'tx signed' email fires here) for ${wallet.publicKey.toBase58()}`);
       const { signedTransaction } = await signTransaction({
         transaction,
         walletAccount: wallet.walletAccount,
       });
-      console.log(`[VRF] Wallet signature OK - signed ${signedTransaction.signatures ? signedTransaction.signatures.length : 0} sig(s). Sending to the ER RPC next.`);
+      console.log(`[ER VRF] Wallet signature OK - signed ${signedTransaction.signatures ? signedTransaction.signatures.length : 0} sig(s). Sending to the ER RPC next.`);
       return signedTransaction;
     },
     async signAllTransactions(transactions) {
@@ -295,10 +295,10 @@ function getReadErProgramFor(url, publicKey) {
   const readWallet = {
     publicKey,
     async signTransaction() {
-      throw new Error('[VRF] read-only provider cannot sign transactions');
+      throw new Error('[ER VRF] read-only provider cannot sign transactions');
     },
     async signAllTransactions() {
-      throw new Error('[VRF] read-only provider cannot sign transactions');
+      throw new Error('[ER VRF] read-only provider cannot sign transactions');
     },
   };
   const provider = new AnchorProvider(connection, readWallet, {
@@ -601,7 +601,7 @@ async function ensureDelegated(pda, playerPubkey) {
     // Router not reachable; fall back to the relay (it is idempotent).
   }
 
-  console.log('[VRF] Delegating player dice account (sponsored by GlobalFolkGames)...');
+  console.log('[ER VRF] Delegating player dice account (sponsored by GlobalFolkGames)...');
   const res = await fetch(config.relayUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -662,7 +662,7 @@ async function rollOnce() {
   // the VRF callback lands on the hosting region, so the poll never sees it.
   const regionUrl = await regionUrlFor(pda);
 
-  console.log(`[VRF] Dice PDA ready (${pda.toBase58()}). Requesting the VRF roll - signing + submitting on region ${regionUrl}. If Dynamic emails you, that is the signature step below working; the failure (if any) is next, in submission/confirmation.`);
+  console.log(`[ER VRF] Dice PDA ready (${pda.toBase58()}). Requesting the VRF roll - signing + submitting on region ${regionUrl}. If Dynamic emails you, that is the signature step below working; the failure (if any) is next, in submission/confirmation.`);
 
   // Unique entropy commitment for this roll (included in the VRF proof).
   // Generated fresh per attempt so a region-rotated retry never reuses a seed
@@ -711,7 +711,7 @@ async function rollOnce() {
     }
   }
 
-  console.warn('[VRF] Timeout waiting for callback result');
+  console.warn('[ER VRF] Timeout waiting for callback result');
   throw new Error('VRF request timed out. Please try again.');
 }
 
@@ -1433,7 +1433,7 @@ async function pingOnchainStack() {
       await Promise.race([blockhashPromise, timeout]);
       return true;
     } catch (e) {
-      console.warn(`[VRF] ping failed for ${url}`, e.message || e);
+      console.warn(`[ER VRF] ping failed for ${url}`, e.message || e);
       return false;
     } finally {
       clearTimeout(timer);

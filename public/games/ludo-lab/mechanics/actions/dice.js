@@ -1,4 +1,4 @@
-// Dice source indicator: 'onchain' (MagicBlock VRF on Solana) or 'offchain' (local)
+// Dice source indicator: 'onchain' (MagicBlock ER VRF on Solana) or 'offchain' (local)
 let activeDiceSource = 'offchain';
 
 // Provably-fair roll policy (Scope A): EVERY dice roll resolves on the
@@ -27,10 +27,10 @@ function resetOnchainProofRollUsed() {
 }
 
 // Bracket tag shown in the Ludo log + console so players know where the
-// CURRENT dice click was resolved: on-chain (MagicBlock VRF on Solana) or not.
+// CURRENT dice click was resolved: on-chain (MagicBlock ER VRF on Solana) or not.
 function currentDiceSourceTag() {
     return activeDiceSource === 'onchain'
-        ? '[MagicBlock VRF on Solana Blockchain]'
+        ? '[MagicBlock ER VRF on Solana Blockchain]'
         : '[Off-Chain Local Randomness]';
 }
 
@@ -116,7 +116,7 @@ async function pingOnchainStack() {
             return await window.magicblockDice.ping();
         }
     } catch (e) {
-        console.warn('[VRF] chain ping failed:', e);
+        console.warn('[ER VRF] chain ping failed:', e);
     }
     // Fallback: if the VRF ping helper is not ready yet, probe the relay's
     // passive health route (never triggers a roll).
@@ -316,7 +316,7 @@ async function rollDiceEngine(source) {
         if (isUserSeat && window.magicblockDice && window.magicblockDice.available()) {
             try {
                 if (totalDisplay) totalDisplay.innerText = 'VRF roll...';
-                displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair roll [MagicBlock VRF on Solana Blockchain]...`);
+                displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair roll [MagicBlock ER VRF on Solana Blockchain]...`);
                 const v = await window.magicblockDice.roll();
                 if (Array.isArray(v) && v.length === 2) {
                     rollValues = v;
@@ -324,7 +324,7 @@ async function rollDiceEngine(source) {
                     onchainProofRollUsedThisMatch = true;
                     lastProofRollSignature = (window.magicblockDice && window.magicblockDice.getLastProofRollSignature)
                         ? window.magicblockDice.getLastProofRollSignature() : null;
-                    console.log(`[MagicBlock VRF on Solana Blockchain] Your roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
+                    console.log(`[MagicBlock ER VRF on Solana Blockchain] Your roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
                     console.log(`[Proof roll TX] ${lastProofRollSignature}`);
                     displayEducationalLog(`${currentTurn.toUpperCase()}: VRF roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
                     // ER rollup tx signatures are NOT indexed by any public
@@ -341,9 +341,17 @@ async function rollDiceEngine(source) {
                         userVerifyLine += ` - dice account delegated on devnet: ${window.gfgExplorer.txLink(diceDelegateSig, 'view tx')}`;
                     }
                     showVerifyLink(userVerifyLine);
+                    // M12 live dice broadcast: tell the multiplayer adapter the
+                    // dice just resolved so the opponent sees them + the board in
+                    // real time (advance=false; the turn does not flip yet).
+                    try {
+                        if (window.gfgLudoAdapter && typeof window.gfgLudoAdapter.onDiceRoll === 'function' && window.gfgLudoAdapter.isActive && window.gfgLudoAdapter.isActive()) {
+                            window.gfgLudoAdapter.onDiceRoll(rollValues[0], rollValues[1]);
+                        }
+                    } catch (e) { /* soft */ }
                 }
             } catch (err) {
-                console.error(`[VRF] roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
+                console.error(`[ER VRF] roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
                 rollValues = null;
             }
         } else {
@@ -360,9 +368,9 @@ async function rollDiceEngine(source) {
                     if (data && Number.isInteger(data.roll1) && Number.isInteger(data.roll2)) {
                         rollValues = [data.roll1, data.roll2];
                         activeDiceSource = 'onchain';
-                        console.log(`[MagicBlock VRF on Solana Blockchain] Computer roll resolved on-chain: ${data.roll1} + ${data.roll2} (seed ${data.seed})`);
+                        console.log(`[MagicBlock ER VRF on Solana Blockchain] Computer roll resolved on-chain: ${data.roll1} + ${data.roll2} (seed ${data.seed})`);
                         console.log(`[Computer roll TX] ${data.signature}`);
-                        displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${data.roll1} + ${data.roll2} [MagicBlock VRF on Solana Blockchain]`);
+                        displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${data.roll1} + ${data.roll2} [MagicBlock ER VRF on Solana Blockchain]`);
                         // Same honest verification as the user seat: the ER
                         // rollup's tx sigs 404 on every public explorer, so no
                         // fake per-roll link. The house dice account is
@@ -372,7 +380,7 @@ async function rollDiceEngine(source) {
                     }
                 }
             } catch (err) {
-                console.error(`[VRF] computer roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
+                console.error(`[ER VRF] computer roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
                 rollValues = null;
             }
         }
