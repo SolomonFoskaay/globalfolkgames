@@ -56,20 +56,44 @@
 // movement.js does, so the board always matches.
 var SNAPSHOT_COLORS = ['green', 'yellow', 'blue', 'red'];
 
+// ---- BOARD SNAPSHOT COMMIT encoding: PATHINDEX (real board cell), not steps ----
+// Encode each token as its ACTUAL position the game uses:
+//   pathIndex -2 (home lane) -> 64 + (stepsWalked - 52)  => 64..69 (lane/win)
+//   pathIndex -1 (yard)       -> 80
+//   otherwise (track)         -> pathIndex              => 0..51
+// This removes TWO bugs of encoding stepsWalked:
+//   1) a token released from the yard has stepsWalked 0 (same as a yard token),
+//      so receivers re-yarded it -> GREEN tokens vanished / wiped by B's snapshot.
+//   2) on-track position is START_INDEX + stepsWalked, so COMMON_PATH[stepsWalked]
+//      teleported RED to GREEN's opposite box.
+var SNAPSHOT_YARD = 80;      // yard marker
+var SNAPSHOT_LANE_BASE = 64; // 64..69 = home-lane stepsWalked 52..57
+
+function tokenEncode(tok) {
+    if (!tok) return SNAPSHOT_YARD;
+    var p = (typeof tok.pathIndex === 'number') ? tok.pathIndex : -1;
+    if (p === -1) return SNAPSHOT_YARD;
+    if (p === -2) {
+        var sw = (typeof tok.stepsWalked === 'number') ? tok.stepsWalked : 55;
+        return SNAPSHOT_LANE_BASE + (sw - 52);
+    }
+    return (p & 0xff);
+}
+
 function snapshotFromTokens() {
     var sw = [];
     for (var c = 0; c < 4; c++) {
         var col = SNAPSHOT_COLORS[c];
         var toks = (window.tokens && window.tokens[col]) || [];
         for (var t = 0; t < 4; t++) {
-            sw.push(toks[t] && typeof toks[t].stepsWalked === 'number' ? (Number(toks[t].stepsWalked) || 0) : 0);
+            sw.push(tokenEncode(toks[t]));
         }
     }
     return sw;
 }
 
-// encode the WHOLE board into a 32-byte commit (positional; the remote device
-// reconstructs it exactly). Called AFTER a real local move has been applied.
+// encode the WHOLE board into a 32-byte commit. byte0 seat, byte1-2 dice,
+// bytes3..18 = tokenEncode positions (real board cells), byte19 = next turn.
 function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
     var m = [];
     for (var i = 0; i < 32; i++) m[i] = 0;
@@ -78,10 +102,6 @@ function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsW
     m[2] = (typeof die2 === 'number' ? die2 : 0) & 0xff;
     var sw = snapshotFromTokens();
     for (var s = 0; s < 16 && s < sw.length; s++) m[3 + s] = (sw[s] & 0xff);
-    // byte19 = the AUTHORITATIVE next turn (color index), computed here from the
-    // SAME rule the game uses (mirroring resolveTurnEndAfterMoves): double-six
-    // keeps this seat, anything else passes to the next active seat. This is
-    // committed so the receiving phone just shows it - no local derivation.
     var me = m[0];
     var d6 = (m[1] === 6 && m[2] === 6);
     m[19] = d6 ? me : ((me + 1) % (seatCount === 4 ? 4 : 2));
@@ -104,28 +124,40 @@ function decodeMove(bytes) {
     } catch (e) { return null; }
 }
 
-// Reconstruct the ENTIRE board from a committed snapshot (deterministic).
-// Mirrors movement.js exactly: stepsWalked<52 -> COMMON_PATH[stepsWalked];
-// 52..56 -> home lane (pathIndex -2 + per-color offsets); 57 -> finished.
-function positionToken(token, sw, color, tIdx) {
-    token.stepsWalked = sw;
-    if (sw >= 52) {
+// Reconstruct a token from the committed ENCODED position (tokenEncode scheme).
+// Mirrors movement.js: 80=yard; 64..69=home-lane(stepsWalked 52..57) via pathIndex
+// -2 + lane offsets; 0..51=track where stepsWalked = pathIndex - START_INDEX.
+function positionToken(token, enc, color, tIdx) {
+    var HY = (typeof HOME_YARDS !== 'undefined') ? HOME_YARDS : null;
+    var CP = (typeof COMMON_PATH !== 'undefined') ? COMMON_PATH : null;
+    var SI = (typeof START_INDEX !== 'undefined') ? START_INDEX : null;
+
+    if (enc === SNAPSHOT_YARD) {
+        token.pathIndex = -1;
+        token.stepsWalked = 0;
+        if (HY && HY[color] && HY[color][tIdx]) { token.c = HY[color][tIdx].c; token.r = HY[color][tIdx].r; }
+        return;
+    }
+    if (enc >= SNAPSHOT_LANE_BASE && enc <= SNAPSHOT_LANE_BASE + 5) {
+        var sw = 52 + (enc - SNAPSHOT_LANE_BASE);
+        token.stepsWalked = sw;
         token.pathIndex = -2;
         var laneOffset = sw - 51;
         if (color === 'green') { token.c = laneOffset; token.r = 7; }
         else if (color === 'yellow') { token.c = 7; token.r = laneOffset; }
         else if (color === 'blue') { token.c = 14 - laneOffset; token.r = 7; }
         else if (color === 'red') { token.c = 7; token.r = 14 - laneOffset; }
-    } else if (sw > 0) {
-        // Same global COMMON_PATH as movement.js (classic-script shared scope).
-        var CP = (typeof COMMON_PATH !== 'undefined') ? COMMON_PATH : null;
-        if (CP && CP[sw]) { token.pathIndex = sw; token.c = CP[sw].c; token.r = CP[sw].r; }
-    } else {
-        // In home yard (stepsWalked 0 = on its yard slot): restore the yard cell.
-        token.pathIndex = -1;
-        var HY = (typeof HOME_YARDS !== 'undefined') ? HOME_YARDS : null;
-        if (HY && HY[color] && HY[color][tIdx]) { token.c = HY[color][tIdx].c; token.r = HY[color][tIdx].r; }
+        return;
     }
+    if (enc >= 0 && enc < 52 && CP && SI) {
+        token.pathIndex = enc;
+        // Game track position = pathIndex, stepsWalked = distance from the
+        // color's start tile (STARTS_INDEX offsets the path).
+        token.stepsWalked = (enc - (SI[color] || 0) + 52) % 52;
+        if (CP[enc]) { token.c = CP[enc].c; token.r = CP[enc].r; }
+        return;
+    }
+    // Fallback: keep as-is (unknown encoding) - never touch an existing token.
 }
 
 // apply a committed snapshot to the local board (deterministic).
@@ -409,87 +441,76 @@ function applyMove(move) {
         });
     }
 
-    // called by the game after a real LOCAL move: commit the move gasless.
-    // SURFACES the result visibly (status line + log) so a silent on-chain
-    // failure is never hidden - the user can see if a commit is being rejected.
-    function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
-        if (!active || !matchRef) return;
-        movedThisTurn = true;
-        var bytes;
-        try {
-            bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
-        } catch (e) {
-            log('encodeMove THREW: ' + (e && e.message));
-            if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Commit encode error: ' + (e && e.message));
-            return;
-        }
-        try { window._mpLatestCommit = bytes; } catch (e) {}
-        log('committing move bytes=' + bytes.join(','));
-        var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green')) };
-        var attempts = 0;
-        var commitLoop = function () {
-            attempts++;
-            var settled = false;
-            var settleSuccess = function (sig) {
-                if (settled) return; settled = true;
-                log('move committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
-                if (typeof window.mpSetStatus === 'function') {
-                    window.mpSetStatus('Move committed on-chain - shared with the other player.');
-                }
-            };
-            var settleFail = function (err) {
-                if (settled) return; settled = true;
-                log('move commit attempt ' + attempts + ' FAILED: ' + err);
-                if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
-                // Loud, visible, never silent: the roller must know the move
-                // did NOT go to the shared board.
-                if (typeof window.mpSetStatus === 'function') {
-                    window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your move is not shared yet');
-                }
-                try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
-            };
-            rail().commitMove(refObj, bytes).then(function (r) {
-                // Rail returns {okay:true, sig} on success (NOT .ok).
-                if (r && r.okay) settleSuccess(r.sig);
-                else settleFail((r && r.error) || 'no result');
-            }).catch(function (e) {
-                settleFail((e && e.message) || String(e));
-            });
-            // Hard timeout so a hung on-chain call can never freeze the turn
-            // silently (it becomes a visible banner instead).
-            setTimeout(function () { settleFail('timed out (no response after 14s)'); }, 14000);
-        };
-        commitLoop();
+    // Called after each REAL local token move - records progress only. The actual
+// on-chain COMMIT is bundled to ONE per turn in onPassTurn (below), so a
+// double-roll turn with two token moves produces a single commit carrying the
+// final board. This fixes: too many tiny commits, and the old race where the
+// first rolled value committed alone and the player lost their second move.
+function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
+    if (!active || !matchRef) return;
+    movedThisTurn = true;
+    try {
+        window._mpLatestCommit = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
+    } catch (e) {
+        log('encodeMove THREW: ' + (e && e.message));
     }
+}
 
-    // A turn ENDS with NO move (e.g. rolled a non-6 while all tokens are in the
-    // yard): the local game passes the turn, but nothing ever commits on-chain,
-    // so the other device never learns it is now its turn. This commits a
-    // board snapshot (positions unchanged) whose byte19 = the NEXT turn, so B
-    // advances to RED from the shared board - exactly like a real move would.
-    function onPassTurn() {
-        // If a real move already committed this turn, its byte19 already told
-        // the other device the next turn - no pass commit needed.
-        if (!active || !matchRef) return;
-        if (movedThisTurn) return;
-        if (!window.tokens) return;
-        var bytes = encodeMove(0, 0, 0, 0, 0, 0);
-        // encodeMove set byte19 from dice 0/0 -> next seat. For a pass we want
-        // the SAME (next) turn; byte19 computed as (me+1)%count is correct.
-        try { window._mpPassCommit = bytes; } catch (e) {}
-        var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : 'green') };
-        var done = false;
-        rail().commitMove(refObj, bytes).then(function (r) {
-            if (r && r.okay) log('pass committed on-chain -> next turn shared');
-            else log('pass commit FAILED', (r && r.error) || 'no result');
-        }).catch(function (e) {
-            log('pass commit threw', (e && e.message) || String(e));
-            done = true;
-        });
-        setTimeout(function () {
-            if (!done) { /* best-effort; no banner spam for passes */ }
-        }, 10000);
+    // ONE commit per turn-end (bundled). Called by resolveTurnEndAfterMoves's pass
+// branch: after ALL the turn's token moves are done (or zero moves), this sends
+// the FINAL board snapshot + the next turn. On the local roller's device this
+// is the single tx for the whole turn - no per-token commits, no race where a
+// first dice value commits alone and steals the turn.
+function onPassTurn() {
+    if (!active || !matchRef) return;
+    if (!window.tokens) return;
+    var bytes;
+    try {
+        bytes = (movedThisTurn && window._mpLatestCommit)
+            ? window._mpLatestCommit
+            : encodeMove(0, 0, 0, 0, 0, 0);
+    } catch (e) {
+        log('pass encode THREW: ' + (e && e.message));
+        return;
     }
+    // Reset the per-turn flag so the NEXT turn can record its moves again.
+    movedThisTurn = false;
+    try { window._mpPassCommit = bytes; } catch (e) {}
+    log('committing TURN bytes=' + bytes.join(','));
+    // Commit seat = bytes[0] (what encodeMove wrote from the real current turn).
+    // Never re-derive seatOf separately - a mid-turn sync could return the wrong
+    // seat and the program would reject the write (NotSeatAuthority).
+    var refObj = { gameId: 1, matchRef: matchRef, seat: bytes[0] & 0xff };
+    var attempts = 0;
+    var commitLoop = function () {
+        attempts++;
+        var settled = false;
+        var settleSuccess = function (sig) {
+            if (settled) return; settled = true;
+            log('turn committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
+            if (typeof window.mpSetStatus === 'function') {
+                window.mpSetStatus('Turn committed on-chain - shared with the other player.');
+            }
+        };
+        var settleFail = function (err) {
+            if (settled) return; settled = true;
+            log('turn commit attempt ' + attempts + ' FAILED: ' + err);
+            if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
+            if (typeof window.mpSetStatus === 'function') {
+                window.mpSetStatus('COMMIT FAILED (x3): ' + err + ' - your turn is not shared yet');
+            }
+            try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
+        };
+        rail().commitMove(refObj, bytes).then(function (r) {
+            if (r && r.okay) settleSuccess(r.sig);
+            else settleFail((r && r.error) || 'no result');
+        }).catch(function (e) {
+            settleFail((e && e.message) || String(e));
+        });
+        setTimeout(function () { settleFail('timed out (no response after 14s)'); }, 14000);
+    };
+    commitLoop();
+}
 
     function onFinish(winnerSeat) {
         if (!active || !matchRef) return;
