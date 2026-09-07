@@ -242,49 +242,130 @@ function applyMove(move) {
             matchRef = r.matchRef;
             lastCount = -1;
             dimmed = false;
-            unsub = rail().subscribe(matchRef, function (s) {
-                try {
-                    if (!s || typeof s.move_count !== 'number') return;
-                    rememberSeats(s);
-                    syncTurnFromBoard(s);
-                    // Begin/finish transitions are surfaced (status/winner fire
-                    // too now), but we only act on NEW moves for the opponent.
-                    if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
-                        try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
-                        if (!window.__mpJoinedStarted) {
-                            window.__mpJoinedStarted = true;
-                            try { if (typeof window.__mpSyncSeats === "function" && typeof s.seats === "number") window.__mpSyncSeats(s.seats); var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
-                        }
-                    }
-                    if (s.move_count === lastCount) return;
-                    if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
-                    var mv = decodeMove(s.last_move_commit);
-                    if (mv && mv.seat !== mySeat) {
-                        var applied = applyMove(mv);
-                        if (applied === 'not-ready') {
-                            // Board not up yet: don't advance lastCount - the
-                            // next poll retries this same commit.
-                            dimmed = false;
-                            return;
-                        }
-                        lastCount = s.move_count;
-                        dimmed = false;
-                        // The board-synced turn was already set by
-                        // syncTurnFromBoard (same seat on double-six, else next
-                        // seat). Do NOT call passTurnSequence here - that would
-                        // advance AGAIN off a device-local guess and skip RED.
-                        // Just reset the roll flags so the new turn can roll.
-                        try {
-                            if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
-                        } catch (e) { /* soft */ }
-                    } else {
-                        lastCount = s.move_count;
-                    }
-                } catch (e) { log('listen err ' + e.message); }
-            });
+            unsub = subscribeBoard();
             log('match created code=' + r.code + ' ref=' + matchRef + ' mySeat=' + mySeat);
             bindSeats();
             return r;
+        });
+    }
+
+    // Shared on-chain board subscription used by create/join/resume. It:
+    //   - surfaces begin status so a joiner's local board starts once;
+    //   - acts ONLY on NEW remote commits (monotonic move_count) - this is the
+    //     fix for the non-double-six double-turn: a late in-flight OWN move
+    //     snapshot (byte19 = our seat) landing after we passed can never revert
+    //     our turn, because our own commits only bump the count;
+    //   - syncs the turn + replays the board for remote commits only.
+    function subscribeBoard() {
+        return rail().subscribe(matchRef, function (s) {
+            try {
+                if (!s || typeof s.move_count !== 'number') return;
+                rememberSeats(s);
+                // Begin status (0->1) fires regardless of move_count: the
+                // JOINER uses it to start its own local board exactly once.
+                if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
+                    try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
+                    if (!window.__mpJoinedStarted) {
+                        window.__mpJoinedStarted = true;
+                        try { if (typeof window.__mpSyncSeats === "function" && typeof s.seats === "number") window.__mpSyncSeats(s.seats); var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
+                    }
+                }
+                // Monotonic guard: only NEW commits (higher move_count) are
+                // acted on. A delayed in-flight move snapshot polled late
+                // must NEVER re-apply/re-sync over a newer one.
+                if (s.move_count <= lastCount) return;
+                if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
+                var mv = decodeMove(s.last_move_commit);
+                if (mv && mv.seat !== mySeat) {
+                    // REMOTE commit: sync our turn + replay the board. Only
+                    // remote commits move OUR turn (our own commits are not
+                    // a source of truth for our own turn - the local
+                    // pass/roll already set it). This is the fix for the
+                    // non-double-six double-turn: a late in-flight OWN move
+                    // snapshot (byte19 = our seat, no advance) landing after
+                    // we passed must never revert us to roll again.
+                    syncTurnFromBoard(s);
+                    var applied = applyMove(mv);
+                    if (applied === 'not-ready') {
+                        // Board not up yet: don't advance lastCount - the
+                        // next poll retries this same commit.
+                        dimmed = false;
+                        return;
+                    }
+                    lastCount = s.move_count;
+                    dimmed = false;
+                    // The board-synced turn was already set by
+                    // syncTurnFromBoard (same seat on double-six, else next
+                    // seat). Do NOT call passTurnSequence here - that would
+                    // advance AGAIN off a device-local guess and skip RED.
+                    // Just reset the roll flags so the new turn can roll.
+                    try {
+                        if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
+                    } catch (e) { /* soft */ }
+                } else {
+                    // Our OWN commit: bump the count only. Our local
+                    // game is authoritative for our own turn.
+                    lastCount = s.move_count;
+                }
+            } catch (e) { log('listen err ' + e.message); }
+        });
+    }
+
+    // M12 REJOIN/RESUME: a player who ALREADY has a seat in a live on-chain
+    // match returns to it after a page reload (or from another device under the
+    // same wallet) WITHOUT a new join (join is blocked once status = 1). It
+    // re-establishes the adapter session + subscription from the board and
+    // replays the latest committed snapshot so tokens/moves/turn come back.
+    // A brand-new player (no seat) is still rejected - they must use the normal
+    // join path while the match is still open.
+    function resume(matchRefOrCode, seat) {
+        if (!rail()) return Promise.resolve(null);
+        var ref = (typeof matchRefOrCode === 'number' && matchRefOrCode > 0)
+            ? matchRefOrCode
+            : (rail().codeToRef ? rail().codeToRef(matchRefOrCode) : 0);
+        if (!ref) return Promise.resolve(null);
+        return rail().state(ref).then(function (s) {
+            if (!s || !s.ok) { log('resume: board not found'); return null; }
+            var wallet = resolveHost();
+            // Find OUR seat from the board players list (the authoritative
+            // on-chain identity). If we are not seated, refuse (join is blocked).
+            var mine = -1;
+            if (Array.isArray(s.players)) {
+                for (var i = 0; i < s.players.length; i++) {
+                    if (s.players[i] && wallet && s.players[i] === wallet) { mine = i; break; }
+                }
+            }
+            if (mine === -1) {
+                log('resume: caller has no seat in this match - rejected');
+                if (typeof window.mpSetStatus === 'function') window.mpSetStatus('You are not in this match - you can only rejoin a match you already joined.');
+                return null;
+            }
+            active = true;
+            matchRef = ref;
+            mySeat = (typeof seat === 'number' && seat >= 0) ? seat : mine;
+            seatCount = (typeof s.seats === 'number' && s.seats === 4) ? 4 : 2;
+            lastCount = -1;
+            dimmed = false;
+            if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
+            rememberSeats(s);
+            bindSeats();
+            unsub = subscribeBoard();
+            // If the LOCAL board is already started (e.g. the host's device had
+            // its board live when it reloaded and persistence re-locked setup),
+            // apply the committed snapshot directly. Otherwise leave lastCount=-1
+            // and let the page start the local board (mpResumeBoard) - the next
+            // poll then applies the snapshot fresh, in the correct order.
+            var boardLocked = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked;
+            if (s.status === 1 && s.move_count > 0 && boardLocked) {
+                var mv = decodeMove(s.last_move_commit);
+                if (mv) {
+                    lastCount = s.move_count;
+                    syncTurnFromBoard(s);
+                    applyMove(mv);
+                }
+            }
+            log('resumed ref=' + ref + ' mySeat=' + mySeat + ' status=' + s.status + ' move=' + s.move_count);
+            return { okay: true, matchRef: ref, seat: mySeat, seatCount: seatCount, status: s.status };
         });
     }
 
@@ -304,40 +385,7 @@ function applyMove(move) {
             // mySeat comes from the on-chain join result (the free seat chosen).
             mySeat = (typeof r.seat === 'number') ? r.seat : ((typeof chosenSeat === 'number') ? chosenSeat : 1);
             lastCount = -1;
-            unsub = rail().subscribe(matchRef, function (s) {
-                try {
-                    if (!s || typeof s.move_count !== 'number') return;
-                    rememberSeats(s);
-                    syncTurnFromBoard(s);
-                    if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
-                        try { if (window.__mpRoom) window.__mpRoom.started = true; } catch (e) {}
-                        if (!window.__mpJoinedStarted) {
-                            window.__mpJoinedStarted = true;
-                            try { if (typeof window.__mpSyncSeats === "function" && typeof s.seats === "number") window.__mpSyncSeats(s.seats); var _js = (window.__mpOrigStart && typeof window.__mpOrigStart === "function") ? window.__mpOrigStart : window.initiateArenaMatch; if (typeof _js === "function") _js(); } catch (e) {}
-                        }
-                    }
-                    if (s.move_count === lastCount) return;
-                    if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
-                    var mv = decodeMove(s.last_move_commit);
-                    if (mv && mv.seat !== mySeat) {
-                        var applied = applyMove(mv);
-                        if (applied === 'not-ready') {
-                            dimmed = false;
-                            return;
-                        }
-                        lastCount = s.move_count;
-                        dimmed = false;
-                        // Board-synced turn already set by syncTurnFromBoard; do
-                        // NOT passTurnSequence again (avoids the double-advance
-                        // that skipped RED). Reset roll flags for the new turn.
-                        try {
-                            if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
-                        } catch (e) { /* soft */ }
-                    } else {
-                        lastCount = s.move_count;
-                    }
-                } catch (e) { /* soft */ }
-            });
+            unsub = subscribeBoard();
             log('joined ref=' + matchRef + ' mySeat=' + mySeat);
             bindSeats();
             return r;
@@ -394,11 +442,24 @@ function applyMove(move) {
         var c = turnFromBoard(s);
         if (!c) return false;
         var got = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
-        if (got === c) return true;
+        if (got === c) {
+            // When the synced turn is already correct AND it is now OUR turn,
+            // clear any stale remote-preview hand so our own tokens blink from
+            // our own dice, not the last remote values.
+            if (c === color() && typeof window.mpClearRemotePreview === 'function') {
+                try { window.mpClearRemotePreview(); } catch (e) {}
+            }
+            return true;
+        }
         // A new turn began -> the per-turn 'did we move?' flag resets so the
         // next turn-ending pass commit works even after a zero-move turn.
         movedThisTurn = false;
         if (window.setGameCurrentTurn) { try { window.setGameCurrentTurn(c); } catch (e) {} }
+        // If the new turn is OUR colour, drop the remote-preview hand (our own
+        // roll will drive the blink from here).
+        if (c === color() && typeof window.mpClearRemotePreview === 'function') {
+            try { window.mpClearRemotePreview(); } catch (e) {}
+        }
         var ti = document.getElementById('turn-indicator');
         if (ti) {
             var cm = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
@@ -435,6 +496,43 @@ function applyMove(move) {
             });
         } catch (e) { /* soft */ }
     }
+
+    // VISUAL-ONLY "which tokens can these committed dice apply to?" for the
+    // OPPONENT'S board. When the remote player rolls/moves, this device renders
+    // their moveable tokens with the blink halo so it is obvious what the remote
+    // hand could do (helps the player reason about captures / safety). It is
+    // PURELY a preview: it reads window.__mpRemoteDiceValues (set by
+    // showRemoteDice) and NEVER touches currentTurnMoves, so the real
+    // isTokenMovable (which drives actual taps/rolls) still returns false for a
+    // remote turn - the opponent can never actually drag a token that is not
+    // theirs. Solo is untouched (the preview returns false when the rail is
+    // idle, so single-player blink behaviour is identical).
+    function isTokenMovablePreview(color, token, index) {
+        try {
+            var railActive = active && typeof window.getGameCurrentTurn === 'function';
+            if (!railActive) return false;
+            var dv = window.__mpRemoteDiceValues;
+            if (!Array.isArray(dv) || !dv.length) return false;
+            var cur = window.getGameCurrentTurn ? window.getGameCurrentTurn() : '';
+            if (color !== cur) return false;
+            if (token.stepsWalked >= 57) return false;
+            if (typeof isTokenInHomeYard === 'function' && isTokenInHomeYard(color, token)) {
+                return (dv.indexOf(6) !== -1);
+            }
+            return dv.some(function (v) { return token.stepsWalked + v <= 57; });
+        } catch (e) { return false; }
+    }
+    window.isTokenMovablePreview = isTokenMovablePreview;
+
+    // Clear the remote-preview hand + re-blip when OUR turn begins, so our own
+    // tokens blink via the normal isTokenMovable path (from OUR rolled dice),
+    // not the stale remote hand.
+    window.mpClearRemotePreview = function () {
+        window.__mpRemoteDiceValues = [];
+        if (typeof window.ensureBoardAnimationLoop === 'function') {
+            try { window.ensureBoardAnimationLoop(); } catch (e) {}
+        }
+    };
 
     // HOST-ONLY: begin the live match (status 0 -> 1), locking out new joins.
     // The host MUST be players[0] (resolved at create); the rail signs the
@@ -541,6 +639,8 @@ function onFinish(winnerSeat) {
             if (!(r && r.okay)) log('finish skipped', (r && r.error) || '');
             if (unsub) { unsub(); unsub = null; }
         });
+        // The match is over - stop auto-resuming it on reload.
+        if (typeof window.mpClearSession === 'function') { try { window.mpClearSession(); } catch (e) {} }
     }
 
     function stop() { active = false; if (unsub) unsub(); unsub = null; }
@@ -556,7 +656,7 @@ function onFinish(winnerSeat) {
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, resume: resume, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

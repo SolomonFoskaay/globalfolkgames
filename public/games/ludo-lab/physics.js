@@ -511,10 +511,19 @@ window.showRemoteDice = function (die1, die2) {
     try {
         displayDiceOnBoard = true;
         isDiceRolled = true;
+        // _settledExact=true means the dice are treated as ALREADY settled, so
+        // updateDice3dRender draws the FLAT settle face with pips taken directly
+        // from the committed ER VRF values. Without it the 3D cube renders at
+        // identity orientation and the opponent sees a fake default face (e.g.
+        // the committed 5+4 "looks like" 1+1). This matches what the roller's
+        // own device shows after its roll locks onto the on-chain result.
         physicalDice = [
-            { x: 200, y: 260, vx: 0, vy: 0, value: die1, finalValue: die1, q: [1, 0, 0, 0] },
-            { x: 310, y: 300, vx: 0, vy: 0, value: die2, finalValue: die2, q: [1, 0, 0, 0] }
+            { x: 200, y: 260, vx: 0, vy: 0, value: die1, finalValue: die1, _settledExact: true, q: [1, 0, 0, 0] },
+            { x: 310, y: 300, vx: 0, vy: 0, value: die2, finalValue: die2, _settledExact: true, q: [1, 0, 0, 0] }
         ];
+        // Mirror the committed roll into the remote-preview hand so the
+        // opponent's board can blink WHICH tokens these values can apply to.
+        try { window.__mpRemoteDiceValues = [Number(die1), Number(die2)]; } catch (e) {}
         var d1 = document.getElementById('val-d1');
         var d2 = document.getElementById('val-d2');
         var tt = document.getElementById('val-total');
@@ -522,5 +531,6 @@ window.showRemoteDice = function (die1, die2) {
         if (d2) d2.innerText = die2;
         if (tt) tt.innerText = '= Total: ' + (die1 + die2);
         if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
+        if (typeof drawLudoLayout === 'function') { try { drawLudoLayout(); } catch (e) {} }
     } catch (e) { /* soft */ }
 };

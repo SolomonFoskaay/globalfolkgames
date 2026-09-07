@@ -238,6 +238,13 @@ function drawAllTokens() {
             if (typeof isTokenMovable === 'function') {
                 canThisPieceMove = isTokenMovable(piece.color, piece.token, piece.index);
             }
+            // M12 remote preview: when a remote player has committed dice, blink
+            // THEIR moveable tokens on this board too (visual only - taps are
+            // still gated by the real isTokenMovable, which returns false for a
+            // remote turn). Single-player is untouched (preview returns false).
+            if (!canThisPieceMove && typeof window.isTokenMovablePreview === 'function') {
+                try { canThisPieceMove = window.isTokenMovablePreview(piece.color, piece.token, piece.index); } catch (e) {}
+            }
 
             ctx.save();
             if (canThisPieceMove) {
@@ -262,9 +269,15 @@ let blinkLoopActive = false;
 function anyTokenBlinkNeeded() {
     if (typeof tokens !== 'object' || !tokens) return false;
     if (typeof isTokenMovable !== 'function') return false;
+    const usePreview = typeof window.isTokenMovablePreview === 'function';
     return Object.keys(tokens).some(color => {
         if (!isSeatActive(color)) return false;
-        return tokens[color].some((token, index) => isTokenMovable(color, token, index));
+        return tokens[color].some((token, index) => {
+            if (isTokenMovable(color, token, index)) return true;
+            // M12: keep the blink loop alive for the remote-preview halo too.
+            if (usePreview) { try { return window.isTokenMovablePreview(color, token, index); } catch (e) { return false; } }
+            return false;
+        });
     });
 }
 
