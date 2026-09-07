@@ -20,6 +20,7 @@
     var matchRef = 0;
     var mySeat = -1;          // which seat index this device controls
     var seatCount = 2;        // multiplayer seat count (2 = green,red; 4 = all)
+    var movedThisTurn = false; // set when a real move committed this turn
     var unsub = null;
     var lastCount = -1;
     var dimmed = false;       // true to ignore opponent turns until they move
@@ -354,6 +355,9 @@ function applyMove(move) {
         if (!c) return false;
         var got = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
         if (got === c) return true;
+        // A new turn began -> the per-turn 'did we move?' flag resets so the
+        // next turn-ending pass commit works even after a zero-move turn.
+        movedThisTurn = false;
         if (window.setGameCurrentTurn) { try { window.setGameCurrentTurn(c); } catch (e) {} }
         var ti = document.getElementById('turn-indicator');
         if (ti) {
@@ -410,6 +414,7 @@ function applyMove(move) {
     // failure is never hidden - the user can see if a commit is being rejected.
     function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
         if (!active || !matchRef) return;
+        movedThisTurn = true;
         var bytes;
         try {
             bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked);
@@ -457,6 +462,35 @@ function applyMove(move) {
         commitLoop();
     }
 
+    // A turn ENDS with NO move (e.g. rolled a non-6 while all tokens are in the
+    // yard): the local game passes the turn, but nothing ever commits on-chain,
+    // so the other device never learns it is now its turn. This commits a
+    // board snapshot (positions unchanged) whose byte19 = the NEXT turn, so B
+    // advances to RED from the shared board - exactly like a real move would.
+    function onPassTurn() {
+        // If a real move already committed this turn, its byte19 already told
+        // the other device the next turn - no pass commit needed.
+        if (!active || !matchRef) return;
+        if (movedThisTurn) return;
+        if (!window.tokens) return;
+        var bytes = encodeMove(0, 0, 0, 0, 0, 0);
+        // encodeMove set byte19 from dice 0/0 -> next seat. For a pass we want
+        // the SAME (next) turn; byte19 computed as (me+1)%count is correct.
+        try { window._mpPassCommit = bytes; } catch (e) {}
+        var refObj = { gameId: 1, matchRef: matchRef, seat: seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : 'green') };
+        var done = false;
+        rail().commitMove(refObj, bytes).then(function (r) {
+            if (r && r.okay) log('pass committed on-chain -> next turn shared');
+            else log('pass commit FAILED', (r && r.error) || 'no result');
+        }).catch(function (e) {
+            log('pass commit threw', (e && e.message) || String(e));
+            done = true;
+        });
+        setTimeout(function () {
+            if (!done) { /* best-effort; no banner spam for passes */ }
+        }, 10000);
+    }
+
     function onFinish(winnerSeat) {
         if (!active || !matchRef) return;
         active = false;
@@ -481,7 +515,7 @@ function applyMove(move) {
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, onMove: onMove, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

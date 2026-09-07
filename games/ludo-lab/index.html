@@ -783,16 +783,16 @@
         window.__mpSyncSeats = function (n) {
             var v = (n === 2 || n === 4) ? n : seats;
             if (v !== seats) { seats = v; updateSeatButtons(); }
-            // Force the game to the SAME active-seat mode as the host, so the
-            // on-chain seat order and the Ludo turn order agree on every device.
-            // ONLY before the match locks: selectMatchMode errors once the game
-            // is live, and we must never spam that error on a live match.
-            try {
-                if (typeof window.selectMatchMode === 'function') {
-                    var locked = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked;
-                    if (!locked) window.selectMatchMode(v === 2 ? '2p' : '4p');
-                }
-            } catch (e) { /* soft */ }
+            // Force the game to the SAME active-seat mode as the host BEFORE the
+            // match locks, exactly ONCE. Never repeat: selectMatchMode logs
+            // 'Match mode: 2 Players' each call and spams the console/phone log.
+            var locked = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked;
+            if (!locked && window.__mpModeApplied !== v) {
+                window.__mpModeApplied = v;
+                try {
+                    if (typeof window.selectMatchMode === 'function') window.selectMatchMode(v === 2 ? '2p' : '4p');
+                } catch (e) { /* soft */ }
+            }
         };
         function setMode(m) {
             mode = m;

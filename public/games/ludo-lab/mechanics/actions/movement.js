@@ -35,6 +35,17 @@ function resolveTurnEndAfterMoves() {
         }
     } else {
         consecutiveDoubleSixes = 0;
+        // M12: a turn that ends with NO move must still be shared on-chain, so
+        // the other device learns it is now its turn (byte19 = next seat). If a
+        // real move committed this turn, onMove already shared the next turn, so
+        // a redundant pass commit is avoided by only firing when no move ran.
+        try {
+            if (window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive()) {
+                if (typeof window.gfgLudoAdapter.onPassTurn === 'function') {
+                    window.gfgLudoAdapter.onPassTurn();
+                }
+            }
+        } catch (e) { /* soft */ }
         setTimeout(() => {
             if (isGamePaused) return;
             passTurnSequence();
