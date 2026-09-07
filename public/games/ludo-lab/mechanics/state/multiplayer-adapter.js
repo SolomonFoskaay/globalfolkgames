@@ -109,8 +109,12 @@ function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsW
         m[19] = me; // mid-turn (dice + move snapshots): turn does NOT move yet
         return m;
     }
-    var d6 = (m[1] === 6 && m[2] === 6);
-    m[19] = d6 ? me : ((me + 1) % (seatCount === 4 ? 4 : 2));
+    // advance=true is ONLY ever used by onPassTurn - a REAL turn pass. The turn
+    // must ALWAYS move to the next seat here. Double-six "shoki" bonuses are
+    // conveyed by NOT passing (the roller stays local + commits no pass), never
+    // by a pass carve-out: on the 3rd consecutive double-six the pass DOES
+    // happen, and passing the real dice values here must not re-grant a bonus.
+    m[19] = (me + 1) % (seatCount === 4 ? 4 : 2);
     return m;
 }
 
@@ -277,13 +281,9 @@ function applyMove(move) {
                 if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
                 var mv = decodeMove(s.last_move_commit);
                 if (mv && mv.seat !== mySeat) {
-                    // REMOTE commit: sync our turn + replay the board. Only
-                    // remote commits move OUR turn (our own commits are not
-                    // a source of truth for our own turn - the local
-                    // pass/roll already set it). This is the fix for the
-                    // non-double-six double-turn: a late in-flight OWN move
-                    // snapshot (byte19 = our seat, no advance) landing after
-                    // we passed must never revert us to roll again.
+                    // REMOTE commit: sync our turn + replay the board. The
+                    // committed byte19 + board are the single source of truth,
+                    // so both devices derive the SAME next turn.
                     syncTurnFromBoard(s);
                     var applied = applyMove(mv);
                     if (applied === 'not-ready') {
@@ -303,8 +303,10 @@ function applyMove(move) {
                         if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
                     } catch (e) { /* soft */ }
                 } else {
-                    // Our OWN commit: bump the count only. Our local
-                    // game is authoritative for our own turn.
+                    // Our OWN commit: bump the count AND sync the displayed
+                    // turn from the board (it matches our local pass; commits
+                    // are serialized so no stale one can reorder behind a pass).
+                    syncTurnFromBoard(s);
                     lastCount = s.move_count;
                 }
             } catch (e) { log('listen err ' + e.message); }
@@ -322,7 +324,7 @@ function applyMove(move) {
         if (!rail()) return Promise.resolve(null);
         var ref = (typeof matchRefOrCode === 'number' && matchRefOrCode > 0)
             ? matchRefOrCode
-            : (rail().codeToRef ? rail().codeToRef(matchRefOrCode) : 0);
+            : (function () { try { var v = parseInt(String(matchRefOrCode || '').toLowerCase(), 36); return (v && v > 0) ? v : 0; } catch (e) { return 0; } })();
         if (!ref) return Promise.resolve(null);
         return rail().state(ref).then(function (s) {
             if (!s || !s.ok) { log('resume: board not found'); return null; }
@@ -547,38 +549,56 @@ function applyMove(move) {
         });
     }
 
-    // Called after each REAL local token move - records progress only. The actual
-// on-chain COMMIT is bundled to ONE per turn in onPassTurn (below), so a
-// double-roll turn with two token moves produces a single commit carrying the
-// final board. This fixes: too many tiny commits, and the old race where the
-// first rolled value committed alone and the player lost their second move.
+    // Serialized commit chain: every gasless board write (dice/move/pass) is sent
+// ONE AT A TIME, each awaiting the previous one's confirmation. This is the
+// fix for the game getting stuck / players getting double turns: without it,
+// each commit retried independently, so a mid-turn move snapshot (byte19 =
+// current seat) could LAND ON-CHAIN AFTER the turn-pass (byte19 = next seat).
+// The board's "latest" then became the stale mid-turn snapshot -> the opponent
+// derived the WRONG turn (green) while the roller had already passed to red,
+// so BOTH devices waited for each other forever. Serializing guarantees the
+// pass is ALWAYS the last write of a turn, so every device derives the same
+// turn from the same board. Two independent rolls in one turn chain naturally
+// (dice1 -> move1 -> move2 -> pass), and a double-6 bonus is just another roll.
+var commitChain = Promise.resolve();
+
 function commitSnapshot(bytes, label) {
-    if (!active || !matchRef) return;
-    if (!bytes || !bytes.length) return;
+    if (!active || !matchRef) return Promise.resolve();
+    if (!bytes || !bytes.length) return Promise.resolve();
     var refObj = { gameId: 1, matchRef: matchRef, seat: bytes[0] & 0xff };
-    var attempts = 0;
-    var commitLoop = function () {
-        attempts++;
-        var settled = false;
-        var settleSuccess = function (sig) {
-            if (settled) return; settled = true;
-            log(label + ' committed on-chain seat=' + refObj.seat + ' sig=' + (sig || ''));
-        };
-        var settleFail = function (err) {
-            if (settled) return; settled = true;
-            log(label + ' commit attempt ' + attempts + ' FAILED: ' + err);
-            if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
-            try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
-        };
-        rail().commitMove(refObj, bytes).then(function (r) {
-            if (r && r.okay) settleSuccess(r.sig);
-            else settleFail((r && r.error) || 'no result');
-        }).catch(function (e) {
-            settleFail((e && e.message) || String(e));
+    // Chain this write behind all pending writes so order is preserved.
+    var run = commitChain.then(function () {
+        if (!active || !matchRef) return;
+        var attempts = 0;
+        return new Promise(function (resolve) {
+            var commitLoop = function () {
+                attempts++;
+                var settled = false;
+                var settle = function (err) {
+                    if (settled) return; settled = true;
+                    if (err) {
+                        log(label + ' commit attempt ' + attempts + ' FAILED: ' + err);
+                        if (attempts < 3) { setTimeout(commitLoop, 1200); return; }
+                        try { window.dispatchEvent(new CustomEvent('gfg:mp-error', { detail: { action: 'commitMove', error: 'on-chain commit failed: ' + err } })); } catch (e) {}
+                    } else {
+                        log(label + ' committed on-chain seat=' + refObj.seat + ' sig=' + (resolve._sig || ''));
+                    }
+                    resolve();
+                };
+                rail().commitMove(refObj, bytes).then(function (r) {
+                    if (r && r.okay) { resolve._sig = r.sig; settle(); }
+                    else settle((r && r.error) || 'no result');
+                }).catch(function (e) {
+                    settle((e && e.message) || String(e));
+                });
+                setTimeout(function () { settle('timed out (no response after 14s)'); }, 14000);
+            };
+            commitLoop();
         });
-        setTimeout(function () { settleFail('timed out (no response after 14s)'); }, 14000);
-    };
-    commitLoop();
+    });
+    // Ensure a failure never blocks the chain permanently.
+    commitChain = run.catch(function () {});
+    return run;
 }
 
 // LIVE dice commit: when the local player rolls, immediately push a snapshot
@@ -618,9 +638,19 @@ function onPassTurn() {
     if (!active || !matchRef) return;
     if (!window.tokens) return;
     var bytes;
+    // Carry the REAL roll values so the pass commit is also the dice commit:
+    // when a roll has NO valid move, the board's latest write is the pass - if
+    // it carries die1=0/die2=0 the receiver skips showRemoteDice and the dice
+    // boxes / cubes never update. Now the pass preserves the rolled dice so the
+    // opponent's dice One/Two + cubes mirror it. (lastDiceRoll1/2 are the game's
+    // script-global roll values from dice.js, finalizeDiceScores.)
+    var d1 = 0, d2 = 0;
+    try { d1 = (typeof lastDiceRoll1 === 'number') ? lastDiceRoll1 : 0; } catch (e) {}
+    try { d2 = (typeof lastDiceRoll2 === 'number') ? lastDiceRoll2 : 0; } catch (e) {}
     try {
-        // Re-encode the CURRENT board with advance=true (turn passes now).
-        bytes = encodeMove(0, 0, 0, 0, 0, 0, true);
+        // Re-encode the CURRENT board with advance=true (turn passes now),
+        // but keep the real dice for the receiver's display.
+        bytes = encodeMove(d1, d2, 0, 0, 0, 0, true);
     } catch (e) {
         log('pass encode THREW: ' + (e && e.message));
         return;

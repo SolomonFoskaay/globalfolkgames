@@ -670,10 +670,11 @@
                 }
                 window.mpSetStatus('CODE: ' + code + ' · share it. Waiting for players.');
                 window.__mpRoom = null;
-                // M12 rejoin: remember this on-chain match (creator, seat 0) so
-                // a reload / re-login on ANY device can resume it while live.
-                if (typeof window.__mpStoreSession === 'function') {
-                    try { window.__mpStoreSession(code, 0, true); } catch (e) {}
+                // M12 rejoin: drop the code into the URL (?mp=CODE) so a reload
+                // on ANY device returns to this live on-chain match. NO local
+                // storage (remote board = the only state).
+                if (typeof window.__mpEnsureUrlCode === 'function') {
+                    try { window.__mpEnsureUrlCode(code); } catch (e) {}
                 }
                 if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
                 window.__mpPollLobby();
@@ -740,10 +741,10 @@
                     if (typeof r.seat === 'number') { try { window.__mpSeatPick = r.seat; } catch (e) {} }
                     window.__mpJoinedSeat = (typeof r.seat === 'number') ? r.seat : (typeof a.seat === 'function' ? a.seat() : -1);
                     window.__mpRoom = null;
-                    // M12 rejoin: remember this on-chain match (joiner + their
-                    // seat) so a reload / re-login anywhere can resume it.
-                    if (typeof window.__mpStoreSession === 'function') {
-                        try { window.__mpStoreSession(joinedCodeUp, (typeof r.seat === 'number') ? r.seat : ((typeof a.seat === 'function' ? a.seat() : -1)), false); } catch (e) {}
+                    // M12 rejoin: drop the code into the URL so a reload returns
+                    // to this live on-chain match (NO local storage).
+                    if (typeof window.__mpEnsureUrlCode === 'function') {
+                        try { window.__mpEnsureUrlCode(joinedCodeUp); } catch (e) {}
                     }
                     if (typeof window.mpEnsurePoll === 'function') window.mpEnsurePoll();
                     window.__mpPollLobby();
@@ -942,66 +943,55 @@ updateSeatButtons();
             var row = document.getElementById('mp-created-row');
             if (row) row.style.display = 'flex';
         };
-        // M12 rejoin session: persist {code, seat, host, savedAt} so a reload /
-        // re-login on any device under the SAME wallet can resume the live
-        // on-chain match (no new join - join is blocked once started).
-        window.__mpStoreSession = function (code, seat, host) {
+        // M12 REJOIN = 100% ON-CHAIN (NO local storage). The match code lives in
+        // the page URL (?mp=CODE) so a reload / re-login on ANY device under the
+        // same wallet returns to the same live board. Everything else is read
+        // fresh from the on-chain board: whether THIS wallet still holds a seat,
+        // the current turn, and the committed snapshot. A player with NO seat is
+        // rejected (cannot join a started match they are not in).
+        window.__mpEnsureUrlCode = function (code) {
             try {
-                var w = window.__mpWallet ? window.__mpWallet() : '';
-                localStorage.setItem('gfg_mp_session', JSON.stringify({
-                    code: String(code || '').toUpperCase(),
-                    seat: (typeof seat === 'number') ? seat : -1,
-                    host: !!host,
-                    wallet: w || '',
-                    savedAt: Date.now()
-                }));
-            } catch (e) { /* best-effort */ }
+                var clean = String(code || '').toUpperCase().replace(/\s+/g, '');
+                if (!clean) return;
+                var u = new URL(window.location.href);
+                u.searchParams.set('mp', clean);
+                window.history.replaceState({}, '', u.toString());
+            } catch (e) { /* soft */ }
         };
-        window.__mpClearSession = function () {
-            try { localStorage.removeItem('gfg_mp_session'); } catch (e) {}
+        window.__mpCodeFromUrl = function () {
+            try { return new URLSearchParams(window.location.search).get('mp') || ''; } catch (e) { return ''; }
         };
-        window.__mpSession = function () {
-            try {
-                var raw = localStorage.getItem('gfg_mp_session');
-                if (!raw) return null;
-                return JSON.parse(raw);
-            } catch (e) { return null; }
-        };
-        // Resume a remembered live on-chain match: verify the current wallet
-        // still holds its seat on the board, then re-establish the adapter
-        // session (board + subscription) and, if the match is live, rebuild the
-        // local board from the committed snapshot. A player with NO seat is
-        // rejected (safe - cannot join a started match they are not in).
-        window.mpResumeMatch = function () {
+        window.__mpClearSession = function () {}; // no local MP session to clear
+        // Resume a live on-chain match by CODE: verify this wallet still holds a
+        // seat on the board, then re-establish the adapter session (board +
+        // subscription) and rebuild the local board. NO new join (join is
+        // blocked once started) and NO local storage - the board is the truth.
+        window.mpResumeMatch = function (code) {
             var a = window.gfgLudoAdapter;
-            var sess = window.__mpSession();
-            if (!a || !sess || !sess.code) return false;
+            if (!a || typeof a.resume !== 'function') return false;
             var wallet = window.__mpWallet();
             if (!wallet) { return false; } // wallet session still settling
             var rail = window.gfgMultiplayer;
             if (!rail || typeof rail.state !== 'function') return false;
-            var code = sess.code;
+            var codeUp = (code || window.__mpCodeFromUrl() || '').toUpperCase().replace(/\s+/g, '');
+            if (!codeUp) return false;
             setMode('multi');
             var codeEl2 = el('mp-code');
-            if (codeEl2) { codeEl2.textContent = code; codeEl2.setAttribute('data-code', code); }
+            if (codeEl2) { codeEl2.textContent = codeUp; codeEl2.setAttribute('data-code', codeUp); }
             var joinInput2 = el('mp-join-code');
-            if (joinInput2) joinInput2.value = code;
+            if (joinInput2) joinInput2.value = codeUp;
+            window._mpResumingCode = codeUp;
             window.mpSetStatus('Resuming your live match...');
-            a.resume(code, sess.seat).then(function (r) {
-                if (!r) { window.mpSetStatus('Could not resume - you are no longer seated in that match.'); return; }
+            a.resume(codeUp).then(function (r) {
+                if (!r) { window.mpSetStatus('Could not resume - you are not seated in this match (it may have finished).'); return; }
                 window.__mpSeatPick = r.seat;
                 window.__mpJoinedSeat = r.seat;
                 window.__mpModeApplied = null;
-                // Keep the adapter seat + code in sync with the UI.
-                var sessNew = window.__mpSession();
-                if (sessNew) { sessNew.seat = r.seat; try { localStorage.setItem('gfg_mp_session', JSON.stringify(sessNew)); } catch (e) {} }
+                window._mpResumingCode = null;
                 window.mpEnsurePoll();
                 window.__mpPollLobby();
                 if (r.status === 1) {
-                    // Live match already begun: start/rebuild the local board so
-                    // both seats render + the resumer can keep playing.
                     window.mpSetStatus('Match LIVE resumed - continuing where you left off.');
-                    var started = r.resumeBoard;
                     if (typeof window.__mpResumeBoard === 'function') {
                         try { window.__mpResumeBoard(r); } catch (e) { /* soft */ }
                     }
@@ -1027,19 +1017,66 @@ updateSeatButtons();
                 }
             } catch (e) { /* soft */ }
         };
-        // Auto-join from a shared ?mp=CODE link.
+        // Auto-join / auto-resume from a shared ?mp=CODE link (or a reload of
+        // the same link). UNIFIED ON-CHAIN BOOT — NO local storage:
+        //   1. Wait for the wallet session to settle (a link visitor often
+        //      lands before Dynamic has hydrated, which is why the link-path
+        //      previously showed a false 'sign in first' — the manual button
+        //      worked because auth had settled by then).
+        //   2. Read the on-chain board for that code.
+        //   3. If THIS wallet already holds a seat -> resume the live board.
+        //      If not seated and the match is still open (status 0) -> join.
+        //      If not seated and it already started -> blocked (safe).
         window.mpSharedCode = function () {
             try { return new URLSearchParams(window.location.search).get('mp') || ''; } catch (e) { return ''; }
         };
         var shared = window.mpSharedCode();
+        if (shared) setMode('multi');
+        // Unified boot: run whenever a code is present in the URL (fresh link
+        // OR reload of this link) OR the user manually entered one earlier and
+        // reloaded - the code is in the URL after create/join (__mpEnsureUrlCode).
         if (shared) {
-            setMode('multi');
             window.__mpRoom = null;
             var joinInput = el('mp-join-code');
             if (joinInput) joinInput.value = shared.toUpperCase().replace(/\s+/g, '');
-            setTimeout(function () {
-                if (typeof window.mpJoinMatch === 'function') window.mpJoinMatch();
-            }, 1200);
+            var __mpBootTries = 0;
+            (function __mpBoot() {
+                if (window.__mpActive && window.__mpActive()) return; // already in a match
+                __mpBootTries++;
+                var wallet = window.__mpWallet();
+                var signedIn = !!(window.currentUser && (window.currentUser.dynamicId || window.currentUser.id));
+                if (!wallet || !signedIn) {
+                    if (__mpBootTries < 20) { setTimeout(__mpBoot, 500); return; } // wait for auth
+                    window.mpSetStatus('Sign in (top-right) to join this match.');
+                    if (typeof window.openDynamicLogin === 'function') { try { window.openDynamicLogin(); } catch (e) {} }
+                    return;
+                }
+                var rail = window.gfgMultiplayer;
+                var codeUp = shared.toUpperCase().replace(/\s+/g, '');
+                if (!rail || typeof rail.state !== 'function') { if (__mpBootTries < 20) { setTimeout(__mpBoot, 500); return; } return; }
+                var ref = (window.__mpRefOf && window.__mpRefOf(codeUp)) || 0;
+                if (!ref) { window.mpSetStatus('Could not resolve that code.'); return; }
+                rail.state(ref).then(function (s) {
+                    if (!s || !s.ok) { if (__mpBootTries < 30) { setTimeout(__mpBoot, 800); return; } window.mpSetStatus('Match not found with that code.'); return; }
+                    // Am I seated? The board is the truth (no local cache).
+                    var mine = -1;
+                    for (var i = 0; i < (s.players || []).length; i++) {
+                        if (s.players[i] && s.players[i] === wallet) { mine = i; break; }
+                    }
+                    if (mine !== -1) {
+                        // Already in this match: resume it (reload / re-login case).
+                        if (typeof window.mpResumeMatch === 'function') window.mpResumeMatch(codeUp);
+                        return;
+                    }
+                    if (s.status !== 0) {
+                        window.mpSetStatus('This match has already started - you can only join while it is still waiting.');
+                        return;
+                    }
+                    // New joiner, match still open: normal join (fills the code
+                    // + runs the same join flow as the manual button).
+                    if (typeof window.mpJoinMatch === 'function') window.mpJoinMatch();
+                }).catch(function () { if (__mpBootTries < 30) setTimeout(__mpBoot, 800); });
+            })();
         }
         // Show the created-code row once a match code exists.
         var _origCreate = window.mpCreateMatch;
@@ -1071,19 +1108,7 @@ updateSeatButtons();
         // Default to SinglePlayer ONLY when the visitor didn't come via a
         // share link — a link visitor must land on the MultiPlayer board.
         if (!shared) setMode('single');
-        // M12 REJOIN BOOT: if this device has a remembered live on-chain match
-        // (and did NOT arrive via a fresh ?mp= join link), wait for the wallet
-        // session to settle, then resume that match so a reload / re-login never
-        // loses access. Bounded retries; soft-fails (never breaks the page).
-        if (!shared && window.__mpSession()) {
-            var __mpBootTries = 0;
-            (function __mpBoot() {
-                if (window.__mpActive && window.__mpActive()) return; // already in a match
-                __mpBootTries++;
-                if (typeof window.mpResumeMatch === 'function' && window.mpResumeMatch()) return; // started
-                if (__mpBootTries < 10) setTimeout(__mpBoot, 500);
-            })();
-        }
+        // (On-chain rejoin boot for shared codes lives above in the shared block.)
     })();
     </script>
 </body>
