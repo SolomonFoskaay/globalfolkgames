@@ -124,7 +124,14 @@
         <!-- Persistent Control Center Layout -->
         <div id="dice-container">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 8px;">
-                <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
+                <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                    <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
+                    <!-- M12 on-chain turn timer chip (2P: only the ACTIVE player shows
+                         a countdown; 4P: every active seat shows its own). The timer is
+                         an ON-CHAIN fact (gfgclock deadlines), the frontend only renders
+                         it + advances a stalled turn. Single-player keeps no chip. -->
+                    <div id="mp-turn-timer" style="display:none; font-size:0.8rem; font-weight:800; color:#fff; background:#7838f8; border:1px solid rgba(155,89,182,0.6); border-radius:8px; padding:2px 8px; white-space:nowrap;" title="On-chain turn timer (GMT). Your turn expires automatically so the game never stalls.">02:00</div>
+                </div>
 
                 <!-- Rearranged Mobile Action Dashboard Row Grid -->
                 <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
@@ -567,6 +574,11 @@
                         var seatNo = (typeof window.__mpJoinedSeat === 'number') ? (window.__mpJoinedSeat + 1) : '';
                         window.mpSetStatus('Match is LIVE' + (seatNo ? ' - you are Seat ' + seatNo : '') + '. Wait for the host to roll, then it is your turn.');
                     }
+                    // M12 on-chain turn timer: start the countdown chip when the
+                    // joiner's local board begins (joiner).
+                    if (typeof window.mpEnsureTimer === 'function') {
+                        try { window.mpEnsureTimer(); } catch (e) {}
+                    }
                 } catch (e) { /* soft */ }
             }
         });
@@ -651,7 +663,9 @@
         doCreate();
         function doCreate() {
             window.mpSetStatus('creating ' + seats + '-seat match...');
-            a.start(1, [], seats, 60, 3600, 0).then(function (r) {
+            // M12 on-chain turn timer: 120s per turn (Ludo's per-game value).
+            // Kept on the board at create; the countdown + expire_turn drive it.
+            a.start(1, [], seats, 120, 3600, 0).then(function (r) {
                 if (!r) { window.mpSetStatus('create failed (see console)'); return; }
                 var code = String(r.code || '').toUpperCase();
                 var codeEl = document.getElementById('mp-code');
@@ -829,6 +843,94 @@
             if (pollTimer) return;
             pollTimer = setInterval(function () { try { window.__mpPollLobby(); } catch (e) {} }, 1200);
         };
+        // M12 ON-CHAIN TURN TIMER: renders the active seat's countdown from the
+        // on-chain gfgclock deadlines (GMT, the same clock the rest of the
+        // platform uses) and advances a stalled turn so play never hangs on a
+        // walkaway. Purely a display + convenience driver of the on-chain
+        // timer; the enforcement itself is the program's clock instructions.
+        var mpTimerTick = null;
+        var mpTimerShown = false;
+        var mpTurnDeadline = 0;   // ms epoch when the current turn's window ends
+        var mpTurnSecs = 120;     // Ludo's per-game turn_secs (from board state if visible)
+        var mpTimeoutSent = {};   // seat -> bool, so we expire a stall ONCE per window
+        window.__mpTouchTurn = function (turnSecs) {
+            // Called (adapter/page) whenever the current turn advances on this
+            // device: the CURRENT turn's deadline resets, giving this player
+            // their own full window. The on-chain deadline is the real one
+            // (last_turn_ts + turn_secs); this local mark only drives the
+            // display countdown, and expire_turn enforces on-chain.
+            if (typeof turnSecs === 'number' && turnSecs > 0) mpTurnSecs = turnSecs;
+            mpTurnDeadline = Date.now() + mpTurnSecs * 1000;
+        };
+        window.mpEnsureTimer = function () {
+            if (mpTimerTick) return;
+            mpTimerTick = setInterval(function () {
+                try {
+                    var a = window.gfgLudoAdapter;
+                    if (!a || typeof a.isActive !== 'function' || !a.isActive()) {
+                        var hideEl = document.getElementById('mp-turn-timer');
+                        if (hideEl) hideEl.style.display = 'none';
+                        return;
+                    }
+                    var chip = document.getElementById('mp-turn-timer');
+                    var live = false;
+                    try { live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked && !!(a && a.ref && a.ref()); } catch (e) {}
+                    if (!chip || !live) { if (chip) chip.style.display = 'none'; return; }
+                    var turn = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
+                    var order = (typeof a.activeOrder === 'function') ? a.activeOrder() : ['green', 'red'];
+                    var seatIdx = order.indexOf(turn);
+                    if (seatIdx < 0) { chip.style.display = 'none'; return; }
+                    // (Re)base the local deadline whenever the turn advances on
+                    // THIS device (own pass or a remote commit that flipped the
+                    // turn). commitMove already refreshed the mover's on-chain
+                    // deadline; this mark keeps the display in step.
+                    if (!mpTimerShown) {
+                        mpTimerShown = true;
+                        window.__mpTouchTurn(mpTurnSecs);
+                    }
+                    var remaining = Math.max(0, Math.floor((mpTurnDeadline - Date.now()) / 1000));
+                    var mm = Math.floor(remaining / 60), ss = remaining % 60;
+                    chip.textContent = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+                    chip.style.display = 'inline-block';
+                    chip.style.background = remaining <= 15 ? '#e74c3c' : (remaining <= 30 ? '#f39c12' : '#7838f8');
+                    // Expired: advance the stalled turn ON-CHAIN (permissionless
+                    // expire_turn; the PROGRAM verifies the real deadline, so the
+                    // on-chain rule supersedes this display). Once per window.
+                    if (remaining <= 0 && seatIdx !== (typeof a.seat === 'function' ? a.seat() : -1)) {
+                        var ref = (typeof a.ref === 'function') ? a.ref() : 0;
+                        if (ref && !mpTimeoutSent[seatIdx]) {
+                            mpTimeoutSent[seatIdx] = true;
+                            var rail2 = window.gfgMultiplayer;
+                            var fireExpire = (rail2 && typeof rail2.expireTurn === 'function')
+                                ? function () { return rail2.expireTurn(ref); }
+                                : (typeof a.expireTurn === 'function' ? function () { return a.expireTurn(); } : null);
+                            if (fireExpire) {
+                                var pr;
+                                try { pr = fireExpire(); } catch (e) { pr = null; }
+                                if (pr && typeof pr.then === 'function') {
+                                    pr.then(function (r) {
+                                        if (r && r.okay) {
+                                            if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Player did not move in time - turn passed so play continues.');
+                                            window.__mpTouchTurn(mpTurnSecs); // next window starts
+                                        }
+                                        setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 4000);
+                                    }).catch(function () { setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 6000); });
+                                } else {
+                                    setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 6000);
+                                }
+                            } else {
+                                setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 6000);
+                            }
+                        }
+                    }
+                } catch (e) { /* soft */ }
+            }, 1000);
+        };
+        window.mpStopTimer = function () {
+            if (mpTimerTick) { clearInterval(mpTimerTick); mpTimerTick = null; }
+            var chip = document.getElementById('mp-turn-timer');
+            if (chip) chip.style.display = 'none';
+        };
         // Host: begin the multiplayer board + lobby when the real game starts.
         // MP gate: the local game must NOT start until the on-chain begin_match
         // actually succeeded (status 0 -> 1). If it fails (e.g. a seat is still
@@ -886,6 +988,11 @@
                                 // board is genuinely live.
                                 if (typeof window.mpSetStatus === 'function') {
                                     window.mpSetStatus('Match is LIVE - your turn to play!');
+                                }
+                                // M12 on-chain turn timer: start the countdown chip
+                                // when the live match begins (host).
+                                if (typeof window.mpEnsureTimer === 'function') {
+                                    try { window.mpEnsureTimer(); } catch (e) {}
                                 }
                                 return started;
                             }
@@ -994,6 +1101,9 @@ updateSeatButtons();
                     window.mpSetStatus('Match LIVE resumed - continuing where you left off.');
                     if (typeof window.__mpResumeBoard === 'function') {
                         try { window.__mpResumeBoard(r); } catch (e) { /* soft */ }
+                    }
+                    if (typeof window.mpEnsureTimer === 'function') {
+                        try { window.mpEnsureTimer(); } catch (e) {}
                     }
                 } else {
                     window.mpSetStatus('Match still waiting for players - press Start when ready.');

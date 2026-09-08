@@ -1559,6 +1559,60 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    // ===== M12 turn timer (core of each game, per-game turn_secs) =====
+    // expire_turn: the on-chain per-turn timer. The game adapter writes, in
+    // EVERY commit's byte19, the seat that is ACTUALLY next to play (its own
+    // colour on a mid-turn/double-six-bonus commit, the next seat on a pass).
+    // The turn window started at the LAST action (last_turn_ts[last_mover]).
+    // When that window passes without `to_play` acting, ANYONE may call
+    // expire_turn:
+    //   - the stalled player's turn is skipped and the board cursor advances to
+    //     the seat AFTER them (so an inactive player can never hold the game
+    //     hostage - the other player keeps playing to win);
+    //   - move_count bumps with a 32-byte "expired" marker (byte0 = 255 +
+    //     byte19 = the seat that is next to play), so every device's
+    //     subscription sees the advance deterministically;
+    //   - the new window starts: last_turn_ts[expired->next] = now, so the NEXT
+    //     player gets their own full turn_secs.
+    // Each commit_move refreshes last_turn_ts, so an actively-PLAYING seat never
+    // times out mid-turn; only a seat that stops acting for a full turn_secs
+    // expires. A double-six bonus roll is exactly like a real move: the commit
+    // refreshes the clock and byte19 = the SAME seat (a NEW turn window for the
+    // same player), so a bonus turn has its own fresh turn_secs - matching the
+    // core rule "every turn (even a bonus) gets its own 120s". turn_secs is per
+    // GAME (Ludo = 120; other games pass their own). SOLO boards are untouched.
+    pub fn expire_turn(ctx: Context<ExpireTurnCtx>, game: u8, match_ref: u64) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 1, PointsError::NotOpen);
+        require!(b.player_count >= 2, PointsError::NotSettled);
+        require!(b.current_turn != 255, PointsError::NotSettled); // turn cursor must exist
+        let last_mover = b.current_turn as usize;
+        // The seat that is actually to play = byte19 of the last commit (the
+        // game adapter writes it on EVERY commit). Fallback: seat after the last
+        // mover (classic non-bonus pass).
+        let commit_to_play = b.last_move_commit[19] as usize;
+        let to_play = if commit_to_play < b.player_count as usize { commit_to_play } else { (last_mover + 1) % b.player_count as usize };
+        // The current to-play window began at the LAST action (the last commit
+        // time). If it has NOT passed, the turn is still live - do nothing.
+        require!(now - b.last_turn_ts[last_mover] >= b.turn_secs as i64, PointsError::StillRunning);
+        // Skip the stalled player: the next seat to play is whoever follows them.
+        let next = (to_play + 1) % b.player_count as usize;
+        // 32-byte expiry marker: byte0 = 255 (not a real seat), byte19 = the
+        // seat that is next to play. The adapter treats byte0==255 as "turn
+        // advanced by timeout, board otherwise unchanged".
+        let mut marker = [0u8; 32];
+        marker[0] = 255u8;
+        marker[19] = next as u8;
+        b.last_move_commit = marker;
+        b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        b.current_turn = next as u8;
+        b.last_turn_ts[next as usize] = now;
+        Ok(())
+    }
+
     pub fn finish_match(ctx: Context<FinishMatchCtx>, game: u8, match_ref: u64, winner_seat: u8) -> Result<()> {
         require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
         let now = Clock::get()?.unix_timestamp;
@@ -2087,6 +2141,18 @@ pub struct BeginMatchCtx<'info> {
 #[derive(Accounts)]
 #[instruction(game: u8, match_ref: u64, seat: u8, move_commit: [u8; 32])]
 pub struct CommitMoveCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `expire_turn` (M12 turn timer, core of each game). Permissionless:
+/// ANY signer records a stalled turn so the game advances. Board-only accounts —
+/// no new seed, no layout change, fully solana-upgrade-safe.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct ExpireTurnCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]

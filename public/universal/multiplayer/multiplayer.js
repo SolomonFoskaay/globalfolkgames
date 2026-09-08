@@ -204,6 +204,31 @@
         }
     }
 
+    // ---- on-chain per-turn timer (game-specced, core of each game) ----
+    // The timer lives ON THE BOARD (gfgboard2): primary turn_secs is set per
+    // game at create (Ludo 120s), each seat's deadline = last_turn_ts[seat] +
+    // turn_secs (GMT). expire_turn is a permissionless anti-stall: when the
+    // current turn's window passes, any device advances the board past the
+    // stalled seat so the other player keeps playing to win. The rail stays
+    // game-agnostic (it only transports the action); the GAME chooses its own
+    // turn_secs and maps its own turn order onto the board cursor.
+    async function expireTurn(matchRef) {
+        var ref = Number(matchRef);
+        if (!ref) { emitError('expireTurn', 'no matchRef'); return { okay: false, error: 'no matchRef' }; }
+        var md = dice();
+        if (!md || typeof md.expireBoardTurn !== 'function') {
+            emitError('expireTurn', 'on-chain timer not ready on this device');
+            return { okay: false, error: 'on-chain timer not ready' };
+        }
+        try {
+            var r = await md.expireBoardTurn(GAME, ref);
+            return r && r.ok ? { okay: true, sig: r.sig } : { okay: false, error: (r && r.error) || 'expire failed' };
+        } catch (e) {
+            emitError('expireTurn', e);
+            return { okay: false, error: (e && e.message) || String(e) };
+        }
+    }
+
     window.gfgMultiplayer = {
         create: create,
         join: join,
@@ -212,6 +237,7 @@
         subscribe: subscribe,
         finish: finish,
         state: state,
+        expireTurn: expireTurn,
         hash32: function (s) {
             var out = new Uint8Array(32);
             var src = String(s || '') + '|' + Date.now();

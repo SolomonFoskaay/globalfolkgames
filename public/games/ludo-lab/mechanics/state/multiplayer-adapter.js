@@ -256,7 +256,14 @@ function applyMove(move) {
         if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
         seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
-        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
+        // M12 per-turn timer default: 120s per turn (2 minutes). The turn clock is
+        // ON-CHAIN (arc2m1f gfgclock) so the timer is provable, not a frontend
+        // guess. Each seat's deadline resets on its own legal move; a stalled
+        // seat times out (permissionless) and the game advances so play never
+        // hangs on a walkaway player. 120s is the Ludo value - other games pass
+        // their own via the same rail clock.
+        var turnSecsFinal = (typeof turnSecs === 'number' && turnSecs > 0) ? turnSecs : 120;
+        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecsFinal, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
             if (!r.okay) { log('create failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Create failed: ' + r.error); return null; }
             active = true;
             matchRef = r.matchRef;
@@ -296,6 +303,23 @@ function applyMove(move) {
                 if (s.move_count <= lastCount) return;
                 if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
                 var mv = decodeMove(s.last_move_commit);
+                // M12 turn timer: the on-chain expiry marker (byte0 = 255) means
+                // the previous turn TIMED OUT and the board cursor advanced to
+                // byte19 (= the seat that is next to play). The board positions
+                // are UNCHANGED (no move happened), so we must NOT re-apply the
+                // snapshot (its all-zero steps would wrongly re-yard every
+                // token) - only advance the sync'd turn.
+                if (mv && mv.seat === 255) {
+                    syncTurnFromBoard(s);
+                    lastCount = s.move_count;
+                    dimmed = false;
+                    var st2 = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
+                    if (st2 === color()) {
+                        if (typeof window.cancelRemoteDiceWindow === 'function') { try { window.cancelRemoteDiceWindow(); } catch (e) {} }
+                        try { if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll(); } catch (e) {}
+                    }
+                    return;
+                }
                 if (mv && mv.seat !== mySeat) {
                     // REMOTE commit: sync our turn + replay the board. The
                     // committed byte19 + board are the single source of truth,
@@ -485,6 +509,12 @@ function applyMove(move) {
             ti.innerText = c.charAt(0).toUpperCase() + c.slice(1) + "'s Turn";
             ti.style.color = cm[c] || '#2ecc71';
         }
+        // M12 turn timer: a real turn advance on this device restarts THIS
+        // player's window (the on-chain deadline is the truth; this mark drives
+        // the display countdown).
+        if (typeof window.__mpTouchTurn === 'function') {
+            try { window.__mpTouchTurn(); } catch (e) {}
+        }
         return true;
     }
 
@@ -523,11 +553,31 @@ function applyMove(move) {
         if (!active || !matchRef) return Promise.resolve({ okay: false, error: 'not in a match' });
         if (mySeat !== 0) return Promise.resolve({ okay: false, error: 'only the host can start' });
         return rail().begin({ gameId: 1, matchRef: matchRef }).then(function (r) {
-            if (r && r.okay) log('match begun');
-            else if (r && r.error) { log('begin failed', r.error); if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Start failed: ' + r.error); }
+            if (r && r.okay) {
+                log('match begun');
+                // M12 on-chain turn timer (core of each game): turn_secs was set
+                // per game at create (Ludo = 120s) and lives ON THE BOARD, so no
+                // extra init is needed. Every commit_move already refreshes the
+                // mover's own deadline (last_turn_ts[seat]), and the page's
+                // countdown reads the board deadline + calls rail().expireTurn
+                // when it passes. Nothing to start here - the board IS the timer.
+            } else if (r && r.error) { log('begin failed', r.error); if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Start failed: ' + r.error); }
             return r;
         });
     }
+
+    // M12 turn timer bridge: advance a STALLED turn on-chain (permissionless;
+    // the program verifies the deadline passed). Called by the page when the
+    // active seat's countdown hits 0. Soft-fail so the game never blocks.
+    function expireTurn() {
+        if (!active || !matchRef || !rail() || typeof rail().expireTurn !== 'function') return;
+        try {
+            var p = rail().expireTurn(matchRef);
+            if (p && typeof p.then === 'function') p.catch(function (e) { log('expire turn err ' + e); });
+        } catch (e) { log('expire turn err ' + e); }
+    }
+
+    // ------- SERIALIZED COMMIT CHAIN -------
 
     // Serialized commit chain: every gasless board write (dice/move/pass) is sent
 // ONE AT A TIME, each awaiting the previous one's confirmation. This is the
@@ -600,6 +650,8 @@ function onDiceRoll(die1, die2) {
 function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
     if (!active || !matchRef) return;
     movedThisTurn = true;
+    // (M12 turn timer: commit_move already refreshes the mover's on-chain
+    // deadline, so no separate touch call is needed - the board is the timer.)
     var bytes;
     try {
         bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, false);
@@ -666,7 +718,7 @@ function onFinish(winnerSeat) {
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, resume: resume, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, resume: resume, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, expireTurn: expireTurn, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;

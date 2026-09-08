@@ -868,6 +868,36 @@ export async function finishBoardMatch(game, matchRef, winnerSeat) {
   return { ok: true, sig };
 }
 
+// ===== M12 turn timer (core of each game, on the BOARD, per-game turn_secs) ====
+// The per-turn timer lives ON THE BOARD itself (seed gfgboard2): each seat's
+// turn deadline = last_turn_ts[seat] + turn_secs (GMT UTC-00). turn_secs is the
+// per-GAME value set at start_match (Ludo = 120s; other games pass their own),
+// so it is game-specced, not game-agnostic. commit_move already resets the
+// mover's last_turn_ts, so every roll (including a double-six bonus roll = a
+// fresh turn) restarts that seat's own window.
+//
+// expire_turn: PERMISSIONLESS anti-stall. Once the CURRENT turn's window passed
+// (the seat whose turn it is did not act within turn_secs), ANY device may call
+// this so the board cursor advances past the stalled seat - the other player
+// keeps playing to win instead of being held hostage. The expiry marker lands
+// in last_move_commit (byte0=255 + byte19=next-to-play) + move_count++, so every
+// device's subscription advances deterministically. Gasless ER write; the caller's
+// session key signs (0 SOL). Soft-fail: if the chain hiccups, the game still
+// plays (the timer just doesn't advance until it retries).
+export async function expireBoardTurn(game, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the turn expiry.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('expire_turn', async (eCtx) => eCtx.program.methods
+    .expireTurn(game, new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
 function pointsPdaFor(gameTag, payerPubkey) {
   return PublicKey.findProgramAddressSync(
     [POINTS_SEED, Buffer.from(gameTag, 'utf8'), payerPubkey.toBytes()],
@@ -1252,6 +1282,10 @@ export function initMagicBlockDice() {
     },
     finishBoardMatch(game, matchRef, winnerSeat) {
       return finishBoardMatch(game, matchRef, winnerSeat);
+    },
+    // M12 on-chain per-turn timer: advance a stalled turn (the board is the timer).
+    expireBoardTurn(game, matchRef) {
+      return expireBoardTurn(game, matchRef);
     },
 
     // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.
