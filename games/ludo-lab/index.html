@@ -846,23 +846,14 @@
             if (pollTimer) return;
             pollTimer = setInterval(function () { try { window.__mpPollLobby(); } catch (e) {} }, 1200);
         };
-        // M12 ON-CHAIN TURN TIMER: renders the active seat's countdown from the
-        // on-chain gfgclock deadlines (GMT, the same clock the rest of the
-        // platform uses) and advances a stalled turn so play never hangs on a
-        // walkaway. Purely a display + convenience driver of the on-chain
-        // timer; the enforcement itself is the program's clock instructions.
+        // M12 ON-CHAIN TURN TIMER: the program owns the turn deadline
+        // (last_turn_ts[seat] = an absolute GMT timestamp, set at begin/on each
+        // turn boundary). This frontend ONLY reads it + displays it - exactly
+        // like the lives-refill / subscription / booster timers. It never caches
+        // or enforces; it just mirrors what the board says, and hands the chain
+        // a permissionless expire call when the deadline has genuinely passed.
         var mpTimerTick = null;
-        var mpTurnSecs = 45;      // Ludo's per-game turn_secs
         var mpTimeoutSent = {};   // seat -> bool, so we expire a stall ONCE per window
-        // M12 turn timer display: the countdown is driven by the ON-CHAIN anchor
-        // only - deadline = max(last_turn_ts[activeSeat], started_at) + turn_secs
-        // (the exact value the program's expire_turn enforces). The frontend
-        // never stores or trusts its own timing; it just renders what the board
-        // says. `turnSecs` is only a fallback for rendering during the brief
-        // window before the first state() returns.
-        window.__mpTouchTurn = function (turnSecs) {
-            if (typeof turnSecs === 'number' && turnSecs > 0) mpTurnSecs = turnSecs;
-        };
         window.mpEnsureTimer = function () {
             if (mpTimerTick) return;
             mpTimerTick = setInterval(function () {
@@ -880,36 +871,39 @@
                     var ref = (typeof a.ref === 'function') ? a.ref() : 0;
                     var rail2 = window.gfgMultiplayer;
                     if (!ref || !rail2 || typeof rail2.state !== 'function' || typeof rail2.expireTurn !== 'function') { if (chip) chip.style.display = 'none'; return; }
-                    // Read the authoritative on-chain deadline for the active seat.
+                    // Read the on-chain board facts (the single source of truth).
                     rail2.state(ref).then(function (s) {
                         try {
                             if (!chip || !s || !s.ok) return;
-                            var turnSecs = Number(s.turn_secs || mpTurnSecs);
-                            var startedAt = Number(s.started_at || 0) * 1000;
                             var lastTs = (s.last_turn_ts && Array.isArray(s.last_turn_ts)) ? s.last_turn_ts : [];
+                            // The active seat = the board's current_turn (later the
+                            // seat that just played via byte19). At begin current_turn
+                            // is 255 = first seat (0) to play; after a commit the
+                            // adapter syncs it to the on-chain turn. Use the local
+                            // game's currentTurn color -> seat index as the display
+                            // anchor, falling back to 0.
                             var turn = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
                             var order = (typeof a.activeOrder === 'function') ? a.activeOrder() : ['green', 'red'];
                             var seatIdx = order.indexOf(turn);
-                            if (seatIdx < 0 || seatIdx >= lastTs.length) { chip.style.display = 'none'; return; }
-                            // Anchor = the seat's turn-began time, clamped to match
-                            // start (the program does the same). 0/unknown => hide.
-                            var anchorMs = Math.max(Number(lastTs[seatIdx] || 0) * 1000, startedAt);
-                            if (!anchorMs) { chip.style.display = 'none'; return; }
-                            var deadlineMs = anchorMs + turnSecs * 1000;
-                            var remaining = Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000));
-                            var mm = Math.floor(remaining / 60), ss = remaining % 60;
-                            chip.textContent = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+                            if (seatIdx < 0) seatIdx = 0;
+                            // The program stores the ABSOLUTE deadline for this seat.
+                            // Display = deadline - now (0 => hide; not yet seeded).
+                            var deadlineSec = Number(lastTs[seatIdx] || 0);
+                            if (!deadlineSec) { chip.style.display = 'none'; return; }
+                            var remainingMs = (deadlineSec * 1000) - Date.now();
+                            if (remainingMs < 0) remainingMs = 0;
+                            var mm = Math.floor(remainingMs / 60000);
+                            var ss = Math.floor(remainingMs % 60000 / 1000);
+                            var ms = Math.floor(remainingMs % 1000);
+                            // Display: 00m:45s:000ms (the format the owner asked for).
+                            chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
                             chip.style.display = 'inline-block';
-                            chip.style.background = remaining <= 15 ? '#e74c3c' : (remaining <= 30 ? '#f39c12' : '#7838f8');
-                            // Expired: advance the stalled turn ON-CHAIN. The
-                            // PROGRAM verifies the real deadline, so this is the
-                            // on-chain rule, not the display. It fires from ANY
-                            // device (including the active player's own) so a
-                            // single test device can observe the auto-pass just
-                            // like the opponent's phone would - expire_turn is
-                            // permissionless when the window is genuinely up.
-                            // Once per window.
-                            if (remaining <= 0) {
+                            chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
+                            // Deadline passed => the PROGRAM enforces the pass. The
+                            // frontend only triggers the permissionless expire call
+                            // (each device may - including the active player's own)
+                            // once per window so the match cannot stall.
+                            if (remainingMs <= 0) {
                                 if (ref && !mpTimeoutSent[seatIdx]) {
                                     mpTimeoutSent[seatIdx] = true;
                                     var pr;

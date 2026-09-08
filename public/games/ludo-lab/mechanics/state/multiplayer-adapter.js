@@ -515,12 +515,6 @@ function applyMove(move) {
             ti.innerText = c.charAt(0).toUpperCase() + c.slice(1) + "'s Turn";
             ti.style.color = cm[c] || '#2ecc71';
         }
-        // M12 turn timer: a real turn advance on this device restarts THIS
-        // player's window (the on-chain deadline is the truth; this mark drives
-        // the display countdown).
-        if (typeof window.__mpTouchTurn === 'function') {
-            try { window.__mpTouchTurn(); } catch (e) {}
-        }
         return true;
     }
 
