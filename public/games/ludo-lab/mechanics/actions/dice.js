@@ -252,9 +252,11 @@ async function rollDiceEngine(source) {
     // active and it is the REMOTE seat's turn (not our seat), do not roll here -
     // the remote player rolls + commits that roll; this device waits for the
     // commit and applies it. Prevents two devices from rolling divergent dice.
+    // The warning mirrors the single-player computer anti-cheat: interference is
+    // ignored. gfgRemoteTurn() is false when the rail is idle, so solo is safe.
     try {
         if (typeof window.gfgRemoteTurn === 'function' && window.gfgRemoteTurn()) {
-            displayEducationalLog("Waiting for the remote player's move...");
+            displayEducationalLog("ANTI-CHEAT: It is the other player's turn - you cannot roll. Waiting for their move...");
             return;
         }
     } catch (e) { /* soft */ }

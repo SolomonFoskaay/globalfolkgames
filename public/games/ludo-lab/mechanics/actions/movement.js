@@ -57,6 +57,17 @@ function handleInputInteraction(clientX, clientY) {
     if (isGamePaused) return;
     if (typeof matchOver !== 'undefined' && matchOver) return;
     if (playerProfiles[currentTurn].mode === 'computer') return;
+    // M12 multiplayer: a REMOTE player's turn shows their moveable tokens
+    // blinking (core isTokenMovable) but is NOT clickable here - same rule as a
+    // single-player computer turn. Tapping the remote player's blinking tokens
+    // (or rolling for them) shows the anti-cheat warning and is ignored.
+    // gfgRemoteTurn() is false in single-player, so this never affects it.
+    try {
+        if (typeof window.gfgRemoteTurn === 'function' && window.gfgRemoteTurn()) {
+            displayEducationalLog('ANTI-CHEAT: It is the other player\u2019s turn - you cannot move their tokens.');
+            return;
+        }
+    } catch (e) { /* soft */ }
 
     if (!isDiceRolled || currentTurnMoves.length === 0) return;
     // Anti-race guard (owner 2026-08-31): no token taps while the dice are

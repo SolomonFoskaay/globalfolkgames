@@ -170,12 +170,27 @@ function positionToken(token, enc, color, tIdx) {
     // Fallback: keep as-is (unknown encoding) - never touch an existing token.
 }
 
+// Edge: does the incoming snapshot differ from the CURRENT board? A dice-only
+// commit carries the SAME positions as the board when the roll was made (just
+// dice flags), so the receiver can tell "roll happened" (show dice + arm blink)
+// from "a token actually moved" (update tokens only). This mirrors singleplayer:
+// dice show, then the core blink appears for the current turn's moveable tokens.
+function snapshotDiffers(move) {
+    if (!move || !Array.isArray(move.steps)) return false;
+    var cur = snapshotFromTokens();
+    for (var i = 0; i < 16 && i < move.steps.length && i < cur.length; i++) {
+        if ((move.steps[i] || 0) !== cur[i]) return true;
+    }
+    return false;
+}
+
 // apply a committed snapshot to the local board (deterministic).
 // Returns true when the move finished the opponent; 'not-ready' if board is up.
 function applyMove(move) {
     var won = false;
     try {
         if (!window.tokens) return 'not-ready';
+        var wasDiceCommit = !snapshotDiffers(move);
         // Reconstruct EVERY token from the snapshot - no move replay needed.
         var anyMissing = false;
         for (var c = 0; c < 4; c++) {
@@ -188,9 +203,10 @@ function applyMove(move) {
             }
         }
         if (anyMissing) return 'not-ready';
-        // Shared dice: mirror the committed roll onto this device so both
-        // screens show the same dice the remote player rolled.
-        if (move.die1 > 0 && move.die2 > 0 && typeof window.showRemoteDice === 'function') {
+        // Shared dice: only a DICE commit (positions unchanged) mirrors the roll
+        // onto this device AND arms the blink window. A real move commit just
+        // updates tokens (no re-show of dice); a pass commit just advances.
+        if (wasDiceCommit && move.die1 > 0 && move.die2 > 0 && typeof window.showRemoteDice === 'function') {
             try { window.showRemoteDice(move.die1, move.die2); } catch (e) { /* soft */ }
         }
         // Fire wins deterministically: any token at 57 after the snapshot is a
@@ -294,19 +310,33 @@ function applyMove(move) {
                     }
                     lastCount = s.move_count;
                     dimmed = false;
-                    // The board-synced turn was already set by
-                    // syncTurnFromBoard (same seat on double-six, else next
-                    // seat). Do NOT call passTurnSequence here - that would
-                    // advance AGAIN off a device-local guess and skip RED.
-                    // Just reset the roll flags so the new turn can roll.
-                    try {
-                        if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
-                    } catch (e) { /* soft */ }
+                    // Only reset the ROLL flags when the shared turn is now OUR
+                    // seat (a remote pass just handed us the turn). During the
+                    // remote player's own turn (their dice/move commits), the
+                    // core blink state we feed (currentTurnMoves / isDiceRolled)
+                    // must SURVIVE so the opponent sees their moveable tokens.
+                    var sharedTurn = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
+                    if (sharedTurn === color()) {
+                        // Cancel any pending remote-dice blink window so the
+                        // remote's dice never leak into OUR token blink, then
+                        // reset the roll flags for our fresh turn.
+                        if (typeof window.cancelRemoteDiceWindow === 'function') {
+                            try { window.cancelRemoteDiceWindow(); } catch (e) {}
+                        }
+                        try {
+                            if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll();
+                        } catch (e) { /* soft */ }
+                    }
                 } else {
-                    // Our OWN commit: bump the count AND sync the displayed
-                    // turn from the board (it matches our local pass; commits
-                    // are serialized so no stale one can reorder behind a pass).
-                    syncTurnFromBoard(s);
+                    // Our OWN commit: bump the count ONLY. The roller's LOCAL
+                    // game is authoritative for its own turn (passTurnSequence
+                    // already advanced it correctly). Re-syncing the turn from
+                    // the board here caused the "flash" bug: the local pass
+                    // happens ~2-4s BEFORE the serialized pass commit lands
+                    // on-chain, so a poll mid-window saw our own stale mid-turn
+                    // move commit (byte19 = our seat) and flashed our colour
+                    // back for a few seconds. A click in that window desynced
+                    // the match. Own commits never move our own displayed turn.
                     lastCount = s.move_count;
                 }
             } catch (e) { log('listen err ' + e.message); }
@@ -444,24 +474,11 @@ function applyMove(move) {
         var c = turnFromBoard(s);
         if (!c) return false;
         var got = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
-        if (got === c) {
-            // When the synced turn is already correct AND it is now OUR turn,
-            // clear any stale remote-preview hand so our own tokens blink from
-            // our own dice, not the last remote values.
-            if (c === color() && typeof window.mpClearRemotePreview === 'function') {
-                try { window.mpClearRemotePreview(); } catch (e) {}
-            }
-            return true;
-        }
+        if (got === c) return true;
         // A new turn began -> the per-turn 'did we move?' flag resets so the
         // next turn-ending pass commit works even after a zero-move turn.
         movedThisTurn = false;
         if (window.setGameCurrentTurn) { try { window.setGameCurrentTurn(c); } catch (e) {} }
-        // If the new turn is OUR colour, drop the remote-preview hand (our own
-        // roll will drive the blink from here).
-        if (c === color() && typeof window.mpClearRemotePreview === 'function') {
-            try { window.mpClearRemotePreview(); } catch (e) {}
-        }
         var ti = document.getElementById('turn-indicator');
         if (ti) {
             var cm = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
@@ -498,43 +515,6 @@ function applyMove(move) {
             });
         } catch (e) { /* soft */ }
     }
-
-    // VISUAL-ONLY "which tokens can these committed dice apply to?" for the
-    // OPPONENT'S board. When the remote player rolls/moves, this device renders
-    // their moveable tokens with the blink halo so it is obvious what the remote
-    // hand could do (helps the player reason about captures / safety). It is
-    // PURELY a preview: it reads window.__mpRemoteDiceValues (set by
-    // showRemoteDice) and NEVER touches currentTurnMoves, so the real
-    // isTokenMovable (which drives actual taps/rolls) still returns false for a
-    // remote turn - the opponent can never actually drag a token that is not
-    // theirs. Solo is untouched (the preview returns false when the rail is
-    // idle, so single-player blink behaviour is identical).
-    function isTokenMovablePreview(color, token, index) {
-        try {
-            var railActive = active && typeof window.getGameCurrentTurn === 'function';
-            if (!railActive) return false;
-            var dv = window.__mpRemoteDiceValues;
-            if (!Array.isArray(dv) || !dv.length) return false;
-            var cur = window.getGameCurrentTurn ? window.getGameCurrentTurn() : '';
-            if (color !== cur) return false;
-            if (token.stepsWalked >= 57) return false;
-            if (typeof isTokenInHomeYard === 'function' && isTokenInHomeYard(color, token)) {
-                return (dv.indexOf(6) !== -1);
-            }
-            return dv.some(function (v) { return token.stepsWalked + v <= 57; });
-        } catch (e) { return false; }
-    }
-    window.isTokenMovablePreview = isTokenMovablePreview;
-
-    // Clear the remote-preview hand + re-blip when OUR turn begins, so our own
-    // tokens blink via the normal isTokenMovable path (from OUR rolled dice),
-    // not the stale remote hand.
-    window.mpClearRemotePreview = function () {
-        window.__mpRemoteDiceValues = [];
-        if (typeof window.ensureBoardAnimationLoop === 'function') {
-            try { window.ensureBoardAnimationLoop(); } catch (e) {}
-        }
-    };
 
     // HOST-ONLY: begin the live match (status 0 -> 1), locking out new joins.
     // The host MUST be players[0] (resolved at create); the rail signs the

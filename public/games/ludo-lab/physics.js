@@ -507,6 +507,16 @@ function renderPhysicalDiceCubes() {
 // board (physical cubes + the val-d1/d2/total text). The remote device rolled
 // on-chain and committed die1/die2; we show the same numbers here so both
 // phones "see" the same dice. Soft-fail: only renders if the 3D path is up.
+// remote-dice settle timeout handle (one per matching pair, so a move commit
+// right after a dice commit doesn't re-arm the dice window each time).
+let _remoteDiceClearTimer = null;
+
+// Cancel a pending remote-dice blink window (used when the shared turn flips to
+// OUR seat, so the remote's dice never leak into our own token blink).
+window.cancelRemoteDiceWindow = function () {
+    if (_remoteDiceClearTimer) { clearTimeout(_remoteDiceClearTimer); _remoteDiceClearTimer = null; }
+};
+
 window.showRemoteDice = function (die1, die2) {
     try {
         displayDiceOnBoard = true;
@@ -521,9 +531,6 @@ window.showRemoteDice = function (die1, die2) {
             { x: 200, y: 260, vx: 0, vy: 0, value: die1, finalValue: die1, _settledExact: true, q: [1, 0, 0, 0] },
             { x: 310, y: 300, vx: 0, vy: 0, value: die2, finalValue: die2, _settledExact: true, q: [1, 0, 0, 0] }
         ];
-        // Mirror the committed roll into the remote-preview hand so the
-        // opponent's board can blink WHICH tokens these values can apply to.
-        try { window.__mpRemoteDiceValues = [Number(die1), Number(die2)]; } catch (e) {}
         var d1 = document.getElementById('val-d1');
         var d2 = document.getElementById('val-d2');
         var tt = document.getElementById('val-total');
@@ -531,6 +538,25 @@ window.showRemoteDice = function (die1, die2) {
         if (d2) d2.innerText = die2;
         if (tt) tt.innerText = '= Total: ' + (die1 + die2);
         if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
+        // Mirror the roller's timing: the dice show for the same ~3.5s window,
+        // then clear so the CORE isTokenMovable starts blinking the remote
+        // player's moveable tokens (exact core rules - yard only on a 6, track
+        // only when steps+value<=57, never while the dice are on the board).
+        if (_remoteDiceClearTimer) { clearTimeout(_remoteDiceClearTimer); _remoteDiceClearTimer = null; }
+        _remoteDiceClearTimer = setTimeout(function () {
+            _remoteDiceClearTimer = null;
+            try {
+                displayDiceOnBoard = false;
+                // Feed the SAME core roll state the roller's own device uses:
+                // isDiceRolled true + the committed values in currentTurnMoves.
+                // isTokenMovable (core) then blinks exactly the moveable tokens,
+                // on both boards, gated by color===currentTurn which the adapter
+                // already synced to the remote player's colour.
+                currentTurnMoves = (typeof die1 === 'number' && typeof die2 === 'number') ? [die1, die2] : [];
+                if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
+                if (typeof drawLudoLayout === 'function') { try { drawLudoLayout(); } catch (e) {} }
+            } catch (e) { /* soft */ }
+        }, 3500);
         if (typeof drawLudoLayout === 'function') { try { drawLudoLayout(); } catch (e) {} }
     } catch (e) { /* soft */ }
 };
