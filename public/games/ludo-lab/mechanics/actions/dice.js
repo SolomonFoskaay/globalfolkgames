@@ -428,6 +428,10 @@ function finalizeDiceScores() {
     if (lastDiceRoll1 === 6 && lastDiceRoll2 === 6) {
         consecutiveDoubleSixes++;
         displayEducationalLog(`${upperColor}: Rolled a double 6! Bonus turn loaded. ${diceSourceTag}`);
+        // M12 turn timer observer (additive, non-gameplay): a double-six means a
+        // bonus turn is granted; the NEXT roll begins a NEW 120s window for the
+        // same seat (a new turn, not an extension of this one).
+        try { window.__mpBonusPending = true; } catch (e) {}
     } else {
         consecutiveDoubleSixes = 0;
         displayEducationalLog(`${upperColor}: Rolled ${lastDiceRoll1} and ${lastDiceRoll2}. Select a blinking token. ${diceSourceTag}`);

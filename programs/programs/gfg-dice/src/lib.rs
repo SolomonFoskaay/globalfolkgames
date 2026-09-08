@@ -1555,32 +1555,48 @@ pub mod gfg_dice {
         b.last_move_commit = move_commit;
         b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
         b.current_turn = seat;
-        b.last_turn_ts[seat as usize] = now;
+        // ===== M12 turn timer (core of each game, fixed-window rule) =====
+        // byte20 of the commit is the turn-BOUNDARY flag set by the game
+        // adapter ONLY when a NEW turn begins:
+        //   - a pass to the next seat (byte19 = next seat), or
+        //   - a double-six bonus roll (byte19 = the SAME seat, a new turn).
+        // When it is set we anchor that seat's turn-began time (last_turn_ts)
+        // to now, giving the next turn's player a FRESH window. On ordinary
+        // rolls/moves we do NOT touch it, so a turn's 120s window is FIXED from
+        // its start: rolling/moving/thinking never extends it (the fixed-window
+        // rule). expire_turn reads this anchor and force-passes when
+        // now - anchor >= turn_secs. last_turn_ts is written nowhere else and
+        // read only by expire_turn, so repurposing it is safe.
+        if move_commit[20] == 1 {
+            let t = move_commit[19] as usize;
+            if t < b.player_count as usize {
+                b.last_turn_ts[t] = now;
+            }
+        }
         Ok(())
     }
 
-    // ===== M12 turn timer (core of each game, per-game turn_secs) =====
-    // expire_turn: the on-chain per-turn timer. The game adapter writes, in
-    // EVERY commit's byte19, the seat that is ACTUALLY next to play (its own
-    // colour on a mid-turn/double-six-bonus commit, the next seat on a pass).
-    // The turn window started at the LAST action (last_turn_ts[last_mover]).
-    // When that window passes without `to_play` acting, ANYONE may call
-    // expire_turn:
+    // ===== M12 turn timer (core of each game, fixed-window rule) =====
+    // expire_turn: the on-chain per-turn timer. FIXED-window: each turn has its
+    // own turn_secs from when it BEGAN (anchored in last_turn_ts by commit_move
+    // when the adapter flags a turn boundary - a pass to the next seat, or a
+    // double-six bonus = a NEW turn for the same seat). Rolling/moving/thinking
+    // within a turn NEVER extends its window; only a genuine new turn (pass or
+    // bonus) starts a fresh one. When the current turn's window passes, ANYONE
+    // may call expire_turn:
     //   - the stalled player's turn is skipped and the board cursor advances to
     //     the seat AFTER them (so an inactive player can never hold the game
     //     hostage - the other player keeps playing to win);
     //   - move_count bumps with a 32-byte "expired" marker (byte0 = 255 +
     //     byte19 = the seat that is next to play), so every device's
     //     subscription sees the advance deterministically;
-    //   - the new window starts: last_turn_ts[expired->next] = now, so the NEXT
-    //     player gets their own full turn_secs.
-    // Each commit_move refreshes last_turn_ts, so an actively-PLAYING seat never
-    // times out mid-turn; only a seat that stops acting for a full turn_secs
-    // expires. A double-six bonus roll is exactly like a real move: the commit
-    // refreshes the clock and byte19 = the SAME seat (a NEW turn window for the
-    // same player), so a bonus turn has its own fresh turn_secs - matching the
-    // core rule "every turn (even a bonus) gets its own 120s". turn_secs is per
-    // GAME (Ludo = 120; other games pass their own). SOLO boards are untouched.
+    //   - the new window starts: last_turn_ts[next] = now, so the NEXT player
+    //     gets their own full turn_secs.
+    // The first turn has no prior commit, so the anchor falls back to the
+    // match's started_at (the match's clock begins when it starts). A double-six
+    // ORIGINAL turn AND every bonus are each time-bound with their own fresh
+    // turn_secs - exactly the core rule. turn_secs is per GAME (Ludo = 120;
+    // other games pass their own). SOLO boards are untouched.
     pub fn expire_turn(ctx: Context<ExpireTurnCtx>, game: u8, match_ref: u64) -> Result<()> {
         require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
         require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
@@ -1588,16 +1604,29 @@ pub mod gfg_dice {
         let b = &mut ctx.accounts.board;
         require!(b.status == 1, PointsError::NotOpen);
         require!(b.player_count >= 2, PointsError::NotSettled);
-        require!(b.current_turn != 255, PointsError::NotSettled); // turn cursor must exist
-        let last_mover = b.current_turn as usize;
-        // The seat that is actually to play = byte19 of the last commit (the
-        // game adapter writes it on EVERY commit). Fallback: seat after the last
-        // mover (classic non-bonus pass).
-        let commit_to_play = b.last_move_commit[19] as usize;
-        let to_play = if commit_to_play < b.player_count as usize { commit_to_play } else { (last_mover + 1) % b.player_count as usize };
-        // The current to-play window began at the LAST action (the last commit
-        // time). If it has NOT passed, the turn is still live - do nothing.
-        require!(now - b.last_turn_ts[last_mover] >= b.turn_secs as i64, PointsError::StillRunning);
+        // The seat actually to play. Before the first commit (current_turn is
+        // still 255) the game's first turn belongs to seat 0 (the host / first
+        // active seat) by convention; after a commit it is byte19 of the last
+        // commit (the adapter writes it on EVERY commit), falling back to the
+        // seat after the last mover for a classic non-bonus pass.
+        let (last_mover, to_play) = if b.current_turn == 255 {
+            (0usize, 0usize)
+        } else {
+            let lmv = b.current_turn as usize;
+            let ctp = b.last_move_commit[19] as usize;
+            let tp = if ctp < b.player_count as usize { ctp } else { (lmv + 1) % b.player_count as usize };
+            (lmv, tp)
+        };
+        // FIXED-window anchor: when the adapter flagged a turn boundary the
+        // commit stored the turn's BEGIN time in last_turn_ts[to_play]. That is
+        // when the CURRENT turn started; it does not move on rolls/moves.
+        // Clamp to started_at: last_turn_ts[to_play] is also stamped at join
+        // (before the match begins), so a turn can never anchor before the
+        // match started. This makes the FIRST turn (no boundary commit yet)
+        // correctly anchored to the match start, and every later boundary set
+        // last_turn_ts[to_play] = now (after started_at) which wins.
+        let anchor = b.last_turn_ts[to_play].max(b.started_at);
+        require!(now - anchor >= b.turn_secs as i64, PointsError::StillRunning);
         // Skip the stalled player: the next seat to play is whoever follows them.
         let next = (to_play + 1) % b.player_count as usize;
         // 32-byte expiry marker: byte0 = 255 (not a real seat), byte19 = the

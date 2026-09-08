@@ -249,6 +249,15 @@ export async function boardState({ game, matchRef }) {
       seats: d[276],
       handles,
       current_turn: d[469],
+      // M12 turn timer: per-seat turn-began anchors (GMT). Each is stamped by
+      // commit_move when the adapter flags a turn boundary (pass / double-six
+      // bonus); expire_turn uses max(last_turn_ts[to_play], started_at) so the
+      // frontend can render the exact on-chain countdown for the active seat.
+      last_turn_ts: (function () {
+        const out = [];
+        for (let i = 0; i < 8; i++) out.push(Number(d.readBigInt64LE(510 + i * 8)));
+        return out;
+      })(),
       stake_usd_cents: Number(d.readBigUInt64LE(470)),
       seat_pot_usd_cents: Number(d.readBigUInt64LE(478)),
       turn_secs: Number(d.readBigUInt64LE(486)),

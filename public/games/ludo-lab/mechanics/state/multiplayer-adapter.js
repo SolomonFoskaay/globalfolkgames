@@ -96,7 +96,12 @@ function snapshotFromTokens() {
 // bytes3..18 = tokenEncode positions (real board cells), byte19 = next turn.
 // `advance`: true only on the turn-pass commit (real move commits stay on the
 // current seat so a mid-turn snapshot NEVER flips the turn to the opponent).
-function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, advance) {
+// `boundary`: M12 turn timer flag. TRUE only when this commit BEGINS a NEW
+// turn for the seat at byte19 - a pass to the next seat, or a double-six bonus
+// roll (same seat, new turn). The program anchors that seat's turn-began time
+// (last_turn_ts) to now, giving the new turn a FRESH fixed window. Ordinary
+// rolls/moves pass boundary=false so a turn's 120s window is never extended.
+function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, advance, boundary) {
     var m = [];
     for (var i = 0; i < 32; i++) m[i] = 0;
     m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
@@ -105,6 +110,7 @@ function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsW
     var sw = snapshotFromTokens();
     for (var s = 0; s < 16 && s < sw.length; s++) m[3 + s] = (sw[s] & 0xff);
     var me = m[0];
+    if (boundary) m[20] = 1; // turn timer: this commit starts a new turn for byte19
     if (!advance) {
         m[19] = me; // mid-turn (dice + move snapshots): turn does NOT move yet
         return m;
@@ -633,14 +639,22 @@ function commitSnapshot(bytes, label) {
 
 // LIVE dice commit: when the local player rolls, immediately push a snapshot
 // (byte19 = current seat, advance=false) so the opponent sees the dice + board
-// in real time, BEFORE any token moves. The turn is NOT advanced.
+// in real time, BEFORE any token moves. The turn is NOT advanced. A roll that
+// begins a BONUS turn (the roll right after a double-six) is a NEW TURN for the
+// same seat -> boundary=true so the program starts a fresh 120s window for it.
 function onDiceRoll(die1, die2) {
     if (!active || !matchRef) return;
     if (!die1 || !die2) return;
     if (!window.tokens) return;
-    var bytes = encodeMove(die1, die2, 0, 0, 0, 0, false);
+    var isBonus = false;
+    try { isBonus = window.__mpBonusPending === true; } catch (e) {}
+    // Consume the flag either way: only the FIRST roll after a double-six is
+    // the bonus roll; later rolls in the same seat (the 2nd bonus roll) re-arm
+    // it on their own double-six finalize.
+    try { window.__mpBonusPending = false; } catch (e) {}
+    var bytes = encodeMove(die1, die2, 0, 0, 0, 0, false, isBonus);
     try { window._mpLatestDice = bytes; } catch (e) {}
-    commitSnapshot(bytes, 'dice');
+    commitSnapshot(bytes, isBonus ? 'dice-bonus' : 'dice');
 }
 
 // Called after each REAL local token move. Each move is committed live with
@@ -681,12 +695,16 @@ function onPassTurn() {
     try { d2 = (typeof lastDiceRoll2 === 'number') ? lastDiceRoll2 : 0; } catch (e) {}
     try {
         // Re-encode the CURRENT board with advance=true (turn passes now),
-        // but keep the real dice for the receiver's display.
-        bytes = encodeMove(d1, d2, 0, 0, 0, 0, true);
+        // but keep the real dice for the receiver's display. boundary=true: a
+        // pass begins a NEW turn for the next seat, so the program anchors a
+        // fresh 120s window for them.
+        bytes = encodeMove(d1, d2, 0, 0, 0, 0, true, true);
     } catch (e) {
         log('pass encode THREW: ' + (e && e.message));
         return;
     }
+    // A pass ends any double-six bonus sequence (a 3rd double-six passes).
+    try { window.__mpBonusPending = false; } catch (e) {}
     movedThisTurn = false;
     try { window._mpPassCommit = bytes; } catch (e) {}
     commitSnapshot(bytes, 'turn');
