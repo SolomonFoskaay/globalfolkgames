@@ -853,7 +853,18 @@
         // or enforces; it just mirrors what the board says, and hands the chain
         // a permissionless expire call when the deadline has genuinely passed.
         var mpTimerTick = null;
-        var mpTimeoutSent = {};   // seat -> bool, so we expire a stall ONCE per window
+        var mpExpiredSeen = {};   // seat -> bool, expire ONCE per turn window
+        // M12 ON-CHAIN TURN TIMER. The PROGRAM owns + enforces the deadline
+        // (last_turn_ts[seat] = absolute GMT until-timestamp). This loop has TWO
+        // jobs, both driven by the on-chain state:
+        //   1) ENFORCE (the important one): every second we read the board; when
+        //      the ACTIVE seat's deadline has genuinely passed, we fire ONE
+        //      permissionless expire_turn (any device may - including the active
+        //      player's own) so the turn always moves on. This runs regardless
+        //      of whether the chip is visible, so a silent player can never
+        //      stall the match.
+        //   2) DISPLAY: mirror the same deadline under the turn name
+        //      (00m:45s:000ms). Frontend never caches or trusts its own timing.
         window.mpEnsureTimer = function () {
             if (mpTimerTick) return;
             mpTimerTick = setInterval(function () {
@@ -864,62 +875,62 @@
                         if (hideEl) hideEl.style.display = 'none';
                         return;
                     }
-                    var chip = document.getElementById('mp-turn-timer');
-                    var live = false;
-                    try { live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked && !!(a && a.ref && a.ref()); } catch (e) {}
-                    if (!chip || !live) { if (chip) chip.style.display = 'none'; return; }
                     var ref = (typeof a.ref === 'function') ? a.ref() : 0;
                     var rail2 = window.gfgMultiplayer;
-                    if (!ref || !rail2 || typeof rail2.state !== 'function' || typeof rail2.expireTurn !== 'function') { if (chip) chip.style.display = 'none'; return; }
+                    if (!ref || !rail2 || typeof rail2.state !== 'function' || typeof rail2.expireTurn !== 'function') return;
                     // Read the on-chain board facts (the single source of truth).
                     rail2.state(ref).then(function (s) {
                         try {
-                            if (!chip || !s || !s.ok) return;
+                            if (!s || !s.ok || s.status !== 1) return;
                             var lastTs = (s.last_turn_ts && Array.isArray(s.last_turn_ts)) ? s.last_turn_ts : [];
-                            // The active seat = the board's current_turn (later the
-                            // seat that just played via byte19). At begin current_turn
-                            // is 255 = first seat (0) to play; after a commit the
-                            // adapter syncs it to the on-chain turn. Use the local
-                            // game's currentTurn color -> seat index as the display
-                            // anchor, falling back to 0.
-                            var turn = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
-                            var order = (typeof a.activeOrder === 'function') ? a.activeOrder() : ['green', 'red'];
-                            var seatIdx = order.indexOf(turn);
-                            if (seatIdx < 0) seatIdx = 0;
-                            // The program stores the ABSOLUTE deadline for this seat.
-                            // Display = deadline - now (0 => hide; not yet seeded).
-                            var deadlineSec = Number(lastTs[seatIdx] || 0);
-                            if (!deadlineSec) { chip.style.display = 'none'; return; }
+                            var lastCommit = (s.last_move_commit && Array.isArray(s.last_move_commit)) ? s.last_move_commit : [];
+                            // ACTIVE SEAT from board facts: byte19 of the last
+                            // commit is who the commit's next turn belongs to
+                            // (adapter writes it on EVERY commit); before the
+                            // first commit it is seat 0 (host / first seat).
+                            var toPlay;
+                            var ctp = Number(lastCommit[19] || 0);
+                            var pc = Number(s.player_count || 0);
+                            if (lastCommit.length >= 20 && ctp < pc && (ctp > 0 || s.move_count > 0)) toPlay = ctp;
+                            else if (typeof s.current_turn === 'number' && s.current_turn !== 255 && s.current_turn + 1 < pc) toPlay = s.current_turn + 1;
+                            else toPlay = 0;
+                            var deadlineSec = Number(lastTs[toPlay] || 0);
+                            // ---- ENFORCE (runs whether or not the chip shows) ----
+                            if (deadlineSec > 0 && (Date.now() / 1000) >= deadlineSec) {
+                                if (!mpExpiredSeen[toPlay]) {
+                                    mpExpiredSeen[toPlay] = true;
+                                    // Clear after a settle window; expire_turn bumps
+                                    // move_count so a NEW deadline arrives for the
+                                    // next seat and this seat's guard is reset.
+                                    setTimeout(function () { try { delete mpExpiredSeen[toPlay]; } catch (e) {} }, 5000);
+                                    var pr;
+                                    try { pr = rail2.expireTurn(ref); } catch (e) { pr = null; }
+                                    if (pr && typeof pr.then === 'function') {
+                                        pr.then(function (r) {
+                                            if (r && r.okay && typeof window.mpSetStatus === 'function') {
+                                                window.mpSetStatus('Player did not move in time - turn passed so play continues.');
+                                            }
+                                        }).catch(function () {});
+                                    }
+                                }
+                            } else if (deadlineSec > 0 && mpExpiredSeen[toPlay]) {
+                                // A fresh deadline for this seat arrived (new turn) -> re-arm.
+                                try { delete mpExpiredSeen[toPlay]; } catch (e) {}
+                            }
+                            // ---- DISPLAY (below the turn name) ----
+                            var chip = document.getElementById('mp-turn-timer');
+                            if (!chip) return;
+                            var live = false;
+                            try { live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked; } catch (e) {}
+                            if (!live || deadlineSec <= 0) { chip.style.display = 'none'; return; }
                             var remainingMs = (deadlineSec * 1000) - Date.now();
                             if (remainingMs < 0) remainingMs = 0;
                             var mm = Math.floor(remainingMs / 60000);
                             var ss = Math.floor(remainingMs % 60000 / 1000);
                             var ms = Math.floor(remainingMs % 1000);
-                            // Display: 00m:45s:000ms (the format the owner asked for).
                             chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
                             chip.style.display = 'inline-block';
                             chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
-                            // Deadline passed => the PROGRAM enforces the pass. The
-                            // frontend only triggers the permissionless expire call
-                            // (each device may - including the active player's own)
-                            // once per window so the match cannot stall.
-                            if (remainingMs <= 0) {
-                                if (ref && !mpTimeoutSent[seatIdx]) {
-                                    mpTimeoutSent[seatIdx] = true;
-                                    var pr;
-                                    try { pr = rail2.expireTurn(ref); } catch (e) { pr = null; }
-                                    if (pr && typeof pr.then === 'function') {
-                                        pr.then(function (r) {
-                                            if (r && r.okay) {
-                                                if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Player did not move in time - turn passed so play continues.');
-                                            }
-                                            setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 4000);
-                                        }).catch(function () { setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 6000); });
-                                    } else {
-                                        setTimeout(function () { try { delete mpTimeoutSent[seatIdx]; } catch (e) {} }, 6000);
-                                    }
-                                }
-                            }
                         } catch (e) { /* soft */ }
                     }).catch(function () { /* soft */ });
                 } catch (e) { /* soft */ }
@@ -929,6 +940,62 @@
             if (mpTimerTick) { clearInterval(mpTimerTick); mpTimerTick = null; }
             var chip = document.getElementById('mp-turn-timer');
             if (chip) chip.style.display = 'none';
+        };
+
+        // ===== M12 turn timer — SINGLE-PLAYER (core of the game, enforced in the
+        // core turn loop; same 45s rule as multiplayer). The board is not used in
+        // solo, so the core loop arms a local deadline and this ticker (a) shows
+        // it under the turn name and (b) auto-passes a HUMAN turn that expires.
+        // Computer turns act instantly, so only the human is timed. MP is handled
+        // entirely by mpEnsureTimer above; solo mode never runs both.
+        var soloTimerTick = null;
+        var soloDeadline = 0;      // epoch ms when the current solo turn's window ends
+        var soloDeadlineArmed = false;
+        window.__soloTurnTick = function () {
+            soloDeadline = Date.now() + 45000; // 45s per turn (Ludo)
+            soloDeadlineArmed = true;
+        };
+        window.mpEnsureSoloTimer = function () {
+            if (soloTimerTick) return;
+            soloTimerTick = setInterval(function () {
+                try {
+                    // Solo only: never when a multiplayer rail is active.
+                    var mpActive = !!(window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive());
+                    var chip = document.getElementById('mp-turn-timer');
+                    if (mpActive) { if (chip) chip.style.display = 'none'; return; }
+                    var live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked && !(typeof matchOver !== 'undefined' && matchOver);
+                    if (!live) { if (chip) chip.style.display = 'none'; return; }
+                    // Arm if the current turn is a HUMAN (the core loop calls
+                    // __soloTurnTick on a human's turn start; re-arm after pass).
+                    if (!soloDeadlineArmed) { if (typeof window.__soloTurnTick === 'function') window.__soloTurnTick(); }
+                    var remainingMs = soloDeadline - Date.now();
+                    var deadlinePassed = remainingMs <= 0;
+                    if (remainingMs < 0) remainingMs = 0;
+                    if (!chip) return;
+                    var mm = Math.floor(remainingMs / 60000);
+                    var ss = Math.floor(remainingMs % 60000 / 1000);
+                    var ms = Math.floor(remainingMs % 1000);
+                    chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
+                    chip.style.display = 'inline-block';
+                    chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
+                    // Auto-pass a HUMAN solo turn that expired (never a computer
+                    // turn — the AI always acts; and never in MP). Guard stacked:
+                    // only when it's a human seat, the match is not over, and we
+                    // are not mid-pause.
+                    var humanTurn = false;
+                    try { humanTurn = !!(window.playerProfiles && window.playerProfiles[currentTurn] && window.playerProfiles[currentTurn].mode === 'human'); } catch (e) {}
+                    try { if (typeof isGamePaused !== 'undefined' && isGamePaused) humanTurn = false; } catch (e) {}
+                    if (deadlinePassed && humanTurn) {
+                        soloDeadlineArmed = false;
+                        try {
+                            if (typeof window.passTurnSequence === 'function') {
+                                if (typeof window.displayEducationalLog === 'function') displayEducationalLog(currentTurn.toUpperCase() + ': Turn time ran out - passing to the next player.');
+                                window.passTurnSequence();
+                            }
+                        } catch (e) { /* soft */ }
+                    }
+                } catch (e) { /* soft */ }
+            }, 1000);
         };
         // Host: begin the multiplayer board + lobby when the real game starts.
         // MP gate: the local game must NOT start until the on-chain begin_match
@@ -1218,6 +1285,15 @@ updateSeatButtons();
         // share link — a link visitor must land on the MultiPlayer board.
         if (!shared) setMode('single');
         // (On-chain rejoin boot for shared codes lives above in the shared block.)
+        // M12 turn timer: boot the SINGLE-PLAYER timer at page load. It is a
+        // self-guarded 1s ticker: it does nothing until a solo match is live
+        // (setupConfigurationLocked), shows the 45s countdown under the turn name
+        // for the human, and auto-passes a human turn that runs out. In MP mode
+        // the mpEnsureTimer path takes over (on-chain deadline enforcement) and
+        // the solo ticker stands down - the two never overlap.
+        if (typeof window.mpEnsureSoloTimer === 'function') {
+            try { window.mpEnsureSoloTimer(); } catch (e) {}
+        }
     })();
     </script>
 </body>

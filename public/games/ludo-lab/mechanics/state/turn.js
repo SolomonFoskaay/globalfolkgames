@@ -371,6 +371,20 @@ function passTurnSequence() {
         return;
     }
 
+    // M12 turn timer (SOLO path, core of the game): the human's own turn is also
+    // timed. Each new turn gets a fresh 45s window (the SAME rule multiplayer
+    // enforces on-chain); if the player does not act in time, the turn auto-
+    // passes so the match never waits on a silent human. MP is handled on-chain
+    // (board deadline + expire_turn), so we only manage the solo deadline here.
+    try {
+        if (!(window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive())) {
+            const wasHuman = playerProfiles[currentTurn] && playerProfiles[currentTurn].mode === 'human';
+            if (wasHuman && typeof window.__soloTurnTick === 'function') {
+                window.__soloTurnTick(); // arm/refresh the solo turn countdown + auto-pass
+            }
+        }
+    } catch (e) { /* soft */ }
+
     // Advance only within the ACTIVE seats (2P: the two chosen seats, 4P: all four).
     const active = getActiveSeats();
     let nextIndex = (active.indexOf(currentTurn) + 1) % active.length;
