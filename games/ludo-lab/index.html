@@ -124,13 +124,14 @@
         <!-- Persistent Control Center Layout -->
         <div id="dice-container">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 8px;">
-                <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px; flex:1; min-width:0;">
                     <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
-                    <!-- M12 on-chain turn timer chip (2P: only the ACTIVE player shows
-                         a countdown; 4P: every active seat shows its own). The timer is
-                         an ON-CHAIN fact (gfgclock deadlines), the frontend only renders
-                         it + advances a stalled turn. Single-player keeps no chip. -->
-                    <div id="mp-turn-timer" style="display:none; font-size:0.8rem; font-weight:800; color:#fff; background:#7838f8; border:1px solid rgba(155,89,182,0.6); border-radius:8px; padding:2px 8px; white-space:nowrap;" title="On-chain turn timer (GMT). Your turn expires automatically so the game never stalls.">02:00</div>
+                    <!-- M12 on-chain turn timer, shown BELOW the turn name (dice card).
+                         The countdown is the exact on-chain deadline the program enforces
+                         (last_turn_ts anchor + turn_secs, UTC). When it reaches 00:00 and
+                         the active seat has not moved, the turn auto-passes (permissionless
+                         on-chain expire_turn) so no player can stall the match. -->
+                    <div id="mp-turn-timer" style="display:none; margin-top:2px; font-size:0.78rem; font-weight:800; color:#fff; background:#7838f8; border:1px solid rgba(155,89,182,0.7); border-radius:8px; padding:1px 8px; white-space:nowrap;" title="Your turn expires automatically so the game never waits on a silent player.">⏱ 00:45</div>
                 </div>
 
                 <!-- Rearranged Mobile Action Dashboard Row Grid -->
@@ -663,9 +664,11 @@
         doCreate();
         function doCreate() {
             window.mpSetStatus('creating ' + seats + '-seat match...');
-            // M12 on-chain turn timer: 120s per turn (Ludo's per-game value).
-            // Kept on the board at create; the countdown + expire_turn drive it.
-            a.start(1, [], seats, 120, 3600, 0).then(function (r) {
+            // M12 on-chain turn timer: 45s per turn (Ludo's per-game value,
+            // tuned by the owner after live testing - each player finishes well
+            // inside 15s). Stored on the board at create; the countdown +
+            // expire_turn drive it.
+            a.start(1, [], seats, 45, 3600, 0).then(function (r) {
                 if (!r) { window.mpSetStatus('create failed (see console)'); return; }
                 var code = String(r.code || '').toUpperCase();
                 var codeEl = document.getElementById('mp-code');
@@ -849,8 +852,7 @@
         // walkaway. Purely a display + convenience driver of the on-chain
         // timer; the enforcement itself is the program's clock instructions.
         var mpTimerTick = null;
-        var mpTurnDeadline = 0;   // ms epoch when the current turn's window ends
-        var mpTurnSecs = 120;     // Ludo's per-game turn_secs
+        var mpTurnSecs = 45;      // Ludo's per-game turn_secs
         var mpTimeoutSent = {};   // seat -> bool, so we expire a stall ONCE per window
         // M12 turn timer display: the countdown is driven by the ON-CHAIN anchor
         // only - deadline = max(last_turn_ts[activeSeat], started_at) + turn_secs
@@ -901,8 +903,13 @@
                             chip.style.background = remaining <= 15 ? '#e74c3c' : (remaining <= 30 ? '#f39c12' : '#7838f8');
                             // Expired: advance the stalled turn ON-CHAIN. The
                             // PROGRAM verifies the real deadline, so this is the
-                            // on-chain rule, not the display. Once per window.
-                            if (remaining <= 0 && seatIdx !== (typeof a.seat === 'function' ? a.seat() : -1)) {
+                            // on-chain rule, not the display. It fires from ANY
+                            // device (including the active player's own) so a
+                            // single test device can observe the auto-pass just
+                            // like the opponent's phone would - expire_turn is
+                            // permissionless when the window is genuinely up.
+                            // Once per window.
+                            if (remaining <= 0) {
                                 if (ref && !mpTimeoutSent[seatIdx]) {
                                     mpTimeoutSent[seatIdx] = true;
                                     var pr;

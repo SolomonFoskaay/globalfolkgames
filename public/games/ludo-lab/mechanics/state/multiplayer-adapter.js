@@ -268,7 +268,7 @@ function applyMove(move) {
         // seat times out (permissionless) and the game advances so play never
         // hangs on a walkaway player. 120s is the Ludo value - other games pass
         // their own via the same rail clock.
-        var turnSecsFinal = (typeof turnSecs === 'number' && turnSecs > 0) ? turnSecs : 120;
+        var turnSecsFinal = (typeof turnSecs === 'number' && turnSecs > 0) ? turnSecs : 45;
         return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecsFinal, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
             if (!r.okay) { log('create failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Create failed: ' + r.error); return null; }
             active = true;
