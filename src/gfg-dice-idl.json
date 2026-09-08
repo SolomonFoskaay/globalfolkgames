@@ -2510,6 +2510,66 @@
       "args": []
     },
     {
+      "name": "expire_turn",
+      "discriminator": [
+        129,
+        137,
+        37,
+        125,
+        78,
+        220,
+        237,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                  50
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game"
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "finish_forfeit",
       "discriminator": [
         152,
