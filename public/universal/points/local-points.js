@@ -415,11 +415,16 @@
 
         var attempts = 0;
         var lastErr = null;
+        // MULTIPLAYER: an award may carry the seat's OWN wallet (from the
+        // on-chain seat->wallet map). Bank it to THAT wallet, not this device's,
+        // so every logged-in player is credited at their own wallet no matter
+        // who created the match. Solo identity is null -> this device's wallet.
+        var authority = (award && award.identity) ? award.identity : null;
         while (attempts < 3) {
             attempts++;
             try {
                 var sig = await window.magicblockDice.recordPoints(
-                    award.gameTag, award.points, award.reason, matchRef,
+                    award.gameTag, award.points, award.reason, matchRef, authority,
                 );
                 processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
                 persistProcessed();
@@ -436,13 +441,13 @@
                 console.log('[local-points] banked ' + award.points + 'pt (ludo ' + award.position + 'st place, user seat' + (award.identity ? ' ' + award.identity : '') + ') — ' + (sig || 'no sig'));
                 var ledger = await refreshLedger(award.gameTag, true);
                 notify(award.gameTag, ledger, lastAward);
-                // Multi-seat: bank the remaining user seats too (each to its own
-                // wallet-hosted device; on one device hosting several, the first
-                // is the local user and further seats are processed best-effort).
+                // Multi-seat: bank the remaining user seats too (each to ITS OWN wallet).
                 for (var k = 1; k < awards.length; k++) {
                     try {
+                        var aw = awards[k];
                         await window.magicblockDice.recordPoints(
-                            awards[k].gameTag, awards[k].points, awards[k].reason, matchRef + k,
+                            aw.gameTag, aw.points, aw.reason, matchRef + k,
+                            (aw && aw.identity) ? aw.identity : null,
                         );
                     } catch (e) { /* soft */ }
                 }

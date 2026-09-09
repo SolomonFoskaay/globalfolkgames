@@ -375,8 +375,11 @@
             attempts++;
             try {
                 // kind=0: GAME WIN — credits M4a pure + M4b lifetime + M4c spendable
+                // MULTIPLAYER: credit the seat's OWN wallet when the M3 award
+                // carries an identity (on-chain seat->wallet); solo = device wallet.
+                var gAuth = (award && award.identity) ? award.identity : null;
                 var sig = await window.magicblockDice.recordGlobalPoints(
-                    0, sourceCode, award.points, award.reason, matchRef,
+                    0, sourceCode, award.points, award.reason, matchRef, gAuth,
                 );
                 processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
                 persistProcessed();

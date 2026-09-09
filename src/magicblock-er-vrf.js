@@ -729,17 +729,24 @@ async function rollOnce() {
 // proof-roll signature that earned the reward encoded as a u64 (its first 8
 // bytes), matching what the program stores as last_match_ref so the on-chain
 // record is traceable back to the exact winning roll.
-export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
+export async function recordPoints(gameTag = 'ludo', points, reason, matchRef, playerPubkey) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { wallet } = ctx;
-  const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
+  // A specific player authority (the seat's OWN wallet) can be passed for
+  // MULTIPLAYER/overseats crediting: a device that legitimately hosts several
+  // user seats banks EACH seat to ITS own wallet. Default = this device's
+  // wallet (single-player unchanged).
+  const authority = (playerPubkey && playerPubkey.constructor && playerPubkey.constructor.name === 'PublicKey')
+    ? playerPubkey
+    : (playerPubkey ? new PublicKey(playerPubkey) : wallet.publicKey);
+  const [pointsPda] = pointsPdaFor(gameTag, authority);
 
   // Relay is idempotent per PDA; it creates + delegates the points PDA if
   // missing, and is a no-op when already delegated. Once the ER validator has
   // picked the account up, the write below runs gasless.
-  await ensureDelegated(pointsPda, wallet.publicKey);
+  await ensureDelegated(pointsPda, authority);
   await waitForErPickup(pointsPda);
 
   const regionUrl = await regionUrlFor(pointsPda);
@@ -749,7 +756,7 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef) {
     .accounts({
       points: pointsPda,
       payer: wallet.publicKey,
-      playerAuthority: wallet.publicKey,
+      playerAuthority: authority,
     })
     .rpc(), { regionUrl });
 
@@ -914,14 +921,19 @@ function premiumPointsPdaFor(payerPubkey) {
 // pure + M4b lifetime + M4c spendable for kind=0 game wins; M4b+M4c only
 // for kind=1 other credits). Gasless on the ER; `matchRef` guards idempotency.
 // `sourceCode` is a u8 enum (1=ludo, 2=ayo_olopon, 10=signup_bonus, etc.).
-export async function recordGlobalPoints(kind, sourceCode, points, reason, matchRef) {
+export async function recordGlobalPoints(kind, sourceCode, points, reason, matchRef, playerPubkey) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { wallet } = ctx;
-  const [globalPda] = globalPointsPdaFor(wallet.publicKey);
+  // MULTIPLAYER: credit the seat's OWN wallet (from the on-chain map) when a
+  // caller passes it; default = this device's wallet (single-player unchanged).
+  const authority = (playerPubkey && playerPubkey.constructor && playerPubkey.constructor.name === 'PublicKey')
+    ? playerPubkey
+    : (playerPubkey ? new PublicKey(playerPubkey) : wallet.publicKey);
+  const [globalPda] = globalPointsPdaFor(authority);
 
-  await ensureDelegated(globalPda, wallet.publicKey);
+  await ensureDelegated(globalPda, authority);
   await waitForErPickup(globalPda);
 
   const regionUrl = await regionUrlFor(globalPda);
@@ -931,7 +943,7 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
     .accounts({
       globalPoints: globalPda,
       payer: wallet.publicKey,
-      playerAuthority: wallet.publicKey,
+      playerAuthority: authority,
     })
     .rpc(), { regionUrl });
 
@@ -1256,8 +1268,8 @@ export function initMagicBlockDice() {
     // M4 — records a global points credit on-chain (gasless ER write).
     // kind: 0 = game win (pure+lifetime+spendable), 1 = other (lifetime+spendable only).
     // sourceCode: u8 enum identifying the game/source. points/reason/matchRef mirror M3.
-    async recordGlobalPoints(kind, sourceCode, points, reason, matchRef) {
-      return recordGlobalPoints(kind, sourceCode, points, reason, matchRef);
+    async recordGlobalPoints(kind, sourceCode, points, reason, matchRef, playerPubkey) {
+      return recordGlobalPoints(kind, sourceCode, points, reason, matchRef, playerPubkey);
     },
 
     // ===== arc2m1 — multiplayer match board (gasless ER, player session key) =====
