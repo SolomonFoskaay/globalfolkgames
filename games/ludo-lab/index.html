@@ -843,6 +843,7 @@
         // the exact value the on-chain expire_turn checks) under the turn name.
         // It NEVER writes or fires anything; the on-chain turn engine enforces.
         var mpTimerTick = null;
+        var mpExpiredFired = {};  // seat -> ts, so expire fires ONCE per window and retries after a gap
         window.mpEnsureTimer = function () {
             if (mpTimerTick) return;
             mpTimerTick = setInterval(function () {
@@ -854,8 +855,10 @@
                         return;
                     }
                     var chip = document.getElementById('mp-turn-timer');
+                    // NOTE: setupConfigurationLocked is a top-level `let` in
+                    // turn.js - NOT a window property. Read it as a bare id.
                     var live = false;
-                    try { live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked && !!(a.ref && a.ref()); } catch (e) {}
+                    try { live = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked && !!(a.ref && a.ref()); } catch (e) {}
                     if (!chip || !live) { if (chip) chip.style.display = 'none'; return; }
                     var ref = (typeof a.ref === 'function') ? a.ref() : 0;
                     var rail2 = window.gfgMultiplayer;
@@ -872,7 +875,9 @@
                             else if (typeof s.current_turn === 'number' && s.current_turn !== 255 && s.current_turn + 1 < pc) toPlay = s.current_turn + 1;
                             else toPlay = 0;
                             var deadlineSec = Number(lastTs[toPlay] || 0);
-                            if (!deadlineSec) { chip.style.display = 'none'; return; }
+                            // arc2m1 timer DISPLAY - renders the active seat's
+                            // on-chain deadline under the turn name.
+                            if (!deadlineSec) { if (chip) chip.style.display = 'none'; return; }
                             var remainingMs = (deadlineSec * 1000) - Date.now();
                             if (remainingMs < 0) remainingMs = 0;
                             var mm = Math.floor(remainingMs / 60000);
@@ -881,12 +886,36 @@
                             chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
                             chip.style.display = 'inline-block';
                             chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
+                            // arc2m1 timer ENFORCEMENT (Option B): this ticker runs
+                            // EVERY second INDEPENDENT of move_count changes. When
+                            // the active seat's on-chain deadline has genuinely
+                            // passed, fire the permissionless expire_turn once per
+                            // window so the turn moves on and the match cannot
+                            // hang. A real move re-stamps the deadline on-chain, so
+                            // active turns are never expired. This is the game's own
+                            // board-watch loop - no separate app/trigger.
+                            if (deadlineSec > 0 && (Date.now() / 1000) >= deadlineSec) {
+                                var last = mpExpiredFired[toPlay] || 0;
+                                if ((Date.now() - last) > 3000) {      // once per 3s per seat
+                                    mpExpiredFired[toPlay] = Date.now();
+                                    var pr2;
+                                    try { pr2 = rail2.expireTurn(ref); } catch (e) { pr2 = null; }
+                                    if (pr2 && typeof pr2.then === 'function') {
+                                        pr2.then(function (r) {
+                                            if (r && r.okay && typeof window.mpSetStatus === 'function') {
+                                                window.mpSetStatus('Player did not move in time - turn passed so play continues.');
+                                            }
+                                        }).catch(function () { /* retry next tick */ });
+                                    }
+                                }
+                            }
                         } catch (e) { /* soft */ }
                     }).catch(function () { /* soft */ });
                 } catch (e) { /* soft */ }
             }, 1000);
         };
-        // Start the display ticker once a match is live (host/joiner/resume).
+        // Start the display + enforcement ticker once a match is live
+        // (host/joiner/resume all call mpEnsurePoll -> this starts too).
         try {
             var _mpStartDisp = function () { if (typeof window.mpEnsureTimer === 'function') { try { window.mpEnsureTimer(); } catch (e) {} } };
             if (typeof window.mpEnsurePoll === 'function') {

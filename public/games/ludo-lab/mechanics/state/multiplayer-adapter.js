@@ -27,8 +27,6 @@
     // arc2m1 turn timer: one-shot guards so a lapsed seat is expired ONCE per
     // window (the program re-stamps the deadline on every real move, so an active
     // seat never trips this).
-    if (!window.__mpExpiredSeen) window.__mpExpiredSeen = {};
-    function resetExpireGuards() { try { window.__mpExpiredSeen = {}; } catch (e) {} }
 
     function log() { try { console.log.apply(console, ['[MP/LUDO]'].concat(Array.prototype.slice.call(arguments))); } catch (e) {} }
     function rail() { return window.gfgMultiplayer; }
@@ -267,7 +265,6 @@ function applyMove(move) {
             matchRef = r.matchRef;
             lastCount = -1;
             dimmed = false;
-            resetExpireGuards();
             unsub = subscribeBoard();
             log('match created code=' + r.code + ' ref=' + matchRef + ' mySeat=' + mySeat);
             bindSeats();
@@ -318,30 +315,6 @@ function applyMove(move) {
                     }
                     return;
                 }
-                // arc2m1 turn timer: while the match is live (the running game's
-                // own poll), if the ACTIVE seat's on-chain deadline has passed,
-                // fire the permissionless expire_turn ONCE per seat-window so the
-                // turn moves on and the game never hangs. This is the safety net
-                // for a player who never moves; normal play keeps re-stamping the
-                // deadline in commit_move so active turns are unaffected.
-                try {
-                    if (s.status === 1 && typeof s.current_turn === 'number' && s.current_turn !== 255 &&
-                        Array.isArray(s.last_turn_ts) && typeof window.gfgMultiplayer === 'object' &&
-                        window.gfgMultiplayer && typeof window.gfgMultiplayer.expireTurn === 'function') {
-                        var pc2 = Number(s.player_count || 0);
-                        var activeSeat = (function () {
-                            var ctp2 = Number((s.last_move_commit && s.last_move_commit[19]) || 0);
-                            if (s.last_move_commit && s.last_move_commit.length >= 20 && ctp2 < pc2 && (ctp2 > 0 || s.move_count > 0)) return ctp2;
-                            return s.current_turn + 1 < pc2 ? s.current_turn + 1 : 0;
-                        })();
-                        var dl = Number(s.last_turn_ts[activeSeat] || 0);
-                        if (dl > 0 && (Date.now() / 1000) >= dl && !window.__mpExpiredSeen[activeSeat]) {
-                            window.__mpExpiredSeen[activeSeat] = true;
-                            setTimeout(function () { try { delete window.__mpExpiredSeen[activeSeat]; } catch (e) {} }, 5000);
-                            try { window.gfgMultiplayer.expireTurn(matchRef).catch(function () {}); } catch (e) {}
-                        }
-                    }
-                } catch (e) { /* soft */ }
                 if (mv && mv.seat !== mySeat) {
                     // REMOTE commit: sync our turn + replay the board. The
                     // committed byte19 + board are the single source of truth,
@@ -424,7 +397,6 @@ function applyMove(move) {
             seatCount = (typeof s.seats === 'number' && s.seats === 4) ? 4 : 2;
             lastCount = -1;
             dimmed = false;
-            resetExpireGuards();
             if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
             rememberSeats(s);
             bindSeats();
@@ -464,7 +436,6 @@ function applyMove(move) {
             // mySeat comes from the on-chain join result (the free seat chosen).
             mySeat = (typeof r.seat === 'number') ? r.seat : ((typeof chosenSeat === 'number') ? chosenSeat : 1);
             lastCount = -1;
-            resetExpireGuards();
             unsub = subscribeBoard();
             log('joined ref=' + matchRef + ' mySeat=' + mySeat);
             bindSeats();
