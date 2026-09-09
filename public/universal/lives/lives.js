@@ -229,6 +229,25 @@
     // A completed match consumes one life. Dedupe guards against the seam's
     // onGameResult handlers AND the gfg:game-result DOM event both landing for
     // the same finish (they fire together in publishGameResult).
+    // M10 ON-CHAIN: the authoritative consume happens on-chain via consumeLife;
+    // the local meter is then re-synced to the on-chain ledger so a) a third-
+    // party frontend using the public program still pays lives, and b) our own
+    // display never drifts from the chain. Soft-fail: if the chain write fails,
+    // the local meter still draws (a completed game always costs a life).
+    function consumeRefFor(env) {
+        try {
+            if (window.magicblockDice && typeof window.magicblockDice.matchRefFromSignature === 'function' &&
+                env.proof && env.proof.signature) {
+                var r = window.magicblockDice.matchRefFromSignature(env.proof.signature);
+                if (r) return String(r);
+            }
+        } catch (e) { /* fall through */ }
+        // Stable fallback so the same completion is always the same idempotency key.
+        var src = String(env.gameId || '') + '@' + String(env.finishedAt || '');
+        var h = 0x811c9dc5;
+        for (var i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+        return String(h >>> 0);
+    }
     function onFinish(env) {
         if (!env || env.schema !== 'gfg:game-result@1') return;
         var key = String(env.gameId || '') + '@' + String(env.finishedAt || '');
@@ -239,8 +258,38 @@
             return p && p.actor === 'user';
         });
         if (!userPlayed) return;
-        consume();
+        // On-chain authoritative consume (gasless; prevents on-chain loops).
+        var md = window.magicblockDice;
+        if (md && typeof md.consumeLife === 'function') {
+            var refNum = consumeRefFor(env);
+            md.consumeLife(String(env.gameId || ''), refNum).then(function () {
+                // Sync the local meter to the on-chain ledger after the write.
+                syncFromChain();
+            }).catch(function () { consume(); });
+        } else {
+            consume();
+        }
     }
+
+    // Re-read the on-chain lives ledger and mirror it into the local meter so the
+    // displayed livesLeft always matches the chain (the PROGRAM is the source of
+    // truth for lives, exactly like the turn timer).
+    function syncFromChain() {
+        try {
+            var md = window.magicblockDice;
+            var addr = readAddress();
+            if (!addr || !md || typeof md.readLivesFor !== 'function') return;
+            md.readLivesFor(addr).then(function (r) {
+                if (!r || !r.ok) return;
+                var s = slice();
+                s.day = r.day;
+                s.used = Math.min(r.used, r.pool); // clamp to pool (could exceed after refill edge)
+                persist();
+                render();
+            }).catch(function () { /* soft */ });
+        } catch (e) { /* soft */ }
+    }
+    window.__gfgLivesSyncFromChain = syncFromChain;
 
     if (window.onGameResult) {
         window.onGameResult(onFinish);

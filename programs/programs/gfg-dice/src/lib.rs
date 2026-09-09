@@ -109,6 +109,7 @@ pub const GLOBAL_TAG: &[u8] = b"global"; // reserved M4 global points tag, no ga
 pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (buy-only)
 pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref, affiliate]
 pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
+pub const LIVES_SEED: &[u8] = b"gfglives";        // M10 lives ledger [gfglives, player] (game-agnostic)
 pub const CLAIM_SEED: &[u8] = b"gfgclaim";        // M6 signup-bonus fence [gfgclaim, player] (permanent, on-chain)
 pub const SIGNUP_BONUS_POINTS: u64 = 500;         // M6 500P lifetime signup bonus (once per account, ever)
 pub const COMP2_SEED: &[u8] = b"gfgcomp2";        // M7 competition instance [gfgcomp2, creator, seq]
@@ -153,6 +154,20 @@ pub fn is_valid_game_tag(tag: &str) -> bool {
         tag,
         "ludo" | "ayo_olopon" | "ludo_lab" | "ayo_lab" | "sandbox"
     )
+}
+
+// M10 LIVES GATE (game-agnostic, on-chain). A player may enter a match
+// (join/begin) only when they have an available life this UTC day OR they are
+// currently unlimited (booster / premium active). The ledger is init_if_needed'd
+// by the caller so a fresh wallet auto-gets its base pool; the PROGRAM enforces
+// `used < pool`, never trusting the client.
+fn gate_lives(l: &LivesAccount, now: i64) -> Result<()> {
+    // Unlimited window still live -> always allowed (no draw).
+    if l.unlimited_until > 0 && l.unlimited_until > now { return Ok(()); }
+    let day = now / 86400;
+    let used = if l.day == day { l.used } else { 0 }; // implicit refill on a new day
+    require!(used < l.pool, PointsError::NoLives);
+    Ok(())
 }
 
 #[ephemeral]
@@ -309,6 +324,42 @@ pub mod gfg_dice {
         dest.last_match_ref = match_ref;
         dest.last_recorded_ts = Clock::get()?.unix_timestamp;
         dest.award_count = dest.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    // ===== M10 LIVES (game-agnostic, on-chain) =====
+    // consume_life: called when a match COMPLETES (a finished game emits the M2
+    // seam). Consumes exactly ONE life from the caller's lives ledger. Rules
+    // (identical to single-player, now chain-enforced):
+    //   - abandon / reset / mid-game disconnect never reach here (no completion
+    //     envelope) -> no life is ever taken for an unfinished match.
+    //   - only the OWNER's ledger can be consumed (player == signer).
+    //   - idempotent by match_ref: re-running the same completion is a no-op.
+    //   - UTC-day reset: `used` restarts at 0 when the UTC day rolls over (the
+    //     daily refill, same GMT+00 the rest of the platform uses).
+    //   - unlimited (booster / premium sub with boosterActiveUntil still live)
+    //     is honored here too: no life is drawn while unlimited, matching the
+    //     front-end lives module.
+    pub fn consume_life(ctx: Context<ConsumeLifeCtx>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let l = &mut ctx.accounts.lives;
+        require!(l.player == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
+        // Unlimited (booster/premium active) -> no draw.
+        if l.unlimited_until > 0 && l.unlimited_until > now {
+            l.last_consumed_ref = match_ref;
+            l.last_consumed_ts = now;
+            return Ok(());
+        }
+        let day = now / 86400;
+        if l.day != day { l.day = day; l.used = 0; } // GMT+00 daily refill
+        // Idempotent per completion ref.
+        if l.last_consumed_ref == match_ref { return Ok(()); }
+        // Pool gate: only consume when still available this day.
+        require!(l.used < l.pool, PointsError::NoLives);
+        l.used = l.used.checked_add(1).ok_or(PointsError::Overflow)?;
+        l.last_consumed_ref = match_ref;
+        l.last_consumed_ts = now;
+        l.award_count = l.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
         Ok(())
     }
 
@@ -1516,6 +1567,12 @@ pub mod gfg_dice {
         hbuf[..hb.len()].copy_from_slice(hb);
         b.handles[seat as usize] = hbuf;
         b.last_turn_ts[seat as usize] = Clock::get()?.unix_timestamp;
+        // M10 lives gate: the JOINER must have a life (or unlimited) before
+        // taking a seat - chain-enforced.
+        {
+            let now = Clock::get()?.unix_timestamp;
+            gate_lives(&ctx.accounts.lives, now)?;
+        }
         Ok(())
     }
 
@@ -1531,6 +1588,12 @@ pub mod gfg_dice {
         // seats freely without transferring authority, and an invited player
         // accidentally seating at seat 0 can never become the creator.
         require!(b.creator == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
+        // M10 lives gate: the CREATOR must have a life (or unlimited) before the
+        // match goes live - chain-enforced so a bare frontend can't begin free.
+        {
+            let now = Clock::get()?.unix_timestamp;
+            gate_lives(&ctx.accounts.lives, now)?;
+        }
         // current_turn stays 255 (none yet): the SEAT THAT JUST MOVED is unused
         // until the first commit. Both devices therefore derive the displayed
         // turn uniformly as "the seat AFTER current_turn" - at begin it is none
@@ -1820,6 +1883,25 @@ pub struct InitializePoints<'info> {
         bump
     )]
     pub points: Account<'info, PlayerPoints>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Context for `consume_life` (M10, game-agnostic on-chain lives). The ledger is
+/// init_if_needed so the first completed match on a device auto-creates the
+/// wallet's lives account (payer = the player's session key, gasless on the ER).
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct ConsumeLifeCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + LivesAccount::INIT_SPACE,
+        seeds = [LIVES_SEED, signer.key().as_ref()],
+        bump
+    )]
+    pub lives: Account<'info, LivesAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -2150,6 +2232,20 @@ pub struct JoinMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
+    // M10 lives gate: the JOINER must have an available life (or be unlimited).
+    // The ledger is init_if_needed so a fresh wallet auto-creates with the
+    // free base pool (5) and 0 used -> the gate passes for new players; after
+    // the day's pool is consumed the program rejects (NoLives) whether or not
+    // the caller is our official frontend - chain-enforced.
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + LivesAccount::INIT_SPACE,
+        seeds = [LIVES_SEED, signer.key().as_ref()],
+        bump
+    )]
+    pub lives: Account<'info, LivesAccount>,
+    pub system_program: Program<'info, System>,
 }
 
 /// Context for `begin_match`.
@@ -2160,6 +2256,18 @@ pub struct BeginMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
+    // M10 lives gate: the HOST (creator) must have an available life (or be
+    // unlimited) before the match goes live. Chain-enforced - an external
+    // frontend calling the program cannot begin without lives.
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = 8 + LivesAccount::INIT_SPACE,
+        seeds = [LIVES_SEED, signer.key().as_ref()],
+        bump
+    )]
+    pub lives: Account<'info, LivesAccount>,
+    pub system_program: Program<'info, System>,
 }
 
 /// Context for `commit_move`.
@@ -2741,6 +2849,40 @@ pub struct PlayerPoints {
     pub spend_count: u64,
 }
 
+/// M10 LIVES ledger (game-agnostic, on-chain).
+/// One account per player, seed [gfglives, player]. The lives gate is the same
+/// for EVERY M1 game (Ludo now, Ayo/future later): a completed match consumes
+/// exactly one life; abandon / reset / disconnect never complete -> never cost
+/// a life (and never award points). Subscribers / boosted (unlimited) players
+/// pass the gate without drawing the meter (boosterActiveUntil read from the
+/// player's premium ledger).
+///
+/// THIS IS THE ON-CHAIN ENFORCEMENT the platform uses: because the lives ledger
+/// lives in the program and start_match/join_match gate against it, an external
+/// frontend calling the public program still cannot onboard unpaid play - the
+/// gate is chain-enforced, not client-enforced.
+///
+/// UTC-day accounting: `day = unix_ts / 86400` (UTC). `used` resets to 0 when
+/// the UTC day changes (refill). `pool` = lives available per day for the
+/// player's tier (free 5 / L2 10 / L3 15 / L4 20), snapshotted by the client
+/// at activation but enforced as `used < pool` by consume/lookup.
+#[account]
+pub struct LivesAccount {
+    pub version: u8,          // 1
+    pub player: Pubkey,       // the owner (to prevent replay from wrong PDA)
+    pub day: i64,             // UTC day key (unix_ts / 86400)
+    pub used: u16,            // lives consumed this UTC day
+    pub pool: u16,            // daily pool for the player's tier (5/10/15/20)
+    pub unlimited_until: i64, // 0 = not unlimited; else GMT epoch (booster / sub)
+    pub last_consumed_ref: u64, // match_ref of the last consumed completion (idempotency)
+    pub last_consumed_ts: i64,
+    pub award_count: u64,     // total lives consumed ever (accounting)
+}
+impl LivesAccount {
+    pub const INIT_SPACE: usize =
+        1 + 32 + 8 + 2 + 2 + 8 + 8 + 8 + 8;
+}
+
 /// On-chain GLOBAL points ledger for one player (M4 — site-wide three-ledger
 /// framework). One account per player, seed [gfgpoints, 'global', player].
 /// Runs gasless on the ER.
@@ -3227,4 +3369,6 @@ pub enum PointsError {
     DuplicateHandle,
     #[msg("profile handle is invalid (5-24 chars, letters/numbers only)")]
     InvalidHandle,
+    #[msg("no lives left today - refill at midnight GMT or go Premium")]
+    NoLives,
 }

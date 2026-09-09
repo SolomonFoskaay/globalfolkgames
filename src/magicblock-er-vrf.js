@@ -19,7 +19,7 @@
 // The module ONLY activates once configure() has been called. Until then
 // available() returns false and the game keeps using local randomness.
 
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { signTransaction, signAllTransactions } from '@dynamic-labs-sdk/solana';
@@ -818,29 +818,84 @@ export async function joinBoardMatch(game, matchRef, seat, handle) {
   if (!ctx) throw new Error('No connected wallet to sign the join.');
   const { wallet } = ctx;
   const [board] = boardPdaFor(game, matchRef);
+  // M10 lives gate: the JOINER's lives ledger must exist (init_if_needed in the
+  // program) and pass the on-chain lives check. The program enforces it - the
+  // client only supplies the seeded account.
+  const [lives] = livesPdaFor(wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   await withErRetry('join_match', async (eCtx) => eCtx.program.methods
     .joinMatch(game, new BN(matchRef), seat, String(handle || ''))
-    .accounts({ signer: wallet.publicKey, board })
+    .accounts({ signer: wallet.publicKey, board, lives, systemProgram: SystemProgram.programId })
     .rpc(), { regionUrl });
   return { ok: true, seat };
 }
 
 // The HOST begins the live match (status 0 -> 1). Requires the signer to be
 // players[0] (seat-authority), so only the host's device can start. Gasless.
+// M10 lives gate: the CREATOR's lives ledger is required too (chain-enforced).
 export async function beginBoardMatch(game, matchRef) {
   const ctx = getErProgram();
   if (!ctx) throw new Error('No connected wallet to sign begin.');
   const { wallet } = ctx;
   const [board] = boardPdaFor(game, matchRef);
+  const [lives] = livesPdaFor(wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   const sig = await withErRetry('begin_match', async (eCtx) => eCtx.program.methods
     .beginMatch(game, new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, board })
+    .accounts({ signer: wallet.publicKey, board, lives, systemProgram: SystemProgram.programId })
     .rpc(), { regionUrl });
   return { ok: true, sig };
+}
+
+// M10 consume a life when a match completes (the M2 seam fires on completion).
+// Gasless ER write; idempotent by match_ref in the program. Soft-fail (an
+// on-chain lifecycle hiccup never blocks the win UX).
+export async function consumeLife(game, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the life.');
+  const { wallet } = ctx;
+  const [lives] = livesPdaFor(wallet.publicKey);
+  await waitForErPickup(lives);
+  const regionUrl = await regionUrlFor(lives);
+  const sig = await withErRetry('consume_life', async (eCtx) => eCtx.program.methods
+    .consumeLife(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, lives, systemProgram: SystemProgram.programId })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+// Read a wallet's on-chain lives ledger (own or any public address, gasless).
+// Returns {ok, day, used, pool, unlimitedUntil, awardCount} or {ok:false}.
+export async function readLivesFor(pubkey) {
+  const [lives] = livesPdaFor(pubkey);
+  const c = createConnection(baseRpcUrl(), 'confirmed');
+  try {
+    const info = await c.getAccountInfo(lives);
+    if (!info || !info.data) return { ok: false, error: 'lives ledger not found' };
+    const d = info.data;
+    if (d.length < 8 + LivesAccountSize) return { ok: false, error: 'lives ledger too small' };
+    return {
+      ok: true,
+      day: Number(d.readBigInt64LE(8 + 1 + 32)),
+      used: d.readUInt16LE(8 + 1 + 32 + 8),
+      pool: d.readUInt16LE(8 + 1 + 32 + 8 + 2),
+      unlimitedUntil: Number(d.readBigInt64LE(8 + 1 + 32 + 8 + 2 + 2)),
+      lastRef: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8)),
+      awardCount: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8 + 8)),
+    };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+const LivesAccountSize = 1 + 32 + 8 + 2 + 2 + 8 + 8 + 8 + 8; // == LivesAccount::INIT_SPACE
+
+function livesPdaFor(pubkey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('gfglives'), pubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
 }
 
 // A player commits their seat's move (32-byte commit) gasless. The program
@@ -1288,6 +1343,13 @@ export function initMagicBlockDice() {
     // arc2m1 turn timer (Option B): permissionless force-pass of a lapsed turn.
     expireBoardTurn(game, matchRef) {
       return expireBoardTurn(game, matchRef);
+    },
+    // M10 lives: consume one on completion + read the on-chain lives ledger.
+    consumeLife(game, matchRef) {
+      return consumeLife(game, matchRef);
+    },
+    readLivesFor(pubkey) {
+      return readLivesFor(pubkey);
     },
 
     // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.

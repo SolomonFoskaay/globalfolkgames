@@ -288,6 +288,35 @@
               }
             ]
           }
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -914,6 +943,61 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "consume_life",
+      "discriminator": [
+        151,
+        204,
+        234,
+        34,
+        182,
+        164,
+        122,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -3383,6 +3467,35 @@
               }
             ]
           }
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -5718,6 +5831,19 @@
       ]
     },
     {
+      "name": "LivesAccount",
+      "discriminator": [
+        203,
+        191,
+        38,
+        41,
+        42,
+        94,
+        28,
+        23
+      ]
+    },
+    {
       "name": "MatchBoard",
       "discriminator": [
         141,
@@ -5995,6 +6121,11 @@
       "code": 6031,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
+    },
+    {
+      "code": 6032,
+      "name": "NoLives",
+      "msg": "no lives left today - refill at midnight GMT or go Premium"
     }
   ],
   "types": [
@@ -6419,6 +6550,69 @@
           },
           {
             "name": "spend_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LivesAccount",
+      "docs": [
+        "M10 LIVES ledger (game-agnostic, on-chain).",
+        "One account per player, seed [gfglives, player]. The lives gate is the same",
+        "for EVERY M1 game (Ludo now, Ayo/future later): a completed match consumes",
+        "exactly one life; abandon / reset / disconnect never complete -> never cost",
+        "a life (and never award points). Subscribers / boosted (unlimited) players",
+        "pass the gate without drawing the meter (boosterActiveUntil read from the",
+        "player's premium ledger).",
+        "",
+        "THIS IS THE ON-CHAIN ENFORCEMENT the platform uses: because the lives ledger",
+        "lives in the program and start_match/join_match gate against it, an external",
+        "frontend calling the public program still cannot onboard unpaid play - the",
+        "gate is chain-enforced, not client-enforced.",
+        "",
+        "UTC-day accounting: `day = unix_ts / 86400` (UTC). `used` resets to 0 when",
+        "the UTC day changes (refill). `pool` = lives available per day for the",
+        "player's tier (free 5 / L2 10 / L3 15 / L4 20), snapshotted by the client",
+        "at activation but enforced as `used < pool` by consume/lookup."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "day",
+            "type": "i64"
+          },
+          {
+            "name": "used",
+            "type": "u16"
+          },
+          {
+            "name": "pool",
+            "type": "u16"
+          },
+          {
+            "name": "unlimited_until",
+            "type": "i64"
+          },
+          {
+            "name": "last_consumed_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_consumed_ts",
+            "type": "i64"
+          },
+          {
+            "name": "award_count",
             "type": "u64"
           }
         ]

@@ -463,6 +463,39 @@
     };
     window.__mpActive = function () { try { var a = window.gfgLudoAdapter; return !!(a && typeof a.isActive === 'function' && a.isActive() && typeof a.ref === 'function' && a.ref()); } catch (e) { return false; } };
 
+    // M10 LIVES GATE (multiplayer, on-chain): create + join must pass even
+    // before taking a seat. It reads the player's on-chain lives ledger (the
+    // SAME source the single-player gate + the program's join/begin gate use)
+    // and, when lives are exhausted and no booster/unlimited is active, shows
+    // the SAME persistent 'No lives left' overlay single-player uses - so a
+    // public external frontend calling our program cannot onboard free play.
+    // Returns a Promise<boolean>: true = allowed, false = blocked.
+    window.mpCheckLives = function () {
+        return new Promise(function (resolve) {
+            try {
+                var md = window.magicblockDice;
+                var wallet = window.__mpWallet ? window.__mpWallet() : null;
+                if (!md || typeof md.readLivesFor !== 'function' || !wallet) { resolve(true); return; } // SDK/wallet not ready: do not hard-block
+                // Unlimited (booster/premium) -> always allowed.
+                var prem = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
+                var unt = Number(prem && prem.boosterActiveUntil ? prem.boosterActiveUntil : 0);
+                if (unt > 0 && unt > Date.now()) { resolve(true); return; }
+                md.readLivesFor(wallet).then(function (r) {
+                    if (!r || !r.ok) { resolve(true); return; } // ledger not created yet = fresh pool (allowed)
+                    var left = Math.max(0, (r.pool || 0) - (r.used || 0));
+                    if (left <= 0) {
+                        window.mpSetStatus('No lives left today - refill at midnight (GMT) or go Premium.');
+                        if (typeof window.showLivesBlocked === 'function') { try { window.showLivesBlocked(true); } catch (e) {} }
+                        else if (typeof window.showAuthBanner === 'function') { window.showAuthBanner('No lives left today. Your meter refills at midnight (GMT). Go Premium for more lives.', true); }
+                        resolve(false);
+                    } else {
+                        resolve(true);
+                    }
+                }).catch(function () { resolve(true); });
+            } catch (e) { resolve(true); }
+        });
+    };
+
     // Render the seat grid (2 or 4 seats) from the ON-CHAIN board state.
     // `s` = rail.state() result: {players:[wallet...], handles:[...], seats,
     // player_count, status, winner_seat}. My wallet identifies "You".
@@ -650,13 +683,20 @@
             var deadline = Date.now() + 3000;
             (function poll() {
                 wallet = window.__mpWallet();
-                if (wallet) return doCreate();
+                if (wallet) {
+                    // M10 lives gate: a creator needs a life (or unlimited).
+                    window.mpCheckLives().then(function (allow) {
+                        if (allow) doCreate();
+                    });
+                    return;
+                }
                 if (Date.now() < deadline) { setTimeout(poll, 200); return; }
                 window.mpSetStatus('wallet session still loading - tap Create again in a second');
             })();
             return;
         }
-        doCreate();
+        // M10 lives gate: a creator needs a life (or unlimited).
+        window.mpCheckLives().then(function (allow) { if (allow) doCreate(); });
         function doCreate() {
             window.mpSetStatus('creating ' + seats + '-seat match...');
             a.start(1, [], seats, 0, 3600, 0).then(function (r) {
@@ -728,13 +768,18 @@
                 var hdeadline = Date.now() + 3000;
                 (function hpoll() {
                     handle = window.__mpHandle();
-                    if (handle) return doJoinInner();
+                    if (handle) {
+                        // M10 lives gate: a joiner needs a life (or unlimited).
+                        window.mpCheckLives().then(function (allow) { if (allow) doJoinInner(); });
+                        return;
+                    }
                     if (Date.now() < hdeadline) { setTimeout(hpoll, 200); return; }
                     window.mpSetStatus('could not resolve your player id yet - try again in a second');
                 })();
                 return;
             }
-            doJoinInner();
+            // M10 lives gate: a joiner needs a life (or unlimited).
+            window.mpCheckLives().then(function (allow) { if (allow) doJoinInner(); });
             function doJoinInner() {
                 window.mpSetStatus('joining ' + code + '...');
                 var codeUp = code.trim().toUpperCase().replace(/\s+/g, '');
