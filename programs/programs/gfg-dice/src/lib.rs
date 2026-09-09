@@ -1566,6 +1566,40 @@ pub mod gfg_dice {
         require!(b.status == 1, PointsError::NotOpen);
         require!(seat < b.player_count, PointsError::RankOutOfRange);
         require!(b.players[seat as usize] == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
+        // ===== M12 turn timer: LAZY SELF-ENFORCING (no frontend firing) =====
+        // The timer continues the cycle on its own, like the lives/subscription/
+        // booster timers. Each seat keeps an ABSOLUTE deadline (last_turn_ts =
+        // when its turn began + turn_secs). On ANY real commit, if the seat that
+        // was EXPECTED to play (byte19 of the last commit) has a deadline that has
+        // passed, that stall is advanced on-chain right here: we emit the expiry
+        // marker (byte0=255, byte19=next seat) + bump move_count so every device's
+        // subscription sees the pass, and set the next seat's fresh deadline. The
+        // incoming move is then recorded on top, so the game simply continues -
+        // a stalled player can never hold the match, and the OTHER player's own
+        // next action is what the program uses to advance (no expire_turn call).
+        // For the FIRST turn (current_turn==255, no commit yet) the expected seat
+        // is 0 (host / first active seat); begin_match seeded its deadline.
+        if b.current_turn != 255 {
+            let expected = {
+                let ctp = b.last_move_commit[19] as usize;
+                if ctp < b.player_count as usize { Some(ctp) }
+                else { (b.current_turn as usize + 1).checked_rem(b.player_count as usize) }
+            };
+            if let Some(exp) = expected {
+                // Only skip if the expected seat is NOT the one now acting; the
+                // acting seat's move is the continuation, whatever it is.
+                if exp != seat as usize && b.last_turn_ts[exp] > 0 && now >= b.last_turn_ts[exp] {
+                    let next = (exp + 1) % b.player_count as usize;
+                    let mut marker = [0u8; 32];
+                    marker[0] = 255u8;
+                    marker[19] = next as u8;
+                    b.last_move_commit = marker;
+                    b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
+                    b.current_turn = next as u8;
+                    b.last_turn_ts[next] = now + b.turn_secs as i64;
+                }
+            }
+        }
         b.last_move_commit = move_commit;
         b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
         b.current_turn = seat;
@@ -1577,9 +1611,8 @@ pub mod gfg_dice {
         // ABSOLUTE deadline = now + turn_secs, exactly like the lives/sub/booster
         // timers (an until-timestamp). The frontend just reads it + displays.
         // On ordinary rolls/moves we do NOT touch it, so a turn's window is
-        // FIXED from when it began. expire_turn force-passes when now >=
-        // deadline. Repurposing last_turn_ts to a deadline is safe (nothing else
-        // reads it).
+        // FIXED from when it began. Repurposing last_turn_ts to a deadline is
+        // safe (nothing else reads it).
         if move_commit[20] == 1 {
             let t = move_commit[19] as usize;
             if t < b.player_count as usize {
