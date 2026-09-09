@@ -923,6 +923,36 @@
                 window.mpEnsurePoll = function () { _origPoll.apply(this, arguments); _mpStartDisp(); };
             }
         } catch (e) { /* soft */ }
+        // arc2m1 SINGLE-PLAYER turn timer (display + enforcement, fully separate
+        // from MP). Runs ONLY when the MP rail is NOT active; the MP timer (above)
+        // owns live matches. Shows the same 45s window under the turn name for the
+        // human's solo turn and auto-passes it if it elapses.
+        var soloTimerTick = null;
+        window.mpEnsureSoloTimer = function () {
+            if (soloTimerTick) return;
+            soloTimerTick = setInterval(function () {
+                try {
+                    var mpActive = !!(window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive());
+                    var chip = document.getElementById('mp-turn-timer');
+                    if (mpActive) { if (chip) chip.style.display = 'none'; return; }
+                    var live = false;
+                    try { live = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked && !(typeof matchOver !== 'undefined' && matchOver); } catch (e) {}
+                    if (!live) { if (chip) chip.style.display = 'none'; return; }
+                    if (typeof window.__soloTurnTick !== 'function') { if (chip) chip.style.display = 'none'; return; }
+                    var remainingMs = window.__soloTurnTick(); // auto-passes expired human turn + returns deadline
+                    if (remainingMs <= 0) { if (chip) chip.style.display = 'none'; return; }
+                    var mm = Math.floor(remainingMs / 60000);
+                    var ss = Math.floor(remainingMs % 60000 / 1000);
+                    var ms = Math.floor(remainingMs % 1000);
+                    chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
+                    chip.style.display = 'inline-block';
+                    chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
+                } catch (e) { /* soft */ }
+            }, 1000);
+        };
+        if (typeof window.mpEnsureSoloTimer === 'function') {
+            try { window.mpEnsureSoloTimer(); } catch (e) {}
+        }
         // Host: begin the multiplayer board + lobby when the real game starts.
         // MP gate: the local game must NOT start until the on-chain begin_match
         // actually succeeded (status 0 -> 1). If it fails (e.g. a seat is still

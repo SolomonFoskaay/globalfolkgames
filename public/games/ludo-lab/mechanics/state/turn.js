@@ -54,6 +54,44 @@ let isGamePaused = false;
 // 1st..Nth + "Play Again" is shown. matchOver guards every action.
 let matchOver = false;
 
+// arc2m1 SINGLE-PLAYER turn timer (separate from the multiplayer on-chain
+// timer, which lives on the board). Solo has no board, so the same 45s rule is
+// enforced here in the core turn loop: each new turn gets a fresh window, and a
+// human's turn that runs out auto-passes (never a computer turn - the AI always
+// acts instantly). This is DISPLAY + enforcement only and NEVER touches the MP
+// rail - the 1s check below stands down the moment a multiplayer match is
+// active (its own on-chain timer takes over).
+const SOLO_TURN_MS = 45000;
+let soloTurnDeadline = 0;
+let soloTurnArmed = false;   // true once a live solo turn is being timed
+window.__soloTurnDeadlineMs = function () { return soloTurnDeadline; };
+window.__soloTurnArmed = function () { return soloTurnArmed; };
+// (Re)arm the current solo turn's window. Called when a new solo turn begins
+// (match start + every pass). Idempotent.
+function armSoloTurnDeadline() {
+    soloTurnDeadline = Date.now() + SOLO_TURN_MS;
+    soloTurnArmed = true;
+}
+// Auto-pass a solo HUMAN turn whose window has elapsed. Called on the 1s tick
+// AND defensively right before the AI would otherwise wait on an idle human.
+function maybeAutoPassSoloTurn() {
+    // Never in multiplayer (the on-chain expire_turn owns that path).
+    if (window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive()) return;
+    if (isGamePaused || matchOver) return;
+    if (!setupConfigurationLocked) return;
+    if (!soloTurnArmed) return;
+    if (Date.now() < soloTurnDeadline) return;
+    // Only a HUMAN seat auto-passes on timeout (computers act instantly; a
+    // finished seat is already auto-skipped by the turn loop).
+    const p = window.playerProfiles && window.playerProfiles[currentTurn];
+    if (!p || p.mode !== 'human') return;
+    soloTurnArmed = false;
+    displayEducationalLog(`${currentTurn.toUpperCase()}: Turn time is up - passing to the next player.`);
+    if (typeof passTurnSequence === 'function') {
+        try { passTurnSequence(); } catch (e) {}
+    }
+}
+
 // Anti-Cheat Automation Settings Engine States
 let setupConfigurationLocked = false;
 // `isUser` marks the seat bound to the signed-in Dynamic user (the "You" seat).
@@ -67,6 +105,15 @@ window.playerProfiles = {
 
 const turnSequence = ['green', 'yellow', 'blue', 'red'];
 const colorsMap = { green: '#2ecc71', yellow: '#f1c40f', blue: '#3498db', red: '#e74c3c' };
+
+// The 1s solo timer tick: auto-pass an elapsed solo human turn + report the
+// deadline for the display chip. Started by the page (non-MP path). Returns the
+// remaining ms for the active solo turn (0 when idle), so the page can render
+// 00m:45s:000ms under the turn name during solo play.
+window.__soloTurnTick = function () {
+    maybeAutoPassSoloTurn();
+    return soloTurnArmed ? (soloTurnDeadline - Date.now()) : 0;
+};
 
 // Match mode: '2p' (exactly TWO seats, user picks any two colours) or '4p'
 // (all four). Selectable BEFORE the match locks; after lock it is frozen.
@@ -339,6 +386,9 @@ function initiateArenaMatch() {
     lastDiceRoll2 = 0;
     currentTurnMoves = [];
 
+    // arc2m1 solo turn timer: the first solo turn starts now.
+    armSoloTurnDeadline();
+
     console.log(`[GFG LUDO] Match started | mode=${matchMode} | activeSeats=${activeSeats.join(',')} | userSeat=${userSeat} | startingTurn=${currentTurn} | seatModes=${Object.keys(playerProfiles).map(c => `${c}:${playerProfiles[c].mode}`).join(',')}`);
 
     // Keep the dice-box turn label in sync with the actual starting seat
@@ -401,6 +451,9 @@ function passTurnSequence() {
     currentTurnMoves = [];
     consecutiveDoubleSixes = 0; 
     if (typeof hideVerifyLink === 'function') hideVerifyLink(); 
+
+    // arc2m1 solo turn timer: every new solo turn starts its own 45s window.
+    armSoloTurnDeadline(); 
 
     const turnIndicator = document.getElementById('turn-indicator');
     if (turnIndicator) {
