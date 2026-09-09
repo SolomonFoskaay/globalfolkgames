@@ -65,6 +65,44 @@
         }
     };
 
+    // (4.1) A multiplayer device that did NOT make the winning move still needs
+    // to complete its local match when the on-chain board reports the finish
+    // (status=2 + winner_seat set by the winner's finish_match). Without this,
+    // that device waits forever on a turn that will never come. The board is
+    // the single source of truth: it already holds the winner; we simply end
+    // the local game, mark the match over and show the ceremony.
+    // We deliberately DO NOT re-publish the seam here: the winner's device
+    // already emitted it and banked every 'user' seat at its own wallet (via
+    // the on-chain identity map). A second emission from this device would use
+    // a different proofSig -> different match_ref -> DOUBLE-credit seats.
+    window.gfgCompleteMatchFromBoard = function (winnerSeat) {
+        if (matchStatus === 'finished') return;
+        try {
+            if (typeof winnerSeat === 'number') {
+                const order = (typeof window.getActiveSeats === 'function')
+                    ? window.getActiveSeats()
+                    : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
+                const winColor = order[winnerSeat];
+                if (winColor && !finishOrder.includes(winColor)) finishOrder.push(winColor);
+            }
+            const active = (typeof window.getActiveSeats === 'function')
+                ? window.getActiveSeats()
+                : (typeof turnSequence !== 'undefined' ? turnSequence : ['green', 'yellow', 'blue', 'red']);
+            active.forEach(c => {
+                if (!finishOrder.includes(c) && !window.isSeatFinished(c)) {
+                    finishOrder.push(c);
+                }
+            });
+            matchStatus = 'finished';
+            window.finishOrder = finishOrder.slice();
+            if (typeof saveGameStateToStorage === 'function') saveGameStateToStorage();
+            if (typeof window.markMatchOver === 'function') window.markMatchOver();
+            if (typeof window.showResultCeremony === 'function') window.showResultCeremony();
+        } catch (e) {
+            console.log('[win-detection] gfgCompleteMatchFromBoard errored', e);
+        }
+    };
+
     window.checkForMatchWinner = function (color) {
         if (!color || !window.playerProfiles) return;
         if (matchStatus !== 'in-progress') return;
@@ -148,6 +186,20 @@
         }
     } catch (e) { /* soft */ }
 
+    // WINNER-ONLY SEAM (item 4, no double-credit): in MP every device runs the
+    // finish locally, but only the device that OWNS the winning seat publishes
+    // + banks. The other devices complete their local match via
+    // gfgCompleteMatchFromBoard (which never re-banks). Without this guard the
+    // CREATOR's device would also try to bank the invited winner at their
+    // wallet, using a DIFFERENT per-device matchRef, and double-credit them.
+    if (mpWallets && finishOrder && finishOrder.length) {
+        try {
+            const a = window.gfgLudoAdapter;
+            const myColor = (typeof a.color === 'function') ? a.color() : null;
+            if (myColor && finishOrder[0] && finishOrder[0] !== myColor) return;
+        } catch (e) { /* soft */ }
+    }
+
     const players = finishOrder.map(color => {
         // Multiplayer: map finish-order colours onto their on-chain seat index
         // (Ludo seat order = green, yellow, blue, red; 2P active order = green,
@@ -168,11 +220,20 @@
         }
         return {
             seat: color,
-            actor: (window.playerProfiles[color] && window.playerProfiles[color].isUser === true)
+            // Multiplayer identity rule (item 4): in MP, EVERY seat that has a
+            // real on-chain wallet attached is a LOGGED-IN PLAYER at their own
+            // wallet - so it is actor 'user' and M3/M4 credit it to ITSELF,
+            // whether or not that player created the match or is "the user on
+            // this device". A seat WITHOUT a wallet (a free human/computer
+            // filler that never joined on-chain) stays 'local'/'house'.
+            // Single-player is untouched (mpWallets is null -> the old checks).
+            actor: (mpWallets && !!identity)
                 ? 'user'
-                : (window.playerProfiles[color] && window.playerProfiles[color].mode === 'human')
-                    ? 'local'
-                    : 'house',
+                : (window.playerProfiles[color] && window.playerProfiles[color].isUser === true)
+                    ? 'user'
+                    : (window.playerProfiles[color] && window.playerProfiles[color].mode === 'human')
+                        ? 'local'
+                        : 'house',
             position: finishOrder.indexOf(color) + 1,
             identity,
             handle,

@@ -303,6 +303,30 @@ function applyMove(move) {
             try {
                 if (!s || typeof s.move_count !== 'number') return;
                 rememberSeats(s);
+                // FINISH propagation (4.1): the match ended on-chain (finish_match
+                // set status=2 + winner_seat). The WINNER already finished + fired
+                // its win UX; the OTHER devices may not have a pending move_count
+                // bump to wake them, so they would stay stuck waiting on a turn
+                // that will never come. Fire the local finish here so EVERY device
+                // completes + shows the result. Guarded per-match (once).
+                if (s.status === 2 || (typeof s.winner_seat === 'number' && s.winner_seat !== 255)) {
+                    if (window.__mpSawFinish !== matchRef) {
+                        window.__mpSawFinish = matchRef;
+                        lastCount = s.move_count;   // absorb any trailing commit
+                        dimmed = false;
+                        try {
+                            // The winner's device already finished + fired the
+                            // win UX. Here (a RECEIVING device) we complete the
+                            // LOCAL match from the on-chain board truth so this
+                            // player's own seats are credited at their wallets
+                            // and nobody stays stuck waiting for a turn.
+                            if (typeof window.gfgCompleteMatchFromBoard === 'function') {
+                                window.gfgCompleteMatchFromBoard(s.winner_seat);
+                            }
+                        } catch (e) { log('finish propagation error', (e && e.message) || e); }
+                    }
+                    return;
+                }
                 // Begin status (0->1) fires regardless of move_count: the
                 // JOINER uses it to start its own local board exactly once.
                 if (s.status === 1 && window.__mpRoom && window.__mpRoom.started !== true) {
