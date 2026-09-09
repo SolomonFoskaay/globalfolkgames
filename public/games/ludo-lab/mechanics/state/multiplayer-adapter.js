@@ -193,6 +193,21 @@ function applyMove(move) {
     var won = false;
     try {
         if (!window.tokens) return 'not-ready';
+        // PHANTOM-BOARD GUARD: a real commit ALWAYS carries dice (byte1/2 > 0)
+        // and a meaningful board. An all-zero / all-home snapshot (fresh board
+        // with move_count 0, or a decoded default) must NEVER be applied - doing
+        // so decodes every token to pathIndex 0 (GREEN's release safe-box) and
+        // stacks all 4 GREEN + 4 RED there. Skip it ('not-ready') so the next
+        // poll retries the real board, keeping the home yards on join/refresh.
+        var hasDice = !!(move && move.die1 > 0 && move.die2 > 0);
+        if (!hasDice && move && Array.isArray(move.steps)) {
+            var anyReal = false;
+            for (var _i = 0; _i < move.steps.length; _i++) {
+                var _v = move.steps[_i] || 0;
+                if (_v !== 0 && _v !== SNAPSHOT_YARD) { anyReal = true; break; }
+            }
+            if (!anyReal) return 'not-ready';
+        }
         var wasDiceCommit = !snapshotDiffers(move);
         // Reconstruct EVERY token from the snapshot - no move replay needed.
         var anyMissing = false;
