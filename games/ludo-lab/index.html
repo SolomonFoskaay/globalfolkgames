@@ -849,11 +849,12 @@
             mpTimerTick = setInterval(function () {
                 try {
                     var a = window.gfgLudoAdapter;
-                    if (!a || typeof a.isActive !== 'function' || !a.isActive()) {
-                        var hideEl = document.getElementById('mp-turn-timer');
-                        if (hideEl) hideEl.style.display = 'none';
-                        return;
-                    }
+                    // OWN-MODE ONLY: when no multiplayer match is live, this
+                    // ticker does NOTHING to the shared turn-timer chip - the
+                    // single-player ticker owns it then. (Previously we hid the
+                    // chip here, which fought the solo ticker and made the MP
+                    // chip blink uncontrollably.)
+                    if (!a || typeof a.isActive !== 'function' || !a.isActive()) return;
                     var chip = document.getElementById('mp-turn-timer');
                     // NOTE: setupConfigurationLocked is a top-level `let` in
                     // turn.js - NOT a window property. Read it as a bare id.
@@ -934,7 +935,11 @@
                 try {
                     var mpActive = !!(window.gfgLudoAdapter && typeof window.gfgLudoAdapter.isActive === 'function' && window.gfgLudoAdapter.isActive());
                     var chip = document.getElementById('mp-turn-timer');
-                    if (mpActive) { if (chip) chip.style.display = 'none'; return; }
+                    // OWN-MODE ONLY: when a multiplayer match is live, this
+                    // solo ticker does NOTHING to the shared chip - the MP
+                    // ticker owns it then. (Previously we hid it here, which
+                    // fought the MP ticker and made the chip blink.)
+                    if (mpActive) return;
                     var live = false;
                     try { live = (typeof setupConfigurationLocked === 'boolean') && setupConfigurationLocked && !(typeof matchOver !== 'undefined' && matchOver); } catch (e) {}
                     if (!live) { if (chip) chip.style.display = 'none'; return; }
