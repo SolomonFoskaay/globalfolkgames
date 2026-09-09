@@ -110,6 +110,7 @@ pub const PREMIUM_SEED: &[u8] = b"gfgprem"; // M5 premium points ledger seed (bu
 pub const AFFILIATE_SEED: &[u8] = b"gfgref";      // M6 affiliate ledger [gfgref, affiliate]
 pub const AFFILIATE_PAIR_SEED: &[u8] = b"gfgrefpair"; // M6 affiliate pair [gfgrefpair, affiliate, referral]
 pub const LIVES_SEED: &[u8] = b"gfglives";        // M10 lives ledger [gfglives, player] (game-agnostic)
+pub const FREE_LIVES_DAY: u64 = 5;                // M10 free daily pool (GMT+00 refill); premium tiers raise pool
 pub const CLAIM_SEED: &[u8] = b"gfgclaim";        // M6 signup-bonus fence [gfgclaim, player] (permanent, on-chain)
 pub const SIGNUP_BONUS_POINTS: u64 = 500;         // M6 500P lifetime signup bonus (once per account, ever)
 pub const COMP2_SEED: &[u8] = b"gfgcomp2";        // M7 competition instance [gfgcomp2, creator, seq]
@@ -360,6 +361,55 @@ pub mod gfg_dice {
         l.last_consumed_ref = match_ref;
         l.last_consumed_ts = now;
         l.award_count = l.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Initializes the M10 LIVES ledger for a player (base layer, relay/sponsor
+    /// pays ONCE per player, bundled into the same first-onboarding flow as
+    /// dice/points/result/premium). ia overrides remain at interface: the free
+    /// base pool is 5/day; unlimited comes from the premium booster. Adds the
+    /// daily UTC pool. Everything after init is gasless ER.
+    pub fn initialize_lives(ctx: Context<InitializeLivesInput>) -> Result<()> {
+        let l = &mut ctx.accounts.lives;
+        let now = Clock::get()?.unix_timestamp;
+        l.version = 1u8;
+        l.player = ctx.accounts.player_authority.key();
+        l.day = now / 86400;
+        l.used = 0;
+        l.pool = FREE_LIVES_DAY as u16;
+        l.unlimited_until = 0;
+        l.last_consumed_ref = 0;
+        l.last_consumed_ts = 0;
+        l.award_count = 0;
+        Ok(())
+    }
+
+    /// Delegates the player's LIVES PDA into an ER session (base layer, sponsor
+    /// pays once) so `consume_life` / the join/begin gates run gasless. Mirrors
+    /// delegate_points.
+    pub fn delegate_lives(ctx: Context<DelegateLivesInput>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_lives(
+            &ctx.accounts.payer,
+            &[LIVES_SEED, authority.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Returns the LIVES PDA to this program (ER -> re-delegate elsewhere).
+    /// Additive, 2026-09-10 (region-agnostic build rule).
+    pub fn undelegate_lives(ctx: Context<CommitAndUndelegateLivesInput>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.lives.to_account_info()])
+        .build_and_invoke()?;
         Ok(())
     }
 
@@ -1887,22 +1937,66 @@ pub struct InitializePoints<'info> {
 }
 
 /// Context for `consume_life` (M10, game-agnostic on-chain lives). The ledger is
-/// init_if_needed so the first completed match on a device auto-creates the
-/// wallet's lives account (payer = the player's session key, gasless on the ER).
+/// created + delegated ONCE by the relay/sponsor during first onboarding
+/// (initialize_lives + delegate_lives, base-layer one-time per player) - the
+/// SAME gasless pattern as points/result/premium. After that every write is a
+/// 0-fee ER tx signed by the player. A player-signed init_if_needed would be a
+/// base/rent toll, so it is intentionally NOT used here.
 #[derive(Accounts)]
 #[instruction(match_ref: u64)]
 pub struct ConsumeLifeCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + LivesAccount::INIT_SPACE,
+        mut,
         seeds = [LIVES_SEED, signer.key().as_ref()],
         bump
     )]
     pub lives: Account<'info, LivesAccount>,
+}
+
+/// Context for `initialize_lives` (M10). Sponsor/relay creates the ledger once
+/// at onboarding (base layer), exactly like initialize_points.
+#[derive(Accounts)]
+pub struct InitializeLivesInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + LivesAccount::INIT_SPACE,
+        seeds = [LIVES_SEED, player_authority.key().as_ref()],
+        bump
+    )]
+    pub lives: Account<'info, LivesAccount>,
     pub system_program: Program<'info, System>,
+}
+
+/// Context for `delegate_lives` (M10). Mirrors DelegatePointsInput.
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateLivesInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    /// CHECK: The lives pda to delegate.
+    #[account(mut, del)]
+    pub lives: UncheckedAccount<'info>,
+}
+
+/// Context for `undelegate_lives` (M10). Mirrors CommitAndUndelegateResultInput.
+#[commit]
+#[derive(Accounts)]
+pub struct CommitAndUndelegateLivesInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The player's wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [LIVES_SEED, player_authority.key().as_ref()], bump)]
+    pub lives: Account<'info, LivesAccount>,
 }
 
 #[delegate]
@@ -2233,19 +2327,16 @@ pub struct JoinMatchCtx<'info> {
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
     // M10 lives gate: the JOINER must have an available life (or be unlimited).
-    // The ledger is init_if_needed so a fresh wallet auto-creates with the
-    // free base pool (5) and 0 used -> the gate passes for new players; after
-    // the day's pool is consumed the program rejects (NoLives) whether or not
-    // the caller is our official frontend - chain-enforced.
+    // The ledger is created + delegated ONCE by the relay during onboarding
+    // (initialize_lives + delegate_lives), so a fresh wallet already has its
+    // base pool (5) with used=0 and passes; after the pool is consumed the
+    // program rejects (NoLives) whether or not the caller is our frontend.
     #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + LivesAccount::INIT_SPACE,
+        mut,
         seeds = [LIVES_SEED, signer.key().as_ref()],
         bump
     )]
     pub lives: Account<'info, LivesAccount>,
-    pub system_program: Program<'info, System>,
 }
 
 /// Context for `begin_match`.
@@ -2260,14 +2351,11 @@ pub struct BeginMatchCtx<'info> {
     // unlimited) before the match goes live. Chain-enforced - an external
     // frontend calling the program cannot begin without lives.
     #[account(
-        init_if_needed,
-        payer = signer,
-        space = 8 + LivesAccount::INIT_SPACE,
+        mut,
         seeds = [LIVES_SEED, signer.key().as_ref()],
         bump
     )]
     pub lives: Account<'info, LivesAccount>,
-    pub system_program: Program<'info, System>,
 }
 
 /// Context for `commit_move`.
@@ -3357,7 +3445,7 @@ pub enum PointsError {
     DuplicateCreditRef,
     #[msg("insufficient premium spendable balance")]
     InsufficientPremiumBalance,
-    #[msg("subscription already active — one plan at a time, re-upgrade only after expiry")]
+    #[msg("subscription already active - one plan at a time, re-upgrade only after expiry")]
     AlreadyActive,
     #[msg("premium account needs upgrade_premium_points (v2 layout) first")]
     NeedsUpgrade,

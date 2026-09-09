@@ -313,10 +313,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -988,10 +984,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -2048,6 +2040,182 @@
         },
         {
           "name": "global_points",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "delegate_lives",
+      "docs": [
+        "Delegates the player's LIVES PDA into an ER session (base layer, sponsor",
+        "pays once) so `consume_life` / the join/begin gates run gasless. Mirrors",
+        "delegate_points."
+      ],
+      "discriminator": [
+        37,
+        66,
+        134,
+        68,
+        248,
+        238,
+        139,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lives"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lives"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lives"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "lives",
           "writable": true
         },
         {
@@ -3171,6 +3339,66 @@
       "args": []
     },
     {
+      "name": "initialize_lives",
+      "docs": [
+        "Initializes the M10 LIVES ledger for a player (base layer, relay/sponsor",
+        "pays ONCE per player, bundled into the same first-onboarding flow as",
+        "dice/points/result/premium). ia overrides remain at interface: the free",
+        "base pool is 5/day; unlimited comes from the premium booster. Adds the",
+        "daily UTC pool. Everything after init is gasless ER."
+      ],
+      "discriminator": [
+        224,
+        234,
+        73,
+        108,
+        231,
+        213,
+        129,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_points",
       "docs": [
         "Idempotent: creates the player's per-game POINTS PDA if it does not",
@@ -3492,10 +3720,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -5500,6 +5724,68 @@
       "args": []
     },
     {
+      "name": "undelegate_lives",
+      "docs": [
+        "Returns the LIVES PDA to this program (ER -> re-delegate elsewhere).",
+        "Additive, 2026-09-10 (region-agnostic build rule)."
+      ],
+      "discriminator": [
+        236,
+        195,
+        163,
+        202,
+        88,
+        252,
+        238,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "undelegate_points",
       "docs": [
         "Commits the latest state and returns the per-game POINTS PDA to this",
@@ -6095,7 +6381,7 @@
     {
       "code": 6026,
       "name": "AlreadyActive",
-      "msg": "subscription already active — one plan at a time, re-upgrade only after expiry"
+      "msg": "subscription already active - one plan at a time, re-upgrade only after expiry"
     },
     {
       "code": 6027,

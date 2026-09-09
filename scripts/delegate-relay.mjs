@@ -48,6 +48,7 @@ const POINTS_SEED = Buffer.from('gfgpoints');
 const RESULT_SEED = Buffer.from('gfgresult');
 const GLOBAL_TAG = Buffer.from('global');
 const PREMIUM_SEED = Buffer.from('gfgprem'); // M5 premium points ledger (buy-only)
+const LIVES_SEED = Buffer.from('gfglives'); // M10 lives ledger [gfglives, player]
 
 // ER helpers — all post-delegation writes stay gasless on ER (sponsor is payer, user never pays)
 // Mirrors src/magicblock-er-vrf.js region-aware targeting, but for sponsor-signed admin writes.
@@ -139,6 +140,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const [resultPda] = PublicKey.findProgramAddressSync([RESULT_SEED, player.toBytes()], PROGRAM_ID);
   const [globalPointsPda] = PublicKey.findProgramAddressSync([POINTS_SEED, GLOBAL_TAG, player.toBytes()], PROGRAM_ID);
   const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
+  const [livesPda] = PublicKey.findProgramAddressSync([LIVES_SEED, player.toBytes()], PROGRAM_ID);
 
   // Delegation check uses the MAGIC ROUTER's getDelegationStatus, not
   // getAccountInfo.owner: with the Router as the primary RPC, getAccountInfo
@@ -157,8 +159,9 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const resultStatus = await retry(() => getDelegationStatus(conn, resultPda));
   const globalStatus = await retry(() => getDelegationStatus(conn, globalPointsPda));
   const premiumStatus = await retry(() => getDelegationStatus(conn, premiumPointsPda));
-  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated && premiumStatus && premiumStatus.isDelegated) {
-    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), premiumPointsPda: premiumPointsPda.toString(), gameTag, delegated: true, steps: [] };
+  const livesStatus = await retry(() => getDelegationStatus(conn, livesPda));
+  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated && premiumStatus && premiumStatus.isDelegated && livesStatus && livesStatus.isDelegated) {
+    return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), premiumPointsPda: premiumPointsPda.toString(), livesPda: livesPda.toString(), gameTag, delegated: true, steps: [] };
   }
 
   // Sponsor spend guard: authorize the estimated cost of the steps we are
@@ -172,7 +175,8 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2)) +
     (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2)) +
     (globalStatus && globalStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(globalPointsPda)) ? 1 : 2)) +
-    (premiumStatus && premiumStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(premiumPointsPda)) ? 1 : 2));
+    (premiumStatus && premiumStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(premiumPointsPda)) ? 1 : 2)) +
+    (livesStatus && livesStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(livesPda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
   const sponsorBalance = await retry(() => conn.getBalance(sponsor.publicKey));
@@ -254,6 +258,26 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     }
     const sig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
     if (sig) steps.push({ step: 'delegate_premium_points', sig });
+  }
+
+  // Lives PDA (M10): create if missing, then delegate if not delegated. This is
+  // BUNDLED into the same first-time onboarding as dice/points/result/global/
+  // premium - the sponsor pays ONE one-time base cost per player LIFETIME, and
+  // after that every lives write (join/begin/consume_life + the daily pool
+  // gates) runs GASLESS on the ER. No per-use cost anywhere. If the account
+  // already exists but was never delegated, we only delegate it.
+  if (!(livesStatus && livesStatus.isDelegated)) {
+    const linfo = await retry(() => conn.getAccountInfo(livesPda));
+    if (!linfo) {
+      const sig = await sendAndConfirmBase(conn, sponsor,
+        await program.methods.initializeLives()
+          .accounts({ lives: livesPda, payer: sponsor.publicKey, playerAuthority: player, systemProgram: SystemProgram.programId })
+          .transaction()
+      );
+      steps.push({ step: 'initialize_lives', sig });
+    }
+    const sig = await delegateLivesPda(program, conn, sponsor, player, livesPda);
+    if (sig) steps.push({ step: 'delegate_lives', sig });
   }
 
   // Record the REAL cost (balance delta), not the estimate, so the ledger
@@ -504,6 +528,45 @@ async function delegatePremiumPointsPda(program, conn, sponsor, player, premiumP
       }
       const detail = err.transactionMessage || err.transactionError?.message || err.message;
       throw new Error(`delegate_premium_points failed: ${detail}`);
+    });
+  return sig;
+}
+
+// M10 lives ledger: delegate the player's [gfglives, player] PDA into an ER
+// session so join/begin/consume_life + the lives gates run GASLESS. Mirrors
+// delegatePremiumPointsPda. The lives PDA is created + delegated ONCE during
+// the same first-time onboarding as dice/points/result/global/premium (sponsor
+// pays the one-time rent + session cost per player LIFETIME; after that every
+// lives write is a 0-fee ER tx signed by the player - never a per-use cost).
+async function delegateLivesPda(program, conn, sponsor, player, livesPda) {
+  const [buffer] = PublicKey.findProgramAddressSync([Buffer.from('buffer'), livesPda.toBytes()], PROGRAM_ID);
+  const [record] = PublicKey.findProgramAddressSync([Buffer.from('delegation'), livesPda.toBytes()], DELEGATION_PROGRAM);
+  const [metadata] = PublicKey.findProgramAddressSync([Buffer.from('delegation-metadata'), livesPda.toBytes()], DELEGATION_PROGRAM);
+
+  const sig = await sendAndConfirmBase(conn, sponsor,
+      await program.methods.delegateLives()
+        .accounts({
+          payer: sponsor.publicKey,
+          playerAuthority: player,
+          lives: livesPda,
+          bufferLives: buffer,
+          delegationRecordLives: record,
+          delegationMetadataLives: metadata,
+          ownerProgram: PROGRAM_ID,
+          delegationProgram: DELEGATION_PROGRAM,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([{ pubkey: ER_VALIDATOR, isSigner: false, isWritable: false }])
+        .transaction()
+    )
+    .catch(async (err) => {
+      await new Promise(r => setTimeout(r, 600));
+      const after = await getDelegationStatus(conn, livesPda);
+      if (after && after.isDelegated) {
+        return null;
+      }
+      const detail = err.transactionMessage || err.transactionError?.message || err.message;
+      throw new Error(`delegate_lives failed: ${detail}`);
     });
   return sig;
 }

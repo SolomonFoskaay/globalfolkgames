@@ -818,15 +818,18 @@ export async function joinBoardMatch(game, matchRef, seat, handle) {
   if (!ctx) throw new Error('No connected wallet to sign the join.');
   const { wallet } = ctx;
   const [board] = boardPdaFor(game, matchRef);
-  // M10 lives gate: the JOINER's lives ledger must exist (init_if_needed in the
-  // program) and pass the on-chain lives check. The program enforces it - the
-  // client only supplies the seeded account.
+  // M10 lives gate: the JOINER's lives ledger must EXIST and pass the on-chain
+  // lives check. ensureDelegated triggers the sponsor relay which creates +
+  // delegates it (BUNDLED with dice/points/result/global/premium in the SAME
+  // first-time onboarding - sponsor pays once per player lifetime, then every
+  // lives write is a 0-fee ER tx). The program enforces the gate itself.
   const [lives] = livesPdaFor(wallet.publicKey);
+  await ensureDelegated(lives, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   await withErRetry('join_match', async (eCtx) => eCtx.program.methods
     .joinMatch(game, new BN(matchRef), seat, String(handle || ''))
-    .accounts({ signer: wallet.publicKey, board, lives, systemProgram: SystemProgram.programId })
+    .accounts({ signer: wallet.publicKey, board, lives })
     .rpc(), { regionUrl });
   return { ok: true, seat };
 }
@@ -840,11 +843,12 @@ export async function beginBoardMatch(game, matchRef) {
   const { wallet } = ctx;
   const [board] = boardPdaFor(game, matchRef);
   const [lives] = livesPdaFor(wallet.publicKey);
+  await ensureDelegated(lives, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   const sig = await withErRetry('begin_match', async (eCtx) => eCtx.program.methods
     .beginMatch(game, new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, board, lives, systemProgram: SystemProgram.programId })
+    .accounts({ signer: wallet.publicKey, board, lives })
     .rpc(), { regionUrl });
   return { ok: true, sig };
 }
@@ -857,11 +861,12 @@ export async function consumeLife(game, matchRef) {
   if (!ctx) throw new Error('No connected wallet to sign the life.');
   const { wallet } = ctx;
   const [lives] = livesPdaFor(wallet.publicKey);
+  await ensureDelegated(lives, wallet.publicKey);
   await waitForErPickup(lives);
   const regionUrl = await regionUrlFor(lives);
   const sig = await withErRetry('consume_life', async (eCtx) => eCtx.program.methods
     .consumeLife(new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, lives, systemProgram: SystemProgram.programId })
+    .accounts({ signer: wallet.publicKey, lives })
     .rpc(), { regionUrl });
   return { ok: true, sig };
 }
