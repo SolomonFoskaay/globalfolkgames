@@ -124,7 +124,15 @@
         <!-- Persistent Control Center Layout -->
         <div id="dice-container">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 8px;">
-                <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px; flex:1; min-width:0;">
+                    <div id="turn-indicator" style="font-size: 0.9rem; font-weight: bold; color: #2ecc71; white-space: nowrap;">Green's Turn</div>
+                    <!-- arc2m1 turn timer: DISPLAY ONLY - reads the on-chain per-seat
+                         deadline (last_turn_ts + turn_secs) and renders it under the
+                         turn name. It never writes/fires anything; the on-chain turn
+                         engine enforces the limit. Shown only during a live
+                         multiplayer match (single-player shows nothing). -->
+                    <div id="mp-turn-timer" style="display:none; margin-top:2px; font-size:0.78rem; font-weight:800; color:#fff; background:#7838f8; border:1px solid rgba(155,89,182,0.7); border-radius:8px; padding:1px 8px; white-space:nowrap;">00m:00s:000ms</div>
+                </div>
 
                 <!-- Rearranged Mobile Action Dashboard Row Grid -->
                 <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
@@ -829,6 +837,63 @@
             if (pollTimer) return;
             pollTimer = setInterval(function () { try { window.__mpPollLobby(); } catch (e) {} }, 1200);
         };
+        // arc2m1 turn timer DISPLAY (read-only). Every second it reads the
+        // on-chain board state (the same state() the lobby poll uses) and renders
+        // the ACTIVE seat's deadline (last_turn_ts[seat], an until-timestamp -
+        // the exact value the on-chain expire_turn checks) under the turn name.
+        // It NEVER writes or fires anything; the on-chain turn engine enforces.
+        var mpTimerTick = null;
+        window.mpEnsureTimer = function () {
+            if (mpTimerTick) return;
+            mpTimerTick = setInterval(function () {
+                try {
+                    var a = window.gfgLudoAdapter;
+                    if (!a || typeof a.isActive !== 'function' || !a.isActive()) {
+                        var hideEl = document.getElementById('mp-turn-timer');
+                        if (hideEl) hideEl.style.display = 'none';
+                        return;
+                    }
+                    var chip = document.getElementById('mp-turn-timer');
+                    var live = false;
+                    try { live = (typeof window.setupConfigurationLocked === 'boolean') && window.setupConfigurationLocked && !!(a.ref && a.ref()); } catch (e) {}
+                    if (!chip || !live) { if (chip) chip.style.display = 'none'; return; }
+                    var ref = (typeof a.ref === 'function') ? a.ref() : 0;
+                    var rail2 = window.gfgMultiplayer;
+                    if (!ref || !rail2 || typeof rail2.state !== 'function') return;
+                    rail2.state(ref).then(function (s) {
+                        try {
+                            if (!s || !s.ok || s.status !== 1) return;
+                            var lastTs = (s.last_turn_ts && Array.isArray(s.last_turn_ts)) ? s.last_turn_ts : [];
+                            var lastCommit = (s.last_move_commit && Array.isArray(s.last_move_commit)) ? s.last_move_commit : [];
+                            var pc = Number(s.player_count || 0);
+                            var toPlay;
+                            var ctp = Number(lastCommit[19] || 0);
+                            if (lastCommit.length >= 20 && ctp < pc && (ctp > 0 || s.move_count > 0)) toPlay = ctp;
+                            else if (typeof s.current_turn === 'number' && s.current_turn !== 255 && s.current_turn + 1 < pc) toPlay = s.current_turn + 1;
+                            else toPlay = 0;
+                            var deadlineSec = Number(lastTs[toPlay] || 0);
+                            if (!deadlineSec) { chip.style.display = 'none'; return; }
+                            var remainingMs = (deadlineSec * 1000) - Date.now();
+                            if (remainingMs < 0) remainingMs = 0;
+                            var mm = Math.floor(remainingMs / 60000);
+                            var ss = Math.floor(remainingMs % 60000 / 1000);
+                            var ms = Math.floor(remainingMs % 1000);
+                            chip.textContent = String(mm).padStart(2, '0') + 'm:' + String(ss).padStart(2, '0') + 's:' + String(ms).padStart(3, '0') + 'ms';
+                            chip.style.display = 'inline-block';
+                            chip.style.background = remainingMs <= 15000 ? '#e74c3c' : (remainingMs <= 30000 ? '#f39c12' : '#7838f8');
+                        } catch (e) { /* soft */ }
+                    }).catch(function () { /* soft */ });
+                } catch (e) { /* soft */ }
+            }, 1000);
+        };
+        // Start the display ticker once a match is live (host/joiner/resume).
+        try {
+            var _mpStartDisp = function () { if (typeof window.mpEnsureTimer === 'function') { try { window.mpEnsureTimer(); } catch (e) {} } };
+            if (typeof window.mpEnsurePoll === 'function') {
+                var _origPoll = window.mpEnsurePoll;
+                window.mpEnsurePoll = function () { _origPoll.apply(this, arguments); _mpStartDisp(); };
+            }
+        } catch (e) { /* soft */ }
         // Host: begin the multiplayer board + lobby when the real game starts.
         // MP gate: the local game must NOT start until the on-chain begin_match
         // actually succeeded (status 0 -> 1). If it fails (e.g. a seat is still

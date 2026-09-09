@@ -1532,6 +1532,15 @@ pub mod gfg_dice {
         // current_turn = the seat that moved, making the next turn unambiguous.
         b.started_at = Clock::get()?.unix_timestamp;
         b.status = 1;
+        // ===== arc2m1 TURN TIMER (game-core, Option B, on-chain) =====
+        // The timer is integral to the game's turn engine: once the match is
+        // live (this begin), every turn is time-bound to turn_secs, no UTC, no
+        // client trigger. last_turn_ts[seat] stores the ABSOLUTE DEADLINE for
+        // that seat's current turn window (an until-timestamp, exactly like the
+        // booster/lives/subscription timers - the frontend just reads it). The
+        // first turn belongs to seat 0 (the host / first active seat): its
+        // window starts now.
+        b.last_turn_ts[0] = b.started_at + b.turn_secs as i64;
         Ok(())
     }
 
@@ -1555,7 +1564,71 @@ pub mod gfg_dice {
         b.last_move_commit = move_commit;
         b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
         b.current_turn = seat;
-        b.last_turn_ts[seat as usize] = now;
+        // ===== arc2m1 TURN TIMER (game-core, Option B, on-chain) =====
+        // The timer is part of the game's turn engine: every turn is time-bound
+        // to turn_secs. last_turn_ts[seat] is the ABSOLUTE DEADLINE (an until-
+        // timestamp) for the seat whose turn is running. The game adapter
+        // (arc2m1 Ludo) writes byte19 in EVERY commit:
+        //   - a mid-turn/roll/move or a double-six bonus => byte19 == seat (the
+        //     SAME player keeps the turn): re-stamp that seat's deadline so the
+        //     current turn continues under a fresh 45s window;
+        //   - a pass to the next player => byte19 == next seat: stamp the NEXT
+        //     seat's deadline so its turn is timed from handover.
+        // There is NO check on whether a player is 'active' - the clock simply
+        // runs for whichever turn is live, and expire_turn (below) force-passes
+        // a seat whose deadline has passed so the game can never stall.
+        let next = move_commit[19] as usize;
+        if next < b.player_count as usize {
+            b.last_turn_ts[next] = now + b.turn_secs as i64;
+        } else {
+            b.last_turn_ts[seat as usize] = now + b.turn_secs as i64;
+        }
+        Ok(())
+    }
+
+    // ===== arc2m1 TURN TIMER: Option B - permissionless force-pass =====
+    // expire_turn: when the CURRENT turn's deadline (last_turn_ts[active]) has
+    // passed, ANY caller (a participant device, or any future frontend) may
+    // advance the turn past the stalled seat so the match never hangs. It reads
+    // its OWN deadline + turn_secs, needs NO turn-order knowledge and does NOT
+    // change game rules: it only skips a seat whose time window is truly over
+    // and lets the Ludo turn engine proceed with whatever is next.
+    // The active seat = the one the last commit named as next (byte19); before
+    // the first commit it is seat 0. After advancing, that seat's OWN window is
+    // given a fresh deadline so its turn is timed like every other turn.
+    pub fn expire_turn(ctx: Context<ExpireTurnCtx>, game: u8, match_ref: u64) -> Result<()> {
+        require!(ctx.accounts.board.game == game, PointsError::InvalidCompetition);
+        require!(ctx.accounts.board.match_ref == match_ref, PointsError::InvalidCompetition);
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == 1, PointsError::NotOpen);
+        require!(b.player_count >= 2, PointsError::NotSettled);
+        // Determinate active seat: byte19 of the last commit is who is next to
+        // play (the adapter writes it every commit); before any commit it is
+        // seat 0 (host / first active seat). current_turn is 'the last mover';
+        // the seat to play is the one AFTER it when no commit names a next yet.
+        let active = if b.current_turn == 255 {
+            0usize
+        } else {
+            let ctp = b.last_move_commit[19] as usize;
+            if ctp < b.player_count as usize {
+                ctp
+            } else {
+                (b.current_turn as usize + 1) % b.player_count as usize
+            }
+        };
+        // If the active seat's deadline is still in the future, the turn is live.
+        require!(now >= b.last_turn_ts[active], PointsError::StillRunning);
+        // The stalled seat is skipped (turn moves to whoever follows it; the
+        // Ludo turn engine re-derives its own next from the game state).
+        let next = (active + 1) % b.player_count as usize;
+        let mut marker = [0u8; 32];
+        marker[0] = 255u8;   // not a real seat => 'timeout advance'
+        marker[19] = next as u8;
+        b.last_move_commit = marker;
+        b.move_count = b.move_count.checked_add(1).ok_or(PointsError::Overflow)?;
+        b.current_turn = next as u8;
+        b.last_turn_ts[next] = now + b.turn_secs as i64;
         Ok(())
     }
 
@@ -2087,6 +2160,18 @@ pub struct BeginMatchCtx<'info> {
 #[derive(Accounts)]
 #[instruction(game: u8, match_ref: u64, seat: u8, move_commit: [u8; 32])]
 pub struct CommitMoveCtx<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, MatchBoard>,
+}
+
+/// Context for `expire_turn` (arc2m1 turn timer, Option B). Permissionless:
+/// any signer records a lapsed turn so the game advances. Board-only accounts -
+/// no new seed, no layout change, solana-upgrade-safe.
+#[derive(Accounts)]
+#[instruction(game: u8, match_ref: u64)]
+pub struct ExpireTurnCtx<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]

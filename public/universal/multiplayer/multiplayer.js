@@ -185,6 +185,29 @@
         return r && r.ok ? r : null;
     }
 
+    // ---- arc2m1 turn timer (Option B): permissionless force-pass of a lapsed
+    // turn. The rail stays game-agnostic - it only transports the action to the
+    // game-core SDK (magicblockDice.expireBoardTurn); the PROGRAM verifies the
+    // active seat's deadline has genuinely passed, so this is a safe safety net
+    // for a player who never moves. Normal play re-stamps the deadline in
+    // commit_move, so active turns are unaffected. Synchronized counter-approval.
+    async function expireTurn(matchRef) {
+        var ref = Number(matchRef);
+        if (!ref) { emitError('expireTurn', 'no matchRef'); return { okay: false, error: 'no matchRef' }; }
+        var md = dice();
+        if (!md || typeof md.expireBoardTurn !== 'function') {
+            emitError('expireTurn', 'on-chain timer not ready on this device');
+            return { okay: false, error: 'on-chain timer not ready' };
+        }
+        try {
+            var r = await md.expireBoardTurn(GAME, ref);
+            return r && r.ok ? { okay: true, sig: r.sig } : { okay: false, error: (r && r.error) || 'expire failed' };
+        } catch (e) {
+            emitError('expireTurn', e);
+            return { okay: false, error: (e && e.message) || String(e) };
+        }
+    }
+
     // ---- begin (host starts the live match; status 0 -> 1; host signs) ----
     async function begin(move) {
         var gameId = (move && move.gameId) || GAME;
@@ -212,6 +235,7 @@
         subscribe: subscribe,
         finish: finish,
         state: state,
+        expireTurn: expireTurn,
         hash32: function (s) {
             var out = new Uint8Array(32);
             var src = String(s || '') + '|' + Date.now();

@@ -249,6 +249,16 @@ export async function boardState({ game, matchRef }) {
       seats: d[276],
       handles,
       current_turn: d[469],
+      // arc2m1 turn timer: per-seat ABSOLUTE DEADLINES (until-timestamps).
+      // last_turn_ts[seat] = the GMT epoch when that seat's current turn window
+      // ends (set at begin for seat 0 and re-stamped by commit_move as turns are
+      // handed over / continued). The frontend reads these + turn_secs to render
+      // the countdown; expire_turn uses them to force-pass a lapsed turn.
+      last_turn_ts: (function () {
+        const out = [];
+        for (let i = 0; i < 8; i++) out.push(Number(d.readBigInt64LE(510 + i * 8)));
+        return out;
+      })(),
       stake_usd_cents: Number(d.readBigUInt64LE(470)),
       seat_pot_usd_cents: Number(d.readBigUInt64LE(478)),
       turn_secs: Number(d.readBigUInt64LE(486)),

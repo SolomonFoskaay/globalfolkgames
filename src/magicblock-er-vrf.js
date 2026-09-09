@@ -868,6 +868,26 @@ export async function finishBoardMatch(game, matchRef, winnerSeat) {
   return { ok: true, sig };
 }
 
+// arc2m1 turn timer (Option B): PERMISSIONLESS force-pass when the current
+// turn's on-chain deadline has passed. ANY participant device (or a future
+// frontend) may call it so a stalled/lapsed turn moves on and the game cannot
+// hang. The program verifies the deadline itself - this is just the gasless
+// write (session key signs, 0 SOL). Soft-fail: if the deadline hasn't passed,
+// the program rejects with StillRunning and nothing changes.
+export async function expireBoardTurn(game, matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the turn expiry.');
+  const { wallet } = ctx;
+  const [board] = boardPdaFor(game, matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('expire_turn', async (eCtx) => eCtx.program.methods
+    .expireTurn(game, new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
 function pointsPdaFor(gameTag, payerPubkey) {
   return PublicKey.findProgramAddressSync(
     [POINTS_SEED, Buffer.from(gameTag, 'utf8'), payerPubkey.toBytes()],
@@ -1240,7 +1260,7 @@ export function initMagicBlockDice() {
       return recordGlobalPoints(kind, sourceCode, points, reason, matchRef);
     },
 
-    // ===== M12 — multiplayer match board (gasless ER, player session key) =====
+    // ===== arc2m1 — multiplayer match board (gasless ER, player session key) =====
     joinBoardMatch(game, matchRef, seat, handle) {
       return joinBoardMatch(game, matchRef, seat, handle);
     },
@@ -1252,6 +1272,10 @@ export function initMagicBlockDice() {
     },
     finishBoardMatch(game, matchRef, winnerSeat) {
       return finishBoardMatch(game, matchRef, winnerSeat);
+    },
+    // arc2m1 turn timer (Option B): permissionless force-pass of a lapsed turn.
+    expireBoardTurn(game, matchRef) {
+      return expireBoardTurn(game, matchRef);
     },
 
     // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.
