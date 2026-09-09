@@ -274,7 +274,11 @@ function applyMove(move) {
         if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
         seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
-        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
+        // arc2m1 timer: the PROGRAM is the single source of truth for turn_secs
+        // (DEFAULT_TURN_SECS on-chain). The client does NOT decide the duration -
+        // 0 is sent and the program enforces its own value, so no off-chain
+        // fallback can inject a different timer across devices or frontends.
+        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: 0, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
             if (!r.okay) { log('create failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Create failed: ' + r.error); return null; }
             active = true;
             matchRef = r.matchRef;

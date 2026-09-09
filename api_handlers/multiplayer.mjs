@@ -27,7 +27,9 @@ export default async function handler(req, res) {
       host: (body.host ?? body.get?.('host')) || null,
       seats: Number(body.seats ?? body.get?.('seats')),
       stakeUsdCents: Number(body.stakeUsdCents ?? body.get?.('stakeUsdCents') ?? 0) || 0,
-      turnSecs: Number(body.turnSecs ?? body.get?.('turnSecs') ?? 60) || 60,
+      // arc2m1 timer: the PROGRAM decides turn_secs (DEFAULT_TURN_SECS). Pass 0
+      // through - no off-chain fallback injects a duration.
+      turnSecs: Number(body.turnSecs ?? body.get?.('turnSecs') ?? 0) || 0,
       maxMatchSecs: Number(body.maxMatchSecs ?? body.get?.('maxMatchSecs') ?? 3600) || 3600,
       seat: Number(body.seat ?? body.get?.('seat')),
       winnerSeat: Number(body.winnerSeat ?? body.get?.('winnerSeat')),

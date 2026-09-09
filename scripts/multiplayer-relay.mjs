@@ -146,7 +146,10 @@ export async function boardCreate({ game, matchRef, seats, host, stakeUsdCents, 
       // settled". player_count must equal the REAL seated wallets.
       const hostKey = (host && (() => { try { return new PublicKey(host); } catch (e) { return null; } })()) || null;
       const list = hostKey ? [hostKey] : [];
-      const tx = await prog.methods.startMatch(game, new BN(matchRef), list, seatCount, new BN(stakeUsdCents || 0), new BN(turnSecs || 60), new BN(maxMatchSecs || 3600))
+      // arc2m1 timer: the PROGRAM is the single source of truth for turn_secs.
+      // Pass 0 (not a fallback) so start_match uses its own DEFAULT_TURN_SECS -
+      // no off-chain layer decides the timer duration.
+      const tx = await prog.methods.startMatch(game, new BN(matchRef), list, seatCount, new BN(stakeUsdCents || 0), new BN(turnSecs || 0), new BN(maxMatchSecs || 3600))
         .accounts({ payer: sponsor.publicKey, board: pda, systemProgram: SystemProgram.programId }).transaction();
       tx.feePayer = sponsor.publicKey;
       await sendMagicTx(conn, tx, [sponsor], { skipPreflight: true }).then(async (sig) => { await conn.confirmTransaction({ signature: sig }, 'confirmed'); });
@@ -291,7 +294,7 @@ function toBytes32(hexOrStr) {
 // ---- public dispatch (used by api_handlers/multiplayer.mjs) -------------------
 export async function dispatch(action, b) {
   switch (action) {
-    case 'create': return boardCreate({ game: Number(b.game), matchRef: Number(b.matchRef), seats: Number(b.seats), host: b.host, stakeUsdCents: Number(b.stakeUsdCents) || 0, turnSecs: Number(b.turnSecs) || 60, maxMatchSecs: Number(b.maxMatchSecs) || 3600 });
+    case 'create': return boardCreate({ game: Number(b.game), matchRef: Number(b.matchRef), seats: Number(b.seats), host: b.host, stakeUsdCents: Number(b.stakeUsdCents) || 0, turnSecs: Number(b.turnSecs) || 0, maxMatchSecs: Number(b.maxMatchSecs) || 3600 });
     case 'begin': return boardBegin({ game: Number(b.game), matchRef: Number(b.matchRef) });
     case 'join': return boardJoin({ game: Number(b.game), matchRef: Number(b.matchRef) });
     case 'commit': return boardCommit({ game: Number(b.game), matchRef: Number(b.matchRef), seat: Number(b.seat), moveCommit: b.moveCommit, regionUrl: b.regionUrl });

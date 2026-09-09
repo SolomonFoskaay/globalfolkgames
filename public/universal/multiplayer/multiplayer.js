@@ -68,7 +68,10 @@
             host: host,
             seats: opts.seats || 2,
             stakeUsdCents: 0,               // free standalone; AGM raises this later
-            turnSecs: opts.turnSecs || 60,
+            // arc2m1 timer: pass 0 so the PROGRAM decides turn_secs (its own
+            // DEFAULT_TURN_SECS). No off-chain fallback here - the board is the
+            // single source of truth, read back for display only.
+            turnSecs: 0,
             maxMatchSecs: opts.maxMatchSecs || 3600,
         });
         if (!r.ok) { emitError('create', r.error || 'create failed'); return { okay: false, error: r.error }; }

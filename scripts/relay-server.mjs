@@ -646,7 +646,7 @@ const server = createServer(async (req, res) => {
         seats: Number(url.searchParams.get('seats')), seat: Number(url.searchParams.get('seat')),
         winnerSeat: Number(url.searchParams.get('winnerSeat')), moveCommit: url.searchParams.get('moveCommit'),
         regionUrl: url.searchParams.get('regionUrl'), stakeUsdCents: Number(url.searchParams.get('stakeUsdCents') || 0) || 0,
-        turnSecs: Number(url.searchParams.get('turnSecs') || 60) || 60, maxMatchSecs: Number(url.searchParams.get('maxMatchSecs') || 3600) || 3600,
+        turnSecs: Number(url.searchParams.get('turnSecs') || 0) || 0, maxMatchSecs: Number(url.searchParams.get('maxMatchSecs') || 3600) || 3600,
       });
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify(r));

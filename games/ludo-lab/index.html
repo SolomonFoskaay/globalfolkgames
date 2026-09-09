@@ -659,7 +659,7 @@
         doCreate();
         function doCreate() {
             window.mpSetStatus('creating ' + seats + '-seat match...');
-            a.start(1, [], seats, 60, 3600, 0).then(function (r) {
+            a.start(1, [], seats, 0, 3600, 0).then(function (r) {
                 if (!r) { window.mpSetStatus('create failed (see console)'); return; }
                 var code = String(r.code || '').toUpperCase();
                 var codeEl = document.getElementById('mp-code');

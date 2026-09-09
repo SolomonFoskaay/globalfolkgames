@@ -121,6 +121,7 @@ pub const MAX_MP: usize = 8;                      // max human seats per earn ma
 pub const HANDLE_SLOT: usize = 24;                // per-seat sitewide handle width (matches ProfileHandle rule 5..24)
 pub const CLOCK_SEED: &[u8] = b"gfgclock";          // Arc2 M1B: per-seat turn clocks + forfeits
 pub const DEFAULT_TIMEOUT_CAP: u8 = 3;              // timeout_seat triggers foreclosure at 3 stalls
+pub const DEFAULT_TURN_SECS: u64 = 45;              // M12 turn timer default per turn (Ludo 45s; clients may pass their own, else the PROGRAM decides)
 pub const AFFILIATE_ENTRIES: usize = 24;          // rolling ring of affiliate month-records
 pub const PROFILE_HANDLE_SEED: &[u8] = b"gfghandle"; // M6 profile handle [gfghandle, handle_bytes]
 
@@ -1419,7 +1420,12 @@ pub mod gfg_dice {
         // stake 0 = Solo/free match (board records facts only, reward-neutral);
         // stake > 0 = earn match (escrow locks it via AGM). M1 never computes
         // rewards - it only stores the stake for downstream modules to read.
-        require!(turn_secs > 0 && max_match_secs > 0, PointsError::InvalidCompetition);
+        // Turn timer (arc2m1): the PROGRAM is the single source of truth. The
+        // client may pass its own per-game turn_secs (Ludo = 45); if a client
+        // sends 0, the program enforces its DEFAULT_TURN_SECS - so a future
+        // frontend can never create an untimed (or wrong-timed) match.
+        require!(max_match_secs > 0, PointsError::InvalidCompetition);
+        let turn_secs_final = if turn_secs > 0 { turn_secs } else { DEFAULT_TURN_SECS };
         let b = &mut ctx.accounts.board;
         b.version = 3u8;
         b.game = game;
@@ -1445,7 +1451,7 @@ pub mod gfg_dice {
         b.current_turn = 255u8; // none yet
         b.stake_usd_cents = stake_usd_cents;
         b.seat_pot_usd_cents = stake_usd_cents.checked_mul(seats as u64).ok_or(PointsError::Overflow)?;
-        b.turn_secs = turn_secs;
+        b.turn_secs = turn_secs_final;
         b.max_match_secs = max_match_secs;
         b.started_at = Clock::get()?.unix_timestamp;
         b.last_turn_ts = [0i64; MAX_MP];
