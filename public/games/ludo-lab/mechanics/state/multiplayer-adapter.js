@@ -96,12 +96,7 @@ function snapshotFromTokens() {
 // bytes3..18 = tokenEncode positions (real board cells), byte19 = next turn.
 // `advance`: true only on the turn-pass commit (real move commits stay on the
 // current seat so a mid-turn snapshot NEVER flips the turn to the opponent).
-// `boundary`: M12 turn timer flag. TRUE only when this commit BEGINS a NEW
-// turn for the seat at byte19 - a pass to the next seat, or a double-six bonus
-// roll (same seat, new turn). The program anchors that seat's turn-began time
-// (last_turn_ts) to now, giving the new turn a FRESH fixed window. Ordinary
-// rolls/moves pass boundary=false so a turn's 120s window is never extended.
-function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, advance, boundary) {
+function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, advance) {
     var m = [];
     for (var i = 0; i < 32; i++) m[i] = 0;
     m[0] = seatOf(window.getGameCurrentTurn ? window.getGameCurrentTurn() : (window.currentTurn || 'green'));
@@ -110,7 +105,6 @@ function encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsW
     var sw = snapshotFromTokens();
     for (var s = 0; s < 16 && s < sw.length; s++) m[3 + s] = (sw[s] & 0xff);
     var me = m[0];
-    if (boundary) m[20] = 1; // turn timer: this commit starts a new turn for byte19
     if (!advance) {
         m[19] = me; // mid-turn (dice + move snapshots): turn does NOT move yet
         return m;
@@ -262,14 +256,7 @@ function applyMove(move) {
         if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
         mySeat = (typeof chosenSeat === 'number') ? chosenSeat : 0;
         seatCount = (typeof seats === 'number' && seats === 4) ? 4 : 2;
-        // M12 per-turn timer default: 120s per turn (2 minutes). The turn clock is
-        // ON-CHAIN (arc2m1f gfgclock) so the timer is provable, not a frontend
-        // guess. Each seat's deadline resets on its own legal move; a stalled
-        // seat times out (permissionless) and the game advances so play never
-        // hangs on a walkaway player. 120s is the Ludo value - other games pass
-        // their own via the same rail clock.
-        var turnSecsFinal = (typeof turnSecs === 'number' && turnSecs > 0) ? turnSecs : 45;
-        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecsFinal, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
+        return rail().create({ gameId: gameId || 1, host: resolveHost(), seats: seats || 2, turnSecs: turnSecs || 60, maxMatchSecs: maxSecs || 3600 }).then(function (r) {
             if (!r.okay) { log('create failed', r.error); if (r.error && typeof window.mpSetStatus === 'function') window.mpSetStatus('Create failed: ' + r.error); return null; }
             active = true;
             matchRef = r.matchRef;
@@ -309,23 +296,6 @@ function applyMove(move) {
                 if (s.move_count <= lastCount) return;
                 if (s.move_count === 0) { lastCount = 0; return; } // no real move yet - skip the all-zero initial commit to avoid a phantom board
                 var mv = decodeMove(s.last_move_commit);
-                // M12 turn timer: the on-chain expiry marker (byte0 = 255) means
-                // the previous turn TIMED OUT and the board cursor advanced to
-                // byte19 (= the seat that is next to play). The board positions
-                // are UNCHANGED (no move happened), so we must NOT re-apply the
-                // snapshot (its all-zero steps would wrongly re-yard every
-                // token) - only advance the sync'd turn.
-                if (mv && mv.seat === 255) {
-                    syncTurnFromBoard(s);
-                    lastCount = s.move_count;
-                    dimmed = false;
-                    var st2 = (window.getGameCurrentTurn && window.getGameCurrentTurn()) || '';
-                    if (st2 === color()) {
-                        if (typeof window.cancelRemoteDiceWindow === 'function') { try { window.cancelRemoteDiceWindow(); } catch (e) {} }
-                        try { if (window.resetTurnForRoll && typeof window.resetTurnForRoll === 'function') window.resetTurnForRoll(); } catch (e) {}
-                    }
-                    return;
-                }
                 if (mv && mv.seat !== mySeat) {
                     // REMOTE commit: sync our turn + replay the board. The
                     // committed byte19 + board are the single source of truth,
@@ -553,31 +523,11 @@ function applyMove(move) {
         if (!active || !matchRef) return Promise.resolve({ okay: false, error: 'not in a match' });
         if (mySeat !== 0) return Promise.resolve({ okay: false, error: 'only the host can start' });
         return rail().begin({ gameId: 1, matchRef: matchRef }).then(function (r) {
-            if (r && r.okay) {
-                log('match begun');
-                // M12 on-chain turn timer (core of each game): turn_secs was set
-                // per game at create (Ludo = 120s) and lives ON THE BOARD, so no
-                // extra init is needed. Every commit_move already refreshes the
-                // mover's own deadline (last_turn_ts[seat]), and the page's
-                // countdown reads the board deadline + calls rail().expireTurn
-                // when it passes. Nothing to start here - the board IS the timer.
-            } else if (r && r.error) { log('begin failed', r.error); if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Start failed: ' + r.error); }
+            if (r && r.okay) log('match begun');
+            else if (r && r.error) { log('begin failed', r.error); if (typeof window.mpSetStatus === 'function') window.mpSetStatus('Start failed: ' + r.error); }
             return r;
         });
     }
-
-    // M12 turn timer bridge: advance a STALLED turn on-chain (permissionless;
-    // the program verifies the deadline passed). Called by the page when the
-    // active seat's countdown hits 0. Soft-fail so the game never blocks.
-    function expireTurn() {
-        if (!active || !matchRef || !rail() || typeof rail().expireTurn !== 'function') return;
-        try {
-            var p = rail().expireTurn(matchRef);
-            if (p && typeof p.then === 'function') p.catch(function (e) { log('expire turn err ' + e); });
-        } catch (e) { log('expire turn err ' + e); }
-    }
-
-    // ------- SERIALIZED COMMIT CHAIN -------
 
     // Serialized commit chain: every gasless board write (dice/move/pass) is sent
 // ONE AT A TIME, each awaiting the previous one's confirmation. This is the
@@ -633,22 +583,14 @@ function commitSnapshot(bytes, label) {
 
 // LIVE dice commit: when the local player rolls, immediately push a snapshot
 // (byte19 = current seat, advance=false) so the opponent sees the dice + board
-// in real time, BEFORE any token moves. The turn is NOT advanced. A roll that
-// begins a BONUS turn (the roll right after a double-six) is a NEW TURN for the
-// same seat -> boundary=true so the program starts a fresh 120s window for it.
+// in real time, BEFORE any token moves. The turn is NOT advanced.
 function onDiceRoll(die1, die2) {
     if (!active || !matchRef) return;
     if (!die1 || !die2) return;
     if (!window.tokens) return;
-    var isBonus = false;
-    try { isBonus = window.__mpBonusPending === true; } catch (e) {}
-    // Consume the flag either way: only the FIRST roll after a double-six is
-    // the bonus roll; later rolls in the same seat (the 2nd bonus roll) re-arm
-    // it on their own double-six finalize.
-    try { window.__mpBonusPending = false; } catch (e) {}
-    var bytes = encodeMove(die1, die2, 0, 0, 0, 0, false, isBonus);
+    var bytes = encodeMove(die1, die2, 0, 0, 0, 0, false);
     try { window._mpLatestDice = bytes; } catch (e) {}
-    commitSnapshot(bytes, isBonus ? 'dice-bonus' : 'dice');
+    commitSnapshot(bytes, 'dice');
 }
 
 // Called after each REAL local token move. Each move is committed live with
@@ -658,8 +600,6 @@ function onDiceRoll(die1, die2) {
 function onMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked) {
     if (!active || !matchRef) return;
     movedThisTurn = true;
-    // (M12 turn timer: commit_move already refreshes the mover's on-chain
-    // deadline, so no separate touch call is needed - the board is the timer.)
     var bytes;
     try {
         bytes = encodeMove(die1, die2, tokenIndex, fromPathIndex, toPathIndex, toStepsWalked, false);
@@ -689,16 +629,12 @@ function onPassTurn() {
     try { d2 = (typeof lastDiceRoll2 === 'number') ? lastDiceRoll2 : 0; } catch (e) {}
     try {
         // Re-encode the CURRENT board with advance=true (turn passes now),
-        // but keep the real dice for the receiver's display. boundary=true: a
-        // pass begins a NEW turn for the next seat, so the program anchors a
-        // fresh 120s window for them.
-        bytes = encodeMove(d1, d2, 0, 0, 0, 0, true, true);
+        // but keep the real dice for the receiver's display.
+        bytes = encodeMove(d1, d2, 0, 0, 0, 0, true);
     } catch (e) {
         log('pass encode THREW: ' + (e && e.message));
         return;
     }
-    // A pass ends any double-six bonus sequence (a 3rd double-six passes).
-    try { window.__mpBonusPending = false; } catch (e) {}
     movedThisTurn = false;
     try { window._mpPassCommit = bytes; } catch (e) {}
     commitSnapshot(bytes, 'turn');
@@ -730,7 +666,7 @@ function onFinish(winnerSeat) {
         }
     }
 
-    window.gfgLudoAdapter = { start: start, join: join, begin: begin, resume: resume, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, expireTurn: expireTurn, stop: stop };
+    window.gfgLudoAdapter = { start: start, join: join, begin: begin, resume: resume, onMove: onMove, onDiceRoll: onDiceRoll, onPassTurn: onPassTurn, onFinish: onFinish, isActive: isActive, ref: ref, seat: seat, color: color, players: players, handles: handles, activeOrder: activeOrder, rememberSeats: rememberSeats, setMySeat: setMySeat, stop: stop };
 
     // ---- hook the game's existing seams (soft, no behavior change when idle) ----
     var _origMove = window.onMoveCommitted;
