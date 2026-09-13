@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Donate | GlobalFolkGames</title>
+    <meta name="description" content="GlobalFolkGames is a free, open source, gasless on-chain game platform. Donations keep the games free to play and help us add more folk games from around the world.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .don-wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px 64px; }
+        .don-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+        .don-eyebrow { color: #f39c12; font-weight: 800; letter-spacing: 0.04em; font-size: 0.78rem; }
+        .don-h1 { font-size: 1.5rem; color: #fff; margin: 6px 0 8px; line-height: 1.25; }
+        .don-body { color: #ddd; font-size: 0.92rem; line-height: 1.7; }
+        .don-body b { color: #fff; }
+        .don-addr { display: flex; gap: 8px; align-items: stretch; margin: 12px 0 4px; flex-wrap: wrap; }
+        .don-addr input { flex: 1 1 260px; min-width: 0; background: #1a1a24; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; }
+        .don-copy { background: linear-gradient(135deg, #f39c12, #e86818); color: #000; border: none; border-radius: 10px; padding: 12px 16px; font-weight: 800; cursor: pointer; }
+        .don-btn { display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; border-radius: 12px; padding: 15px 12px; font-weight: 800; font-size: 1rem; margin-top: 10px; }
+        .don-btn.primary { background: linear-gradient(135deg, #f39c12, #e86818); color: #000; }
+        .don-btn.purple { background: linear-gradient(135deg, #9b59b6, #7838f8); color: #fff; }
+        .don-btn.ghost { background: transparent; border: 1px solid #333; color: #f39c12; }
+        .don-tiny { font-size: 0.78rem; color: #999; line-height: 1.6; margin-top: 12px; }
+        .don-h2 { color: #fff; font-size: 1.1rem; margin: 0 0 8px; }
+        .don-tag { display: inline-block; font-size: 0.72rem; font-weight: 800; color: #9b59b6; border: 1px solid rgba(155,89,182,0.5); border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+<div class="don-wrap">
+
+    <div class="don-card">
+        <span class="don-eyebrow">SUPPORT THE PLATFORM</span>
+        <h1 class="don-h1">Keep the games free to play</h1>
+        <p class="don-body">GlobalFolkGames is free, open source, and gasless for players. Nobody pays to play, and nobody signs a wallet popup to make a move. The platform quietly pays the small on-chain costs so the experience stays as simple as a normal web game.</p>
+        <p class="don-body" style="margin-top:10px;">Your support covers the things that are never free: RPC and infrastructure, the one-time on-chain setup for each player, hosting, and the work of adding the next folk games from around the world. Every donation, whatever the size, is genuinely appreciated.</p>
+    </div>
+
+    <div class="don-card">
+        <span class="don-tag">DONATE ANY AMOUNT</span>
+        <h2 class="don-h2">Send SOL or USDC (Solana)</h2>
+        <p class="don-body">Donate any amount directly to the platform wallet below. This is a plain transfer, no forms and no account needed.</p>
+        <div class="don-addr">
+            <input id="don-address" readonly value="Hj6EUEF2mNqe1cRTYQLzURaarD5RXF6WoKMWPne1YzH3">
+            <button class="don-copy" id="don-copy">Copy</button>
+        </div>
+        <p class="don-tiny">This wallet accepts SOL and Solana USDC. Please send on the Solana network only. A donation of any size is welcome and helps the project keep running. Donations are gifts, they are not an investment, and they do not promise any return, points, or payout.</p>
+    </div>
+
+    <div class="don-card">
+        <span class="don-tag">LARGER SUPPORT</span>
+        <h2 class="don-h2">Want lifetime access? That is the Early Backer collection</h2>
+        <p class="don-body">A small or one-time donation of a few dollars is appreciated, but it does not unlock lifetime access. The platform has to stay sustainable for everyone, so lifetime benefits are tied to the limited Early Backer collection, not to donations.</p>
+        <p class="don-body" style="margin-top:10px;">Early Backers get lifetime L3 membership (more daily lives, higher daily rewards, a win multiplier, and no ads) plus a numbered seat. The collection is small on purpose and it is what funds the move toward Mainnet.</p>
+        <a class="don-btn purple" href="/backers/" style="margin-top:14px;">See the Early Backer collection</a>
+    </div>
+
+    <div class="don-card">
+        <span class="don-tag">OTHER WAYS TO HELP (FREE)</span>
+        <h2 class="don-h2">You can support without spending anything</h2>
+        <p class="don-body">If you cannot donate, these help just as much:</p>
+        <p class="don-body" style="margin-top:8px;">
+            Play the games and tell a friend. Star the open source repo. Share the platform on socials. Report bugs. Build something with the code and let us know. Join the community and help other players.
+        </p>
+        <a class="don-btn ghost" href="/games/">Play the games</a>
+        <a class="don-btn ghost" href="/contact/">Join the community</a>
+    </div>
+
+    <p class="don-tiny" style="text-align:center;">GlobalFolkGames does not promise earnings, rewards, or financial returns of any kind. The games are for fun and for the love of these folk games.</p>
+
+</div>
+
+<script>
+    (function () {
+        var btn = document.getElementById('don-copy');
+        var field = document.getElementById('don-address');
+        if (!btn || !field) return;
+        btn.addEventListener('click', function () {
+            try {
+                field.select();
+                field.setSelectionRange(0, 999);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(field.value);
+                } else {
+                    document.execCommand('copy');
+                }
+                btn.textContent = 'Copied';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+            } catch (e) {
+                btn.textContent = 'Select and copy';
+            }
+        });
+    })();
+</script>
+<script src="/global_header.js"></script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Game Economy | GlobalFolkGames</title>
+    <meta name="description" content="Why so many web3 games fail when they rely on a token or NFT sale, and the sustainable subscription model GlobalFolkGames uses instead. A plain guide for game developers.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .eco-wrap { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
+        .eco-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+        .eco-eyebrow { color: #f39c12; font-weight: 800; letter-spacing: 0.04em; font-size: 0.78rem; }
+        .eco-h1 { font-size: 1.55rem; color: #fff; margin: 6px 0 10px; line-height: 1.25; }
+        .eco-h2 { color: #fff; font-size: 1.15rem; margin: 0 0 10px; }
+        .eco-h3 { color: #f39c12; font-size: 0.98rem; margin: 16px 0 6px; }
+        .eco-body { color: #ddd; font-size: 0.92rem; line-height: 1.75; }
+        .eco-body b { color: #fff; }
+        .eco-body a { color: #f39c12; }
+        .eco-list { color: #ddd; font-size: 0.92rem; line-height: 1.75; padding-left: 18px; margin: 8px 0; }
+        .eco-list li { margin-bottom: 6px; }
+        .eco-callout { border-left: 3px solid #9b59b6; background: rgba(155,89,182,0.08); border-radius: 0 10px 10px 0; padding: 12px 14px; margin: 12px 0; color: #e8e8e8; font-size: 0.9rem; line-height: 1.7; }
+        .eco-callout.warn { border-left-color: #e74c3c; background: rgba(231,76,60,0.08); }
+        .eco-callout.good { border-left-color: #2ecc71; background: rgba(46,204,113,0.08); }
+        .eco-btn { display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; border-radius: 12px; padding: 14px 12px; font-weight: 800; font-size: 0.95rem; margin-top: 10px; }
+        .eco-btn.primary { background: linear-gradient(135deg, #f39c12, #e86818); color: #000; }
+        .eco-btn.ghost { background: transparent; border: 1px solid #333; color: #f39c12; }
+        .eco-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; }
+        .eco-table th, .eco-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+        .eco-table th { color: #f39c12; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .eco-tiny { font-size: 0.78rem; color: #999; line-height: 1.6; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="eco-wrap">
+
+    <div class="eco-card">
+        <span class="eco-eyebrow">THE GAME ECONOMY</span>
+        <h1 class="eco-h1">Why web3 games break, and how to build one that lasts</h1>
+        <p class="eco-body">This page is for game developers, especially from web2, who are about to put a game on-chain. It explains the money trap that has sunk a generation of web3 games, and the plain, proven model GlobalFolkGames uses instead. No hype, no token pitch.</p>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">The trap: one-time money against forever costs</h2>
+        <p class="eco-body">The usual web3 game plan is to raise once, through a token sale, an ICO, or an NFT drop. That can bring in a large amount of cash on a single day. It feels like success.</p>
+        <p class="eco-body" style="margin-top:10px;">But a game does not cost money once. It costs money <b>every month, forever</b>:</p>
+        <ul class="eco-list">
+            <li>RPC and node providers</li>
+            <li>Servers, hosting, and the gasless sponsor that pays each player's on-chain setup</li>
+            <li>Audits, monitoring, and security work</li>
+            <li>Support, moderation, and community</li>
+            <li>New content and new games so players keep coming back</li>
+        </ul>
+        <div class="eco-callout warn">A raise is a spike. Expenses are a flat line that never ends. Six to twelve months later, the spike is gone and the flat line is still there.</div>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">Then play-to-earn makes it worse</h2>
+        <p class="eco-body">When a game pays players in its own token, it creates a second problem on top of the first.</p>
+        <ul class="eco-list">
+            <li><b>Players sell.</b> The more people earn, the more they sell, and selling pushes the price down.</li>
+            <li><b>Payouts are fixed, revenue is not.</b> The game owes token rewards whether or not it earned anything that month.</li>
+            <li><b>The death spiral.</b> Token price falls, so players earn less, so they leave, so the token falls further. It does not recover from there.</li>
+        </ul>
+        <div class="eco-callout warn">If you promise to give out more than you take in, no amount of raise survives. The math always wins.</div>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">The model that has actually survived: subscriptions</h2>
+        <p class="eco-body">Traditional web games have survived for decades on a boring, reliable model: <b>monthly subscriptions with levels and benefits.</b> It works because the money is recurring, and it grows when the game grows.</p>
+        <table class="eco-table">
+            <tr><th>Model</th><th>When money comes in</th><th>Does it cover monthly costs?</th></tr>
+            <tr><td>Token / ICO</td><td>Once</td><td>No, it runs out</td></tr>
+            <tr><td>NFT sale</td><td>Once</td><td>No, it runs out</td></tr>
+            <tr><td>Subscriptions</td><td>Every month</td><td>Yes, and it compounds</td></tr>
+        </table>
+        <div class="eco-callout good">More players means more subscriptions, which means more budget for infrastructure and more games. The model gets stronger as the platform grows, instead of weaker.</div>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">How GlobalFolkGames applies it</h2>
+        <p class="eco-body">GlobalFolkGames does not use a token, and it does not use NFTs as the main way in. It uses monthly memberships with levels and clear benefits. That is what pays the bills. Here is the key part, and it is the part most web3 games get wrong:</p>
+        <div class="eco-callout">The earn feature is funded from a share of monthly subscription revenue, roughly thirty percent of it. If there are fewer members, the pool is smaller. The platform never promises a fixed payout that it would have to cover by printing a token or selling an asset. Prizes are always paid out of money the platform actually earned.</div>
+        <p class="eco-body" style="margin-top:10px;">This is why nobody is forced to grind. There is no play-to-earn treadmill that has to be fed. You play because the games are good, and members get nicer benefits: more daily lives, higher daily rewards, a win multiplier, and no ads.</p>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">The web2 to web3 idea, in one line</h2>
+        <p class="eco-body">Keep the web2 money model that works (subscriptions and levels), and use web3 only for what it is genuinely good at: transparency, verifiable fairness, and open ownership of the game itself. Do not replace a working revenue model with a speculative one.</p>
+        <div class="eco-callout">On-chain should make your game <b>trustworthy and open</b>, not turn it into a casino. A player should be able to verify the game, not be required to gamble on it.</div>
+        <p class="eco-body" style="margin-top:10px;">That is how you keep the huge web2 audience, which is the real prize. Fewer than one percent of gamers are deep in web3. If your on-chain decisions scare the other ninety-nine percent away, no token price matters.</p>
+    </div>
+
+    <div class="eco-card">
+        <h2 class="eco-h2">A quick checklist before you launch</h2>
+        <ul class="eco-list">
+            <li>Is my revenue recurring, or is it one-time? If one-time, expenses will eventually beat it.</li>
+            <li>Do I owe payments I did not earn this month? If yes, that is the token trap.</li>
+            <li>Can a player use the game without buying a token or NFT? They should be able to.</li>
+            <li>Does a wallet popup interrupt play? It should not. Use gasless rails so onboarding feels like a normal game.</li>
+            <li>Would a normal web2 gamer understand the first thirty seconds? If not, fix that before anything else.</li>
+        </ul>
+        <a class="eco-btn primary" href="/academy/">Learn to build this in the Academy</a>
+        <a class="eco-btn ghost" href="/games/">Play the live games</a>
+    </div>
+
+    <p class="eco-tiny">GlobalFolkGames does not promise earnings, rewards, or financial returns. Nothing on this page is financial advice. It is a description of a business model that has to pay for itself to survive.</p>
+
+</div>
+
+<script src="/global_header.js"></script>
+</body>
+</html>

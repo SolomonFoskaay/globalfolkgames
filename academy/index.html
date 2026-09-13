@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Academy | GlobalFolkGames</title>
+    <meta name="description" content="Learn to build web3 games with a web2 feel. From the basics of Solana to building a fully playable on-chain game with the MagicBlock Ephemeral Rollup, using the real GlobalFolkGames codebase.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        :root { --ac: #f39c12; --ac2: #9b59b6; }
+        .ac-wrap { max-width: 980px; margin: 0 auto; padding: 22px 14px 80px; }
+        .ac-hero { text-align: center; margin-bottom: 18px; }
+        .ac-eyebrow { color: var(--ac); font-weight: 800; letter-spacing: 0.05em; font-size: 0.76rem; }
+        .ac-h1 { color: #fff; font-size: 1.6rem; margin: 6px 0 8px; line-height: 1.22; }
+        .ac-sub { color: #cfcfcf; font-size: 0.92rem; line-height: 1.65; max-width: 640px; margin: 0 auto; }
+        .ac-tracks { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 16px 0 22px; }
+        .ac-track { border: 1px solid #333; background: #1a1a24; color: #fff; border-radius: 12px; padding: 12px 16px; font-weight: 800; font-size: 0.9rem; cursor: pointer; min-width: 150px; }
+        .ac-track.active { border-color: var(--ac); background: linear-gradient(135deg, rgba(243,156,18,0.18), rgba(155,89,182,0.18)); }
+        .ac-track small { display: block; font-weight: 600; font-size: 0.7rem; color: #999; margin-top: 3px; }
+        .ac-layout { display: flex; gap: 18px; align-items: flex-start; }
+        .ac-nav { flex: 0 0 260px; position: sticky; top: 12px; }
+        .ac-nav-item { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #ddd; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 0.85rem; }
+        .ac-nav-item.active { border-color: var(--ac); color: #fff; }
+        .ac-nav-item.done .ac-dot { background: #2ecc71; border-color: #2ecc71; }
+        .ac-dot { width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; color: #000; font-weight: 900; }
+        .ac-nav-item.done .ac-dot::after { content: "\2713"; }
+        .ac-main { flex: 1 1 auto; min-width: 0; }
+        .ac-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+        .ac-main h2 { color: #fff; font-size: 1.28rem; margin: 0 0 10px; line-height: 1.3; }
+        .ac-main h3 { color: var(--ac); font-size: 1rem; margin: 16px 0 6px; }
+        .ac-p { color: #ddd; font-size: 0.92rem; line-height: 1.75; margin: 8px 0; }
+        .ac-p b { color: #fff; }
+        .ac-p code, .ac-code-inline { background: #12121a; border: 1px solid #2a2a36; border-radius: 6px; padding: 1px 6px; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; color: #f8c471; }
+        .ac-ul { color: #ddd; font-size: 0.92rem; line-height: 1.75; padding-left: 18px; margin: 8px 0; }
+        .ac-ul li { margin-bottom: 6px; }
+        .ac-note { border-left: 3px solid var(--ac2); background: rgba(155,89,182,0.08); border-radius: 0 10px 10px 0; padding: 11px 13px; margin: 12px 0; color: #e8e8e8; font-size: 0.88rem; line-height: 1.65; }
+        .ac-note.warn { border-left-color: #e74c3c; background: rgba(231,76,60,0.08); }
+        .ac-note.good { border-left-color: #2ecc71; background: rgba(46,204,113,0.08); }
+        .ac-editor { width: 100%; box-sizing: border-box; min-height: 150px; background: #0e0e15; color: #eaeaea; border: 1px solid #333; border-radius: 10px; padding: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; line-height: 1.55; resize: vertical; }
+        .ac-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .ac-btn { border: none; border-radius: 10px; padding: 11px 16px; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
+        .ac-btn.primary { background: linear-gradient(135deg, var(--ac), #e86818); color: #000; }
+        .ac-btn.purple { background: linear-gradient(135deg, var(--ac2), #7838f8); color: #fff; }
+        .ac-btn.ghost { background: transparent; border: 1px solid #333; color: var(--ac); }
+        .ac-out { margin-top: 10px; border-radius: 10px; padding: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; display: none; }
+        .ac-out.show { display: block; }
+        .ac-out.ok { background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.4); color: #bdf0d0; }
+        .ac-out.bad { background: rgba(231,76,60,0.1); border: 1px solid rgba(231,76,60,0.4); color: #f5c6c0; }
+        .ac-quiz-opt { display: block; width: 100%; text-align: left; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: #ddd; border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; cursor: pointer; font-size: 0.88rem; }
+        .ac-quiz-opt.correct { border-color: #2ecc71; background: rgba(46,204,113,0.12); color: #fff; }
+        .ac-quiz-opt.wrong { border-color: #e74c3c; background: rgba(231,76,60,0.12); }
+        .ac-actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+        .ac-progress { color: #999; font-size: 0.8rem; }
+        .ac-file { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; color: #f8c471; }
+        .ac-soon { text-align: center; color: #bbb; padding: 30px 10px; }
+        .ac-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; }
+        .ac-table th, .ac-table td { text-align: left; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+        .ac-table th { color: var(--ac); }
+        @media (max-width: 760px) {
+            .ac-layout { flex-direction: column; }
+            .ac-nav { position: static; flex: none; width: 100%; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+            .ac-nav-item { flex: 0 0 auto; width: auto; margin-bottom: 0; white-space: nowrap; }
+            .ac-nav-item span.ac-t { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+        }
+    </style>
+</head>
+<body>
+<div class="ac-wrap">
+
+    <div class="ac-hero">
+        <span class="ac-eyebrow">GLOBALFOLKGAMES ACADEMY</span>
+        <h1 class="ac-h1">Build web3 games with a web2 feel</h1>
+        <p class="ac-sub">Learn by doing, on the real code behind a live game. Start from the basics, understand why the layer matters, then build and deploy a fully playable on-chain game. Friendlier than a docs page, deeper than a tutorial.</p>
+    </div>
+
+    <div class="ac-tracks">
+        <button class="ac-track active" data-track="svm" id="track-svm">SVM (Solana)<small>Active now</small></button>
+        <button class="ac-track" data-track="evm" id="track-evm">EVM<small>Coming soon</small></button>
+    </div>
+
+    <div class="ac-layout" id="ac-layout">
+        <nav class="ac-nav" id="ac-nav"></nav>
+        <div class="ac-main" id="ac-main">
+            <div class="ac-card">
+                <h2 id="lesson-title"></h2>
+                <div id="lesson-body"></div>
+                <div id="lesson-widget"></div>
+                <div class="ac-actions">
+                    <button class="ac-btn ghost" id="btn-prev">Back</button>
+                    <span class="ac-progress" id="progress-label"></span>
+                    <button class="ac-btn primary" id="btn-next">Next lesson</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var SVM = [
+        {
+            id: 'what-is-a-game',
+            title: '1. What a game actually is',
+            body: [
+                '<p class="ac-p">Strip away the graphics and a game is a tiny loop:</p>',
+                '<ul class="ac-ul">',
+                '<li><b>State:</b> where everything is right now (whose turn, where the pieces are).</li>',
+                '<li><b>Input:</b> what a player does (roll, tap a token).</li>',
+                '<li><b>Rules:</b> what the input is allowed to change.</li>',
+                '<li><b>Render:</b> draw the new state so the next player sees it.</li>',
+                '</ul>',
+                '<p class="ac-p">Every board game, from Ludo to chess, is this same loop. When we move a game on-chain we do not change the loop. We change <b>where the state lives</b> and <b>who is allowed to change it</b>.</p>',
+                '<div class="ac-note good">Hold this idea: an on-chain game is the same game, with the rules and the state kept where nobody can quietly cheat.</div>'
+            ],
+            quiz: {
+                q: 'In the game loop, which part should live on-chain if you want a fair, cheat-proof game?',
+                options: ['Only the graphics', 'The state and the rules', 'Nothing, keep it all in JavaScript'],
+                correct: 1,
+                explain: 'The state (turn, positions) and the rules (what is legal) are what a cheater wants to fake. Keeping them on-chain means the browser only asks for moves; it cannot invent them.'
+            }
+        },
+        {
+            id: 'why-web3-games-lose-players',
+            title: '2. Why web3 games lose players',
+            body: [
+                '<p class="ac-p">Most gamers are not in web3. Fewer than one percent. If your game asks them to install a wallet, buy a token, and approve a popup for every single move, they leave. That is not a wallet problem. It is a design problem.</p>',
+                '<p class="ac-p">A move that costs money and a signature is a wall between the player and the fun. The trick is to keep the web2 feeling (email sign in, tap to play, nothing to approve) while the web3 rails do the real work quietly in the background.</p>',
+                '<div class="ac-note warn">The rule for this whole course: <b>the player should never notice the blockchain.</b> If they notice it, you designed it wrong.</div>'
+            ],
+            quiz: {
+                q: 'What is the biggest reason web2 players bounce off a web3 game?',
+                options: ['The graphics are not good enough', 'Wallet setup and signing a transaction for every action', 'There are too many levels'],
+                correct: 1,
+                explain: 'Friction. Signing every action and funding a wallet is a wall. Remove the friction and the web3 rails become invisible, which is exactly what you want.'
+            }
+        },
+        {
+            id: 'solana-basics',
+            title: '3. Solana in plain words',
+            body: [
+                '<p class="ac-p">You only need four ideas to start.</p>',
+                '<h3>Accounts</h3>',
+                '<p class="ac-p">An account is a box of data with an address. Some boxes hold a balance, some hold your game state. Think of a labelled locker.</p>',
+                '<h3>Programs</h3>',
+                '<p class="ac-p">A program is the code that lives on-chain and is allowed to open certain lockers. Your game rules are a program.</p>',
+                '<h3>Transactions</h3>',
+                '<p class="ac-p">A transaction is a signed instruction to a program: "please do this". A signature proves the person asking actually owns the account.</p>',
+                '<h3>PDAs (program-derived addresses)</h3>',
+                '<p class="ac-p">A PDA is an address the program <b>owns</b>, derived from fixed seeds. Because no human holds its private key, only the program can change it. This is how you store game state nobody can tamper with.</p>',
+                '<div class="ac-note">A PDA is like a locker the game owns, and the only key is the rulebook. Not even a player can open it by hand.</div>'
+            ],
+            quiz: {
+                q: 'Why is a PDA perfect for storing a game board?',
+                options: ['It is cheap to draw', 'Only the program can change it, so no player can fake the board', 'It makes the game load faster'],
+                correct: 1,
+                explain: 'A PDA has no human key. The program is the only writer, so the board cannot be edited outside the rules.'
+            }
+        },
+        {
+            id: 'derive-a-pda',
+            title: '4. Derive your first PDA',
+            body: [
+                '<p class="ac-p">A PDA is found by hashing seeds together with the program id. Solana gives you <span class="ac-code-inline">findProgramAddressSync</span>. It returns the address and a "bump" that keeps it off the elliptic curve, so no private key can exist for it.</p>',
+                '<p class="ac-p">Complete the code so it derives a per-player PDA with the seeds <span class="ac-code-inline">"player"</span> and the player address.</p>'
+            ],
+            code: {
+                starter: 'const [pda, bump] = PublicKey.findProgramAddressSync(\n  [ /* seeds here */ ],\n  programId\n);',
+                checks: [
+                    { test: function (s) { return /findProgramAddressSync/.test(s); }, hint: 'Use findProgramAddressSync.' },
+                    { test: function (s) { return /Buffer\.from\(\s*[\'"]player[\'"]\s*\)/.test(s); }, hint: 'First seed: Buffer.from("player").' },
+                    { test: function (s) { return /\.toBytes\(\)/.test(s); }, hint: 'Second seed: the player public key as bytes, e.g. player.toBytes().' }
+                ],
+                expected: 'PDA derived. In the real repo the dice account uses seeds [gfgplayerd, player], the points ledger [gfgpoints, game, player], and the match board [gfgboard2, game, matchRef]. Same idea, different labels.'
+            }
+        },
+        {
+            id: 'base-vs-magicblock',
+            title: '5. Base Solana vs MagicBlock ER',
+            body: [
+                '<p class="ac-p">You can put rules and state on Solana. The question is <b>which layer</b>.</p>',
+                '<table class="ac-table">',
+                '<tr><th>Base Solana</th><th>MagicBlock Ephemeral Rollup (ER)</th></tr>',
+                '<tr><td>Every write is a real transaction with a small fee.</td><td>Writes run on a fast rollup, free for the player.</td></tr>',
+                '<tr><td>Slow enough that a per-move game feels laggy.</td><td>Fast enough for turns and dice in real time.</td></tr>',
+                '<tr><td>The player needs SOL and to approve each action.</td><td>No player SOL, no per-move popups (a session key signs).</td></tr>',
+                '</table>',
+                '<p class="ac-p">This is the core lesson of the whole platform. On base Solana, a dice game can mean a fee and a signature for every roll. On the ER, the same game is gasless and instant, and unfairness disappears because outcomes come from ER VRF, not from the browser.</p>',
+                '<div class="ac-note warn">Without a layer like the ER, an on-chain game means signing every move. That is exactly the wall that scares web2 players away. The layer is not a nice extra. For a playable game, it is the difference between working and not.</div>',
+                '<p class="ac-p">The rule: put the <b>one-time setup</b> on base (create and delegate an account) and the <b>repeated gameplay</b> on the ER.</p>'
+            ],
+            quiz: {
+                q: 'Where should a per-turn dice roll run, and why?',
+                options: ['On base Solana, because it is the main chain', 'On the MagicBlock ER, because it is fast and gasless for the player', 'In the browser, so it is instant'],
+                correct: 1,
+                explain: 'Base writes cost a fee and a signature per action, which kills the flow. The ER runs the roll fast and free. Never in the browser, or the player controls the dice.'
+            }
+        },
+        {
+            id: 'provably-fair-dice',
+            title: '6. Provably fair dice (ER VRF)',
+            body: [
+                '<p class="ac-p">If the browser rolls the dice, the browser can lie. Fairness needs randomness the player cannot predict or control. On the ER, a Verifiable Random Function (VRF) produces randomness on-chain, and anyone can verify it came from the chain.</p>',
+                '<p class="ac-p">The code below turns a raw random byte into a six sided roll, the way the Ludo game does. Complete the maths so each roll lands between 1 and 6.</p>'
+            ],
+            code: {
+                language: 'js',
+                runnable: true,
+                starter: '// byte is 0..255. Map it to 1..6.\nfunction roll(byte) {\n  return /* your maths here */;\n}\nreturn [roll(0), roll(255), roll(42)];',
+                expectedFn: function (result) {
+                    var ok = Array.isArray(result) && result.length === 3 && result.every(function (n) { return n >= 1 && n <= 6; });
+                    return { ok: ok, note: ok ? 'Every value is a valid six sided roll. In the real game two of these become the move.' : 'Each roll must be between 1 and 6.' };
+                },
+                hint: 'Modulo gives a remainder 0..5. Add 1 to reach 1..6: (byte % 6) + 1.'
+            }
+        },
+        {
+            id: 'game-modes-and-seams',
+            title: '7. The plug and play seam',
+            body: [
+                '<p class="ac-p">A platform with several games should not wire each game to the rewards by hand. GlobalFolkGames uses one contract, the <b>result seam</b>.</p>',
+                '<ul class="ac-ul">',
+                '<li>Every game ends by calling <span class="ac-code-inline">window.publishGameResult(...)</span> with who played and where they placed.</li>',
+                '<li>Reward modules subscribe with <span class="ac-code-inline">window.onGameResult(...)</span> and update themselves.</li>',
+                '<li>The game knows nothing about points, tiers, or prizes. The reward modules know nothing about the game.</li>',
+                '</ul>',
+                '<p class="ac-p">That one decision is why many games can share one reward system. Add a game, and the rewards already work.</p>',
+                '<div class="ac-note good">This is the difference between a game and a platform. The seam is the platform.</div>'
+            ],
+            quiz: {
+                q: 'Why does the result seam matter for a multi game platform?',
+                options: ['It makes each game smaller', 'It lets reward modules plug in once and work for every game', 'It removes the need for a blockchain'],
+                correct: 1,
+                explain: 'The seam is the contract bus. Games publish results; reward modules subscribe. One integration, reused forever.'
+            }
+        },
+        {
+            id: 'ludo-repo-tour',
+            title: '8. Tour the Ludo repo',
+            body: [
+                '<p class="ac-p">Now the payoff. This is a map of the real, live repository so you can find your way around before you fork it.</p>',
+                '<div class="ac-note">Open the repo beside this page and follow along. Do not worry about reading every line yet. Just learn where things live.</div>'
+            ],
+            fileMap: [
+                { path: 'programs/programs/gfg-dice/src/lib.rs', note: 'The on-chain program. Accounts, instructions, rules, the dice, the points, and the match board.' },
+                { path: 'src/magicblock-er-vrf.js', note: 'The client SDK. It talks to the program, handles gasless onboarding, rolls dice, and records results.' },
+                { path: 'scripts/delegate-relay.mjs', note: 'The sponsor relay. It pays the one time on-chain setup so players never fund a wallet.' },
+                { path: 'public/universal/result-seam/', note: 'The plug and play contract every game publishes to.' },
+                { path: 'public/universal/points/', note: 'Reward modules that subscribe to the seam.' },
+                { path: 'games/ludo-lab/', note: 'The playable Ludo game: board, physics, turns, and the multiplayer rail.' },
+                { path: 'public/universal/multiplayer/', note: 'The game agnostic multiplayer rail (match codes, turns, forfeit).' },
+                { path: 'api/ and api_handlers/', note: 'The small serverless relay endpoints (sponsor setup, house rolls, admin gates).' }
+            ],
+            quiz: {
+                q: 'A game needs to award points when it finishes. Where does that happen?',
+                options: ['Inside the game code, hard wired', 'The game publishes a result and a reward module credits the points', 'In the database'],
+                correct: 1,
+                explain: 'The game only reports facts. Reward modules listen on the seam and do the crediting, so they work for every game.'
+            }
+        },
+        {
+            id: 'fork-and-deploy',
+            title: '9. Fork it and deploy your game',
+            body: [
+                '<p class="ac-p">You are now ready for the finish line. The goal is a working game on Solana devnet, powered by the same rails as the live site.</p>',
+                '<ol class="ac-ul">',
+                '<li>Fork the repository and clone it locally.</li>',
+                '<li><span class="ac-code-inline">npm install</span> then <span class="ac-code-inline">npm run dev</span>. Play Ludo once so you see the thing you are about to build on.</li>',
+                '<li>Build the program in <span class="ac-code-inline">programs/</span> and deploy it to devnet with your own key.</li>',
+                '<li>Sync the IDL and point the client at your program id.</li>',
+                '<li>Run your own sponsor relay with your own key. Now the one time onboarding cost is yours, and your players still pay nothing.</li>',
+                '<li>Change one thing. A board colour, a rule, a new game mode. Ship it. That is game development.</li>',
+                '</ol>',
+                '<div class="ac-note warn">Read the upgrade safety notes in the repo before you change any on-chain account layout. On-chain data is permanent, and a careless change can orphan it.</div>',
+                '<p class="ac-p">When your build works, you have done what most tutorials never reach: a real, playable, gasless, verifiable game on Solana.</p>',
+                '<a class="ac-btn purple" style="display:block;text-align:center;text-decoration:none;margin-top:10px;padding:14px;" href="https://github.com/SolomonFoskaay/globalfolkgames" target="_blank" rel="noopener noreferrer">Open the repository</a>'
+            ]
+        },
+        {
+            id: 'economy-lesson',
+            title: '10. Make it last: the game economy',
+            body: [
+                '<p class="ac-p">Building the game is half the job. Keeping it alive is the other half, and this is where most web3 games die.</p>',
+                '<p class="ac-p">A token sale or an NFT drop brings money once. Servers, gasless sponsorship, and new content cost money every month. When the one time money runs out, the game stops. Play to earn makes it worse: players sell the token, the price falls, and the game cannot pay what it promised.</p>',
+                '<p class="ac-p">The model that survives is the boring one: <b>monthly subscriptions with levels and benefits.</b> The money repeats, and it grows with the game. On GlobalFolkGames, the earn feature is funded from a share of subscription revenue, so prizes come from money actually earned, never from printing an asset.</p>',
+                '<div class="ac-note good">Use web3 for trust and openness. Use subscriptions for the money. That combination is how you keep the huge web2 audience and survive past six months.</div>',
+                '<a class="ac-btn primary" style="display:block;text-align:center;text-decoration:none;margin-top:10px;padding:14px;" href="/economy/">Read the full game economy guide</a>'
+            ]
+        }
+    ];
+
+    var CURRICULUM = { svm: SVM, evm: [] };
+
+    var state = { track: 'svm', index: 0, done: {} };
+    try {
+        var saved = JSON.parse(localStorage.getItem('gfg_academy_v1') || '{}');
+        if (saved && typeof saved === 'object') {
+            state.done = saved.done || {};
+            if (saved.track) state.track = saved.track;
+            if (typeof saved.index === 'number') state.index = saved.index;
+        }
+    } catch (e) { /* ignore */ }
+
+    function persist() { try { localStorage.setItem('gfg_academy_v1', JSON.stringify(state)); } catch (e) { /* ignore */ } }
+
+    var $nav = document.getElementById('ac-nav');
+    var $title = document.getElementById('lesson-title');
+    var $body = document.getElementById('lesson-body');
+    var $widget = document.getElementById('lesson-widget');
+    var $prev = document.getElementById('btn-prev');
+    var $next = document.getElementById('btn-next');
+    var $prog = document.getElementById('progress-label');
+
+    function lessons() { return CURRICULUM[state.track] || []; }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+    function renderNav() {
+        var list = lessons();
+        if (!list.length) { $nav.innerHTML = ''; return; }
+        $nav.innerHTML = list.map(function (l, i) {
+            var cls = 'ac-nav-item' + (i === state.index ? ' active' : '') + (state.done[l.id] ? ' done' : '');
+            return '<button class="' + cls + '" data-i="' + i + '"><span class="ac-dot"></span><span class="ac-t">' + esc(l.title) + '</span></button>';
+        }).join('');
+        $nav.querySelectorAll('.ac-nav-item').forEach(function (b) {
+            b.addEventListener('click', function () { state.index = Number(b.getAttribute('data-i')); persist(); render(); });
+        });
+    }
+
+    function render() {
+        var list = lessons();
+        if (!list.length) {
+            $title.textContent = 'EVM track';
+            $body.innerHTML = '<div class="ac-soon"><p class="ac-p">The EVM track is on the way.</p><p class="ac-p">We start with Solana because that is what powers these games today. The course is built chain agnostic, so an EVM path can be added as a sibling track without changing the lessons you learn here.</p></div>';
+            $widget.innerHTML = '';
+            $prog.textContent = '';
+            $prev.disabled = true; $next.disabled = true;
+            return;
+        }
+        if (state.index < 0) state.index = 0;
+        if (state.index >= list.length) state.index = list.length - 1;
+        var lesson = list[state.index];
+
+        renderNav();
+        $title.textContent = lesson.title;
+        $body.innerHTML = (lesson.body || []).join('');
+        $widget.innerHTML = '';
+        if (lesson.quiz) renderQuiz(lesson, $widget);
+        if (lesson.code) renderCode(lesson, $widget);
+        if (lesson.fileMap) renderFileMap(lesson, $widget);
+
+        var doneCount = 0;
+        list.forEach(function (l) { if (state.done[l.id]) doneCount++; });
+        $prog.textContent = doneCount + ' of ' + list.length + ' done';
+        $prev.disabled = state.index === 0;
+        $next.textContent = state.index === list.length - 1 ? 'Mark done' : 'Next lesson';
+    }
+
+    function markDone(lesson, btn) {
+        state.done[lesson.id] = true;
+        persist();
+        if (btn) { btn.textContent = 'Done'; btn.disabled = true; }
+        var doneCount = 0; lessons().forEach(function (l) { if (state.done[l.id]) doneCount++; });
+        $prog.textContent = doneCount + ' of ' + lessons().length + ' done';
+        renderNav();
+    }
+
+    function renderQuiz(lesson, mount) {
+        var wrap = document.createElement('div');
+        wrap.className = 'ac-card';
+        wrap.innerHTML = '<h3>Quick check</h3><p class="ac-p">' + esc(lesson.quiz.q) + '</p>';
+        lesson.quiz.options.forEach(function (opt, i) {
+            var b = document.createElement('button');
+            b.className = 'ac-quiz-opt';
+            b.textContent = opt;
+            b.addEventListener('click', function () {
+                if (wrap.getAttribute('data-answered') === '1') return;
+                wrap.setAttribute('data-answered', '1');
+                var correct = i === lesson.quiz.correct;
+                b.classList.add(correct ? 'correct' : 'wrong');
+                if (!correct) {
+                    var rc = wrap.querySelectorAll('.ac-quiz-opt')[lesson.quiz.correct];
+                    if (rc) rc.classList.add('correct');
+                }
+                var ex = document.createElement('p');
+                ex.className = 'ac-p';
+                ex.style.marginTop = '8px';
+                ex.innerHTML = '<b>' + (correct ? 'Correct. ' : 'Not quite. ') + '</b>' + esc(lesson.quiz.explain);
+                wrap.appendChild(ex);
+                if (correct) markDone(lesson);
+            });
+            wrap.appendChild(b);
+        });
+        mount.appendChild(wrap);
+    }
+
+    function renderCode(lesson, mount) {
+        var wrap = document.createElement('div');
+        wrap.className = 'ac-card';
+        wrap.innerHTML = '<h3>Your turn</h3>';
+        var ta = document.createElement('textarea');
+        ta.className = 'ac-editor';
+        ta.value = lesson.code.starter || '';
+        ta.spellcheck = false;
+        wrap.appendChild(ta);
+        var row = document.createElement('div');
+        row.className = 'ac-btnrow';
+        var run = document.createElement('button');
+        run.className = 'ac-btn primary';
+        run.textContent = 'Check my code';
+        var hint = document.createElement('button');
+        hint.className = 'ac-btn ghost';
+        hint.textContent = 'Hint';
+        row.appendChild(run); row.appendChild(hint);
+        wrap.appendChild(row);
+        var out = document.createElement('div');
+        out.className = 'ac-out';
+        wrap.appendChild(out);
+
+        hint.addEventListener('click', function () {
+            out.className = 'ac-out show';
+            out.textContent = lesson.code.hint || lesson.code.expected || 'Think about what the rule needs.';
+        });
+
+        run.addEventListener('click', function () {
+            var src = ta.value;
+            var messages = [];
+            var ok = true;
+            if (lesson.code.checks) {
+                lesson.code.checks.forEach(function (c) {
+                    var pass = false;
+                    try { pass = !!c.test(src); } catch (e) { pass = false; }
+                    messages.push((pass ? '  ok   ' : '  miss ') + c.hint);
+                    if (!pass) ok = false;
+                });
+                if (ok) messages.push('\n' + lesson.code.expected);
+            } else if (lesson.code.runnable) {
+                var result, err = null;
+                try { result = new Function(src)(); } catch (e) { err = e; }
+                if (err) { messages.push('Error: ' + err.message); ok = false; }
+                else {
+                    var res = lesson.code.expectedFn ? lesson.code.expectedFn(result) : { ok: true, note: 'Ran fine.' };
+                    ok = res.ok;
+                    messages.push('Output: ' + JSON.stringify(result));
+                    messages.push(res.note || '');
+                }
+            }
+            out.className = 'ac-out show ' + (ok ? 'ok' : 'bad');
+            out.textContent = messages.join('\n');
+            if (ok) markDone(lesson);
+        });
+
+        mount.appendChild(wrap);
+    }
+
+    function renderFileMap(lesson, mount) {
+        var wrap = document.createElement('div');
+        wrap.className = 'ac-card';
+        wrap.innerHTML = '<h3>Repository map</h3>';
+        lesson.fileMap.forEach(function (f) {
+            var row = document.createElement('div');
+            row.style.marginBottom = '10px';
+            row.innerHTML = '<div class="ac-file">' + esc(f.path) + '</div><div class="ac-p" style="margin:2px 0 0;">' + esc(f.note) + '</div>';
+            wrap.appendChild(row);
+        });
+        var b = document.createElement('button');
+        b.className = 'ac-btn purple';
+        b.style.marginTop = '8px';
+        b.textContent = 'I found these in the repo';
+        b.addEventListener('click', function () { markDone(lesson, b); });
+        wrap.appendChild(b);
+        mount.appendChild(wrap);
+    }
+
+    $prev.addEventListener('click', function () { if (state.index > 0) { state.index--; persist(); render(); } });
+    $next.addEventListener('click', function () {
+        var list = lessons();
+        var lesson = list[state.index];
+        if (state.index === list.length - 1) { markDone(lesson); }
+        else { state.index++; persist(); render(); }
+    });
+
+    function setTrack(t) {
+        state.track = t; state.index = 0; persist();
+        document.getElementById('track-svm').classList.toggle('active', t === 'svm');
+        document.getElementById('track-evm').classList.toggle('active', t === 'evm');
+        render();
+    }
+    document.getElementById('track-svm').addEventListener('click', function () { setTrack('svm'); });
+    document.getElementById('track-evm').addEventListener('click', function () { setTrack('evm'); });
+
+    document.getElementById('track-svm').classList.toggle('active', state.track === 'svm');
+    document.getElementById('track-evm').classList.toggle('active', state.track === 'evm');
+    render();
+})();
+</script>
+<script src="/global_header.js"></script>
+</body>
+</html>

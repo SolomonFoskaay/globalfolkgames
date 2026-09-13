@@ -1,0 +1,22 @@
+# Internal-only paths STRIPPED from the public export.
+#
+# The private repo keeps every one of these forever. The public repo keeps
+# every commit, message, date and author (the months of real work stay as
+# proof); only these file blobs are removed from the published history.
+#
+# Read scripts/opensource/README.md before running the export.
+
+# Unfixed-weakness + anti-abuse playbook (never publish)
+docs/changelog/security-queue.md
+
+# Internal strategy / ops runbooks
+docs/architecture-2.0.md
+docs/launch/run-sheet.md
+docs/changelog/unreleased.md
+
+# Business strategy (pricing, payout split, revenue playbook)
+public/changelog/economics.json
+
+# Internal agent process docs
+.opencode/
+AGENTS.md

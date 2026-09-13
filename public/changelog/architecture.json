@@ -613,6 +613,31 @@
         "AGM PLUGS ON LATER: same match, added money/escrow; zero gameplay change. Same clocks/timers enforced free so players train on the real experience.",
         "SOLID PRINCIPLE: design for mainnet economics (gasless to players, ~0.0003 SOL sponsor per match boundary) - not devnet-free behavior."
       ]
+    },
+    {
+      "id": "arcv2m13",
+      "title": "Academy (chain-agnostic web2-to-web3 game dev learning)",
+      "status": "in-progress",
+      "summary": "A modern, mobile-first, interactive academy that teaches web2 developers how to build web3 games with a web2 feel, using the real GlobalFolkGames codebase. Chain-agnostic shell with SVM (Solana, active) first and an EVM track kept as an inactive placeholder.",
+      "expectedInput": [
+        "The public repo, the live games, and the universal modules/seams as teaching material.",
+        "Game developers (web2 first), students, colleges, and hackathon builders."
+      ],
+      "expectedOutput": [
+        "A guided hands-on curriculum: game and Solana basics, on-chain game design, base Solana vs MagicBlock ER (cost and UX), ER VRF fairness, the result seam, a repo breakdown of Ludo, and fork-and-deploy to devnet + MagicBlock.",
+        "Interactive lessons with side-by-side code and instant feedback (quiz plus finish-the-code), progress saved locally, mobile-first, pure HTML/CSS/JS.",
+        "A final path where the learner forks and deploys a working, gasless, verifiable game."
+      ],
+      "details": [
+        "MODULE ID arcv2m13 (architecture v2; the v1 architecture is kept as record only).",
+        "HOME /academy (academy/index.html), added as a Vite input; mobile-first, brand orange/purple, no framework.",
+        "CHAIN-AGNOSTIC SHELL: track selector SVM (active) and EVM (inactive placeholder). Lessons are data-driven so an EVM track can be added as a sibling without rewriting the SVM lessons.",
+        "CURRICULUM (SVM): (1) what a game is, (2) why web3 games lose players, (3) Solana basics (accounts/programs/transactions/PDAs), (4) derive a PDA, (5) base Solana vs MagicBlock ER, (6) provably fair dice via ER VRF, (7) the plug-and-play result seam, (8) Ludo repo tour, (9) fork and deploy, (10) the game economy.",
+        "INTERACTIVE: multiple-choice checks and finish-the-code exercises; JS-runnable exercises execute in a sandbox and validate output; pattern checks guide the on-chain-specific exercises. Progress saved in localStorage (gfg_academy_v1).",
+        "ECONOMY LESSON ties to /economy: why token/NFT one-time raises fail against recurring infra costs, and the sustainable monthly subscription plus levels model (earn funded by a share of subscription revenue, no token/NFT as primary access).",
+        "LINKS back to the live product pages (games, economy, contact) so learners stay on the live site, not just the code.",
+        "NO backend, no Supabase: the academy is static and client-side, consistent with the on-chain plus Vercel-only stack."
+      ]
     }
   ],
   "rules": [
