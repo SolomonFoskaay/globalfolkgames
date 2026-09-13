@@ -14,13 +14,14 @@ We never rewrite the private repo and we never silently delete anything.
 
 See `private-paths.txt`. In short:
 
-- the unfixed-weakness / anti-abuse playbook (`security-queue.md`)
+- the unfixed-weakness and anti-abuse playbook (`security-queue.md`)
 - internal strategy and launch runbooks
-- business strategy (`economics.json`)
 - internal agent process docs (`AGENTS.md`, `.opencode/`)
 
 Everything else ships: the games, the on-chain program, the ER/gasless SDK,
-the universal modules, the relay, the public pages.
+the universal modules, the relay, the public pages. Only files that are NOT
+served to the live site are removed, so the public repo still builds exactly
+like production.
 
 ## How to run the export
 
