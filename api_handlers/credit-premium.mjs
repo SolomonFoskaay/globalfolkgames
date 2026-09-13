@@ -22,11 +22,18 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    // Operator token is now optional — the page is staff-gated and Vercel already has
-    // GFG_Gasless_Sponsor_Keypair (sponsor id.json) to sign gasless on ER. If a token
-    // is provided, verify it; if not, allow (the on-chain admin_authority check still holds).
+    // (Removed 2026 public-release: the token was previously optional and a
+    // missing token was allowed. That is a bypass and is gone - see below.)
     const expected = process.env.GFG_OPERATOR_TOKEN;
-    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
+    // FAIL-CLOSED (public release hardening): the operator token is REQUIRED.
+    // A missing token must NEVER be treated as allowed - previously it was, so
+    // anyone could call this endpoint and have the relay sign a premium credit
+    // to any wallet. Server-side only; no Supabase dependency.
+    if (!expected || expected.length < 16) {
+      res.status(500).json({ error: 'server misconfigured: GFG_OPERATOR_TOKEN is not set' });
+      return;
+    }
+    if (!body.token || String(body.token) !== expected) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }

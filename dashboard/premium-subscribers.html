@@ -221,6 +221,16 @@
             $select.onchange=()=>{ const w=$select.value; if(!w) return; $player.value=w; const u=allUsers.find(x=>x.wallet===w); $selUser.textContent=u?`${u.email} — ${w}`:w; };
             $search.oninput=()=>{ const q=$search.value.trim().toLowerCase(); const fl=allUsers.filter(u=>(u.email&&u.email.toLowerCase().includes(q))||(u.wallet&&u.wallet.toLowerCase().includes(q))); renderUserSelect(fl); };
 
+            // Public-release hardening: the admin endpoints are fail-closed
+            // server-side and require GFG_OPERATOR_TOKEN. The token is entered
+            // once per session and kept in sessionStorage (never in code).
+            function opToken(){
+                let t = '';
+                try { t = sessionStorage.getItem('gfg_op_token') || ''; } catch(e){}
+                if (!t) { t = window.prompt('Enter GFG_OPERATOR_TOKEN (admin) to authorize admin actions') || ''; if (t) { try { sessionStorage.setItem('gfg_op_token', t); } catch(e){} } }
+                return t;
+            }
+
             $btnCredit.onclick=async()=>{
                 const player=$player.value.trim(); // NEVER toLowerCase a Solana address
                 const points=parseInt($points.value,10), creditRef=parseInt($ref.value.trim(),10);
@@ -230,7 +240,7 @@
                 if(!Number.isInteger(creditRef)||creditRef<=0) return alert('Credit reference must be a positive integer.');
                 $btnCredit.disabled=true; $res.textContent='Crediting on-chain (gasless ER)...';
                 try {
-                    const r=await fetch('/api/credit-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,points,creditRef})});
+                    const r=await fetch('/api/credit-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,points,creditRef,token:opToken()})});
                     const j=await r.json();
                     if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
                     await loadUsers();
@@ -262,7 +272,7 @@
                 try {
                     const [lr, pr] = await Promise.all([
                         fetch('/api/dynamic-list',{cache:'no-store'}).then(r=>r.json()),
-                        fetch('/api/premium-tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(r=>r.json()),
+                        fetch('/api/premium-tracker',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:opToken()})}).then(r=>r.json()),
                     ]);
                     const users=(lr.users||[]).filter(u=>u.wallet);
                     const subs=(pr.subscribers||[]);
@@ -327,7 +337,7 @@
                 if(!confirm('Activate Level '+lvl+' for '+w+'? This spends '+(lvl===1?5000:lvl===2?10000:15000)+' premium spendable on-chain (fails if they don\'t have it).')) return;
                 $actionMsg.textContent='Activating on-chain...'; $btnUpgrade.disabled=true;
                 try{
-                    const r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w,level:lvl})});
+                    const r=await fetch('/api/activate-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w,level:lvl,token:opToken()})});
                     const j=await r.json(); if(!r.ok) throw new Error(j.error||'upgrade failed');
                     $actionMsg.textContent='Upgraded. Sig: '+String(j.sig||'').slice(0,16)+' — refreshing.'; await loadTracker();
                 }catch(e){ $actionMsg.textContent='Upgrade failed: '+esc(e.message); }
@@ -338,7 +348,7 @@
                 if(!confirm('Downgrade/cancel '+w+'? Sets level to 0 and clears the active window on-chain.')) return;
                 $actionMsg.textContent='Cancelling on-chain...'; $btnCancel.disabled=true;
                 try{
-                    const r=await fetch('/api/cancel-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w})});
+                    const r=await fetch('/api/cancel-premium',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player:w,token:opToken()})});
                     const j=await r.json(); if(!r.ok) throw new Error(j.error||'cancel failed');
                     $actionMsg.textContent='Cancelled. Sig: '+String(j.sig||'').slice(0,16)+' — refreshing.'; await loadTracker();
                 }catch(e){ $actionMsg.textContent='Cancel failed: '+esc(e.message); }

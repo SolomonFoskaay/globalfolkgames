@@ -151,6 +151,14 @@
     <script src="/dash-core.js"></script>
     <script src="/dash-nav.js"></script>
     <script>
+        // Public-release hardening: admin competition actions are fail-closed
+        // server-side and require GFG_OPERATOR_TOKEN (entered once per session).
+        function opToken() {
+            let t = '';
+            try { t = sessionStorage.getItem('gfg_op_token') || ''; } catch (e) {}
+            if (!t) { t = window.prompt('Enter GFG_OPERATOR_TOKEN (admin) to authorize admin actions') || ''; if (t) { try { sessionStorage.setItem('gfg_op_token', t); } catch (e) {} } }
+            return t;
+        }
         async function waitForWalletAndGate() {
             for (let i = 0; i < 8; i++) {
                 try {
@@ -269,7 +277,8 @@
             renderShares();
 
             async function post(body) {
-                const r = await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                const payload = Object.assign({}, body, { token: opToken() });
+                const r = await fetch('/api/competitions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const j = await r.json();
                 if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
                 return j;

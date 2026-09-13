@@ -146,6 +146,14 @@
     <script src="/pager.js"></script>
     <script src="/dash-nav.js"></script>
     <script>
+        // Public-release hardening: admin endpoints are fail-closed server-side
+        // and require GFG_OPERATOR_TOKEN. Entered once per session (never in code).
+        function opToken(){
+            let t = '';
+            try { t = sessionStorage.getItem('gfg_op_token') || ''; } catch(e){}
+            if (!t) { t = window.prompt('Enter GFG_OPERATOR_TOKEN (admin) to authorize admin actions') || ''; if (t) { try { sessionStorage.setItem('gfg_op_token', t); } catch(e){} } }
+            return t;
+        }
         document.addEventListener('DOMContentLoaded', () => {
             window.GFG_DASH_NAV.render({
                 brand: '🛡 Dashboard',
@@ -349,7 +357,7 @@
                     const res = await fetch('/api/credit-premium', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ player, points, creditRef }),
+                        body: JSON.stringify({ player, points, creditRef, token: opToken() }),
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));

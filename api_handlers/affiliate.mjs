@@ -35,7 +35,14 @@ export default async function handler(req, res) {
     }
     const body = typeof req.body === 'string' && req.body.length ? JSON.parse(req.body) : (req.body || {});
     const expected = process.env.GFG_OPERATOR_TOKEN;
-    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
+    // FAIL-CLOSED (public release hardening): admin writes (record/pay/settle)
+    // require the operator token; a missing token is DENIED. (GET reads stay
+    // public: they are on-chain ledger data, safe to read.)
+    if (!expected || expected.length < 16) {
+      res.status(500).json({ error: 'server misconfigured: GFG_OPERATOR_TOKEN is not set' });
+      return;
+    }
+    if (!body.token || String(body.token) !== expected) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }

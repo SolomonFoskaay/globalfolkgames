@@ -239,9 +239,9 @@ const server = createServer(async (req, res) => {
     try {
       const { player, points, creditRef, token } = JSON.parse(body || '{}');
       const expected = process.env.GFG_OPERATOR_TOKEN;
-      if (expected && expected.length >= 16 && token && token !== expected) {
-        throw new Error('unauthorized operator token');
-      }
+      // FAIL-CLOSED: token required; missing is denied (public release hardening).
+      if (!expected || expected.length < 16) throw new Error('server misconfigured: GFG_OPERATOR_TOKEN is not set');
+      if (!token || String(token) !== expected) throw new Error('unauthorized operator token');
       if (!player) throw new Error('missing "player" pubkey');
       const result = await handleCreditPremium(player, points, creditRef);
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
@@ -259,7 +259,8 @@ const server = createServer(async (req, res) => {
     try {
       const { player, token } = JSON.parse(body || '{}');
       const expected = process.env.GFG_OPERATOR_TOKEN;
-      if (expected && expected.length >= 16 && token && token !== expected) throw new Error('unauthorized operator token');
+      if (!expected || expected.length < 16) throw new Error('server misconfigured: GFG_OPERATOR_TOKEN is not set');
+      if (!token || String(token) !== expected) throw new Error('unauthorized operator token');
       if (!player) throw new Error('missing "player" pubkey');
       const result = await handleCancelPremium(player);
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
@@ -277,7 +278,8 @@ const server = createServer(async (req, res) => {
     try {
       const { player, token, level } = JSON.parse(body || '{}');
       const expected = process.env.GFG_OPERATOR_TOKEN;
-      if (expected && expected.length >= 16 && token && token !== expected) throw new Error('unauthorized operator token');
+      if (!expected || expected.length < 16) throw new Error('server misconfigured: GFG_OPERATOR_TOKEN is not set');
+      if (!token || String(token) !== expected) throw new Error('unauthorized operator token');
       if (!player) throw new Error('missing "player" pubkey');
       const result = await handleAdminActivatePremium(player, level);
       res.writeHead(200, { 'Content-Type': 'application/json', ...cors });

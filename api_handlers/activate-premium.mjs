@@ -22,7 +22,12 @@ export default async function handler(req, res) {
   }
   try {
     const expected = process.env.GFG_OPERATOR_TOKEN;
-    if (expected && expected.length >= 16 && body.token && body.token !== expected) {
+    // FAIL-CLOSED (public release hardening): token REQUIRED, missing is denied.
+    if (!expected || expected.length < 16) {
+      res.status(500).json({ error: 'server misconfigured: GFG_OPERATOR_TOKEN is not set' });
+      return;
+    }
+    if (!body.token || String(body.token) !== expected) {
       res.status(401).json({ error: 'unauthorized operator token' });
       return;
     }

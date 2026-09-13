@@ -22,10 +22,13 @@ export default async function handler(req, res) {
     }
   } catch (e) { /* ignore */ }
   const expected = process.env.GFG_OPERATOR_TOKEN;
-  // Premium PDAs are public on-chain data; the staff page loads this on its own
-  // after the DashCore.gateStaff() check. The token is only enforced if supplied
-  // and mismatched (some callers still pass it).
-  if (expected && expected.length >= 16 && token && token !== expected) {
+  // FAIL-CLOSED (public release hardening): this is a staff-only dataset, so the
+  // token is REQUIRED. A missing token is denied (previously it was allowed).
+  if (!expected || expected.length < 16) {
+    res.status(500).json({ error: 'server misconfigured: GFG_OPERATOR_TOKEN is not set' });
+    return;
+  }
+  if (!token || String(token) !== expected) {
     res.status(401).json({ error: 'unauthorized operator token' });
     return;
   }
