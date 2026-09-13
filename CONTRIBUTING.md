@@ -53,6 +53,29 @@ promise. If there is no request, nothing happens. Never count on it.
 7. **Do not build ahead of a module's status.** Some modules are planned but
    not started. Check the architecture file before building.
 
+## Working with an AI agent
+
+This project ships a written brief for AI coding agents, [`AGENTS.md`](AGENTS.md),
+plus focused rules under `.opencode/rules/`. They exist so a human or an agent
+can continue the work safely, and they are the project brain when the original
+author is unavailable.
+
+- **You may use any AI agent** (Claude, Cursor, Copilot, opencode, and others).
+  Point it at `AGENTS.md` before it writes anything.
+- **Follow it strictly for contributions.** A pull request that ignores the
+  module-first rule, the surgical-edit rule, or the no-secrets rule will be sent
+  back. The brief is what keeps the platform from regressing.
+- **Never let an agent commit a secret**, and never let it rewrite a
+  source-of-truth file (`architecture.json`, `changelog.json`) wholesale.
+
+A short starting prompt:
+
+```text
+Read AGENTS.md first. State which module the change belongs to before writing
+code. Make surgical edits only. Never commit secrets. Run the build before you
+finish.
+```
+
 ## Getting started
 
 ```bash

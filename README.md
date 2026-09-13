@@ -144,6 +144,32 @@ revenue, so prizes always come from money actually earned. No token and no NFT
 as the main way in. Read the full explanation at
 [globalfolkgames.fun/economy](https://globalfolkgames.fun/economy).
 
+## Built with AI agents, and they can continue it
+
+The whole project carries a written brief for AI coding agents:
+[`AGENTS.md`](AGENTS.md). It is the project brain. It records what the project
+is, the terminology, the module system, the hard rules, the build and deploy
+commands, and the current state, so a human **or an agent** can pick the work up
+even if the original local folder is gone. That is deliberate: it means the
+project can survive its author being away, on a new machine, or handing it to
+contributors.
+
+- **Cloners and learners**: keep `AGENTS.md` and `.opencode/rules/`, or copy
+  them into your fork and tweak the names. Point your own AI agent at the file
+  and it will follow the same architecture and safety rules instead of guessing.
+  It works with any agent that can read files in the repo.
+- **Contributors**: follow `AGENTS.md` strictly. It is what keeps pull requests
+  mergeable. The module-first rule, the surgical-edit rule, and the no-secrets
+  rule are not suggestions.
+
+A short starting prompt for any agent:
+
+```text
+Read AGENTS.md first. State which module the change belongs to before writing
+code. Make surgical edits only. Never commit secrets. Run the build before you
+finish.
+```
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
