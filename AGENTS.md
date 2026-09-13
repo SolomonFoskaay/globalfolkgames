@@ -10,6 +10,22 @@ GASLESS on-chain dice** powered by MagicBlock VRF. Players are onboarded
 Web2-style: they sign in with email OTP (Dynamic), never hold or pay SOL, and
 every dice roll is a cryptographically verifiable on-chain roll.
 
+**OPEN SOURCE (2026):** this repository is public. Nothing here is a secret:
+`AGENTS.md`, `.opencode/`, and `docs/changelog/security-queue.md` are published
+on purpose so any developer or agent can continue the work even if a local
+folder is lost. The ONLY thing that must never be committed is key material
+(private keys, seed phrases, keypairs, `.env` values). A public key, program id,
+or admin wallet address is not a secret. Live site: https://globalfolkgames.fun
+
+## The Academy (arcv2m13)
+
+The chain-agnostic teaching module lives at `/academy` (`academy/index.html`,
+Vite input). It takes a web2 developer from game and Solana basics to a
+deployed, gasless on-chain game using this repo, with SVM active and an EVM
+track as a placeholder. Spec lives in `architecture.json` module `arcv2m13`.
+Companion pages: `/economy` (why token/NFT game economies fail and the
+subscription model that survives) and `/donate`.
+
 ## Terminology (IMPORTANT — do not confuse these)
 
 - **ER VRF** = the randomness primitive, ALWAYS via the MagicBlock ER VRF queue
@@ -316,6 +332,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 - **M11 — Community (on-chain UGC forum, M11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
 
 - **M12 — Multiplayer (STANDALONE game-agnostic rail, M12):** a FREE multiplayer rail (match codes, gasless ER moves via a delegated board, turn clocks/forfeit, finish + seam) that ANY game plugs into with a small adapter. Standalone = works with zero money and NO AGM; players train on exactly what they'll bet on later. AGM is a separate money plug that attaches the SAME match later, zero gameplay change. Canonical home `public/universal/multiplayer/` (README + multiplayer.js); per-game adapter lives in each game (Ludo's is the reference). Slices arc2m12a-d. NOT inside M1 - it is its own module (program board/clocks instructions stay M1: arc2m1a/b/c/e/f/g/h).
+
+- **arcv2m13 — Academy (chain-agnostic web2-to-web3 game dev learning):** the interactive, mobile-first teaching module at `/academy` (`academy/index.html`). SVM active, EVM placeholder. Teaches game + Solana basics, base Solana vs MagicBlock ER, ER VRF fairness, the result seam, a Ludo repo breakdown, then fork-and-deploy, plus the game economy lesson. In-progress. Companion pages `/economy` and `/donate`. Spec in `architecture.json` module `arcv2m13`.
 
 **Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
 (premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
@@ -687,15 +705,22 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
   Any gate enforced only in browser JS is cosmetic, not a gate. Always flag
   designs where the client declares its own identity/roles/access (self-reported
   wallet = no proof of control).
-- **Known gap (accepted, interim):** the changelog admin page's "staff-only"
-  gate is client-side (`public/changelog/render.js` + public `roles.json`). It
-  is readable/bypassable via DevTools (mock `window.getDynamicSolanaWallet`, the
-  roles fetch, or just call `window.renderChangelog('admin')`). Treat it as a
-  UX convenience for the owner, NOT security — never put real secrets behind it.
-- **Real fix (future roadmap item):** server-side challenge signature — the
+- **Known gap (now UX-only, not a value boundary):** the changelog admin page's
+  "staff-only" gate is client-side (`public/changelog/render.js` + public
+  `roles.json`) and is readable/bypassable via DevTools (mock
+  `window.getDynamicSolanaWallet`, the roles fetch, or just call
+  `window.renderChangelog('admin')`). This is fine because no value and no write
+  authority sit behind it: the admin write endpoints are fail-closed server-side
+  (required `GFG_OPERATOR_TOKEN`, 2026 public-release hardening) and the on-chain
+  program enforces authority (`admin_authority`) directly. Treat the page gate
+  purely as a UX convenience for the owner, and never put real secrets behind it.
+- **Real fix (future roadmap item):** server-side challenge signature. The
   server issues a nonce, the client signs it with the Dynamic wallet, the server
   verifies the recovered pubkey against a SERVER-side staff list, and only then
-  serves staff data. Never trust the client's wallet claim.
+  serves staff data. Never trust the client's wallet claim. The longer-term
+  target is owner-wallet on-chain admin authority, which removes the operator
+  endpoint entirely. See `docs/changelog/security-queue.md` for the full,
+  accurate current posture.
 - **Content & file protection (HARD RULE, baked in 2026-08-25, see .opencode/rules/content-protection.md):** never rewrite/wipe a whole existing file; `architecture.json`, `changelog.json` and any source-of-truth content files must be edited surgically, MUST assert their top-level keys survive before writing back, and existing content/modules/entries are never removed without the owner's explicit approval. No silent file deletes or `git add -A` over unverified protected diffs.
 - **Never advertise live weaknesses:** security/anti-exploit work is never put
   in client-served data at all — no flag, no filter, no hidden bytes. It is
