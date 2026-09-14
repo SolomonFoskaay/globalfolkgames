@@ -688,6 +688,21 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
 - **No cron / no external automation (HARD RULE):** NEVER introduce Vercel cron jobs, scheduled workflows, or Supabase-triggered automation to move game/economy state. Everything that automated (affiliate monthly settlement, competition window rolls, payouts) is run MANUALLY by the owner: an admin dashboard button or a local script (`node scripts/...`). Paid/subscription flows stay manual-on-chain like today. If a task would need a cron/scheduler to work, STOP and tell the owner that route is being proposed (they may decline); it is never added silently.
 - **No new platform/stack without telling the owner:** before introducing any new backing service, dependency, or infra (e.g. a scheduler, queue, external API), explicitly state in the plan that it is a NEW dependency and get approval. The current stack is fixed: Solana/Anchor + MagicBlock ER (gasless), Vite, Node, Vercel (one function), dynamic-auth, Supabase (backup/restore only, never live truth).
 - **Never amend a pushed commit without explicit owner approval.** If the commit is already on the remote, make a new commit instead.
+- **Open-source branch + PR-only merges (HARD RULE, 2026):** the repo is public
+  and `main` is protected. All work now happens on the `osv1` branch (open
+  source version 1). Commit and push to `osv1`, then open a pull request from
+  `osv1` to `main`; the OWNER merges. Never commit or push directly to `main`.
+  The agent creates the branch, commits, pushes, and opens the PR, but the owner
+  reviews and merges. Keep using `osv1` until the owner explicitly starts a v2.
+- **Always ask before pushing or opening a PR (HARD RULE):** after committing,
+  the agent MUST ASK the owner before `git push` and before opening a pull
+  request. Do not push or open a PR automatically; confirm first, every time.
+- **The novel earn feature is a headline differentiator (do not bury it):**
+  gamers earn the way creators do. A share (about 30%) of each month's premium
+  memberships goes to the gamers who join the Member Cup and qualify. It is
+  funded by real subscription revenue (no token, no fixed payout), so it is
+  sustainable and grows with the platform. Surface this clearly in the README,
+  the site, and any forker-facing docs.
 
 ## Security / anti-exploit rules (READ BEFORE CODING — non-negotiable)
 

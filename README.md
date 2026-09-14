@@ -67,6 +67,40 @@ It exists for two reasons:
 Read the thinking behind the design on the live site and in
 [`public/changelog/architecture.json`](public/changelog/architecture.json).
 
+## The novel part: gamers earn the way creators do
+
+This is the idea we are pioneering, and it is worth calling out on its own.
+
+Creators get paid by the platforms they create on. Musicians, writers, and
+streamers all have a way to earn from the platforms that host them. **Gamers
+never had the same deal.** If you are simply good at the games your family
+actually plays, almost nobody built a home for that.
+
+GlobalFolkGames does. Each month, **30 percent of every premium membership goes
+back to the gamers who join that month's Member Cup and clear the qualification
+line.** The players on paid plans fund the share, not other players. You never
+stake anything on a match. The person across the board is not paying your prize.
+
+Why this matters, and why it is sustainable:
+
+- **It is funded by revenue, not by a token.** Payouts are a share of
+  subscriptions that were actually collected that month. There is no token to
+  print, no fixed payout the platform has to cover, and no death spiral.
+- **It grows with the platform.** More members means a bigger monthly share,
+  and it grows without anyone rewriting the rules.
+- **No one is forced to grind.** If there are no paid members, there is no
+  pressure to give out play-to-earn money. The games stay fun first.
+- **It is public and on-chain.** The pool, the winners, their final points, and
+  the payout status are shown on the site.
+
+This is a deliberate contrast to play-to-earn and to betting: it treats gamers
+the way a creator platform treats paying members, but points it at gameplay.
+
+Read the full explanation and the current cup at
+[globalfolkgames.fun/competitions](https://globalfolkgames.fun/competitions),
+and the reasoning at
+[globalfolkgames.fun/economy](https://globalfolkgames.fun/economy).
+
 ## Current games
 
 | Game | Status | Play |
