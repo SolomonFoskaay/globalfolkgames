@@ -48,7 +48,9 @@
                 grid.innerHTML = list.map(g =>
                     '<a class="tile ' + (g.status === 'live' ? 'live' : '') + '" href="/games/game.html?g=' + encodeURIComponent(g.slug) + '">' +
                     '<div class="icon">' + g.emoji + '</div><h3>' + esc(g.name) + '</h3>' +
-                    '<div class="orig">' + (g.origins || []).map(o => o.flag).join(' ') + ' ' + (g.origins || []).map(o => o.country).join(', ') + '</div>' +
+                    '<div class="orig">' + (g.region
+                        ? esc(g.region) + ' · ' + (g.origins || []).map(o => o.country).join(', ')
+                        : (g.origins || []).map(o => o.flag).join(' ') + ' ' + (g.origins || []).map(o => o.country).join(', ')) + '</div>' +
                     (g.status === 'live' ? '<span class="badge play">Play now</span>' : '<span class="badge soon">Coming soon</span>') +
                     '</a>').join('') || '<p class="empty">No game matches that search.</p>';
             }

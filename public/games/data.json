@@ -27,6 +27,36 @@
       }
     },
     {
+      "slug": "chess",
+      "name": "Chess",
+      "emoji": "♟️",
+      "status": "soon",
+      "region": "MultiNations",
+      "origins": [
+        { "country": "India", "flag": "🇮🇳" },
+        { "country": "Iran", "flag": "🇮🇷" },
+        { "country": "Spain", "flag": "🇪🇸" },
+        { "country": "Italy", "flag": "🇮🇹" }
+      ],
+      "familyNote": "Living form of Chaturanga. Sister games Xiangqi, Shogi and Janggi stay on their own country cards.",
+      "history": "Chess is the game most people mean when they say chess: the 8x8 board, king, queen, pawns, the fight that ends when the king cannot escape. It did not spring from one factory or one century. It began in India as Chaturanga, the four-limbed army game of the sixth and seventh centuries. Persia took it in and named the king shah, which is why we still say check and checkmate. Players and writers across the medieval Islamic world, especially in Baghdad and then in Islamic Spain, kept the game alive and carried it into Europe. In the late 1400s, players in Spain and Italy gave the queen and the bishop the long reach they have now, and that is the chess grandmasters still play. The rules are old public knowledge. No company owns them. What you play here is that living board, with a finished match recorded on-chain so the result cannot quietly change.",
+      "howToPlay": "Two players sit at an 8x8 board. The near-right corner from each person should be a light square. White moves first. Each side has a king, a queen, two rooks, two bishops, two knights and eight pawns. The king steps one square any way. The queen runs any distance in any direction. The rook runs along ranks and files. The bishop runs diagonally and stays on its colour forever. The knight jumps in an L and can pass over other pieces. Pawns walk one step forward, two on their first move, and capture one step diagonally. A pawn that reaches the last row becomes a queen, or another piece you choose. You take a piece by landing on its square. If the king is attacked, that is check. If he has no safe square, no capture that removes the attack, and no piece that can block it, that is checkmate, and the game is over. Later you will meet castling, which tucks the king behind a rook in one move, and en passant, a pawn capture that only exists the turn after a double step. The first good habits are simple. Bring pieces out toward the centre. Get the king safe. Do not leave a piece where it can be taken for nothing. That is enough to enjoy the board, and it is the same board used in every serious tournament in the world.",
+      "shapers": [
+        { "country": "India", "text": "This is the root. Around the sixth and seventh centuries, in the Gupta world of north India, people played Chaturanga on an 8x8 board already known as ashtapada. The name means four divisions: infantry, cavalry, elephants, chariots. Those become the pawn, knight, bishop and rook. Two ideas that still define chess were already there: each piece moves differently, and the game turns on the fate of one piece, the king. Sister games grew from the same family later, Xiangqi in China, Shogi in Japan, Janggi in Korea, Makruk in Thailand. Those stay their own games on this site. International chess is the branch that travelled west." },
+        { "country": "Iran (Persia)", "text": "When the game crossed into Sasanian Persia it became chatrang, then shatranj. The court treated it as part of a prince's education. The Persian word shah for king gives us check. Shah mat, the king is helpless, gives us checkmate. Without this step, the names we speak at the board would be different, and the two-player court form that Europe received would not have been the same." },
+        { "country": "The medieval Islamic world (Iraq and Spain as the named doors)", "text": "After the Arab conquest of Persia the game moved in Arabic as shatranj. Baghdad produced the first great written theory and composed problems. Masters such as al-Suli treated the game as a study, not only a pastime. From there it travelled with trade and conquest across North Africa and into Al-Andalus. Spain is the door into Latin Europe. Alfonso X's Libro de los juegos (1283) already treats chess as a game worth writing down in a Christian court. We do not pin the whole Islamic centuries on one modern flag, but Iraq (Baghdad) and Spain are the honest named stops." },
+        { "country": "Spain and Italy, late 1400s", "text": "Medieval European chess still had a weak counsellor and a short-range bishop. In the last decades of the fifteenth century, first in Italy and Spain, the counsellor became the modern queen and the bishop learned to run the whole diagonal. Players called the new game things like alla rabiosa, the mad queen. Castling and the pawn's first double step settle in this same era. That is the ruleset used in every world championship. France, England and later Russia made the game a public culture, coffee houses, books, the Staunton piece style from Britain in 1849, Soviet schoolrooms, but they did not invent the moves. Those countries are the road, not the origin." }
+      ],
+      "rules": {
+        "minSeats": 2,
+        "maxSeats": 2,
+        "turnModel": "move",
+        "turnSecs": 120,
+        "matchSecs": 5400,
+        "resultModel": "ranked"
+      }
+    },
+    {
       "slug": "mahjong",
       "name": "Mahjong",
       "emoji": "🀄",

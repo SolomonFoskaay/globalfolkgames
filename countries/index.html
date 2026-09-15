@@ -42,6 +42,7 @@
             var data = (await r.json()).games || [];
             function find(slug) { return data.find(g => g.slug === slug); }
             var COUNTRIES = [
+                { flag: '🇮🇳 🇮🇷 🇪🇸 🇮🇹', country: 'MultiNations', stats: 'Boards more than one people changed', note: 'Some boards crossed more than one courtyard before they became the game people play today. MultiNations is where we keep those honestly. Each game still names the peoples who changed it. We do not invent a flag for the whole world.', games: ['chess'] },
                 { flag: '🇨🇳', country: 'China', stats: '~728M gamers', games: ['mahjong', 'weiqi', 'xiangqi'] },
                 { flag: '🇮🇳', country: 'India', stats: '~500-560M gamers', games: ['pachisi', 'carrom', 'Gyan Chaupar'] },
                 { flag: '🇺🇸', country: 'United States', stats: '~215-224M gamers', games: ['euchre', 'spades', 'chunkey'] },
@@ -72,7 +73,9 @@
                         return '<a class="tag ' + cls + '" href="/games/game.html?g=' + encodeURIComponent(slug) + '">' + esc(lbl) + '</a>';
                     }).join('');
                     return '<div class="ccard"><span class="flag">' + c.flag + '</span><h3>' + esc(c.country) + '</h3>' +
-                        '<div class="stats">' + esc(c.stats) + '</div><div>' + games + '</div></div>';
+                        '<div class="stats">' + esc(c.stats) + '</div>' +
+                        (c.note ? '<p style="color:#aaa;font-size:0.78rem;line-height:1.6;margin:6px 0 8px;">' + esc(c.note) + '</p>' : '') +
+                        '<div>' + games + '</div></div>';
                 }).join('') || '<p class="empty">No match for that search.</p>';
             }
             document.getElementById('country-search').addEventListener('input', function () { render(this.value); });
