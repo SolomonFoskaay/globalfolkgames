@@ -193,15 +193,14 @@ registry and failover.
 - Seam: emission and wallet-correct crediting.
 - Gasless: 0-SOL session-key writes succeed on the ER.
 
-## 14. Open questions for the owner
+## 14. Locked decisions (popular-standard defaults)
 
-1. Time control presets and the default for a casual match (for example 5+0
-   blitz default, with 1+0 bullet, 10+0 rapid, 30+0 classical).
-2. Draw-offer UX: allow offers, or finish only on the automatic draw rules?
-3. Solo AI difficulty: one fixed strength, or two levels (a light and a slightly
-   deeper engine)?
-4. Do we cap the game length for safety (for example 300 plies), after which it
-   is an automatic draw, to bound the history array and compute?
+1. Time controls: presets 1+0 bullet, 3+2 blitz, 5+0 blitz, 10+0 rapid as the
+   DEFAULT, and 30+0 classical.
+2. Draw offers: agreed draws allowed (mutual offer then accept), matching
+   standard chess.
+3. Solo AI: two difficulty levels, light and standard.
+4. Game length: a 300-ply safety cap finishes as an automatic draw, to bound the
+   history array and compute. This is a safety bound, not a rule change.
 
-Once you answer these four, this doc is final and Phase 1 (the on-chain core
-with perft tests) begins.
+This doc is final. Phase 1 (the on-chain core with perft tests) begins.
