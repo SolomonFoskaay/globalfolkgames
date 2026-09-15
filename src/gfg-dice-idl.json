@@ -242,6 +242,65 @@
       "args": []
     },
     {
+      "name": "ai_chess_move",
+      "docs": [
+        "House-signed on-chain AI reply (single player). The signer must be the",
+        "AI seat's wallet; the move is generated and validated on-chain."
+      ],
+      "discriminator": [
+        73,
+        127,
+        204,
+        114,
+        24,
+        128,
+        78,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "level",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "begin_match",
       "discriminator": [
         30,
@@ -423,6 +482,62 @@
         {
           "name": "seq",
           "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "claim_chess_timeout",
+      "docs": [
+        "PERMISSIONLESS timeout claim. Anyone may call it; the program verifies",
+        "the seat to move has genuinely run out of time and finishes the game as",
+        "a win for the opponent. No crank, deterministic from on-chain timestamps."
+      ],
+      "discriminator": [
+        57,
+        72,
+        129,
+        10,
+        107,
+        190,
+        58,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -1529,6 +1644,182 @@
           "name": "game",
           "type": "u8"
         },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "delegate_chess_board",
+      "docs": [
+        "Relay moves the chess board into the ER session (base layer, sponsor)."
+      ],
+      "discriminator": [
+        12,
+        72,
+        137,
+        111,
+        50,
+        238,
+        189,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "board"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "board"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "board"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "board",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
         {
           "name": "match_ref",
           "type": "u64"
@@ -3099,6 +3390,103 @@
       "args": []
     },
     {
+      "name": "initialize_chess_match",
+      "docs": [
+        "Relay/sponsor creates the chess board PDA for a match (base layer). Seat",
+        "0 is the host (the human); seat 1 is the house (the on-chain AI opponent",
+        "for solo). Requires the host's lives ledger (gate only; the life is",
+        "consumed on completion via consume_life)."
+      ],
+      "discriminator": [
+        153,
+        155,
+        72,
+        52,
+        151,
+        239,
+        178,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "host"
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "host"
+              }
+            ]
+          }
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "time_ms",
+          "type": "u64"
+        },
+        {
+          "name": "increment_ms",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "initialize_comp",
       "docs": [
         "Creates a Competition escrow PDA. Base layer; the payer (sponsor) covers",
@@ -3738,6 +4126,73 @@
         {
           "name": "handle",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "make_chess_move",
+      "docs": [
+        "A seated player submits a move. Fully validated on-chain (legality,",
+        "turn, end conditions). Gasless ER write."
+      ],
+      "discriminator": [
+        2,
+        204,
+        150,
+        12,
+        57,
+        219,
+        208,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        },
+        {
+          "name": "from",
+          "type": "u8"
+        },
+        {
+          "name": "to",
+          "type": "u8"
+        },
+        {
+          "name": "promo",
+          "type": "u8"
         }
       ]
     },
@@ -5108,6 +5563,86 @@
       ]
     },
     {
+      "name": "start_chess_match",
+      "docs": [
+        "Host starts the match (status 0 -> 1). Requires the signer's lives.",
+        "Gasless ER write; the host's session key signs."
+      ],
+      "discriminator": [
+        150,
+        72,
+        128,
+        80,
+        55,
+        141,
+        23,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "start_match",
       "discriminator": [
         100,
@@ -5609,6 +6144,70 @@
       ]
     },
     {
+      "name": "undelegate_chess_board",
+      "docs": [
+        "Relay returns the finished chess board to the base layer (commit +",
+        "undelegate) so the record is readable by the seam and the profile."
+      ],
+      "discriminator": [
+        237,
+        96,
+        50,
+        249,
+        255,
+        165,
+        216,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "undelegate_competition_tally",
       "docs": [
         "Return a player's competition tally to this program (region-agnostic)."
@@ -6065,6 +6664,19 @@
       ]
     },
     {
+      "name": "ChessBoard",
+      "discriminator": [
+        137,
+        250,
+        2,
+        59,
+        19,
+        68,
+        215,
+        7
+      ]
+    },
+    {
       "name": "Competition",
       "discriminator": [
         193,
@@ -6412,6 +7024,16 @@
       "code": 6032,
       "name": "NoLives",
       "msg": "no lives left today - refill at midnight GMT or go Premium"
+    },
+    {
+      "code": 6033,
+      "name": "IllegalMove",
+      "msg": "illegal chess move"
+    },
+    {
+      "code": 6034,
+      "name": "NotYourTurn",
+      "msg": "not your turn"
     }
   ],
   "types": [
@@ -6555,6 +7177,125 @@
           {
             "name": "paid_period_count",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChessBoard",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "game",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "seat_count",
+            "type": "u8"
+          },
+          {
+            "name": "result",
+            "type": "u8"
+          },
+          {
+            "name": "end_reason",
+            "type": "u8"
+          },
+          {
+            "name": "side_to_move",
+            "type": "u8"
+          },
+          {
+            "name": "castling",
+            "type": "u8"
+          },
+          {
+            "name": "ep",
+            "type": "u8"
+          },
+          {
+            "name": "check_flag",
+            "type": "u8"
+          },
+          {
+            "name": "seats",
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "clock_ms",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "increment_ms",
+            "type": "u64"
+          },
+          {
+            "name": "turn_started_at",
+            "type": "i64"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "finished_at",
+            "type": "i64"
+          },
+          {
+            "name": "halfmove",
+            "type": "u16"
+          },
+          {
+            "name": "fullmove",
+            "type": "u16"
+          },
+          {
+            "name": "move_count",
+            "type": "u32"
+          },
+          {
+            "name": "last_hash",
+            "type": "u64"
+          },
+          {
+            "name": "draw_offer",
+            "type": "u8"
+          },
+          {
+            "name": "last_request_ref",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
