@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>M2 · Result seam | Architecture v2 | GlobalFolkGames</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+</head>
+<body data-arch="v2" data-module="m2">
+    <main class="mobile-container dash-rail-content changelog-page admin">
+        <div id="architecture-items" class="changelog-entries">
+            <p class="empty">Checking access…</p>
+        </div>
+    </main>
+    <script src="/global_header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/changelog/architecture.js"></script>
+    <script src="/changelog/arch-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.requireStaffAccess) {
+                const role = await window.requireStaffAccess();
+                if (role && window.renderArchitecture) window.renderArchitecture();
+            } else if (window.renderArchitecture) {
+                window.renderArchitecture();
+            }
+            if (window.GFG_ARCH_NAV) window.GFG_ARCH_NAV.render();
+        });
+    </script>
+</body>
+</html>
