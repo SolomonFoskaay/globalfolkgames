@@ -99,6 +99,10 @@ use ephemeral_rollups_sdk::vrf::{
     types::SerializableAccountMeta,
 };
 
+// M1A Chess core (Phase 1): on-chain engine in its own module, additive on the
+// same program. Adds no instruction yet; Phase 2 wires the lifecycle.
+pub mod chess;
+
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
 pub const PLAYER: &[u8] = b"gfgplayerd";
