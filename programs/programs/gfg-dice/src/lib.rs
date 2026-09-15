@@ -102,6 +102,7 @@ use ephemeral_rollups_sdk::vrf::{
 // M1A Chess core (Phase 1): on-chain engine in its own module, additive on the
 // same program. Adds no instruction yet; Phase 2 wires the lifecycle.
 pub mod chess;
+pub use chess::*;
 
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
@@ -179,6 +180,154 @@ fn gate_lives(l: &LivesAccount, now: i64) -> Result<()> {
 #[program]
 pub mod gfg_dice {
     use super::*;
+
+    // ===== M1A Chess (Phase 2: single player, fully on-chain) =====
+
+    /// Relay/sponsor creates the chess board PDA for a match (base layer). Seat
+    /// 0 is the host (the human); seat 1 is the house (the on-chain AI opponent
+    /// for solo). Requires the host's lives ledger (gate only; the life is
+    /// consumed on completion via consume_life).
+    pub fn initialize_chess_match(
+        ctx: Context<InitializeChessMatch>,
+        match_ref: u64,
+        time_ms: u64,
+        increment_ms: u64,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        gate_lives(&ctx.accounts.lives, now)?;
+        let b = &mut ctx.accounts.board;
+        let init = Position::initial();
+        b.version = 1;
+        b.game = CHESS_TAG;
+        b.status = STATUS_LOBBY;
+        b.seat_count = 2;
+        b.result = RESULT_NONE;
+        b.end_reason = REASON_NONE;
+        b.side_to_move = WHITE;
+        b.castling = INITIAL_CASTLING;
+        b.ep = NO_EP;
+        b.check_flag = 0;
+        b.seats = [ctx.accounts.host.key(), ctx.accounts.payer.key()];
+        b.position = init.squares;
+        b.clock_ms = [time_ms, time_ms];
+        b.increment_ms = increment_ms;
+        b.turn_started_at = 0;
+        b.started_at = 0;
+        b.finished_at = 0;
+        b.halfmove = 0;
+        b.fullmove = 1;
+        b.move_count = 0;
+        b.last_hash = position_hash(&init);
+        b.draw_offer = 255;
+        b.last_request_ref = match_ref;
+        b.bump = ctx.bumps.board;
+        Ok(())
+    }
+
+    /// Relay moves the chess board into the ER session (base layer, sponsor).
+    pub fn delegate_chess_board(ctx: Context<DelegateChessBoardInput>, match_ref: u64) -> Result<()> {
+        ctx.accounts.delegate_board(
+            &ctx.accounts.payer,
+            &[CHESS_SEED, &match_ref.to_le_bytes()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Host starts the match (status 0 -> 1). Requires the signer's lives.
+    /// Gasless ER write; the host's session key signs.
+    pub fn start_chess_match(ctx: Context<StartChessMatch>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        gate_lives(&ctx.accounts.lives, now)?;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_LOBBY, PointsError::NotOpen);
+        require!(
+            ctx.accounts.signer.key() == b.seats[0] || ctx.accounts.signer.key() == b.seats[1],
+            PointsError::NotSeatAuthority
+        );
+        b.status = STATUS_PLAYING;
+        b.started_at = now;
+        b.turn_started_at = now;
+        Ok(())
+    }
+
+    /// A seated player submits a move. Fully validated on-chain (legality,
+    /// turn, end conditions). Gasless ER write.
+    pub fn make_chess_move(
+        ctx: Context<MakeChessMove>,
+        match_ref: u64,
+        from: u8,
+        to: u8,
+        promo: u8,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        let seat = b.side_to_move as usize;
+        require!(ctx.accounts.signer.key() == b.seats[seat], PointsError::NotYourTurn);
+        if from > 63 || to > 63 || from == to {
+            return Err(error!(PointsError::IllegalMove));
+        }
+        apply_move_to_board(b, Move { from, to, promo }, now)
+    }
+
+    /// House-signed on-chain AI reply (single player). The signer must be the
+    /// AI seat's wallet; the move is generated and validated on-chain.
+    pub fn ai_chess_move(ctx: Context<AiChessMove>, match_ref: u64, level: u8) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        require!(b.side_to_move == AI_SEAT, PointsError::NotYourTurn);
+        require!(
+            ctx.accounts.signer.key() == b.seats[AI_SEAT as usize],
+            PointsError::NotSeatAuthority
+        );
+        let pos = Position {
+            squares: b.position,
+            side: b.side_to_move,
+            castling: b.castling,
+            ep: b.ep,
+            halfmove: b.halfmove,
+            fullmove: b.fullmove,
+        };
+        let lvl = if level == 0 { 1 } else { level };
+        let mv = choose_ai_move(&pos, lvl).ok_or(error!(PointsError::IllegalMove))?;
+        apply_move_to_board(b, mv, now)
+    }
+
+    /// PERMISSIONLESS timeout claim. Anyone may call it; the program verifies
+    /// the seat to move has genuinely run out of time and finishes the game as
+    /// a win for the opponent. No crank, deterministic from on-chain timestamps.
+    pub fn claim_chess_timeout(ctx: Context<ClaimChessTimeout>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        let seat = b.side_to_move as usize;
+        let elapsed = (now - b.turn_started_at).max(0) as u64;
+        require!(elapsed > b.clock_ms[seat], PointsError::StillRunning);
+        let result = if seat == 0 { RESULT_BLACK } else { RESULT_WHITE };
+        finish_board(b, result, REASON_TIMEOUT, now);
+        Ok(())
+    }
+
+    /// Relay returns the finished chess board to the base layer (commit +
+    /// undelegate) so the record is readable by the seam and the profile.
+    pub fn undelegate_chess_board(
+        ctx: Context<CommitAndUndelegateChessBoard>,
+        match_ref: u64,
+    ) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.board.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
 
     /// Idempotent: creates the player's dice PDA if it does not exist yet.
     /// The payer (sponsor) pays rent; the account belongs to `player_authority`.
@@ -3463,4 +3612,8 @@ pub enum PointsError {
     InvalidHandle,
     #[msg("no lives left today - refill at midnight GMT or go Premium")]
     NoLives,
+    #[msg("illegal chess move")]
+    IllegalMove,
+    #[msg("not your turn")]
+    NotYourTurn,
 }

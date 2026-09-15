@@ -581,6 +581,205 @@ impl ChessBoard {
     pub const LEN: usize = 204;
 }
 
+// ---------- Phase 2: AI, apply/finish, contexts ----------
+
+use crate::{LivesAccount, PointsError, LIVES_SEED};
+use ephemeral_rollups_sdk::anchor::{commit, delegate};
+use ephemeral_rollups_sdk::cpi::DelegateConfig;
+use ephemeral_rollups_sdk::ephem::MagicIntentBundleBuilder;
+
+pub const CHESS_TAG: u8 = 1;
+pub const AI_SEAT: u8 = 1;
+pub const INITIAL_CASTLING: u8 = CR_WK | CR_WQ | CR_BK | CR_BQ;
+
+/// Material score from the perspective of the side to move (positive is good
+/// for the side to move). Kept simple to fit the ER compute budget.
+pub fn evaluate(pos: &Position) -> i32 {
+    let mut score = 0i32;
+    for i in 0..64usize {
+        let p = pos.squares[i];
+        if p == EMPTY { continue; }
+        let v = match kind_of(p) {
+            WN => 320, WB => 330, WR => 500, WQ => 900, WK => 20000, _ => 100,
+        };
+        if color_of(p) == pos.side { score += v; } else { score -= v; }
+    }
+    score
+}
+
+/// Deterministic on-chain AI. One ply for level 1, two plies (opponent best
+/// reply) for level 2. Never returns an illegal move (it only picks from the
+/// legal list), so the AI can never cheat or blunder into an illegal state.
+pub fn choose_ai_move(pos: &Position, level: u8) -> Option<Move> {
+    let mut legal = MoveList::new();
+    generate_legal_moves(pos, &mut legal);
+    if legal.len == 0 { return None; }
+    let mut best: Option<Move> = None;
+    let mut best_score = i32::MIN;
+    for i in 0..legal.len {
+        let mv = legal.get(i);
+        let np = make_move(pos, mv);
+        let mut sc = -evaluate(&np);
+        if level >= 2 {
+            let mut reply = MoveList::new();
+            generate_legal_moves(&np, &mut reply);
+            if reply.len > 0 {
+                let mut worst = i32::MAX;
+                for j in 0..reply.len {
+                    let np2 = make_move(&np, reply.get(j));
+                    let s2 = -evaluate(&np2);
+                    if s2 < worst { worst = s2; }
+                }
+                sc = -worst;
+            }
+        }
+        if sc > best_score { best_score = sc; best = Some(mv); }
+    }
+    best
+}
+
+pub fn finish_board(b: &mut ChessBoard, result: u8, reason: u8, now: i64) {
+    b.status = STATUS_FINISHED;
+    b.result = result;
+    b.end_reason = reason;
+    b.finished_at = now;
+    b.turn_started_at = now;
+    b.check_flag = 0;
+}
+
+/// Spend the mover's clock, apply `mv`, update counters, and finish the game
+/// if the move produced an end condition. Rejects any illegal move.
+pub fn apply_move_to_board(b: &mut ChessBoard, mv: Move, now: i64) -> Result<()> {
+    let pos = Position {
+        squares: b.position,
+        side: b.side_to_move,
+        castling: b.castling,
+        ep: b.ep,
+        halfmove: b.halfmove,
+        fullmove: b.fullmove,
+    };
+    let mut legal = MoveList::new();
+    generate_legal_moves(&pos, &mut legal);
+    let mut ok = false;
+    for i in 0..legal.len {
+        let m = legal.get(i);
+        if m.from == mv.from && m.to == mv.to && m.promo == mv.promo { ok = true; break; }
+    }
+    if !ok { return Err(error!(PointsError::IllegalMove)); }
+
+    let seat = b.side_to_move as usize;
+    let elapsed = (now - b.turn_started_at).max(0) as u64;
+    let remaining = b.clock_ms[seat].saturating_sub(elapsed);
+    b.clock_ms[seat] = remaining.saturating_add(b.increment_ms);
+    b.turn_started_at = now;
+
+    let np = make_move(&pos, mv);
+    b.position = np.squares;
+    b.side_to_move = np.side;
+    b.castling = np.castling;
+    b.ep = np.ep;
+    b.halfmove = np.halfmove;
+    b.fullmove = np.fullmove;
+    b.move_count = b.move_count.saturating_add(1);
+    b.last_hash = position_hash(&np);
+
+    if is_checkmate(&np) {
+        let r = if seat == 0 { RESULT_WHITE } else { RESULT_BLACK };
+        finish_board(b, r, REASON_CHECKMATE, now);
+    } else if is_stalemate(&np) {
+        finish_board(b, RESULT_DRAW, REASON_STALEMATE, now);
+    } else if is_insufficient_material(&np) {
+        finish_board(b, RESULT_DRAW, REASON_INSUFFICIENT, now);
+    } else if is_fifty_move(&np) {
+        finish_board(b, RESULT_DRAW, REASON_FIFTY, now);
+    } else if b.move_count >= 300 {
+        finish_board(b, RESULT_DRAW, REASON_PLY_CAP, now);
+    } else {
+        b.check_flag = if in_check(&np, np.side) { 1 } else { 0 };
+    }
+    Ok(())
+}
+
+// ---- contexts (instructions are wired in lib.rs) ----
+
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct InitializeChessMatch<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: host wallet (seat 0, the human; seat 1 is the house for solo).
+    pub host: AccountInfo<'info>,
+    #[account(mut, seeds = [LIVES_SEED, host.key().as_ref()], bump)]
+    pub lives: Account<'info, LivesAccount>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + ChessBoard::LEN,
+        seeds = [CHESS_SEED, &match_ref.to_le_bytes()],
+        bump
+    )]
+    pub board: Account<'info, ChessBoard>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateChessBoardInput<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the chess board PDA to delegate.
+    #[account(mut, del)]
+    pub board: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct StartChessMatch<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+    #[account(mut, seeds = [LIVES_SEED, signer.key().as_ref()], bump)]
+    pub lives: Account<'info, LivesAccount>,
+}
+
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct MakeChessMove<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+}
+
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct AiChessMove<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+}
+
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct ClaimChessTimeout<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+}
+
+#[commit]
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct CommitAndUndelegateChessBoard<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+}
+
 // ---------- tests (host): perft + rules ----------
 
 #[cfg(test)]
