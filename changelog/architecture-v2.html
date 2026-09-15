@@ -2,80 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Architecture 2.0 - Admin - GlobalFolkGames</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Architecture v2 (Modules) | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
-    <style>
-        body { background:#0f0f13; }
-        .wrap { max-width:1020px; margin:0 auto; padding:80px 16px 40px; }
-        .topnav { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
-        .topnav a { padding:8px 14px; border-radius:8px; text-decoration:none; font-weight:700; font-size:0.85rem; }
-        .topnav .v2 { background:linear-gradient(135deg,#f87818,#e86818); color:#000; }
-        .topnav .v1 { background:#1a1a24; color:#bbb; border:1px solid #333; }
-        .md { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:18px; line-height:1.7; color:#ddd; font-size:0.9rem; }
-        .md h1, .md h2, .md h3 { color:#f87818; }
-        .md h1 { font-size:1.35rem; } .md h2 { font-size:1.15rem; } .md h3 { font-size:1rem; }
-        .md a { color:#7838f8; }
-        .md table { border-collapse:collapse; width:100%; margin:8px 0; }
-        .md th, .md td { border:1px solid #333; padding:6px 8px; text-align:left; font-size:0.82rem; }
-        .md th { background:#1a1a24; color:#f87818; }
-        .md code { color:#9b59b6; background:rgba(255,255,255,0.06); padding:0 4px; border-radius:4px; }
-        .md li { margin:2px 0; }
-        .md hr { border:none; border-top:1px solid #333; margin:18px 0; }
-        .md p { margin:8px 0; }
-    </style>
 </head>
-<body>
-    <div class="wrap">
-        <h1 style="font-size:1.3rem;margin:0 0 4px;">Architecture 2.0</h1>
-        <p style="font-size:0.85rem; color:#888; margin:0 0 12px;">The 2.0 redesign (draft). Focus: P2P / P2C / Leverage earn, all-on-chain, M1 v2 multiplayer rebuild. <b style="color:#f87818;">1.0 stays listed below for reference.</b></p>
-        <div class="topnav">
-            <a class="v2" href="/changelog/architecture-v2.html">Architecture V2</a>
-            <a class="v1" href="/changelog/architecture.html">Architecture V1</a>
-        </div>
-        <div class="md" id="md"></div>
-        <p style="margin-top:14px; font-size:0.8rem; color:#888;"><a href="/dashboard/" style="color:#f87818;">Dashboard home</a> · <a href="/dashboard/run-sheet.md" style="color:#f87818;">Launch run sheet</a></p>
-    </div>
+<body data-arch="v2">
 
+    <main class="mobile-container dash-rail-content changelog-page admin">
+        <section class="changelog-head">
+            <a href="/dashboard/" class="changelog-back">← Dashboard</a>
+            <h2>Architecture v2, staff workspace</h2>
+            <p class="changelog-sub">The current architecture: pluggable modules, each with its own page. This is the source-of-truth guide for what exists, what is being built, and what is planned. M1 carries a searchable game dropdown with a LOCKED build spec per game (Ludo, Chess, ...). Staff only.</p>
+            <div class="changelog-meta">
+                <span id="changelog-role" class="changelog-role"></span>
+                <a href="/changelog/admin.html" class="changelog-admin-link">Raw changelog →</a>
+            </div>
+        </section>
+
+        <div id="architecture-items" class="changelog-entries">
+            <p class="empty">Checking access…</p>
+        </div>
+
+        <p style="margin-top:16px; font-size:0.8rem; color:#888;">
+            <a href="/changelog/architecture-v2.html" style="color:#f87818;">Architecture v2 (this workspace)</a>
+            &nbsp;·&nbsp; <a href="/changelog/architecture.html" style="color:#7838f8;">Architecture v1 (record)</a>
+            &nbsp;·&nbsp; <a href="/dashboard/architecture-2.0.md" style="color:#7838f8;">v2 design note (.md)</a>
+        </p>
+    </main>
+
+    <!-- Global scripts (needed for points + auth → wallet role) -->
     <script src="/global_header.js"></script>
     <script src="/changelog/render.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/changelog/architecture.js"></script>
+    <script src="/changelog/arch-nav.js"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const staff = await window.requireStaffAccess();
-            const md = document.getElementById('md');
-            if (!staff) { md.innerHTML = '<p style="color:#888;">Restricted. Sign in with a staff account.</p>'; return; }
-            try {
-                const r = await fetch('/dashboard/architecture-2.0.md', { cache: 'no-store' });
-                const txt = await r.text();
-                md.innerHTML = renderMd(txt);
-            } catch (e) { md.textContent = 'Could not load architecture-2.0.md: ' + e.message; }
+            if (window.requireStaffAccess) {
+                const role = await window.requireStaffAccess();
+                if (role && window.renderArchitecture) window.renderArchitecture();
+            } else if (window.renderArchitecture) {
+                window.renderArchitecture();
+            }
+            if (window.GFG_ARCH_NAV) window.GFG_ARCH_NAV.render();
         });
-
-        function renderMd(src) {
-            var esc = function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-            var lines = src.replace(/\r\n/g, '\n').split('\n');
-            var out = [], table = [], inTable = false;
-            function flushTable(){ if (table.length) { out.push('<table>'); table.forEach(function(r){ out.push('<tr>' + r.map(c => '<td>'+c+'</td>').join('') + '</tr>'); out.push('</tr>'); }); out.push('</table>'); table=[]; } }
-            (lines).forEach(function (line) {
-                var t = line.trim();
-                if (t.indexOf('|') === 0 && t.indexOf('---') === -1) { inTable = true; var cells = t.split('|').slice(1,-1).map(c => esc(c.trim())); if (table.length===0 || table[0].join('|') !== cells.join('|')) table.push(cells); return; }
-                if (t.indexOf('---|---') !== -1) return;
-                if (inTable) { flushTable(); inTable=false; }
-                if (t === '' || t === '---') { out.push(''); return; }
-                var m;
-                if (t.startsWith('## ')) out.push('<h2>'+esc(t.slice(3))+'</h2>');
-                else if (t.startsWith('### ')) out.push('<h3>'+esc(t.slice(4))+'</h3>');
-                else if (t.startsWith('#### ')) out.push('<h3 style="color:#7838f8;">'+esc(t.slice(5))+'</h3>');
-                else if (t.startsWith('# ')) out.push('<h1>'+esc(t.slice(2))+'</h1>');
-                else if (t.startsWith('- ')) out.push('<li>'+esc(t.slice(2))+'</li>');
-                else if (t.startsWith('* ')) out.push('<li>'+esc(t.slice(2))+'</li>');
-                else if (/^\d+\.\s/.test(t)) { out.push('<li>'+esc(t.replace(/^\d+\.\s/,''))+'</li>'); }
-                else out.push('<p>'+esc(t)+'</p>');
-            });
-            flushTable();
-            return out.join('\n');
-        }
     </script>
 </body>
 </html>

@@ -43,6 +43,16 @@
     return `<span class="badge b-status ${esc(status)}">${esc(label)}</span>`;
   }
 
+  // Version-aware links. On a v2 page (body[data-arch="v2"]) module cards and
+  // the back link point at the v2 module pages; otherwise they stay on the v1
+  // pages. Arcv1 and arcv2 never cross-link into each other's pages.
+  function isV2Page() {
+    return !!(document.body && document.body.dataset && document.body.dataset.arch === 'v2');
+  }
+  function archPrefix() { return isV2Page() ? 'architecture-v2-' : 'architecture-'; }
+  function modHref(id) { return '/changelog/' + archPrefix() + String(id).toLowerCase() + '.html'; }
+  function archHomeHref() { return isV2Page() ? '/changelog/architecture-v2.html' : '/changelog/architecture.html'; }
+
   function detailsHtml(items) {
     if (!Array.isArray(items) || !items.length) return '';
     return `<div class="entry-details"><h4>Dev notes</h4><ul>${items.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
@@ -73,13 +83,13 @@
     return `
       <article class="entry roadmap-entry econ-entry">
         <div class="entry-head">
-          <a class="entry-version arch-module-link" href="/changelog/architecture-${m.id.toLowerCase()}.html">${esc(m.id)} →</a>
+          <a class="entry-version arch-module-link" href="${modHref(m.id)}">${esc(m.id)} →</a>
           ${statusBadge(m.status)}${gameCount}${contractBadge}
         </div>
         <h3>${esc(m.title)}</h3>
         ${m.summary ? `<p class="entry-summary">${esc(m.summary)}</p>` : ''}
         ${detailsHtml(m.details)}
-        <p class="entry-git">Module page: <a href="/changelog/architecture-${m.id.toLowerCase()}.html" style="color:#7838f8;">${esc(m.id)} full detail →</a></p>
+        <p class="entry-git">Module page: <a href="${modHref(m.id)}" style="color:#7838f8;">${esc(m.id)} full detail →</a></p>
       </article>`;
   }
 
@@ -212,7 +222,7 @@
   function renderModulePage(m) {
     return `
       <section class="changelog-head">
-        <a href="/changelog/architecture.html" class="changelog-back">← Architecture home</a>
+        <a href="${archHomeHref()}" class="changelog-back">← Architecture home</a>
         <div class="entry-head">
           <span class="entry-version">${esc(m.id)}</span>
           ${statusBadge(m.status)}
@@ -288,7 +298,7 @@
         return;
       }
       optionsEl.innerHTML = matches.map(g => `
-        <button type="button" class="game-option" data-game="${esc(g.id)}" role="option">
+        <button type="button" class="game-option" data-game="${esc(g.gameKey || g.id)}" role="option">
           <span class="game-option-title">${esc(g.title)}</span>
           <span class="badge b-status ${esc(g.status)}">${esc(STATUS_LABEL[g.status] || g.status)}</span>
         </button>
@@ -296,7 +306,7 @@
     }
 
     function selectGame(gameId) {
-      const game = games.find(g => g.id === gameId);
+      const game = games.find(g => (g.gameKey || g.id) === gameId);
       if (!game) return;
       searchEl.value = game.title;
       specEl.innerHTML = gameSpecHtml(game, m.id);
@@ -327,7 +337,7 @@
     const preferred = games.find(g => g.status === 'locked') || games[0];
     if (preferred) {
       renderOptions('');
-      selectGame(preferred.id);
+      selectGame(preferred.gameKey || preferred.id);
     }
   }
 
