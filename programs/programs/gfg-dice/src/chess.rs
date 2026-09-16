@@ -668,7 +668,7 @@ pub fn apply_move_to_board(b: &mut ChessBoard, mv: Move, now: i64) -> Result<()>
     if !ok { return Err(error!(PointsError::IllegalMove)); }
 
     let seat = b.side_to_move as usize;
-    let elapsed = (now - b.turn_started_at).max(0) as u64;
+    let elapsed = ((now - b.turn_started_at).max(0) as u64).saturating_mul(1000);
     let remaining = b.clock_ms[seat].saturating_sub(elapsed);
     b.clock_ms[seat] = remaining.saturating_add(b.increment_ms);
     b.turn_started_at = now;

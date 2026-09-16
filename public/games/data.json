@@ -30,7 +30,8 @@
       "slug": "chess",
       "name": "Chess",
       "emoji": "♟️",
-      "status": "soon",
+      "status": "live",
+      "play": "/games/chess/",
       "region": "MultiNations",
       "origins": [
         { "country": "India", "flag": "🇮🇳" },

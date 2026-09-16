@@ -306,7 +306,7 @@ pub mod gfg_dice {
         let b = &mut ctx.accounts.board;
         require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
         let seat = b.side_to_move as usize;
-        let elapsed = (now - b.turn_started_at).max(0) as u64;
+        let elapsed = ((now - b.turn_started_at).max(0) as u64).saturating_mul(1000);
         require!(elapsed > b.clock_ms[seat], PointsError::StillRunning);
         let result = if seat == 0 { RESULT_BLACK } else { RESULT_WHITE };
         finish_board(b, result, REASON_TIMEOUT, now);
