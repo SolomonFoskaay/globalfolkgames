@@ -173,9 +173,9 @@
     out.innerHTML = '<div class="v-card">' + pill('Checking both ledgers...', 'idle') + '</div>';
     var erTx = null, baseTx = null;
     Promise.all([
-      erRpc('getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0, encoding: 'json' }])
+      erRpc('getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 1, encoding: 'json' }])
         .then(function (t) { erTx = t; }).catch(function () {}),
-      rpc(BASE_RPC, 'getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0, encoding: 'json' }])
+      rpc(BASE_RPC, 'getTransaction', [sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 1, encoding: 'json' }])
         .then(function (t) { baseTx = t; }).catch(function () {})
     ]).then(function () {
       if (baseTx) { out.innerHTML = renderFound(sig, baseTx, 'base'); return; }

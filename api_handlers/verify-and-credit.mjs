@@ -70,7 +70,7 @@ async function fetchTransaction(rpcUrl, txSignature) {
   // report 'No USDC transfer found' even for a successful payment.
   return conn.getParsedTransaction(txSignature, {
     commitment: 'confirmed',
-    maxSupportedTransactionVersion: 0,
+    maxSupportedTransactionVersion: 1,
   });
 }
 
