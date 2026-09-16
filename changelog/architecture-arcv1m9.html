@@ -3,39 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Architecture (Modules) | GlobalFolkGames</title>
+    <title>arcv1m9 | Architecture v1 (record) | GlobalFolkGames</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/changelog/changelog.css">
 </head>
-<body>
-
+<body data-module="arcv1m9">
     <main class="mobile-container dash-rail-content changelog-page admin">
-        <section class="changelog-head">
-            <a href="/changelog/admin.html" class="changelog-back">← Changelog admin</a>
-            <h2>Architecture, staff workspace</h2>
-            <p class="changelog-sub" style="margin-top:4px;">
-                <a href="/changelog/architecture-v2.html" style="color:#f87818; font-weight:700;">Architecture V2 (current focus)</a>
-                &nbsp;·&nbsp; <b>Architecture V1 (this page, shipped modules)</b>
-            </p>
-            <p class="changelog-sub">The platform is a set of pluggable modules, not a rigid stack. This is the source-of-truth guide for what exists, what is being built, and what is planned: every feature added to the platform slots into one of these modules. Staff only.</p>
-            <div class="changelog-meta">
-                <span id="changelog-role" class="changelog-role"></span>
-                <a href="/changelog/admin.html" class="changelog-admin-link">Raw changelog →</a>
-            </div>
-        </section>
-
         <div id="architecture-items" class="changelog-entries">
             <p class="empty">Checking access…</p>
         </div>
     </main>
-
-    <!-- Global scripts (needed for points + auth → wallet role) -->
     <script src="/global_header.js"></script>
     <script src="/changelog/render.js"></script>
     <script src="/dash-nav.js"></script>
     <script src="/changelog/architecture.js"></script>
     <script src="/changelog/arch-nav.js"></script>
-
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             if (window.requireStaffAccess) {

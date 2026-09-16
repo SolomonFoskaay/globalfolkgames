@@ -15,7 +15,10 @@
 // Data lives in architecture.json (client-served but admin-gated; no unfixed
 // security/anti-exploit details go here, per security-queue.md rules).
 (function () {
-  const ARCH_JSON = '/changelog/architecture.json';
+  const ARCH_JSON_V2 = '/changelog/architecture.json';
+  const ARCH_JSON_V1 = '/changelog/architecture-v1.json';
+  // v2 pages load the live architecture.json; v1 pages load the frozen record.
+  function archJsonUrl() { return isV2Page() ? ARCH_JSON_V2 : ARCH_JSON_V1; }
   const STATUSES = ['planned', 'in-progress', 'shipped'];
   const STATUS_LABEL = {
     'planned': 'Planned',
@@ -345,7 +348,7 @@
     const out = qs('#architecture-items');
     if (!out) return;
     try {
-      if (!cache) cache = await loadJson(ARCH_JSON);
+      if (!cache) cache = await loadJson(archJsonUrl());
       const activeTab = 'summary';
       out.dataset.tab = activeTab;
       out.innerHTML = renderOverview(cache, activeTab);
@@ -366,7 +369,7 @@
     const out = qs('#architecture-items');
     if (!out) return;
     try {
-      if (!cache) cache = await loadJson(ARCH_JSON);
+      if (!cache) cache = await loadJson(archJsonUrl());
       const m = (cache.modules || []).find(x => x.id.toLowerCase() === String(moduleId).toLowerCase());
       if (!m) {
         out.innerHTML = `<p class="empty">Module ${esc(moduleId)} not found.</p>`;
