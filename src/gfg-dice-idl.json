@@ -7507,6 +7507,23 @@
             "type": "u64"
           },
           {
+            "name": "history",
+            "type": {
+              "array": [
+                "u64",
+                128
+              ]
+            }
+          },
+          {
+            "name": "hist_len",
+            "type": "u16"
+          },
+          {
+            "name": "hist_pos",
+            "type": "u16"
+          },
+          {
             "name": "draw_offer",
             "type": "u8"
           },

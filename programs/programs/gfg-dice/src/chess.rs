@@ -567,6 +567,9 @@ pub struct ChessBoard {
     pub fullmove: u16,
     pub move_count: u32,
     pub last_hash: u64,
+    pub history: [u64; 128],
+    pub hist_len: u16,
+    pub hist_pos: u16,
     pub draw_offer: u8,
     pub last_request_ref: u64,
     pub bump: u8,
@@ -575,10 +578,9 @@ pub struct ChessBoard {
 impl ChessBoard {
     // Borsh-fixed layout length (no padding). Kept explicit so the Phase 2
     // `space = 8 + ChessBoard::LEN` is exact and the layout is stable.
-    // The full move/position history does NOT live here (it would blow the 4 KB
-    // stack frame on deserialize); per the locked spec it lives in a separate
-    // Ephemeral Account in Phase 2/3.
-    pub const LEN: usize = 212;
+    // history is a bounded 128-ply ring buffer (position hashes) for threefold
+    // repetition; it fits the 4 KB stack frame, unlike a full move list.
+    pub const LEN: usize = 1240;
 }
 
 // ---------- Phase 2: AI, apply/finish, contexts ----------
@@ -683,11 +685,25 @@ pub fn apply_move_to_board(b: &mut ChessBoard, mv: Move, now: i64) -> Result<()>
     b.move_count = b.move_count.saturating_add(1);
     b.last_hash = position_hash(&np);
 
+    // Threefold repetition: count this position in the bounded history, then
+    // store it (ring buffer). 128 plies covers every practical repetition.
+    let mut rep = 1u32;
+    let n = b.hist_len as usize;
+    for i in 0..n {
+        if b.history[i] == b.last_hash { rep += 1; }
+    }
+    let slot = (b.hist_pos as usize) % 128;
+    b.history[slot] = b.last_hash;
+    b.hist_pos = ((slot + 1) % 128) as u16;
+    if n < 128 { b.hist_len = (n + 1) as u16; }
+
     if is_checkmate(&np) {
         let r = if seat == 0 { RESULT_WHITE } else { RESULT_BLACK };
         finish_board(b, r, REASON_CHECKMATE, now);
     } else if is_stalemate(&np) {
         finish_board(b, RESULT_DRAW, REASON_STALEMATE, now);
+    } else if rep >= 3 {
+        finish_board(b, RESULT_DRAW, REASON_THREEFOLD, now);
     } else if is_insufficient_material(&np) {
         finish_board(b, RESULT_DRAW, REASON_INSUFFICIENT, now);
     } else if is_fifty_move(&np) {
@@ -903,6 +919,35 @@ mod tests {
     }
 
     #[test]
+    fn threefold_repetition_draws() {
+        let init = Position::initial();
+        let mut b = ChessBoard {
+            version: 1, game: CHESS_TAG, status: STATUS_PLAYING, seat_count: 2,
+            result: RESULT_NONE, end_reason: REASON_NONE,
+            side_to_move: WHITE, castling: INITIAL_CASTLING, ep: NO_EP, check_flag: 0,
+            seats: [Pubkey::default(); 2],
+            position: init.squares,
+            clock_ms: [600000, 600000], increment_ms: 0,
+            turn_started_at: 0, started_at: 0, finished_at: 0,
+            halfmove: 0, fullmove: 1, move_count: 0, last_hash: 0,
+            history: [0u64; 128], hist_len: 0, hist_pos: 0,
+            draw_offer: 255, last_request_ref: 0, bump: 0,
+        };
+        // Knight shuffle back to the start position three times.
+        let seq = [(6u8, 21u8), (62, 45), (21, 6), (45, 62)];
+        let mut now = 100i64;
+        for _cycle in 0..3 {
+            for (f, t) in seq {
+                now += 1;
+                apply_move_to_board(&mut b, Move { from: f, to: t, promo: 0 }, now).unwrap();
+            }
+        }
+        assert_eq!(b.status, STATUS_FINISHED, "game finished");
+        assert_eq!(b.end_reason, REASON_THREEFOLD, "threefold draw");
+        assert_eq!(b.result, RESULT_DRAW);
+    }
+
+    #[test]
     fn chessboard_len_matches_borsh() {
         use anchor_lang::AnchorSerialize;
         let b = ChessBoard {
@@ -913,6 +958,7 @@ mod tests {
             clock_ms: [0u64; 2],
             increment_ms: 0, turn_started_at: 0, started_at: 0, finished_at: 0,
             halfmove: 0, fullmove: 0, move_count: 0, last_hash: 0,
+            history: [0u64; 128], hist_len: 0, hist_pos: 0,
             draw_offer: 0, last_request_ref: 0, bump: 0,
         };
         let mut buf = Vec::new();
