@@ -78,7 +78,7 @@ export async function ensureChessDelegated(matchRef) {
 }
 
 // Create the chess board (sponsor pays) then delegate it to the ER. Idempotent.
-export async function chessCreate({ matchRef, host, timeMs, incrementMs }) {
+export async function chessCreate({ matchRef, host, timeMs, incrementMs, solo }) {
   try {
     if (!matchRef || !host) return { ok: false, error: 'matchRef and host required' };
     const pda = chessPda(matchRef);
@@ -90,6 +90,7 @@ export async function chessCreate({ matchRef, host, timeMs, incrementMs }) {
         refBN(matchRef),
         new BN(Number(timeMs) || 600000),
         new BN(Number(incrementMs) || 0),
+        Number(solo) === 0 ? 0 : 1,
       ).accounts({
         payer: sponsor.publicKey,
         host: hostKey,

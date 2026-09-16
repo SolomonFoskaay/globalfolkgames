@@ -8,6 +8,60 @@
   },
   "instructions": [
     {
+      "name": "accept_draw_chess",
+      "docs": [
+        "The other seated player accepts the draw. Mutual agreement ends the game."
+      ],
+      "discriminator": [
+        89,
+        34,
+        139,
+        77,
+        243,
+        128,
+        70,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "activate_booster",
       "docs": [
         "(M5 v3) Activates an unlimited-life booster by spending premium spendable.",
@@ -3458,6 +3512,10 @@
         {
           "name": "increment_ms",
           "type": "u64"
+        },
+        {
+          "name": "solo",
+          "type": "u8"
         }
       ]
     },
@@ -4004,6 +4062,86 @@
       "args": []
     },
     {
+      "name": "join_chess_match",
+      "docs": [
+        "A second player joins an open chess match (seat 1). Gasless ER write,",
+        "lives-gated. Refuses if seat 1 is taken or the joiner is the host."
+      ],
+      "discriminator": [
+        54,
+        143,
+        175,
+        160,
+        64,
+        21,
+        123,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lives",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  108,
+                  105,
+                  118,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "join_match",
       "docs": [
         "M12 join_match: a player joins a free seat on the board (gasless ER,",
@@ -4331,6 +4469,60 @@
         {
           "name": "game_tag",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "offer_draw_chess",
+      "docs": [
+        "A seated player offers a draw. Gasless ER write."
+      ],
+      "discriminator": [
+        114,
+        10,
+        23,
+        164,
+        97,
+        193,
+        62,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -5079,6 +5271,60 @@
         {
           "name": "handle",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "resign_chess_match",
+      "docs": [
+        "A seated player resigns; the opponent wins. Gasless ER write."
+      ],
+      "discriminator": [
+        28,
+        252,
+        119,
+        46,
+        87,
+        179,
+        246,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "board",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  104,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_ref"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "match_ref",
+          "type": "u64"
         }
       ]
     },
@@ -7259,6 +7505,23 @@
           {
             "name": "last_hash",
             "type": "u64"
+          },
+          {
+            "name": "history",
+            "type": {
+              "array": [
+                "u64",
+                128
+              ]
+            }
+          },
+          {
+            "name": "hist_len",
+            "type": "u16"
+          },
+          {
+            "name": "hist_pos",
+            "type": "u16"
           },
           {
             "name": "draw_offer",
