@@ -44,11 +44,11 @@ export class SpendCapExceeded extends Error {
 
 export function spendCaps() {
   return {
-    // Per-player default sized for Scope C (three PDAs per player: dice +
-    // points + result, each ~0.0042 SOL fresh init+delegate => ~0.0126 real;
-    // 0.015 leaves ~1.2x margin and stays far under total / tank).
-    // Env-tunable.
-    perPlayerLamports: Math.round(envNumber('GFG_SPEND_CAP_PER_PLAYER_SOL', 0.015) * LAMPORTS_PER_SOL),
+    // Per-player default sized for the FULL first-time onboarding: dice +
+    // points + result + global + premium + lives, each ~0.0042 SOL fresh
+    // init+delegate (measured live ~0.018 for all six); 0.025 leaves margin and
+    // stays far under the total / tank. Env-tunable.
+    perPlayerLamports: Math.round(envNumber('GFG_SPEND_CAP_PER_PLAYER_SOL', 0.025) * LAMPORTS_PER_SOL),
     // Global default 10 SOL on devnet: at ~0.0084 SOL/player it funds the
     // first ~1,000 fresh players without an onboarding pause. It is a safety
     // tripwire against a drained sponsor wallet, NOT a subscription meter, so it

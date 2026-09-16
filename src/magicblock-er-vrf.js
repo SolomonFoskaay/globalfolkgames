@@ -926,8 +926,67 @@ async function chessRelay(action, payload) {
   return res.json();
 }
 
-export async function createChessMatch(matchRef, hostPubkey, timeMs, incrementMs) {
-  return chessRelay('create', { matchRef, host: hostPubkey, timeMs, incrementMs });
+export async function createChessMatch(matchRef, hostPubkey, timeMs, incrementMs, solo) {
+  return chessRelay('create', { matchRef, host: hostPubkey, timeMs, incrementMs, solo: (solo === 0 ? 0 : 1) });
+}
+
+// Phase 3 (multiplayer): join an open seat (gasless ER write, lives-gated).
+export async function joinChessMatch(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the join.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  const [lives] = livesPdaFor(wallet.publicKey);
+  await ensureDelegated(lives, wallet.publicKey);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  await withErRetry('join_chess_match', async (eCtx) => eCtx.program.methods
+    .joinChessMatch(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board, lives })
+    .rpc(), { regionUrl });
+  return { ok: true };
+}
+
+export async function resignChessMatch(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the resignation.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('resign_chess_match', async (eCtx) => eCtx.program.methods
+    .resignChessMatch(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+export async function offerDrawChess(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the draw offer.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('offer_draw_chess', async (eCtx) => eCtx.program.methods
+    .offerDrawChess(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+export async function acceptDrawChess(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the draw accept.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('accept_draw_chess', async (eCtx) => eCtx.program.methods
+    .acceptDrawChess(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
 }
 
 export async function startChessMatch(matchRef) {
@@ -1440,11 +1499,15 @@ export function initMagicBlockDice() {
     // start / move / claim on the ER (gasless) and read the board state.
     chess: {
       pda(matchRef) { return chessPdaFor(matchRef); },
-      create(matchRef, hostPubkey, timeMs, incrementMs) { return createChessMatch(matchRef, hostPubkey, timeMs, incrementMs); },
+      create(matchRef, hostPubkey, timeMs, incrementMs, solo) { return createChessMatch(matchRef, hostPubkey, timeMs, incrementMs, solo); },
+      join(matchRef) { return joinChessMatch(matchRef); },
       start(matchRef) { return startChessMatch(matchRef); },
       move(matchRef, from, to, promo) { return makeChessMove(matchRef, from, to, promo); },
       ai(matchRef, level) { return aiChessMove(matchRef, level); },
       claimTimeout(matchRef) { return claimChessTimeout(matchRef); },
+      resign(matchRef) { return resignChessMatch(matchRef); },
+      offerDraw(matchRef) { return offerDrawChess(matchRef); },
+      acceptDraw(matchRef) { return acceptDrawChess(matchRef); },
       read(matchRef) { return readChessBoard(matchRef); },
     },
 

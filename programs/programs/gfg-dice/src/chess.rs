@@ -768,6 +768,28 @@ pub struct ClaimChessTimeout<'info> {
     pub board: Account<'info, ChessBoard>,
 }
 
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct JoinChessMatch<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+    #[account(mut, seeds = [LIVES_SEED, signer.key().as_ref()], bump)]
+    pub lives: Account<'info, LivesAccount>,
+}
+
+/// Seat-holder action (resign, offer draw, accept draw). The handler checks the
+/// signer is actually one of the two seats.
+#[derive(Accounts)]
+#[instruction(match_ref: u64)]
+pub struct ChessSeatAction<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
+    pub board: Account<'info, ChessBoard>,
+}
+
 #[commit]
 #[derive(Accounts)]
 #[instruction(match_ref: u64)]

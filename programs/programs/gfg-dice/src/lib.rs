@@ -192,6 +192,7 @@ pub mod gfg_dice {
         match_ref: u64,
         time_ms: u64,
         increment_ms: u64,
+        solo: u8,
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let b = &mut ctx.accounts.board;
@@ -206,7 +207,7 @@ pub mod gfg_dice {
         b.castling = INITIAL_CASTLING;
         b.ep = NO_EP;
         b.check_flag = 0;
-        b.seats = [ctx.accounts.host.key(), ctx.accounts.payer.key()];
+        b.seats = [ctx.accounts.host.key(), if solo == 1 { ctx.accounts.payer.key() } else { Pubkey::default() }];
         b.position = init.squares;
         b.clock_ms = [time_ms, time_ms];
         b.increment_ms = increment_ms;
@@ -309,6 +310,53 @@ pub mod gfg_dice {
         require!(elapsed > b.clock_ms[seat], PointsError::StillRunning);
         let result = if seat == 0 { RESULT_BLACK } else { RESULT_WHITE };
         finish_board(b, result, REASON_TIMEOUT, now);
+        Ok(())
+    }
+
+    /// A second player joins an open chess match (seat 1). Gasless ER write,
+    /// lives-gated. Refuses if seat 1 is taken or the joiner is the host.
+    pub fn join_chess_match(ctx: Context<JoinChessMatch>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        gate_lives(&ctx.accounts.lives, now)?;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_LOBBY, PointsError::NotOpen);
+        require!(b.seats[1] == Pubkey::default(), PointsError::AlreadyClaimed);
+        require!(ctx.accounts.signer.key() != b.seats[0], PointsError::NotSeatAuthority);
+        b.seats[1] = ctx.accounts.signer.key();
+        Ok(())
+    }
+
+    /// A seated player resigns; the opponent wins. Gasless ER write.
+    pub fn resign_chess_match(ctx: Context<ChessSeatAction>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        let signer = ctx.accounts.signer.key();
+        let seat = if signer == b.seats[0] { 0u8 } else if signer == b.seats[1] { 1u8 } else { return Err(error!(PointsError::NotSeatAuthority)); };
+        let result = if seat == 0 { RESULT_BLACK } else { RESULT_WHITE };
+        finish_board(b, result, REASON_RESIGN, now);
+        Ok(())
+    }
+
+    /// A seated player offers a draw. Gasless ER write.
+    pub fn offer_draw_chess(ctx: Context<ChessSeatAction>, match_ref: u64) -> Result<()> {
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        let signer = ctx.accounts.signer.key();
+        let seat = if signer == b.seats[0] { 0u8 } else if signer == b.seats[1] { 1u8 } else { return Err(error!(PointsError::NotSeatAuthority)); };
+        b.draw_offer = seat;
+        Ok(())
+    }
+
+    /// The other seated player accepts the draw. Mutual agreement ends the game.
+    pub fn accept_draw_chess(ctx: Context<ChessSeatAction>, match_ref: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let b = &mut ctx.accounts.board;
+        require!(b.status == STATUS_PLAYING, PointsError::NotOpen);
+        let signer = ctx.accounts.signer.key();
+        let seat = if signer == b.seats[0] { 0u8 } else if signer == b.seats[1] { 1u8 } else { return Err(error!(PointsError::NotSeatAuthority)); };
+        require!(b.draw_offer != 255 && b.draw_offer != seat, PointsError::IllegalMove);
+        finish_board(b, RESULT_DRAW, REASON_AGREEMENT, now);
         Ok(())
     }
 
