@@ -110,7 +110,7 @@
     var W = { 1:'\u2659',2:'\u2658',3:'\u2657',4:'\u2656',5:'\u2655',6:'\u2654' };
     var B = { 7:'\u265F',8:'\u265E',9:'\u265D',10:'\u265C',11:'\u265B',12:'\u265A' };
 
-    var st = { matchRef: 0, mySeat: 0, solo: false, board: null, sel: -1, lastFrom: -1, lastTo: -1, busy: false, poll: null, time: TIMES[3], level: 1, hints: [] };
+    var st = { matchRef: 0, mySeat: 0, solo: false, board: null, sel: -1, lastFrom: -1, lastTo: -1, busy: false, poll: null, time: TIMES[3], level: 1, hints: [], lastProofSig: null, seamFired: false };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
     var $ = function (id) { return document.getElementById(id); };
 
@@ -237,11 +237,30 @@
         return who;
     }
 
+    // Publish the M2 result seam once when the game finishes, so M3/M4 credit
+    // the winner at its own wallet (identity = the seat wallet). Solo: seat 1 is
+    // the house and never earns. The proof binds the on-chain result (last sig).
+    function publishSeamOnce(b) {
+        if (st.seamFired) return;
+        st.seamFired = true;
+        if (typeof window.publishGameResult !== 'function') return;
+        var draw = b.result === 2, whiteWin = b.result === 0, blackWin = b.result === 1;
+        var players = [
+            { seat: 'white', actor: 'user', position: draw ? 1 : (whiteWin ? 1 : 2), identity: b.seats[0] },
+            { seat: 'black', actor: st.solo ? 'house' : 'user', position: draw ? 1 : (blackWin ? 1 : 2), identity: st.solo ? null : b.seats[1] },
+        ];
+        var proof = st.lastProofSig ? { method: 'solana-tx', chain: 'solana-devnet', signature: st.lastProofSig } : null;
+        try {
+            window.publishGameResult({ gameId: 'chess', mode: st.solo ? 'solo' : 'multiplayer', finishedAt: Date.now(), players: players, proof: proof });
+        } catch (e) { console.log('[chess] seam publish failed', e); }
+    }
+    function noteSig(r) { if (r && r.sig) st.lastProofSig = r.sig; }
+
     async function pollState() {
         if (!st.matchRef) return;
         try {
             var s = await md().read(st.matchRef);
-            if (s && s.ok) { st.board = s; render(); $('ch-msg').textContent = statusText(); return s; }
+            if (s && s.ok) { st.board = s; render(); $('ch-msg').textContent = statusText(); if (s.status === 2) publishSeamOnce(s); return s; }
         } catch (e) { /* soft */ }
         return null;
     }
@@ -260,7 +279,7 @@
 
     async function aiTurn() {
         if (st.busy) return; st.busy = true;
-        try { var r = await md().ai(st.matchRef, st.level); if (r && r.ok === false) console.log('ai:', r.error); } catch (e) { console.log('ai error', e); }
+        try { var r = await md().ai(st.matchRef, st.level); noteSig(r); if (r && r.ok === false) console.log('ai:', r.error); } catch (e) { console.log('ai error', e); }
         st.busy = false;
         await pollState();
     }
@@ -283,6 +302,7 @@
         st.busy = true; $('ch-msg').textContent = 'Submitting move on-chain…';
         try {
             var r = await md().move(st.matchRef, from, sq, promo);
+            noteSig(r);
             st.sel = -1; st.hints = []; st.lastFrom = from; st.lastTo = sq;
             await pollState();
             if (st.solo && st.board && st.board.status === 1 && st.board.sideToMove !== st.mySeat) { stopPolling(); await aiTurn(); startPolling(); }
@@ -362,7 +382,7 @@
 
     async function resign() {
         if (!confirm('Resign this game?')) return;
-        try { await md().resign(st.matchRef); await pollState(); } catch (e) { alert('Resign failed: ' + (e.message || e)); }
+        try { var r = await md().resign(st.matchRef); noteSig(r); await pollState(); } catch (e) { alert('Resign failed: ' + (e.message || e)); }
     }
     async function offerDraw() {
         try { await md().offerDraw(st.matchRef); await pollState(); $('ch-msg').textContent = 'Draw offered.'; } catch (e) { alert('Draw offer failed: ' + (e.message || e)); }

@@ -40,6 +40,15 @@
             },
             reasons: { win1st: 1, win2nd: 2, win3rd: 3 },
         },
+        chess: {
+            gameTag: 'chess',
+            // Win = 1st place. A draw publishes BOTH seats at position 1, so a
+            // draw shares the win pool (M3 owner-tuneable). 2 seats only.
+            positions: {
+                2: { 1: 100, 2: 0 },
+            },
+            reasons: { win1st: 1, win2nd: 2, win3rd: 3 },
+        },
     };
 
     // Track which match_refs were already banked (in-memory + localStorage) so
