@@ -103,6 +103,8 @@ use ephemeral_rollups_sdk::vrf::{
 // same program. Adds no instruction yet; Phase 2 wires the lifecycle.
 pub mod chess;
 pub use chess::*;
+pub mod probe;
+pub use probe::*;
 
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
@@ -373,6 +375,34 @@ pub mod gfg_dice {
         )
         .commit_and_undelegate(&[ctx.accounts.board.to_account_info()])
         .build_and_invoke()?;
+        Ok(())
+    }
+
+    // ===== TEMPORARY resize probe (Player Core dynamic vs bounded decision) =====
+    pub fn probe_init(ctx: Context<ProbeInitCtx>) -> Result<()> {
+        let p = &mut ctx.accounts.probe;
+        p.version = 1;
+        p.marker = 0xA5;
+        p.len_marker = ProbeAccount::LEN as u32;
+        Ok(())
+    }
+
+    pub fn probe_delegate(ctx: Context<ProbeDelegateCtx>) -> Result<()> {
+        let payer = ctx.accounts.payer.key();
+        ctx.accounts.delegate_probe(
+            &ctx.accounts.payer,
+            &[PROBE_SEED, payer.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|a| a.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    pub fn probe_resize(ctx: Context<ProbeResizeCtx>, new_len: u32) -> Result<()> {
+        let p = &mut ctx.accounts.probe;
+        p.len_marker = new_len;
         Ok(())
     }
 
