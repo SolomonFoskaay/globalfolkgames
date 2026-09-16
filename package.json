@@ -15,7 +15,7 @@
     "@dynamic-labs-sdk/client": "^1.26.0",
     "@dynamic-labs-sdk/solana": "^1.26.0",
     "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.98.1",
+    "@solana/web3.js": "^1.99.0",
     "bs58": "^5.0.0"
   },
   "engines": {

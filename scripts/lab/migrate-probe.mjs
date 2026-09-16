@@ -81,7 +81,7 @@ async function sendAndLog(label, tx, conn = baseConn) {
   } catch (e) {
     console.log(`  [${label}] FAILED: ${(e.message || '').slice(0, 120)}`);
     try {
-      const t = await conn.getTransaction(sig, { commitment: 'confirmed' });
+      const t = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 1 });
       console.log('  logs:', JSON.stringify((t && t.meta && t.meta.logMessages || []).slice(0, 20), null, 1));
     } catch (_) { console.log('  (no logs fetched)'); }
     throw e;

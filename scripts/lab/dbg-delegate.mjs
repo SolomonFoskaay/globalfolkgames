@@ -68,7 +68,7 @@ try {
 await sleep(3000);
 info = await baseConn.getAccountInfo(pda);
 console.log('after delegate owner', info ? info.owner.toBase58() : 'null', 'len', info ? info.data.length : 0);
-const tx = await baseConn.getTransaction(delegateSig, { commitment: 'confirmed' });
+const tx = await baseConn.getTransaction(delegateSig, { commitment: 'confirmed', maxSupportedTransactionVersion: 1 });
 if (tx) console.log('tx logs tail:', (tx.meta?.logMessages || []).slice(-6));
 await sleep(2000);
 const er = new Connection(ER_URL, 'confirmed');
