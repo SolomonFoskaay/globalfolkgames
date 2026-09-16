@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chess | GlobalFolkGames</title>
+    <meta name="description" content="Play world-standard chess fully on-chain. Solo against an on-chain computer or online multiplayer. Gasless, no wallet popups, verified on Solana.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background:#0f0f13; }
+        .ch-wrap { max-width: 720px; margin: 0 auto; padding: 12px 12px 80px; }
+        .ch-head { text-align:center; margin: 6px 0 10px; }
+        .ch-title { color:#fff; font-size:1.3rem; margin:0; }
+        .ch-region { display:inline-block; background:rgba(155,89,182,0.18); color:#c39bd3; border:1px solid rgba(155,89,182,0.5); border-radius:999px; padding:3px 10px; font-size:0.72rem; font-weight:700; margin-top:6px; }
+        .ch-card { background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px; margin-bottom:12px; }
+        .ch-status { text-align:center; color:#ddd; font-size:0.9rem; min-height:20px; margin-bottom:8px; }
+        .ch-clockrow { display:flex; justify-content:space-between; gap:8px; margin-bottom:8px; }
+        .ch-clock { flex:1; background:#1a1a24; border:1px solid #2a2a36; border-radius:8px; padding:6px 10px; text-align:center; font-family:ui-monospace,Menlo,monospace; font-size:0.85rem; color:#bbb; }
+        .ch-clock.active { border-color:#f39c12; color:#fff; }
+        .ch-board { display:grid; grid-template-columns:repeat(8, 1fr); width:100%; max-width:520px; margin:0 auto; aspect-ratio:1/1; border-radius:8px; overflow:hidden; border:2px solid #2a2a36; }
+        .ch-sq { display:flex; align-items:center; justify-content:center; font-size:min(6.5vw, 40px); user-select:none; cursor:pointer; position:relative; }
+        .ch-sq.light { background:#e8e0d0; }
+        .ch-sq.dark { background:#9b7f5f; }
+        .ch-sq.sel { outline:3px solid #f39c12; outline-offset:-3px; }
+        .ch-sq.hint::after { content:''; position:absolute; width:22%; height:22%; border-radius:50%; background:rgba(46,204,113,0.6); }
+        .ch-sq.hintcap::after { content:''; position:absolute; inset:6%; border-radius:50%; border:3px solid rgba(231,76,60,0.7); }
+        .ch-sq.lastm { box-shadow: inset 0 0 0 3px rgba(243,156,18,0.55); }
+        .ch-sq.check { box-shadow: inset 0 0 0 3px rgba(231,76,60,0.9); }
+        .ch-pc.w { color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.6), 0 0 1px #000; }
+        .ch-pc.b { color:#111; text-shadow:0 1px 2px rgba(255,255,255,0.25); }
+        .ch-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+        .ch-btn { border:none; border-radius:10px; padding:12px 14px; font-weight:800; font-size:0.88rem; cursor:pointer; flex:1; min-width:130px; }
+        .ch-btn.primary { background:linear-gradient(135deg,#f39c12,#e86818); color:#000; }
+        .ch-btn.purple { background:linear-gradient(135deg,#9b59b6,#7838f8); color:#fff; }
+        .ch-btn.ghost { background:transparent; border:1px solid #333; color:#f39c12; }
+        .ch-btn:disabled { opacity:0.5; cursor:not-allowed; }
+        .ch-input { width:100%; box-sizing:border-box; background:#1a1a24; color:#fff; border:1px solid #333; border-radius:10px; padding:11px; font-size:0.9rem; margin-bottom:8px; }
+        .ch-note { color:#999; font-size:0.78rem; line-height:1.6; margin-top:8px; }
+        .ch-sel { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+        .ch-pill { border:1px solid #333; background:#1a1a24; color:#bbb; border-radius:999px; padding:7px 12px; font-size:0.8rem; cursor:pointer; }
+        .ch-pill.active { border-color:#f39c12; color:#fff; }
+        .ch-hidden { display:none; }
+    </style>
+</head>
+<body>
+<main class="ch-wrap">
+
+    <div class="ch-head">
+        <h1 class="ch-title">♟️ Chess</h1>
+        <div class="ch-region">MultiNations</div>
+    </div>
+
+    <div class="ch-card" id="ch-lobby">
+        <p class="ch-status" id="ch-auth">Sign in to play (email, no wallet needed).</p>
+        <div id="ch-lobby-actions" class="ch-hidden">
+            <div class="ch-sel" id="ch-time-pills"></div>
+            <div class="ch-sel" id="ch-level-pills"></div>
+            <div class="ch-row">
+                <button class="ch-btn primary" id="ch-solo">New solo game</button>
+            </div>
+            <div class="ch-row">
+                <button class="ch-btn purple" id="ch-create">Create online match</button>
+            </div>
+            <div class="ch-row">
+                <input class="ch-input" id="ch-code-in" placeholder="Enter a match code to join">
+                <button class="ch-btn ghost" id="ch-join">Join online match</button>
+            </div>
+            <p class="ch-note">World-standard rules. Fully on-chain (board, rules, and the computer opponent). Every move is gasless: no wallet popups, no fees.</p>
+        </div>
+    </div>
+
+    <div class="ch-card ch-hidden" id="ch-wait">
+        <p class="ch-status" id="ch-wait-msg">Waiting…</p>
+        <div class="ch-row">
+            <button class="ch-btn ghost" id="ch-copy">Copy code</button>
+            <button class="ch-btn ghost" id="ch-start">Start match</button>
+            <button class="ch-btn ghost" id="ch-leave">Leave</button>
+        </div>
+        <p class="ch-note" id="ch-wait-note"></p>
+    </div>
+
+    <div class="ch-card ch-hidden" id="ch-game">
+        <div class="ch-clockrow">
+            <div class="ch-clock" id="ch-clock-top">--:--</div>
+            <div class="ch-clock" id="ch-clock-bot">--:--</div>
+        </div>
+        <div class="ch-status" id="ch-msg"></div>
+        <div class="ch-board" id="ch-board"></div>
+        <div class="ch-row">
+            <button class="ch-btn ghost" id="ch-draw">Offer draw</button>
+            <button class="ch-btn ghost" id="ch-resign">Resign</button>
+        </div>
+        <p class="ch-note">Tap a piece, then tap where it should go. Illegal moves are rejected on-chain.</p>
+    </div>
+
+</main>
+
+<script src="/global_header.js"></script>
+<script>
+(function () {
+    'use strict';
+    var TIMES = [
+        { key: '1+0', ms: 60000, inc: 0, label: '1+0 bullet' },
+        { key: '3+2', ms: 180000, inc: 2000, label: '3+2 blitz' },
+        { key: '5+0', ms: 300000, inc: 0, label: '5+0 blitz' },
+        { key: '10+0', ms: 600000, inc: 0, label: '10+0 rapid' },
+        { key: '30+0', ms: 1800000, inc: 0, label: '30+0 classical' }
+    ];
+    var LEVELS = [ { v: 1, label: 'AI: light' }, { v: 2, label: 'AI: standard' } ];
+    var W = { 1:'\u2659',2:'\u2658',3:'\u2657',4:'\u2656',5:'\u2655',6:'\u2654' };
+    var B = { 7:'\u265F',8:'\u265E',9:'\u265D',10:'\u265C',11:'\u265B',12:'\u265A' };
+
+    var st = { matchRef: 0, mySeat: 0, solo: false, board: null, sel: -1, lastFrom: -1, lastTo: -1, busy: false, poll: null, time: TIMES[3], level: 1, hints: [] };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
+    var $ = function (id) { return document.getElementById(id); };
+
+    function wallet() { try { return (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || null; } catch (e) { return null; } }
+    function myAddr() { var w = wallet(); if (!w) return null; return typeof w === 'string' ? w : (w.address || w.publicKey || null); }
+    function md() { return window.magicblockDice && window.magicblockDice.chess; }
+    function code(ref) { return Number(ref).toString(36).toUpperCase(); }
+    function fromCode(c) { try { var v = parseInt(String(c || '').toLowerCase(), 36); return (v && v > 0) ? v : 0; } catch (e) { return 0; } }
+
+    function buildPills() {
+        $('ch-time-pills').innerHTML = TIMES.map(function (t) {
+            return '<span class="ch-pill' + (t.key === st.time.key ? ' active' : '') + '" data-t="' + t.key + '">' + t.label + '</span>';
+        }).join('');
+        $('ch-level-pills').innerHTML = LEVELS.map(function (l) {
+            return '<span class="ch-pill' + (l.v === st.level ? ' active' : '') + '" data-l="' + l.v + '">' + l.label + '</span>';
+        }).join('');
+        $('ch-time-pills').querySelectorAll('[data-t]').forEach(function (el) {
+            el.addEventListener('click', function () { st.time = TIMES.find(function (x) { return x.key === el.getAttribute('data-t'); }); buildPills(); });
+        });
+        $('ch-level-pills').querySelectorAll('[data-l]').forEach(function (el) {
+            el.addEventListener('click', function () { st.level = Number(el.getAttribute('data-l')); buildPills(); });
+        });
+    }
+
+    function show(id) { ['ch-lobby','ch-wait','ch-game'].forEach(function (x) { $(x).classList.add('ch-hidden'); }); if (id) $(id).classList.remove('ch-hidden'); }
+
+    async function refreshAuth() {
+        var a = myAddr();
+        if (a && md()) { $('ch-lobby-actions').classList.remove('ch-hidden'); $('ch-auth').textContent = 'Signed in. Pick a game.'; }
+        else { $('ch-lobby-actions').classList.add('ch-hidden'); $('ch-auth').textContent = 'Sign in to play (email, no wallet needed).'; }
+    }
+
+    // ---- client pseudo-legal hints (UI only; the program is authoritative) ----
+    function pieceAt(sq) { return st.board ? st.board.position[sq] : 0; }
+    function isWhiteP(p) { return p >= 1 && p <= 6; }
+    function isBlackP(p) { return p >= 7 && p <= 12; }
+    function kind(p) { return p >= 7 ? p - 6 : p; }
+    function colorOf(p) { return p >= 7 ? 1 : 0; }
+    function onB(f, r) { return f >= 0 && f < 8 && r >= 0 && r < 8; }
+    function pseudoMoves(from) {
+        var out = [];
+        var p = pieceAt(from); if (!p) return out;
+        var us = colorOf(p), k = kind(p);
+        var f0 = from % 8, r0 = Math.floor(from / 8);
+        function push(to) { var t = pieceAt(to); if (!t || colorOf(t) !== us) out.push(to); }
+        if (k === 1) {
+            var dir = us === 0 ? 1 : -1;
+            var one = from + dir * 8;
+            if (onB(f0, r0 + dir) && !pieceAt(one)) { out.push(one); var two = from + dir * 16; if ((us === 0 ? r0 === 1 : r0 === 6) && !pieceAt(two)) out.push(two); }
+            [[-1,dir],[1,dir]].forEach(function (d) { var nf = f0 + d[0], nr = r0 + d[1]; if (onB(nf, nr)) { var t = nr * 8 + nf; var q = pieceAt(t); if ((q && colorOf(q) !== us) || t === st.board.ep) out.push(t); } });
+        } else if (k === 2) {
+            [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]].forEach(function (d) { var nf = f0 + d[0], nr = r0 + d[1]; if (onB(nf, nr)) push(nr * 8 + nf); });
+        } else if (k === 6) {
+            [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]].forEach(function (d) { var nf = f0 + d[0], nr = r0 + d[1]; if (onB(nf, nr)) push(nr * 8 + nf); });
+        } else {
+            var dirs = [];
+            if (k === 4 || k === 5) dirs = dirs.concat([[1,0],[-1,0],[0,1],[0,-1]]);
+            if (k === 3 || k === 5) dirs = dirs.concat([[1,1],[1,-1],[-1,1],[-1,-1]]);
+            dirs.forEach(function (d) { var nf = f0 + d[0], nr = r0 + d[1]; while (onB(nf, nr)) { var t = nr * 8 + nf; var q = pieceAt(t); if (!q) out.push(t); else { if (colorOf(q) !== us) out.push(t); break; } nf += d[0]; nr += d[1]; } });
+        }
+        return out;
+    }
+
+    function render() {
+        if (!st.board) return;
+        var b = st.board;
+        var topIsBlack = (st.mySeat === 0); // white at bottom by default; when black, flip
+        var flip = st.mySeat === 1;
+        var html = '';
+        for (var row = 0; row < 8; row++) {
+            for (var col = 0; col < 8; col++) {
+                var rr = flip ? row : 7 - row;
+                var cc = flip ? 7 - col : col;
+                var sq = rr * 8 + cc;
+                var light = ((cc + rr) % 2) === 1;
+                var cls = 'ch-sq ' + (light ? 'light' : 'dark');
+                if (sq === st.sel) cls += ' sel';
+                if (sq === st.lastFrom || sq === st.lastTo) cls += ' lastm';
+                var p = b.position[sq];
+                var hint = st.hints.indexOf(sq) !== -1;
+                if (hint) cls += p ? ' hintcap' : ' hint';
+                if (b.checkFlag && p && kind(p) === 6 && colorOf(p) === b.sideToMove) cls += ' check';
+                var pc = p ? '<span class="ch-pc ' + (p <= 6 ? 'w' : 'b') + '">' + (p <= 6 ? W[p] : B[p]) + '</span>' : '';
+                html += '<div class="' + cls + '" data-sq="' + sq + '">' + pc + '</div>';
+            }
+        }
+        $('ch-board').innerHTML = html;
+        $('ch-board').querySelectorAll('[data-sq]').forEach(function (el) {
+            el.addEventListener('click', function () { onSquare(Number(el.getAttribute('data-sq'))); });
+        });
+        renderClocks();
+    }
+
+    function fmt(ms) {
+        if (ms < 0) ms = 0;
+        var s = Math.floor(ms / 1000), m = Math.floor(s / 60); s = s % 60;
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    function renderClocks() {
+        var b = st.board; if (!b) return;
+        var now = Date.now();
+        var topSeat = st.mySeat === 0 ? 1 : 0;
+        var botSeat = st.mySeat;
+        function rem(seat) {
+            var ms = b.clockMs[seat];
+            if (b.status === 1 && b.sideToMove === seat) ms = ms - (now - b.turnStartedAt * 1000);
+            return ms;
+        }
+        var isSolo = st.solo;
+        $('ch-clock-top').textContent = (isSolo ? 'AI (black)' : 'Opponent') + ' ' + fmt(rem(topSeat));
+        $('ch-clock-bot').textContent = 'You (' + (st.mySeat === 0 ? 'white' : 'black') + ') ' + fmt(rem(botSeat));
+        $('ch-clock-top').classList.toggle('active', b.status === 1 && b.sideToMove === topSeat);
+        $('ch-clock-bot').classList.toggle('active', b.status === 1 && b.sideToMove === botSeat);
+    }
+
+    function statusText() {
+        var b = st.board; if (!b) return '';
+        if (b.status === 0) return 'Waiting to start.';
+        if (b.status === 2) {
+            var r = b.result === 0 ? 'White wins' : b.result === 1 ? 'Black wins' : 'Draw';
+            return 'Game over: ' + r + '.';
+        }
+        var who = b.sideToMove === st.mySeat ? 'Your move.' : (st.solo && b.sideToMove === (1 - st.mySeat) ? 'Computer thinking…' : 'Waiting for opponent.');
+        return who;
+    }
+
+    async function pollState() {
+        if (!st.matchRef) return;
+        try {
+            var s = await md().read(st.matchRef);
+            if (s && s.ok) { st.board = s; render(); $('ch-msg').textContent = statusText(); return s; }
+        } catch (e) { /* soft */ }
+        return null;
+    }
+
+    function startPolling(ms) {
+        stopPolling();
+        st.poll = setInterval(function () {
+            pollState().then(function (s) {
+                if (s && s.status === 2) { stopPolling(); render(); $('ch-msg').textContent = statusText(); }
+                // Solo: when it becomes the AI's turn, let the house move.
+                if (s && st.solo && s.status === 1 && s.sideToMove !== st.mySeat && !st.busy) aiTurn();
+            });
+        }, ms || 1300);
+    }
+    function stopPolling() { if (st.poll) { clearInterval(st.poll); st.poll = null; } }
+
+    async function aiTurn() {
+        if (st.busy) return; st.busy = true;
+        try { var r = await md().ai(st.matchRef, st.level); if (r && r.ok === false) console.log('ai:', r.error); } catch (e) { console.log('ai error', e); }
+        st.busy = false;
+        await pollState();
+    }
+
+    async function onSquare(sq) {
+        if (!st.board || st.board.status !== 1 || st.busy) return;
+        if (st.board.sideToMove !== st.mySeat) return;
+        var p = pieceAt(sq);
+        if (st.sel === -1) {
+            if (p && colorOf(p) === st.mySeat) { st.sel = sq; st.hints = pseudoMoves(sq); render(); }
+            return;
+        }
+        if (sq === st.sel) { st.sel = -1; st.hints = []; render(); return; }
+        if (p && colorOf(p) === st.mySeat) { st.sel = sq; st.hints = pseudoMoves(sq); render(); return; }
+        // attempt the move; choose promotion = queen if a pawn reaches the last rank
+        var from = st.sel, promo = 0;
+        var pk = kind(pieceAt(from));
+        var toRank = Math.floor(sq / 8);
+        if (pk === 1 && ((st.mySeat === 0 && toRank === 7) || (st.mySeat === 1 && toRank === 0))) promo = 5; // queen
+        st.busy = true; $('ch-msg').textContent = 'Submitting move on-chain…';
+        try {
+            var r = await md().move(st.matchRef, from, sq, promo);
+            st.sel = -1; st.hints = []; st.lastFrom = from; st.lastTo = sq;
+            await pollState();
+            if (st.solo && st.board && st.board.status === 1 && st.board.sideToMove !== st.mySeat) { stopPolling(); await aiTurn(); startPolling(); }
+        } catch (e) {
+            $('ch-msg').textContent = 'Illegal move (rejected on-chain).';
+        }
+        st.busy = false;
+        render();
+    }
+
+    async function newSolo() {
+        var a = myAddr(); if (!a) return alert('Sign in first.');
+        var ref = Date.now();
+        $('ch-auth').textContent = 'Setting up the on-chain board…';
+        try {
+            var c = await md().create(ref, a, st.time.ms, st.time.inc, 1);
+            if (!c.ok) throw new Error(c.error || 'create failed');
+            st.matchRef = ref; st.mySeat = 0; st.solo = true;
+            $('ch-auth').textContent = 'Starting…';
+            await md().start(ref);
+            show('ch-game');
+            await pollState();
+            $('ch-msg').textContent = statusText();
+            startPolling();
+        } catch (e) {
+            alert('Could not start the game: ' + (e.message || e));
+            refreshAuth();
+        }
+    }
+
+    async function createOnline() {
+        var a = myAddr(); if (!a) return alert('Sign in first.');
+        var ref = Date.now();
+        $('ch-auth').textContent = 'Creating the on-chain board…';
+        try {
+            var c = await md().create(ref, a, st.time.ms, st.time.inc, 0);
+            if (!c.ok) throw new Error(c.error || 'create failed');
+            st.matchRef = ref; st.mySeat = 0; st.solo = false;
+            $('ch-wait-msg').textContent = 'Match code: ' + code(ref);
+            $('ch-wait-note').textContent = 'Share this code. The board is on-chain; no wallet is needed to join.';
+            show('ch-wait');
+            $('ch-start').classList.add('ch-hidden');
+            st.poll = setInterval(async function () {
+                var s = await pollState();
+                if (s && s.seats && s.seats[1] && s.seats[1].length > 20 && !s.seats[1].startsWith('111111111111')) {
+                    $('ch-wait-msg').textContent = 'Opponent joined. Start the match.';
+                    $('ch-start').classList.remove('ch-hidden');
+                }
+            }, 1800);
+        } catch (e) { alert('Could not create the match: ' + (e.message || e)); refreshAuth(); }
+    }
+
+    async function joinOnline() {
+        var a = myAddr(); if (!a) return alert('Sign in first.');
+        var ref = fromCode($('ch-code-in').value);
+        if (!ref) return alert('Enter a valid match code.');
+        try {
+            var r = await md().join(ref);
+            if (r && r.ok === false) throw new Error(r.error);
+            st.matchRef = ref; st.solo = false;
+            await pollState();
+            st.mySeat = 1; // join always fills seat 1 (black)
+            show('ch-game');
+            startPolling();
+        } catch (e) { alert('Could not join: ' + (e.message || e)); }
+    }
+
+    async function startMatch() {
+        try {
+            await md().start(st.matchRef);
+            stopPolling();
+            show('ch-game');
+            await pollState();
+            startPolling();
+        } catch (e) { alert('Could not start: ' + (e.message || e)); }
+    }
+
+    async function resign() {
+        if (!confirm('Resign this game?')) return;
+        try { await md().resign(st.matchRef); await pollState(); } catch (e) { alert('Resign failed: ' + (e.message || e)); }
+    }
+    async function offerDraw() {
+        try { await md().offerDraw(st.matchRef); await pollState(); $('ch-msg').textContent = 'Draw offered.'; } catch (e) { alert('Draw offer failed: ' + (e.message || e)); }
+    }
+
+    function leave() { stopPolling(); st.matchRef = 0; st.board = null; show('ch-lobby'); refreshAuth(); }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        buildPills();
+        refreshAuth();
+        window.addEventListener('gfg:auth-changed', refreshAuth);
+        var t = setInterval(function () { refreshAuth(); if (myAddr()) clearInterval(t); }, 1500);
+        $('ch-solo').addEventListener('click', newSolo);
+        $('ch-create').addEventListener('click', createOnline);
+        $('ch-join').addEventListener('click', joinOnline);
+        $('ch-start').addEventListener('click', startMatch);
+        $('ch-resign').addEventListener('click', resign);
+        $('ch-draw').addEventListener('click', offerDraw);
+        $('ch-leave').addEventListener('click', leave);
+        $('ch-copy').addEventListener('click', function () {
+            try { navigator.clipboard.writeText(code(st.matchRef)); $('ch-copy').textContent = 'Copied'; setTimeout(function () { $('ch-copy').textContent = 'Copy code'; }, 1500); } catch (e) {}
+        });
+    });
+})();
+</script>
+</body>
+</html>

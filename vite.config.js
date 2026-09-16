@@ -25,6 +25,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         'ludo-lab': './games/ludo-lab/index.html',
+        chess: './games/chess/index.html',
         changelog: './changelog/index.html',
         'changelog-admin': './changelog/admin.html',
         'changelog-economics': './changelog/economics.html',
