@@ -875,9 +875,20 @@ export async function consumeLife(game, matchRef) {
 // Returns {ok, day, used, pool, unlimitedUntil, awardCount} or {ok:false}.
 export async function readLivesFor(pubkey) {
   const [lives] = livesPdaFor(pubkey);
-  const c = createConnection(baseRpcUrl(), 'confirmed');
   try {
-    const info = await c.getAccountInfo(lives);
+    // Read from the account's HOSTING ER region (the lives PDA is delegated),
+    // falling back to base. Reading base for a delegated account returns the
+    // last committed (stale) copy, which would make the displayed lives drift.
+    let info = null;
+    try {
+      const url = await regionUrlFor(lives);
+      const c = createConnection(url, 'confirmed', 8000);
+      info = await c.getAccountInfo(lives);
+    } catch (e) { /* fall back to base */ }
+    if (!info) {
+      const cb = createConnection(baseRpcUrl(), 'confirmed');
+      info = await cb.getAccountInfo(lives).catch(() => null);
+    }
     if (!info || !info.data) return { ok: false, error: 'lives ledger not found' };
     const d = info.data;
     if (d.length < 8 + LivesAccountSize) return { ok: false, error: 'lives ledger too small' };
@@ -888,7 +899,7 @@ export async function readLivesFor(pubkey) {
       pool: d.readUInt16LE(8 + 1 + 32 + 8 + 2),
       unlimitedUntil: Number(d.readBigInt64LE(8 + 1 + 32 + 8 + 2 + 2)),
       lastRef: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8)),
-      awardCount: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8 + 8)),
+      awardCount: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8 + 8 + 8)),
     };
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
