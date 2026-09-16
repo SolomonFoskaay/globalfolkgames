@@ -47,28 +47,28 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
 `/changelog/architecture.html`). Module status lives THERE, not in AGENTS.md
 (AGENTS.md only mirrors the current state).
 
-**Modules (M1-M9):**
-- **M1 — Game core:** the games themselves (Ludo now), board rules, moves,
+**Modules (arcv2m1-arcv2m9):**
+- **arcv2m1 — Game core:** the games themselves (Ludo now), board rules, moves,
   win detection, timing/AI constraints. Game-agnostic: adding a game = adding a
   game module, the rest of the platform doesn't care which game is running.
-  M1 is ONE module; its game core sub-module **M1A** covers EVERY game (the
-  dropdown on the M1 admin page differentiates them: M1A Ludo locked, M1A Ayo
-  Olopon planned, ...). Each game's LOCKED build spec lives under M1's `games`
+  arcv2m1 is ONE module; its game core sub-module **arcv2m1A** covers EVERY game (the
+  dropdown on the arcv2m1 admin page differentiates them: arcv2m1A Ludo locked, arcv2m1A Ayo
+  Olopon planned, ...). Each game's LOCKED build spec lives under arcv2m1's `games`
   in architecture.json and is the build + test benchmark.
-- **M2 — Universal result seam (the plug-and-play contract bus):** the one
+- **arcv2m2 — Universal result seam (the plug-and-play contract bus):** the one
   integration contract between every game and every reward module. Standalone
   because it is the platform's wiring, not a game and not a reward. Every game
   ends with `window.publishGameResult()`; every reward module subscribes via
   `window.onGameResult()`. 50 games = 1 reward plug, 1 competition plug.
   Its canonical home + the whole universal-modules tree lives in
-  `public/universal/` (`result-seam/` = M2, plus homed folders for M3-M8).
-- **M3 — Local points (pure):** per-game board points, no platform rule. The
+  `public/universal/` (`result-seam/` = arcv2m2, plus homed folders for arcv2m3-arcv2m8).
+- **arcv2m3 — Local points (pure):** per-game board points, no platform rule. The
   old "+100 1st-place" rule is DROPPED; a game's own scoring is purely its own.
-  Consumes the seam (M2).
-- **M4 — Global ledgers:** platform-wide ledgers (lifetime points, spendable
+  Consumes the seam (arcv2m2).
+- **arcv2m4 — Global ledgers:** platform-wide ledgers (lifetime points, spendable
   points) that aggregate game results. Points flow game -> seam -> local ->
-  global. Consumes the seam (M2).
-- **M5 — Active Tier subscription + Premium points:** the money + launch engine.
+  global. Consumes the seam (arcv2m2).
+- **arcv2m5 — Active Tier subscription + Premium points:** the money + launch engine.
   Premium points live on their own on-chain ledger ([gfgprem, player], buy-only,
   premium_lifetime + premium_spendable). The plan LADDER is CONFIG-DRIVEN
   (owner 2026-08-22) so more levels are added as data, never code. Launch ships
@@ -78,19 +78,19 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   competition final-points boost, AND ad-free (Monetag ads suppressed for
   active Level-3, so Free/L2 carry the ads and the upgrade is visible);
   activation premium cost TBD, proposed 10,000P). Plans are non-cancellable/non-refundable 30-day on-chain subs
-  (no auto-renew); the win multiplier applies at M4 flow-up. Owner-approved
-  2026-08-20; the M5 spec in architecture.json is the LAUNCH GUIDE (payment
+  (no auto-renew); the win multiplier applies at arcv2m4 flow-up. Owner-approved
+  2026-08-20; the arcv2m5 spec in architecture.json is the LAUNCH GUIDE (payment
   pipe, admin credit, receipts/logs, daily reward + lives boosted values,
   12-month affiliate, daily earn campaign).
-- **M6 — Point sources:** launch = 500P signup bonus (once per wallet, permanent
+- **arcv2m6 — Point sources:** launch = 500P signup bonus (once per wallet, permanent
   on-chain fence) + 12-month affiliate (20% of each referred plan’s PAYABLE USD price, read
   live from the config-driven plan ladder so a plan price change auto-updates
   the share (L2 $5 = $1.00, L3 $10 = $2.00), never fixed to a plan; USD cents
   on-chain; referrer must hold an ACTIVE qualifying sub that month or that
   month is forfeited, and 2 consecutive inactive periods (~60 days)
   permanently close that pair; manual Naira payout 3-7 days). Giveaway/social deferred. All feed M4b+M4c via kind=1
-  credits, never M3/M4a. In-progress.
-- **M7 — Competitions:** on-chain CONFIG-DRIVEN earn-competition framework
+  credits, never arcv2m3/M4a. In-progress.
+- **arcv2m7 — Competitions:** on-chain CONFIG-DRIVEN earn-competition framework
   (owner-approved 2026-08-22, in-progress). Every competition is an ON-CHAIN
   INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects):
   allowed subscription levels MULTI-SELECT (L2 + L3 + more, any-of, or
@@ -108,14 +108,14 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   paid status from on-chain gfgwin. One entry/account/window, any-of {L2,L3}
   + 500P entry, manual payout, redemption agnostic. On-chain winners via additive [gfgwin, comp, rank] +
   record_competition_winners + mark_winner_paid (approved). Full
-  multi-sponsor settlement + escrow stays DEFERRED until M1-M6 stable.
-  Consumes the seam (M2). In-progress.
-- **M8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
-  The escrow proof-of-life; product build waits behind M1-M4.
-- **M10 — Lives + daily rewards:** the free-play gate (free 5 lives/day, Level-2
+  multi-sponsor settlement + escrow stays DEFERRED until arcv2m1-arcv2m6 stable.
+  Consumes the seam (arcv2m2). In-progress.
+- **arcv2m8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
+  The escrow proof-of-life; product build waits behind arcv2m1-arcv2m4.
+- **arcv2m10 — Lives + daily rewards:** the free-play gate (free 5 lives/day, Level-2
   10/day, Level-3 15/day, GMT+00 reset, consumed ONLY on match completion, never on abandon/reset/
-  disconnect) + daily earn (free 25P/day, Level-2 200P/day, Level-3 300P/day, kind=1 credit into M4,
-  new source_code 14). Ships inside the M5 build window. In-progress.
+  disconnect) + daily earn (free 25P/day, Level-2 200P/day, Level-3 300P/day, kind=1 credit into arcv2m4,
+  new source_code 14). Ships inside the arcv2m5 build window. In-progress.
 
 **HARD RULES (do not regress):**
 0. **Surgical edits only, never rewrite.** When updating any code (adding a
@@ -150,8 +150,8 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    read `architecture.json` first, state the module, slot check, renumber by
    build order when inserting a module. Never skip it; the owner will not repeat
    this.
-2. **M7/M8 scope gate.** The FULL multi-sponsor competition settlement platform
-   (M7) and the sponsor escrow product (M8) do NOT start until M1-M6 are stable
+2. **arcv2m7/arcv2m8 scope gate.** The FULL multi-sponsor competition settlement platform
+   (arcv2m7) and the sponsor escrow product (arcv2m8) do NOT start until arcv2m1-arcv2m6 are stable
    and verified for Ludo. The competition FRAMEWORK (owner-approved 2026-08-22,
    in-progress) is different: it ships for launch as an on-chain config-driven
    create-your-own-competition system (admin creator UI + on-chain instances,
@@ -160,30 +160,30 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    launch marketing. The on-chain S2 escrow + Scope C finish-order code that
    ALREADY exists stays (program id unchanged, idempotent, verified live on
    devnet) but multi-sponsor settlement / sponsor-funded builds wait.
-3. **Modules integrate cleanly.** Each module is a seam: games (M1) emit into
-   the result bus (M2); local points (M3) and global ledgers (M4) consume it;
-   spendable (M4) buys tiers (M5) or enters events (M7). Never hard-wire one
+3. **Modules integrate cleanly.** Each module is a seam: games (arcv2m1) emit into
+   the result bus (arcv2m2); local points (arcv2m3) and global ledgers (arcv2m4) consume it;
+   spendable (arcv2m4) buys tiers (arcv2m5) or enters events (arcv2m7). Never hard-wire one
    game into the platform.
-4. **Universal result seam (M2, the plug-and-play contract):** every game ends
+4. **Universal result seam (arcv2m2, the plug-and-play contract):** every game ends
     by calling `window.publishGameResult()` (`public/universal/result-seam/game-result.js`,
     canonical `gfg:game-result@1` envelope: `players[]` with seat/actor/position|score +
-    optional on-chain proof). M3/M4/M7 subscribe via `window.onGameResult()` and
+    optional on-chain proof). arcv2m3/arcv2m4/arcv2m7 subscribe via `window.onGameResult()` and
     NEVER read game internals. A game never ships its own reward/competition
     plug — 50 games = 1 reward plug, 1 competition plug. Adding a new game =
     emit the same envelope; the platform doesn't change.
 4b. **Universal modules folder (`public/universal/`):** every platform-side
     module that plugs into any game has a canonical folder there
-    (`result-seam/` = M2, `points/` = M3, `ledgers/` = M4,
-    `subscription/` = M5, `point-sources/` = M6, `competitions/` = M7,
-    `escrow/` = M8, `multiplayer/` = **M12 standalone** game-agnostic multiplayer rail). A game plugs in ONCE (`publishGameResult`); a universal
+    (`result-seam/` = arcv2m2, `points/` = arcv2m3, `ledgers/` = arcv2m4,
+    `subscription/` = arcv2m5, `point-sources/` = arcv2m6, `competitions/` = arcv2m7,
+    `escrow/` = arcv2m8, `multiplayer/` = **arcv2m12 standalone** game-agnostic multiplayer rail). A game plugs in ONCE (`publishGameResult`); a universal
     module subscribes ONCE (`onGameResult`) and updates inside its own folder
     without touching the game. UNIVERSAL MEANS REUSABLE BY NAME: a universal
-    module is game-agnostic - ANY M1 game (Ludo, Ayo Olopon, ...) plugs into it
-    and reuses it; it is NEVER tailored to one game the way M1 game code is.
-    M1-only game tooling (like the `/verify/` receipt explorer, proof-of-play)
+    module is game-agnostic - ANY arcv2m1 game (Ludo, Ayo Olopon, ...) plugs into it
+    and reuses it; it is NEVER tailored to one game the way arcv2m1 game code is.
+    arcv2m1-only game tooling (like the `/verify/` receipt explorer, proof-of-play)
     is NOT a universal module and does NOT live in `public/universal/`. New
     universal capabilities land in this tree and mirror into `architecture.json`.
-    **BUILD RULE (hard):** when building ANY universal module (M2-M8), the code
+    **BUILD RULE (hard):** when building ANY universal module (arcv2m2-arcv2m8), the code
     MUST live in its canonical `public/universal/<folder>/` — never in `src/`,
     never in a game folder, never scattered across the repo. The folder is the
     module's home; its README documents the contract; `architecture.json` holds
@@ -203,14 +203,14 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
     snake_case keys fail with "Reached maximum depth for account resolution".
     A banned/failing region is always a re-pin job, never a feature outage.
 5. **Feature Tracker stays synced.** Roadmap items reference their module
-   (e.g. "Earn competitions = M7"). Module statuses live in
+   (e.g. "Earn competitions = arcv2m7"). Module statuses live in
    `architecture.json`; roadmap mirrors the same states.
 6. **Admin visibility:** the Architecture workspace is admin-only, listed in the
    drawer Admin section below "Game Economics" and on the raw changelog header.
    Never move it to the public page.
-7. **The module list is extensible.** M1-M9 cover the current roadmap, but any
+7. **The module list is extensible.** arcv2m1-arcv2m9 cover the current roadmap, but any
    genuinely new domain (community/forum, support, profile, etc.) becomes a NEW
-   module (M9+) recorded in `architecture.json` FIRST. A feature is never
+   module (arcv2m9+) recorded in `architecture.json` FIRST. A feature is never
    "unmodular" — either it slots into an existing module or it earns a new one.
    Existing and future features must integrate through the module seams, never
    standalone.
@@ -222,18 +222,18 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
    this.
 
 **Current module status (mirror of architecture.json, 2026-08-15):**
-- M1: in-progress — Ludo (ludo-lab) verified COMPLETE against its locked spec
-  A-Z (2026-08-16: 107/107 harness + 3D dice + Scope A/B/C shipped). M1 also
+- arcv2m1: in-progress — Ludo (ludo-lab) verified COMPLETE against its locked spec
+  A-Z (2026-08-16: 107/107 harness + 3D dice + Scope A/B/C shipped). arcv2m1 also
   owns its proof-of-play TOOLING: the `/verify/` receipt explorer (game-tooling,
-  NOT in `public/universal/` - it proves M1's rolls/matches on-chain by querying
+  NOT in `public/universal/` - it proves arcv2m1's rolls/matches on-chain by querying
   the MagicBlock ER + base devnet RPC directly, and the win popup's "See
-  on-chain receipt" link opens it pre-filled). The next M1A game is Ayo Olopon
+  on-chain receipt" link opens it pre-filled). The next arcv2m1A game is Ayo Olopon
   (planned, spec not yet locked).
-- M2: in-progress — universal result seam (built: `public/universal/result-seam/game-result.js`
+- arcv2m2: in-progress — universal result seam (built: `public/universal/result-seam/game-result.js`
   + the whole universal-modules tree `public/universal/` with homed folders for
-  M3-M8; Ludo ludo-lab emits the envelope; subscribers for M3/M4/M7 land with
+  arcv2m3-arcv2m8; Ludo ludo-lab emits the envelope; subscribers for arcv2m3/arcv2m4/arcv2m7 land with
   those modules).
-- M3: in-progress — local points, two-track on-chain per game (PURE unspendable
+- arcv2m3: in-progress — local points, two-track on-chain per game (PURE unspendable
   lifetime + SPENDABLE split, one PDA seed [gfgpoints, game_tag, player], gasless
   on the ER, extended gfg program, NO new program). Owner-locked 2026-08-16:
   Ludo scoring 4P 1st=100/2nd=50/3rd=10/4th=0, 2P only 1st=100; ONLY the "You"
@@ -241,7 +241,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   3rd banks WIN_3RD(3) (reason stored as u8; previously every placed award was
   labelled WIN_1ST). Harness-verified live 2026-08-16: on-chain ER harness (0-SOL
   player, gasless record_points + spend_local, spendable-only decrement) PASS;
-  M3 module harness 29/29 against the locked spec (scoring, user-only,
+  arcv2m3 module harness 29/29 against the locked spec (scoring, user-only,
   idempotency, spend, + resilience: retry-on-transient, confirm-timeout ledger
   read-back recovery, hard-failure surfacing). LIVE-VERIFIED 2026-08-16 by the
   owner: the +100 2P win banked on-chain (test wallet FBWcuv...VnbCN ludo PDA
@@ -253,7 +253,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   loading... don't refresh the page" in flight and a neutral no-amount pending
   line on failure; "+N banked on-chain" appears ONLY once confirmed.
   clearTransient() on Play Again. **DISPLAY STABILITY CONTRACT (owner-approved
-  2026-08-18, source of truth = architecture.json M3):** window.localPoints.get()
+  2026-08-18, source of truth = architecture.json arcv2m3):** window.localPoints.get()
   ALWAYS background-refreshes; the last-known ledger renders into
   data-local-points-* slots on load and on failed/wallet-not-ready refresh; the
   cache is WALLET-KEYED (gfg_local_points_cache_v2, one wallet per user, so a
@@ -269,77 +269,77 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   re-fetch; global header "Local:" chip via initGlobalHeader({localPointsTag});
   ludo-lab ceremony "+N Ludo points banked on-chain"; client pointsPda(gameTag)
   powers the profile on-chain ledger card.
-- M4: in-progress — global ledgers (M4a pure / M4b lifetime / M4c spendable).
+- arcv2m4: in-progress — global ledgers (M4a pure / M4b lifetime / M4c spendable).
   ON-CHAIN via the same delegated gfg program (seed [gfgpoints, 'global', player],
   GlobalPoints account type + record_global/spend_global instructions, gasless on
-  the ER, no new program). Multiplier-blind flow-up: M4 banks the base unmultiplied
-  win via the seam; M5 applies the tier boost as a separate kind-1 credit so M4a
+  the ER, no new program). Multiplier-blind flow-up: arcv2m4 banks the base unmultiplied
+  win via the seam; arcv2m5 applies the tier boost as a separate kind-1 credit so M4a
   pure can never be multiplied. Track A complete: program deployed, relay wired,
   client SDK (recordGlobalPoints/spendGlobal/fetchGlobalPointsPda), universal
   module (public/universal/ledgers/global-ledger.js), profile 3-ledger card,
-  both harnesses pass (M4 module harness 27/27 — the game-win scenarios fixed
-  2026-08-18 to set the M3 award mock per the locked spec). **M4 FLOW-UP +
+  both harnesses pass (arcv2m4 module harness 27/27 — the game-win scenarios fixed
+  2026-08-18 to set the arcv2m3 award mock per the locked spec). **arcv2m4 FLOW-UP +
   DISPLAY STABILITY CONTRACT (owner-approved 2026-08-18, source of truth =
-  architecture.json M4):** M4 credits the global ledger from the SAME seam
-  envelope M3 banks, resolving the award by CROSS-MODULE match_ref against
-  M3's lastSeenAward/lastAward (read synchronously at bank entry, bounded ~2s
-  poll only when M3 hasn't set it yet — never a blind credit, never a stale
+  architecture.json arcv2m4):** arcv2m4 credits the global ledger from the SAME seam
+  envelope arcv2m3 banks, resolving the award by CROSS-MODULE match_ref against
+  arcv2m3's lastSeenAward/lastAward (read synchronously at bank entry, bounded ~2s
+  poll only when arcv2m3 hasn't set it yet — never a blind credit, never a stale
   award). window.globalLedger.get() ALWAYS background-refreshes; cache is
   WALLET-KEYED (gfg_global_ledger_cache_v2); the module renders cached numbers
   on load/failure and re-fetches on wallet-ready + gfg:auth-changed. The
   global-ledger module is loaded on EVERY page via header.js (it injects
   /universal/ledgers/global-ledger.js + local-points.js when absent) so the
   header pill never sits on a permanent Loading state. ludo-lab ceremony shows
-  an M4 "global points banked on-chain" credit line beside the M3 line
-  (never-promise rule); Play Again clears M4 transient state too.
-- M9: planned — player inventory (on-chain asset wallet [gfgassets, player]).
+  an arcv2m4 "global points banked on-chain" credit line beside the arcv2m3 line
+  (never-promise rule); Play Again clears arcv2m4 transient state too.
+- arcv2m9: planned — player inventory (on-chain asset wallet [gfgassets, player]).
   Per-game item catalogs (skins, items, sounds) stored as media bytes directly
-  on-chain. Each game defines its own catalog (like M1's game dropdown); M9
+  on-chain. Each game defines its own catalog (like arcv2m1's game dropdown); arcv2m9
   owns the wallet infrastructure. Gasless grant/equip/revoke via session key,
   sliced reads (dataSlice). Module at public/universal/inventory/.
-- M5: in-progress — Active Tier + Premium points launch engine, CONFIG-DRIVEN
+- arcv2m5: in-progress — Active Tier + Premium points launch engine, CONFIG-DRIVEN
   plan ladder (owner 2026-08-22): Level-2 2x now $5 / Nigeria N5,000 (was
   $3/N4,000, 5,000P activation unchanged) + NEW Level-3 3x actual $20, discount
   $10 / N13,500, Nigeria N8,000 (15 lives, 300P daily, 3x wins, 1.5x comp
   final-points, activation premium TBD ~10,000P), on-chain [gfgprem, player]
   buy-only ledger, 30-day sub no auto-renew, admin credit flow, 12-month
   affiliate + daily earn campaign in the same launch bundle. Launch-guide spec
-  lives in M5.
-  Booster (M5 v3, live): 72h unlimited-lives for 500P premium spendable ($1,
+  lives in arcv2m5.
+  Booster (arcv2m5 v3, live): 72h unlimited-lives for 500P premium spendable ($1,
   base value $0.002 per point, USD rate never Naira) on any
   plan (no multiplier). PremiumPoints layout bumped to v3 (booster_active_until)
   with permissionless upgrade_premium_points_v3; premium undelegate ctx is
   unttyped so legacy v1/v2 ledgers can leave a region; scripts/upgrade-premium-v3.mjs
   swept every live premium ledger (v1/v2 -> v3) and re-pinned to AS. Client:
-  magicblockDice.activateBooster (session-key, gasless, region-aware) + M10 lives
+  magicblockDice.activateBooster (session-key, gasless, region-aware) + arcv2m10 lives
   reads boosterActiveUntil -> unlimited while active; card on /profile/upgrade.
-- M6: in-progress — 500P signup bonus (on-chain fence) + 12-month affiliate
+- arcv2m6: in-progress — 500P signup bonus (on-chain fence) + 12-month affiliate
   (20% of the referred plan’s payable USD price, dynamic from the config plan
   ladder, active-sub monthly gate + 60-day pair-forfeit, manual Naira
   3-7 days). Giveaway/social deferred.
-- M7: in-progress — on-chain config-driven earn-competition framework (admin
+- arcv2m7: in-progress — on-chain config-driven earn-competition framework (admin
   creator UI + on-chain instances, rules R12-R18, no Supabase); launch
   instance = LUDO EARN (72h, was 24h): $2/N2,750 pool split 10 ways, window-fresh +
   auto-stop, FINAL-POINTS ranking with live tier boost (L3 1.5x / L2 1.0x,
   downgrade hides instantly, L1 freeze = no position), multi-select tier
   requirement any-of {L2,L3,...}, gfgwin on-chain winners + public past-winners
   paid-status proof, manual payout.
-  Multi-sponsor platform + M8 escrow product deferred.
-- M8: planned (deferred) — sponsor escrow.
-- M10: in-progress — lives + daily rewards gate (ships with M5; ladder by plan:
+  Multi-sponsor platform + arcv2m8 escrow product deferred.
+- arcv2m8: planned (deferred) — sponsor escrow.
+- arcv2m10: in-progress — lives + daily rewards gate (ships with arcv2m5; ladder by plan:
   5/10/15 lives, 25/200/300P daily).
 
-- **M11 — Community (on-chain UGC forum, M11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
+- **arcv2m11 — Community (on-chain UGC forum, arcv2m11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
 
-- **M12 — Multiplayer (STANDALONE game-agnostic rail, M12):** a FREE multiplayer rail (match codes, gasless ER moves via a delegated board, turn clocks/forfeit, finish + seam) that ANY game plugs into with a small adapter. Standalone = works with zero money and NO AGM; players train on exactly what they'll bet on later. AGM is a separate money plug that attaches the SAME match later, zero gameplay change. Canonical home `public/universal/multiplayer/` (README + multiplayer.js); per-game adapter lives in each game (Ludo's is the reference). Slices arc2m12a-d. NOT inside M1 - it is its own module (program board/clocks instructions stay M1: arc2m1a/b/c/e/f/g/h).
+- **arcv2m12 — Multiplayer (STANDALONE game-agnostic rail, arcv2m12):** a FREE multiplayer rail (match codes, gasless ER moves via a delegated board, turn clocks/forfeit, finish + seam) that ANY game plugs into with a small adapter. Standalone = works with zero money and NO AGM; players train on exactly what they'll bet on later. AGM is a separate money plug that attaches the SAME match later, zero gameplay change. Canonical home `public/universal/multiplayer/` (README + multiplayer.js); per-game adapter lives in each game (Ludo's is the reference). Slices arc2m12a-d. NOT inside arcv2m1 - it is its own module (program board/clocks instructions stay arcv2m1: arc2m1a/b/c/e/f/g/h).
 
 - **arcv2m13 — Academy (chain-agnostic web2-to-web3 game dev learning):** the interactive, mobile-first teaching module at `/academy` (`academy/index.html`). SVM active, EVM placeholder. Teaches game + Solana basics, base Solana vs MagicBlock ER, ER VRF fairness, the result seam, a Ludo repo breakdown, then fork-and-deploy, plus the game economy lesson. In-progress. Companion pages `/economy` and `/donate`. Spec in `architecture.json` module `arcv2m13`.
 
-**Build order:** M1+M2+M3+M4 stable for Ludo FIRST -> **M5 + M10 launch engine**
-(premium points + sub + multiplier + lives/daily) -> M6 launch sources -> M7
+**Build order:** arcv2m1+arcv2m2+arcv2m3+arcv2m4 stable for Ludo FIRST -> **arcv2m5 + arcv2m10 launch engine**
+(premium points + sub + multiplier + lives/daily) -> arcv2m6 launch sources -> arcv2m7
 competition framework (admin creator UI + on-chain instances, launch instance =
-Daily Ludo Earn, all launch gates in that order) -> M9
-(inventory) -> M7 full multi-sponsor platform / M8 escrow
+Daily Ludo Earn, all launch gates in that order) -> arcv2m9
+(inventory) -> arcv2m7 full multi-sponsor platform / arcv2m8 escrow
 -> S3 rails (on-ramp, cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never
 build ahead of its module status.
 
@@ -668,7 +668,7 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
   - `chore` = tooling, config, deps (e.g. `chore: update Vite config`)
   - `docs` = docs only (e.g. `docs: update AGENTS.md commit rules`)
   - `refactor` = restructure without behavior change
-- **Scope:** the module or area affected (e.g. `M3`, `M4`, `profile`, `recovery`, `dashboard`, `ludo`, `relay`).
+- **Scope:** the module or area affected (e.g. `arcv2m3`, `arcv2m4`, `profile`, `recovery`, `dashboard`, `ludo`, `relay`).
 - **Summary:** imperative mood, lowercase, no period. Say WHAT changed, not HOW.
 - **Body (optional):** bullet points for non-obvious changes. Never include secrets, keys, or env values.
 - **Before commit + push, always:**
@@ -755,8 +755,8 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
 
 ## Status / next steps
 
-- [x] **Complete AS sweep (2026-08-19, shipped):** `scripts/migrate-to-as.mjs --all` was NOT sweeping every wallet - it only read the spend ledger, so wallets that onboarded before the ledger existed (or outside the relay, e.g. the owner's `42Xs2...`) stayed pinned to US with no ledger entry and were silently skipped. Fixed: `--all` now sweeps the UNION of spend-ledger players + Supabase `profiles.solana_wallet` (every signed-in user, the authoritative registry) + the house key; account existence is still checked on-chain per PDA so the wider list costs nothing. Live re-run re-pinned the 3 remaining US wallets (`42Xs2...`, `2TbJ...`, `3qNep...`) to AS, and the follow-up audit shows every delegated PDA on devnet-as. ALSO fixed: (a) `scripts/relay-server.mjs` backfill read the M4 global ledger at byte offset 2 (garbage) - the Anchor layout's discriminator is 8 bytes, so `global_pure_lifetime` lives at offset 8 (matches the M3 read); (b) `verify/verify.js` + `dashboard/recovery.html` excluded US entirely - they now try US LAST as a legacy fallback (matching the client's `regionCandidatesFor`: host first, AS/EU, then US), so a pre-flip US-pinned receipt still resolves. Note: the earlier "M4 Invalid account discriminator" for `42Xs2...` was a PROBE bug (fetched the global PDA with the `playerPoints` type instead of `globalPoints`); the product's `fetchGlobalPointsPda` (`src/magicblock-vrf.js`) always used the correct type and reads fine.
-- [x] **ER RPC hardening (2026-08-18, shipped):** single-point `devnet-us.magicblock.app` (which began answering `-32005 client temporarily banned`) replaced with a 3-region registry + failover in `src/gfg-rpc.js` (`ER_ENDPOINTS` US/AS/EU, `pickErRpcUrl`/`markErRpcFailure`/`markErRpcSuccess`/`rotateErRpc`, exponential cooldown 5s→60s, round-robin fresh-session start so sessions don't all land on the same region). Every ER consumer rotates: `src/magicblock-vrf.js` (rolls + M3/M4/Scope C writes via `withErRetry`, `waitForErPickup`, callback polls; `banned` counts as a network error), `scripts/roll-relay.mjs` (house rolls), `scripts/endpoints-probe.mjs` (now probes every ER region with a real `getLatestBlockhash` RPC + reports `ops.erRotation`), `verify/verify.js` + `dashboard/recovery.html` (per-region failover), and the backfill/restore/harness scripts. `createConnection` gained a backoff-confirm option (`{backoffMs:[400,800,1200,1800,2500]}`) so a slow-to-confirm tx never hammers the RPC; the outage-monitor ping now probes `getLatestBlockhash` (works on every endpoint) instead of `getSlot`, and its interval went 8s→20s in ludo + ludo-lab. Verified live: rotation unit smoke PASS; devnet-us answers "client temporarily banned" while devnet-as + devnet-eu answer `getLatestBlockhash`; probe watchlist shows US DOWN / AS+EU OK.
+- [x] **Complete AS sweep (2026-08-19, shipped):** `scripts/migrate-to-as.mjs --all` was NOT sweeping every wallet - it only read the spend ledger, so wallets that onboarded before the ledger existed (or outside the relay, e.g. the owner's `42Xs2...`) stayed pinned to US with no ledger entry and were silently skipped. Fixed: `--all` now sweeps the UNION of spend-ledger players + Supabase `profiles.solana_wallet` (every signed-in user, the authoritative registry) + the house key; account existence is still checked on-chain per PDA so the wider list costs nothing. Live re-run re-pinned the 3 remaining US wallets (`42Xs2...`, `2TbJ...`, `3qNep...`) to AS, and the follow-up audit shows every delegated PDA on devnet-as. ALSO fixed: (a) `scripts/relay-server.mjs` backfill read the arcv2m4 global ledger at byte offset 2 (garbage) - the Anchor layout's discriminator is 8 bytes, so `global_pure_lifetime` lives at offset 8 (matches the arcv2m3 read); (b) `verify/verify.js` + `dashboard/recovery.html` excluded US entirely - they now try US LAST as a legacy fallback (matching the client's `regionCandidatesFor`: host first, AS/EU, then US), so a pre-flip US-pinned receipt still resolves. Note: the earlier "arcv2m4 Invalid account discriminator" for `42Xs2...` was a PROBE bug (fetched the global PDA with the `playerPoints` type instead of `globalPoints`); the product's `fetchGlobalPointsPda` (`src/magicblock-vrf.js`) always used the correct type and reads fine.
+- [x] **ER RPC hardening (2026-08-18, shipped):** single-point `devnet-us.magicblock.app` (which began answering `-32005 client temporarily banned`) replaced with a 3-region registry + failover in `src/gfg-rpc.js` (`ER_ENDPOINTS` US/AS/EU, `pickErRpcUrl`/`markErRpcFailure`/`markErRpcSuccess`/`rotateErRpc`, exponential cooldown 5s→60s, round-robin fresh-session start so sessions don't all land on the same region). Every ER consumer rotates: `src/magicblock-vrf.js` (rolls + arcv2m3/arcv2m4/Scope C writes via `withErRetry`, `waitForErPickup`, callback polls; `banned` counts as a network error), `scripts/roll-relay.mjs` (house rolls), `scripts/endpoints-probe.mjs` (now probes every ER region with a real `getLatestBlockhash` RPC + reports `ops.erRotation`), `verify/verify.js` + `dashboard/recovery.html` (per-region failover), and the backfill/restore/harness scripts. `createConnection` gained a backoff-confirm option (`{backoffMs:[400,800,1200,1800,2500]}`) so a slow-to-confirm tx never hammers the RPC; the outage-monitor ping now probes `getLatestBlockhash` (works on every endpoint) instead of `getSlot`, and its interval went 8s→20s in ludo + ludo-lab. Verified live: rotation unit smoke PASS; devnet-us answers "client temporarily banned" while devnet-as + devnet-eu answer `getLatestBlockhash`; probe watchlist shows US DOWN / AS+EU OK.
 - [x] **Region-aware ER targeting + dice re-pin to AS (2026-08-18, shipped):** a delegated account's ER state lives on EXACTLY ONE region (the validator the relay pinned it to via remainingAccounts), so the client now resolves each account's hosting region via the Router's `getDelegationStatus` -> fqdn (`regionUrlForFqdn` in gfg-rpc.js) and submits + polls THERE (`withErRetry(..., {regionUrl})`; rotation is only a fallback for accounts the Router has not reported yet). All PDAs the relay pins now target the AS validator `MAS1Dt9...` (delegate-relay, comp-relay, probe, gfg-dice-config, magicblock-vrf). The 11 legacy US-pinned player dice accounts were migrated live with `scripts/migrate-to-as.mjs` (undelegate on the hosting region, sponsor signs; then re-delegate DIRECTLY to AS as a single `delegate` step, bypassing handleDelegate's multi-PDA budget which trips the per-player cap on already-onboarded players). All 13 tracked dice PDAs now report devnet-as; point ledgers verified intact through the round-trip. Migration cost recorded honestly as `migration` spend events (sponsor-keyed, caps untouched). SCOPE CLOSED (2026-08-18, same day): the program gained ADDITIVE `undelegate_points/undelegate_result/undelegate_global_points` (same program id, no layout/seed change, solana-upgrade-safety compliant), so POINTS/RESULT/GLOBAL PDAs can be re-pinned off a flaky region like dice. `scripts/migrate-to-as.mjs` now migrates ALL PDA types per player; the full live run re-pinned every US-hosted PDA to AS (all 13 tracked PDAs report devnet-as or pin AS on next use). Gotcha FIXED during the run: Anchor `#[delegate]` helper accounts need the relay's camelCase keys (`bufferGlobalPoints`/`globalPoints`), NOT snake_case — the first house-global pass errored `Reached maximum depth for account resolution. Unresolved accounts: bufferGlobalPoints` then succeeded after mirroring delegate-relay.mjs exactly. RULE LOCKED INTO architecture.json keyRules + rules: every new per-player PDA type ships its own `undelegate_*` in the SAME program build (RPC/region-agnostic build rule) so a banned ER region is always a re-pin job, never a feature outage.
 - [x] Program upgraded to ER (ephemeral/delegate/commit/undelegate), deployed.
 - [x] IDL synced to `src/gfg-dice-idl.json`.

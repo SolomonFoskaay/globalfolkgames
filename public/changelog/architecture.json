@@ -1,114 +1,114 @@
 {
   "updated": "2026-08-29",
-  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. M1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Every module now carries expectedInput and expectedOutput sections defining its exact contract with upstream/downstream modules. Staff only.",
+  "note": "Admin-only Architecture (Modules) workspace. The platform is a set of pluggable modules, not a rigid stack. This is the guide for what exists, what is being built, and what is planned: every feature added to the platform should slot into one of these modules. Each module has its own admin page (left rail navigates between them); the home page shows the overview of all modules. arcv2m1 carries a per-game sub-module store (searchable game dropdown) where each game's LOCKED build spec lives. Every module now carries expectedInput and expectedOutput sections defining its exact contract with upstream/downstream modules. Staff only.",
   "overview": {
     "title": "How the Platform Works",
-    "subtitle": "Living overview \u2014 keep updated when any module spec changes. The agent must read this before any feature work.",
+    "subtitle": "Living overview — keep updated when any module spec changes. The agent must read this before any feature work.",
     "infraNotes": [
       "MAGICBLOCK ER REGION NOTE (2026-08-18): devnet-us.magicblock.app began answering \"-32005 client temporarily banned\", so the project is BANNED on the US ER route (other regions AS/EU healthy). Fix shipped in one sweep: (1) the single US endpoint became a 3-region ER registry + failover + exponential cooldown in src/gfg-rpc.js; (2) the client + relay + probe now resolve each delegated account's ACTUAL hosting region via the Magic Router (getDelegationStatus -> fqdn) and submit/poll THERE, with cross-region rotation only as a fallback; (3) the program gained additive undelegate_points/undelegate_result/undelegate_global_points instructions so points/result/global PDAs can be moved off a flaky region (previously only the dice PDA could), and scripts/migrate-to-as.mjs re-pins any already-delegated PDA to the AS validator (MAS1Dt9q...) sponsor-signed, cap-exempt migration cost. All 13 tracked devnet PDAs now report devnet-as or are pinned to AS on next use. RELAY + DELEGATE CODE RULE: the canonical delegate account key form is the camelCase form the relay uses (bufferGlobalPoints/globalPoints, NOT buffer_global_points) - Anchor's resolver for the #[delegate] helper accounts only reliably matches camelCase; mirror delegate-relay.mjs exactly in any future delegate/migrate code (see the failure this note documents: the first migration pass errored with \"Reached maximum depth for account resolution. Unresolved accounts: bufferGlobalPoints\" from snake_case keys)."
     ],
     "flowChain": [
       {
-        "from": "M1",
-        "to": "M2",
+        "from": "arcv2m1",
+        "to": "arcv2m2",
         "label": "Game emits result envelope on match finish"
       },
       {
-        "from": "M2",
-        "to": "M3",
+        "from": "arcv2m2",
+        "to": "arcv2m3",
         "label": "Seam fans envelope to local points subscriber"
       },
       {
-        "from": "M2",
-        "to": "M4",
+        "from": "arcv2m2",
+        "to": "arcv2m4",
         "label": "Seam fans envelope to global ledgers subscriber"
       },
       {
-        "from": "M5",
-        "to": "M4",
+        "from": "arcv2m5",
+        "to": "arcv2m4",
         "label": "Tier boost: kind-1 credit into M4b+M4c only (never M4a)"
       },
       {
-        "from": "M6",
-        "to": "M4",
+        "from": "arcv2m6",
+        "to": "arcv2m4",
         "label": "Signup/referral/giveaway: kind-1 credit into M4b+M4c only"
       },
       {
-        "from": "M2",
-        "to": "M7",
+        "from": "arcv2m2",
+        "to": "arcv2m7",
         "label": "Seam fans envelope to competitions subscriber"
       },
       {
-        "from": "M7",
-        "to": "M8",
+        "from": "arcv2m7",
+        "to": "arcv2m8",
         "label": "Comp optionally attaches sponsor escrow"
       },
       {
-        "from": "M1",
-        "to": "M9",
+        "from": "arcv2m1",
+        "to": "arcv2m9",
         "label": "Game grants item to player inventory on achievement/win"
       }
     ],
     "modules": [
       {
-        "id": "M1",
+        "id": "arcv2m1",
         "title": "Game core",
-        "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into M2 on match finish."
+        "what": "The games themselves (Ludo, Ayo Olopon, ...). On-chain ER VRF dice for every seat. Knows NOTHING about points, tiers, or competitions. Emits into arcv2m2 on match finish."
       },
       {
-        "id": "M2",
+        "id": "arcv2m2",
         "title": "Result seam",
-        "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to M3/M4/M7."
+        "what": "The universal plug-and-play bus. One call per game finish (window.publishGameResult), one subscription for all consumers. Validates/normalizes the envelope, fans to arcv2m3/arcv2m4/arcv2m7."
       },
       {
-        "id": "M3",
+        "id": "arcv2m3",
         "title": "Local points",
-        "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE \u2014 every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE \u2014 the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns."
+        "what": "Per-game two-track on-chain ledger: (1) LOCAL PURE — every verified win in that game, unspendable, never diluted, bragging-rights source of truth; (2) LOCAL SPENDABLE — the spendable split drawn down by that game's own in-game spends. Only the 'You' seat ever earns."
       },
       {
-        "id": "M4",
+        "id": "arcv2m4",
         "title": "Global ledgers",
-        "what": "Site-wide three ledgers: (a) PURE \u2014 sum of M3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME \u2014 every point earned from any source (M3 + M5 multiplier + M6 sources), unspendable; (c) SPENDABLE \u2014 the same lifetime total but spendable."
+        "what": "Site-wide three ledgers: (a) PURE — sum of arcv2m3 local wins across all games, no multiplier, honest cross-game skill total; (b) LIFETIME — every point earned from any source (arcv2m3 + arcv2m5 multiplier + arcv2m6 sources), unspendable; (c) SPENDABLE — the same lifetime total but spendable."
       },
       {
-        "id": "M5",
+        "id": "arcv2m5",
         "title": "Active Tier",
         "what": "Monthly subscription bought from M4c spendable. 2x/3x/4x multiplier on base win points, applied as a SECOND kind-1 credit into M4b+M4c only (M4a pure is never multiplied)."
       },
       {
-        "id": "M6",
+        "id": "arcv2m6",
         "title": "Point sources",
-        "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch M3 local or M4a pure."
+        "what": "Signup bonus, referral, giveaway, social earn. All feed M4b+M4c as kind-1 credits. Never touch arcv2m3 local or M4a pure."
       },
       {
-        "id": "M7",
+        "id": "arcv2m7",
         "title": "Competitions",
-        "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (M2). Entry from M4c spendable. Deferred until M1-M4 stable."
+        "what": "Earn events (daily/weekly/monthly) + leaderboards. Consumes the seam (arcv2m2). Entry from M4c spendable. Deferred until arcv2m1-arcv2m4 stable."
       },
       {
-        "id": "M8",
+        "id": "arcv2m8",
         "title": "Sponsor escrow",
-        "what": "Optional on-chain escrow plugin for M7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until M7 product build."
+        "what": "Optional on-chain escrow plugin for arcv2m7. Brand locks SOL before the event, 30/70 rake at settle. Deferred until arcv2m7 product build."
       },
       {
-        "id": "M9",
+        "id": "arcv2m9",
         "title": "Player inventory",
-        "what": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure."
+        "what": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like arcv2m1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). arcv2m1 games define their own item catalogs; arcv2m9 owns the wallet infrastructure."
       }
     ],
     "flowDiagram": {
-      "label": "Data flow \u2014 every arrow is the universal result seam (M2)",
-      "path": "M1 Game \u2192 M2 Seam \u2192 M3 Local Bank (per-game pure+spendable) \u2192 M4 Global Bank (site-wide pure+lifetime+spendable) \u2192 M5 Tier Boost (kind-1 to lifetime+spendable only) / M6 Sources (kind-1 to lifetime+spendable only) | M1 Game \u2192 M9 Inventory (per-game items/skins/sounds on-chain)"
+      "label": "Data flow — every arrow is the universal result seam (arcv2m2)",
+      "path": "arcv2m1 Game → arcv2m2 Seam → arcv2m3 Local Bank (per-game pure+spendable) → arcv2m4 Global Bank (site-wide pure+lifetime+spendable) → arcv2m5 Tier Boost (kind-1 to lifetime+spendable only) / arcv2m6 Sources (kind-1 to lifetime+spendable only) | arcv2m1 Game → arcv2m9 Inventory (per-game items/skins/sounds on-chain)"
     },
     "keyRules": [
-      "Every game ends by emitting into M2; no game knows about points, tiers, or competitions.",
-      "M3 local points are NEVER diluted: no multiplier, no purchase, no bonus, no giveaway, no referral.",
-      "Multiplier (M5) applies only at M4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
-      "Source-tagged: every M4 credit carries its game/event source. The gameId from the M2 envelope IS the source identity for game wins \u2014 downstream modules must NOT hardcode source strings or duplicate scoring tables.",
-      "Modules integrate through seams (M2), never hard-wires.",
-      "BUILD CONTRACT (Input/Output): every module MUST have expectedInput and expectedOutput sections in architecture.json before building. The agent MUST read both sections of a module AND its upstream/downstream modules before, during, and after building. A module that duplicates another module's work (e.g. M4 recomputing M3's scoring) is a design bug caught by this contract.",
-      "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability built for ANY module MUST be RPC/region agnostic by construction. Concretely: (1) every new per-player PDA type (dice/points/result/global/comp/assets/...) ships its own undelegate instruction in the SAME program build, so any account can leave a flaky/banned ER region and be re-pinned to a healthy one; (2) client/relay/probe code must never assume a single ER endpoint or region \u2014 resolve each account's hosting region from the Magic Router (getDelegationStatus -> fqdn) and target it, with the 3-region registry + failover as the base transport (src/gfg-rpc.js); (3) delegate account maps use the relay's camelCase key form (bufferGlobalPoints/globalPoints), never snake_case, for the #[delegate] helper accounts. This is what let the 2026-08-18 US-route ban (\"-32005 client temporarily banned\") be survived by moving the whole fleet to AS instead of redesigning. Banned/failing region = a re-pin job, not a feature outage.",
-      "Build order gates everything: M1+M2+M3+M4 stable for Ludo FIRST -> M5 -> M6 -> M9 -> M7/M8. Never build ahead of the module status."
+      "Every game ends by emitting into arcv2m2; no game knows about points, tiers, or competitions.",
+      "arcv2m3 local points are NEVER diluted: no multiplier, no purchase, no bonus, no giveaway, no referral.",
+      "Multiplier (arcv2m5) applies only at arcv2m4 flow-up as kind-1 credits; M4a pure is NEVER multiplied.",
+      "Source-tagged: every arcv2m4 credit carries its game/event source. The gameId from the arcv2m2 envelope IS the source identity for game wins — downstream modules must NOT hardcode source strings or duplicate scoring tables.",
+      "Modules integrate through seams (arcv2m2), never hard-wires.",
+      "BUILD CONTRACT (Input/Output): every module MUST have expectedInput and expectedOutput sections in architecture.json before building. The agent MUST read both sections of a module AND its upstream/downstream modules before, during, and after building. A module that duplicates another module's work (e.g. arcv2m4 recomputing arcv2m3's scoring) is a design bug caught by this contract.",
+      "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability built for ANY module MUST be RPC/region agnostic by construction. Concretely: (1) every new per-player PDA type (dice/points/result/global/comp/assets/...) ships its own undelegate instruction in the SAME program build, so any account can leave a flaky/banned ER region and be re-pinned to a healthy one; (2) client/relay/probe code must never assume a single ER endpoint or region — resolve each account's hosting region from the Magic Router (getDelegationStatus -> fqdn) and target it, with the 3-region registry + failover as the base transport (src/gfg-rpc.js); (3) delegate account maps use the relay's camelCase key form (bufferGlobalPoints/globalPoints), never snake_case, for the #[delegate] helper accounts. This is what let the 2026-08-18 US-route ban (\"-32005 client temporarily banned\") be survived by moving the whole fleet to AS instead of redesigning. Banned/failing region = a re-pin job, not a feature outage.",
+      "Build order gates everything: arcv2m1+arcv2m2+arcv2m3+arcv2m4 stable for Ludo FIRST -> arcv2m5 -> arcv2m6 -> arcv2m9 -> arcv2m7/arcv2m8. Never build ahead of the module status."
     ],
     "universalFolder": {
       "path": "public/universal/",
@@ -116,49 +116,49 @@
       "layout": [
         {
           "folder": "result-seam/",
-          "module": "M2",
+          "module": "arcv2m2",
           "file": "game-result.js",
           "desc": "The bus itself. Validates/normalizes the gfg:game-result@1 envelope, fans to subscribers."
         },
         {
           "folder": "points/",
-          "module": "M3",
+          "module": "arcv2m3",
           "file": "local-points.js",
-          "desc": "Per-game two-track local ledger (PURE + SPENDABLE). Subscribes to M2, banks verified user-seat wins."
+          "desc": "Per-game two-track local ledger (PURE + SPENDABLE). Subscribes to arcv2m2, banks verified user-seat wins."
         },
         {
           "folder": "ledgers/",
-          "module": "M4",
+          "module": "arcv2m4",
           "file": "global-ledger.js",
-          "desc": "Site-wide three ledgers (PURE + LIFETIME + SPENDABLE). Subscribes to M2, credits kind-0 game wins. M5/M6 drive kind-1 credits here."
+          "desc": "Site-wide three ledgers (PURE + LIFETIME + SPENDABLE). Subscribes to arcv2m2, credits kind-0 game wins. arcv2m5/arcv2m6 drive kind-1 credits here."
         },
         {
           "folder": "subscription/",
-          "module": "M5",
+          "module": "arcv2m5",
           "file": "(planned)",
           "desc": "Active Tier monthly subscription. Drives kind-1 multiplier credits into M4b+M4c only."
         },
         {
           "folder": "point-sources/",
-          "module": "M6",
+          "module": "arcv2m6",
           "file": "(planned)",
           "desc": "Signup bonus, referral, giveaway, social earn. All drive kind-1 credits into M4b+M4c."
         },
         {
           "folder": "competitions/",
-          "module": "M7",
+          "module": "arcv2m7",
           "file": "(planned)",
-          "desc": "Earn events + leaderboards. Subscribes to M2, entry from M4c spendable."
+          "desc": "Earn events + leaderboards. Subscribes to arcv2m2, entry from M4c spendable."
         },
         {
           "folder": "escrow/",
-          "module": "M8",
+          "module": "arcv2m8",
           "file": "(planned)",
-          "desc": "Optional on-chain sponsor escrow plugin for M7."
+          "desc": "Optional on-chain sponsor escrow plugin for arcv2m7."
         },
         {
           "folder": "inventory/",
-          "module": "M9",
+          "module": "arcv2m9",
           "file": "(planned)",
           "desc": "On-chain player inventory wallet. Per-game item catalogs (skins, sounds, items) stored as media bytes in the account. Gasless grant/equip/revoke."
         }
@@ -167,80 +167,80 @@
   },
   "modules": [
     {
-      "id": "M1",
+      "id": "arcv2m1",
       "title": "Game core + proof of play",
       "status": "in-progress",
-      "summary": "Per-game engine + on-chain ER VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. M1 is ONE module; its game core sub-module M1A covers every game (Ludo locked now, Ayo Olopon planned next, then 50+) - the dropdown on this page differentiates the games. Each game's LOCKED spec lives there.",
+      "summary": "Per-game engine + on-chain ER VRF dice + verifiable roll. Knows NOTHING about points, tiers, competitions. arcv2m1 is ONE module; its game core sub-module arcv2m1A covers every game (Ludo locked now, Ayo Olopon planned next, then 50+) - the dropdown on this page differentiates the games. Each game's LOCKED spec lives there.",
       "expectedOutput": {
-        "summary": "What M1 MUST emit for downstream modules (M2 seam consumers) to work. Every M1 game MUST produce exactly this. Nothing more, nothing less.",
+        "summary": "What arcv2m1 MUST emit for downstream modules (arcv2m2 seam consumers) to work. Every arcv2m1 game MUST produce exactly this. Nothing more, nothing less.",
         "items": [
-          "SEAM ENVELOPE (via window.publishGameResult): the one contract M1 fulfills. Called once on match finish. Format: { gameId: string (e.g. 'ludo', 'ayo_olopon'), mode: string, startedAt: number (ms), finishedAt: number (ms), players: [{ seat: string (game-local color/position), actor: 'user'|'house'|'local', position: number|null (ranked), score: number|null (score-based), identity: string|null (wallet, resolved by bus for 'user') }], proof: { method: string, chain: string, signature: string|null, pda: string|null } | null }",
-          "GAME_ID (critical): the string gameId ('ludo', 'ayo_olopon') is the PRIMARY KEY that M3 uses to look up scoring tables and M4 uses as the source identity. It MUST be stable per game, lowercase, no spaces. This is the game's identity on the platform.",
-          "PLAYERS ARRAY (critical): every active seat in the match. actor='user' is the signed-in player (only this seat earns M3/M4 rewards). position is the ranked finish (1st..nth). The array length determines mode (2P vs 4P). ALL active seats must be present.",
-          "PROOF (critical for banking): envelope.proof.signature MUST be a valid on-chain tx signature (the winning roll or match-end proof). M3 and M4 use the first 8 bytes as match_ref for idempotency. If proof is null, no downstream module banks anything.",
-          "ON-CHAIN PDAs (M1 manages these, downstream modules read them): PlayerPoints PDA [gfgpoints, game_tag, player] (M3), GlobalPoints PDA [gfgpoints, 'global', player] (M4), MatchResult PDA [gfgresult, player, match_ref] (Scope C). These are created/delegated by the relay on first use."
+          "SEAM ENVELOPE (via window.publishGameResult): the one contract arcv2m1 fulfills. Called once on match finish. Format: { gameId: string (e.g. 'ludo', 'ayo_olopon'), mode: string, startedAt: number (ms), finishedAt: number (ms), players: [{ seat: string (game-local color/position), actor: 'user'|'house'|'local', position: number|null (ranked), score: number|null (score-based), identity: string|null (wallet, resolved by bus for 'user') }], proof: { method: string, chain: string, signature: string|null, pda: string|null } | null }",
+          "GAME_ID (critical): the string gameId ('ludo', 'ayo_olopon') is the PRIMARY KEY that arcv2m3 uses to look up scoring tables and arcv2m4 uses as the source identity. It MUST be stable per game, lowercase, no spaces. This is the game's identity on the platform.",
+          "PLAYERS ARRAY (critical): every active seat in the match. actor='user' is the signed-in player (only this seat earns arcv2m3/arcv2m4 rewards). position is the ranked finish (1st..nth). The array length determines mode (2P vs 4P). ALL active seats must be present.",
+          "PROOF (critical for banking): envelope.proof.signature MUST be a valid on-chain tx signature (the winning roll or match-end proof). arcv2m3 and arcv2m4 use the first 8 bytes as match_ref for idempotency. If proof is null, no downstream module banks anything.",
+          "ON-CHAIN PDAs (arcv2m1 manages these, downstream modules read them): PlayerPoints PDA [gfgpoints, game_tag, player] (arcv2m3), GlobalPoints PDA [gfgpoints, 'global', player] (arcv2m4), MatchResult PDA [gfgresult, player, match_ref] (Scope C). These are created/delegated by the relay on first use."
         ]
       },
       "expectedInput": {
-        "summary": "What M1 NEEDS from the platform to run. M1 is standalone \u2014 it does NOT receive anything from M3, M4, M5, M6, or M7. Its inputs are infrastructure, not modules.",
+        "summary": "What arcv2m1 NEEDS from the platform to run. arcv2m1 is standalone — it does NOT receive anything from arcv2m3, arcv2m4, arcv2m5, arcv2m6, or arcv2m7. Its inputs are infrastructure, not modules.",
         "items": [
-          "PLAYER IDENTITY: Dynamic wallet (email OTP sign-in) providing session key for gasless on-chain signing. M1 never sees raw private keys.",
-          "ON-CHAIN VRF: MagicBlock VRF via the ER (ephemeral rollup) for dice randomness. Every roll resolves on-chain, gasless. M1 calls the VRF through the delegated dice PDA.",
+          "PLAYER IDENTITY: Dynamic wallet (email OTP sign-in) providing session key for gasless on-chain signing. arcv2m1 never sees raw private keys.",
+          "ON-CHAIN VRF: MagicBlock VRF via the ER (ephemeral rollup) for dice randomness. Every roll resolves on-chain, gasless. arcv2m1 calls the VRF through the delegated dice PDA.",
           "SPONSOR RELAY: app-funded sponsor wallet that pays the one-time init+delegate cost per player (~0.0086 SOL for dice+points+result PDAs). After delegation, all rolls are free.",
-          "GAME CONFIGURATION: board layout, rules, timing constants (AI speed, roll delays, turn pacing). Each M1A game has its own LOCKED spec in the games dropdown.",
+          "GAME CONFIGURATION: board layout, rules, timing constants (AI speed, roll delays, turn pacing). Each arcv2m1A game has its own LOCKED spec in the games dropdown.",
           "SEAM SCRIPTS: public/universal/result-seam/game-result.js must be loaded BEFORE the game runs, so window.publishGameResult is available when the match finishes."
         ]
       },
       "details": [
-        "M1A = the game core sub-module for ALL games (one sub-module, many games). The dropdown below differentiates them: M1A Ludo (locked), M1A Ayo Olopon (planned), more later.",
-        "Ludo is the first M1A game (live, on-chain ER VRF dice for EVERY seat). LOCKED 2026-08-15.",
+        "arcv2m1A = the game core sub-module for ALL games (one sub-module, many games). The dropdown below differentiates them: arcv2m1A Ludo (locked), arcv2m1A Ayo Olopon (planned), more later.",
+        "Ludo is the first arcv2m1A game (live, on-chain ER VRF dice for EVERY seat). LOCKED 2026-08-15.",
         "ALL rolls resolve on-chain in the game's single delegated ER session (ER VRF queue, gasless, ~50-100ms), bundled with game moves - NO server-side /api/roll house roll in the on-chain build.",
         "Three seat types: 'You' (signed-in user, own delegated dice PDA, session key, manual input); 'Human' (extra local human, on-chain roll like a computer, manual input, no separate session sign-in); 'Computer' (fully automated on-chain, automation itself runs in the ER).",
         "Any seat's roll has NO offline fallback: retry x3 then pause + monitor (never fake roll).",
-        "A game emits into the universal result seam (M2) and knows nothing else. It NEVER knows how points/competitions work.",
-        "Pluggable: M1A Ayo Olopon becomes the next game with the same proof-of-play contract + the same result seam.",
-        "Per-game locked specs: see the game dropdown below (M1A Ludo locked 2026-08-15).",
-        "PROOF OF PLAY (verifiable tooling, shipped 2026-08-16): the public /verify/ receipt explorer proves any GlobalFolkGames receipt on-chain, because ER receipts are NOT indexed by public explorers (SolanaFM/Solana only see base + settlement). Signature lookups query BOTH the ER RPC (getTransaction on devnet-us.magicblock.app) and the base devnet RPC (api.devnet.solana.com); account lookups always surface the permanent base-explorer (solana.fm) record plus recent rollup sigs (getSignaturesForAddress). The ludo-lab winners popup gains a 'See on-chain receipt' link opening /verify/?tx=<sig> pre-filled + auto-queried. Honesty rule kept: never link an ER sig on a standard explorer. Lives as M1 game-tooling (game-adjacent), NOT inside public/universal/ - it is proof-of-play support for M1 games, not a universal consumer module."
+        "A game emits into the universal result seam (arcv2m2) and knows nothing else. It NEVER knows how points/competitions work.",
+        "Pluggable: arcv2m1A Ayo Olopon becomes the next game with the same proof-of-play contract + the same result seam.",
+        "Per-game locked specs: see the game dropdown below (arcv2m1A Ludo locked 2026-08-15).",
+        "PROOF OF PLAY (verifiable tooling, shipped 2026-08-16): the public /verify/ receipt explorer proves any GlobalFolkGames receipt on-chain, because ER receipts are NOT indexed by public explorers (SolanaFM/Solana only see base + settlement). Signature lookups query BOTH the ER RPC (getTransaction on devnet-us.magicblock.app) and the base devnet RPC (api.devnet.solana.com); account lookups always surface the permanent base-explorer (solana.fm) record plus recent rollup sigs (getSignaturesForAddress). The ludo-lab winners popup gains a 'See on-chain receipt' link opening /verify/?tx=<sig> pre-filled + auto-queried. Honesty rule kept: never link an ER sig on a standard explorer. Lives as arcv2m1 game-tooling (game-adjacent), NOT inside public/universal/ - it is proof-of-play support for arcv2m1 games, not a universal consumer module."
       ],
       "games": [
         {
-          "id": "M1A",
+          "id": "arcv2m1A",
           "gameKey": "ludo",
           "title": "Ludo",
           "status": "locked",
           "lockedAt": "2026-08-15",
-          "summary": "LOCKED build spec for M1A (Ludo). The agent MUST read this before/during any Ludo M1 build, test against it, and only conclude M1 for Ludo when the build matches it end to end.",
+          "summary": "LOCKED build spec for arcv2m1A (Ludo). The agent MUST read this before/during any Ludo arcv2m1 build, test against it, and only conclude arcv2m1 for Ludo when the build matches it end to end.",
           "details": [
             "DICE - ER VRF for every seat, on-chain: every roll resolves on the MagicBlock ER VRF queue (5hBR...K5Tc, gasless, ~50-100ms). 'You' rolls via the player's own delegated dice PDA (session key signs, 0 SOL). Computer/human seats roll via the server-signed house roll (AMENDED 2026-08-15, owner-approved anti-cheat decision): the app-held sponsor key signs gasless ER VRF rolls on the same queue - the key never leaves the server, so a player can NEVER re-roll the computer's dice until favorable. A client-signed computer roll is impossible to make cheat-resistant on the current ER model (roll and its consumption are separate txs), so the house signer stays server-side. Full on-chain roll+move bundling (Match PDA, auto_computer_move) is a mainnet-phase build.",
             "SEAT TYPES: (1) 'You' = signed-in user seat; roll via the player's own delegated dice PDA, session key signs silently (0 SOL); manual input (tap dice, tap token). (2) 'Human' = extra local human seat (dropdown 'Human', NOT 'You'); roll is ON-CHAIN via the server-signed house roll (sponsored by the app session; NO separate sign-in, NO session key requested); move is MANUAL input by the real human (dice tap + token tap), never auto-played. (3) 'Computer' = fully automated; roll on-chain via the server-signed house roll (AMENDED 2026-08-15: AI decision + token move are client-side in this build, the dice roll is the on-chain proof; auto_computer_move-style on-chain automation is deferred to mainnet and needs a Match PDA). Human-vs-computer timing constants unchanged (deliberate slow AI pace).",
-            "MATCH OUTCOMES (AMENDED 2026-08-16): finished = all active seats have all 4 tokens DISAPPEARED OFF THE BOARD COMPLETELY -> game marks status=finished (game state + persisted payload) and emits the seam. The FULL finish order 1st..Nth + reward mirror are committed on-chain by the Scope C consumer (record_result, gasless ER write, proof-bound to the match's proof-roll signature), now WIRED IN-GAME (2026-08-16): win-detection fires it soft-fail on match end and the ceremony shows a copyable receipt plus a working devnet link to the result account's base-layer creation tx when freshly sponsored. M1 still does NO reward banking itself (record_points is a separate mirror the legacy ludo build uses). ONLY finished earns M3/M4 rewards later (rewards gate on status===finished). A dedicated on-chain status field awaits the mainnet-phase Match PDA build. abandoned = End Match button (best-effort on tab close) closes the match in game state as status=abandoned - never rewarded, never emits the seam (this build keeps it client-side + persisted; the on-chain immortalized-abandoned record is mainnet-phase). session lost = browser dies with no tx -> ER session expires -> no permanent record (acceptable).",
+            "MATCH OUTCOMES (AMENDED 2026-08-16): finished = all active seats have all 4 tokens DISAPPEARED OFF THE BOARD COMPLETELY -> game marks status=finished (game state + persisted payload) and emits the seam. The FULL finish order 1st..Nth + reward mirror are committed on-chain by the Scope C consumer (record_result, gasless ER write, proof-bound to the match's proof-roll signature), now WIRED IN-GAME (2026-08-16): win-detection fires it soft-fail on match end and the ceremony shows a copyable receipt plus a working devnet link to the result account's base-layer creation tx when freshly sponsored. arcv2m1 still does NO reward banking itself (record_points is a separate mirror the legacy ludo build uses). ONLY finished earns arcv2m3/arcv2m4 rewards later (rewards gate on status===finished). A dedicated on-chain status field awaits the mainnet-phase Match PDA build. abandoned = End Match button (best-effort on tab close) closes the match in game state as status=abandoned - never rewarded, never emits the seam (this build keeps it client-side + persisted; the on-chain immortalized-abandoned record is mainnet-phase). session lost = browser dies with no tx -> ER session expires -> no permanent record (acceptable).",
             "COMPLETED DEFINITION (confirmed): all active seats must finish. 2P: both seats all 4 tokens home. 4P: all 4 seats. No 'leader wins and match ends' shortcut - rewards stay honest.",
             "ENDGAME BEHAVIOR: (1) auto-skip finished seats - once a seat has all 4 tokens off the board its turns auto-pass (~1.5s log, no dice roll, no tap) for human AND computer seats. (2) auto-complete - when all active seats have all 4 tokens off the board the loop STOPS (result ceremony 1st..4th + 'Play Again'), no infinite cycling, no reset-only ending. (3) NO skip-remaining toggle; End Match is the only speed escape hatch.",
-            "P\u00c8 (capture) is UNCONDITIONAL on the common path - fixed + verified (commit 1af91cc, 18/18 checks, both ludo + ludo-lab). Only two safe zones: the 4 colored start boxes (universally safe for any token standing there) and the own-color home lane. Same-color tokens stack. Landing on an opponent with the LAST movable token + LAST die still p\u00e8's.",
-            "TERMINOLOGY (hard rules): 'disappeared from board completely' = the winning/finished state (stepsWalked >= 57, token at center, hidden) - this is what counts toward finishing. 'locked back in homebox / return home' = the LOSING state after p\u00e8 (pathIndex -1, needs a 6 to re-enter). 'home safe zone' = the 5 colored boxes before the center (own color only). Two win paths: (a) full 360\u00b0 circuit into own home lane -> center -> disappear; (b) p\u00e8 fast-track - capture an opponent -> capturer completes circuit and disappears.",
-            "SEAM: M1 emits the gfg:game-result@1 envelope via window.publishGameResult when the match completes (all active seats finished). M1 knows NOTHING about points/tiers/competitions.",
+            "PÈ (capture) is UNCONDITIONAL on the common path - fixed + verified (commit 1af91cc, 18/18 checks, both ludo + ludo-lab). Only two safe zones: the 4 colored start boxes (universally safe for any token standing there) and the own-color home lane. Same-color tokens stack. Landing on an opponent with the LAST movable token + LAST die still pè's.",
+            "TERMINOLOGY (hard rules): 'disappeared from board completely' = the winning/finished state (stepsWalked >= 57, token at center, hidden) - this is what counts toward finishing. 'locked back in homebox / return home' = the LOSING state after pè (pathIndex -1, needs a 6 to re-enter). 'home safe zone' = the 5 colored boxes before the center (own color only). Two win paths: (a) full 360° circuit into own home lane -> center -> disappear; (b) pè fast-track - capture an opponent -> capturer completes circuit and disappears.",
+            "SEAM: arcv2m1 emits the gfg:game-result@1 envelope via window.publishGameResult when the match completes (all active seats finished). arcv2m1 knows NOTHING about points/tiers/competitions.",
             "MATCH MODE (2P / 4P, pre-lock selector): selectable before the match locks via the Players toggle (2 or 4) on the setup panel. 2P plays the classic opposite corners (green + red) only - yellow + blue dropdowns are disabled - and the match completes when BOTH active seats have all 4 tokens home. 4P plays all four seats and completes when ALL FOUR finish. Everything derives from the ACTIVE seats: turn loop, endgame auto-complete, ceremony, and the seam envelope (2 players in 2P, 4 in 4P). matchMode is persisted and restored with the match. Changing mode mid-match is blocked once the match locks.",
-            "LOCAL POINTS (M3 cross-ref, owner-locked 2026-08-16): Ludo's own local scoring = 4P 1st 100 / 2nd 50 / 3rd 10 / 4th 0 (game auto-ends once 3 winners emerge, so 4th earns nothing); 2P only 1st earns 100 (2P auto-ends the moment 1st emerges). ONLY the 'You' (user) seat earns - house and local-human seats earn nothing even if first. Banked by the M3 universal module (public/universal/points/) via the seam; the game itself does NOT compute or bank points (M1 stays reward-blind)."
+            "LOCAL POINTS (arcv2m3 cross-ref, owner-locked 2026-08-16): Ludo's own local scoring = 4P 1st 100 / 2nd 50 / 3rd 10 / 4th 0 (game auto-ends once 3 winners emerge, so 4th earns nothing); 2P only 1st earns 100 (2P auto-ends the moment 1st emerges). ONLY the 'You' (user) seat earns - house and local-human seats earn nothing even if first. Banked by the arcv2m3 universal module (public/universal/points/) via the seam; the game itself does NOT compute or bank points (arcv2m1 stays reward-blind)."
           ]
         },
         {
-          "id": "M1A",
+          "id": "arcv2m1A",
           "gameKey": "ayo-olopon",
           "title": "Ayo Olopon",
           "status": "planned",
-          "summary": "Nigeria-native Ayo Olopon, the next M1A game. Spec not yet locked; when it is, this entry is the LOCKED build spec and the agent builds/tests against it exactly like Ludo.",
+          "summary": "Nigeria-native Ayo Olopon, the next arcv2m1A game. Spec not yet locked; when it is, this entry is the LOCKED build spec and the agent builds/tests against it exactly like Ludo.",
           "details": [
-            "Planned M1A game - no locked spec yet. Same proof-of-play contract + same M2 result seam as Ludo.",
+            "Planned arcv2m1A game - no locked spec yet. Same proof-of-play contract + same arcv2m2 result seam as Ludo.",
             "Lock the spec here (status -> locked) BEFORE building; the agent then uses this entry as the build + test benchmark."
           ]
         },
         {
-          "id": "M1A",
+          "id": "arcv2m1A",
           "gameKey": "chess",
           "title": "Chess",
           "status": "locked",
           "lockedAt": "2026-09-15",
-          "summary": "LOCKED build spec for M1A Chess (MultiNations). The agent MUST read this before/during the Chess build, test against it, and only conclude M1 for Chess when the build matches it end to end. Chess is fully on-chain for BOTH single player and multiplayer: board, rules, history, and the computer opponent live in the program; the frontend only displays and sends intended moves. Anything not stated in this spec is not built.",
+          "summary": "LOCKED build spec for arcv2m1A Chess (MultiNations). The agent MUST read this before/during the Chess build, test against it, and only conclude arcv2m1 for Chess when the build matches it end to end. Chess is fully on-chain for BOTH single player and multiplayer: board, rules, history, and the computer opponent live in the program; the frontend only displays and sends intended moves. Anything not stated in this spec is not built.",
           "details": [
             "RULESET (world standard, public domain): implement the FIDE Laws of Chess (the globally used competitive ruleset) in our OWN wording. The rules of chess are facts and procedures and are not copyrightable; FIDE handbook TEXT is copyrighted, so never copy FIDE wording and never use FIDE event names, FIDE branding, or Chess.com branding/assets. Standard Staunton-style pieces only. This is the international chess line (Chaturanga to shatranj to modern chess), NOT Xiangqi, Shogi or Janggi; those are separate games on their own country cards and are never treated as chess skins.",
             "BOARD AND SETUP: 8x8 board, 64 squares, alternating light and dark, a light square in each player's near-right corner. Standard start: rooks, knights, bishops, queen on her own colour, king, then eight pawns. White moves first. Coordinates a1 to h8. Each side: one king, one queen, two rooks, two bishops, two knights, eight pawns.",
@@ -255,213 +255,213 @@
             "CHESS CLOCK (on-chain deadlines plus a permissionless claim_timeout, NO crank): standard time controls with a base time plus increment, chosen from popular-standard presets: 1+0 bullet, 3+2 blitz, 5+0 blitz, 10+0 rapid as the DEFAULT, and 30+0 classical, configurable per match. A safety cap of 300 plies finishes the game as an automatic draw, to bound the history array (a safety bound, never a rule change). Each seat has an on-chain clock and an absolute deadline; every move stamps it and adds the increment. When a seat's clock lapses, ANYONE may call a permissionless claim_timeout (exactly the Ludo expire_turn pattern, in the same program): the program verifies the deadline from on-chain timestamps and finalises the game as a win for the opponent, deterministically, no matter who calls it or how much later. The browser is never trusted to enforce the clock. A MagicBlock crank to auto-trigger the timeout is OPTIONAL and DEFERRED; it is not required for correctness and adds no new program or dependency. Agreed draws are allowed (a mutual offer then accept), matching standard chess.",
             "COMPUTER OPPONENT (on-chain): the AI is produced by the program, never by the client. It is a deterministic light engine: full legal move generation plus a shallow search (material plus simple positional scoring, one to two plies, plus a small opening book), sized to fit the ER compute budget and requesting up to 1.4M compute units per transaction when needed. AI moves are signed by the house/sponsor key (server-side, like Ludo's house roll) so a player can never retry the AI until it blunders. Deeper search and any engine beyond the compute budget are DEFERRED to the mainnet phase. Two difficulty levels are offered: light and standard.",
             "MATCH LIFECYCLE AND STATUSES: created or lobby (status 0), in progress (status 1), finished (status 2). Outcomes: white wins, black wins, or draw. End reasons: checkmate, resignation, timeout or clock, and the draw reasons (stalemate, threefold, fifty-move, insufficient material, agreement). Abandon is not a completion. Only a COMPLETED match emits the seam and can earn; abandoned or disconnected matches never reward and never draw a life.",
-            "RESULT SEAM (M2): on completion the game publishes the gfg:game-result@1 envelope via window.publishGameResult, carrying seat to wallet identity exactly like Ludo's multiplayer, so each logged-in seat is credited at its own wallet. M1 is reward-blind: it reports the outcome and the finish facts and does nothing about points.",
-            "LOCAL POINTS (M3 cross-ref): chess scoring maps a win to 1st place; a draw shares the position pool so a fair draw is not punished; a loss earns nothing. ONLY a You or logged-in seat earns; house and computer seats never earn. Points are banked by the M3 universal module via the seam, never by the game. The exact point numbers are locked in M3 by the owner before the build; the win-as-1st mapping is fixed here.",
+            "RESULT SEAM (arcv2m2): on completion the game publishes the gfg:game-result@1 envelope via window.publishGameResult, carrying seat to wallet identity exactly like Ludo's multiplayer, so each logged-in seat is credited at its own wallet. arcv2m1 is reward-blind: it reports the outcome and the finish facts and does nothing about points.",
+            "LOCAL POINTS (arcv2m3 cross-ref): chess scoring maps a win to 1st place; a draw shares the position pool so a fair draw is not punished; a loss earns nothing. ONLY a You or logged-in seat earns; house and computer seats never earn. Points are banked by the arcv2m3 universal module via the seam, never by the game. The exact point numbers are locked in arcv2m3 by the owner before the build; the win-as-1st mapping is fixed here.",
             "FRONTEND: display only, mobile first, in the existing brand. Piece rendering MAY use an open-source board and piece set freely for display (drag and drop plus classic Staunton-style pieces), but the frontend holds NO rules authority. It renders the on-chain board and sends intended moves with the session key (gasless). Board coordinates, last-move highlight, check indicator and legal-move hints are UI conveniences derived from the on-chain state (read from the ER or server), never authoritative.",
             "SESSION KEYS AND GASLESS: the player's session key signs moves on the ER (0 SOL, no wallet popups). Onboarding (one-time create plus delegate) is sponsor-paid and bundled with the existing dice, points, result, global, premium and lives PDAs. There is no new per-move cost to the player or the sponsor.",
             "PROGRAM PLACEMENT (SINGLE PROGRAM, owner-locked 2026-09-15): chess ships as ADDITIVE instructions on the SAME gfg program (program id unchanged), never a second program. The chess code lives in its own Rust module file inside the same crate (for example src/chess.rs) so the crate stays organised and one deploy, one IDL, and shared lives and points are preserved. New seed prefix (gfgchess*), versioned account layouts (a version u8 first), a permissionless idempotent migrate_* for any layout change, and an undelegate_* for every new per-player PDA, per the solana-upgrade-safety rule. No live Ludo seed or layout is ever changed. Guardrail: if the .so size or compile time ever becomes a real problem (it is about 1.18 MB today and chess adds little), revisit splitting into a chess module program; the default stays one program.",
-            "TESTS (the build benchmark; all must pass before M1 is complete for Chess): (a) perft-style legal move generation matching known standard node counts for the opening positions; (b) checkmate, stalemate, threefold repetition, fifty-move and insufficient material detection; (c) castling rights plus en passant plus promotion correctness; (d) on-chain rejection of illegal moves (moving into check, wrong seat, out of turn, illegal piece movement); (e) clock plus crank timeout forfeit with no client online; (f) lives gate pass and fail plus exactly one life per completed match; (g) seam emission with wallet-correct crediting; (h) gasless ER writes from a 0-SOL session key. The spec is the benchmark; only an end-to-end match against it concludes M1 for Chess.",
+            "TESTS (the build benchmark; all must pass before arcv2m1 is complete for Chess): (a) perft-style legal move generation matching known standard node counts for the opening positions; (b) checkmate, stalemate, threefold repetition, fifty-move and insufficient material detection; (c) castling rights plus en passant plus promotion correctness; (d) on-chain rejection of illegal moves (moving into check, wrong seat, out of turn, illegal piece movement); (e) clock plus crank timeout forfeit with no client online; (f) lives gate pass and fail plus exactly one life per completed match; (g) seam emission with wallet-correct crediting; (h) gasless ER writes from a 0-SOL session key. The spec is the benchmark; only an end-to-end match against it concludes arcv2m1 for Chess.",
             "MULTINATIONS CATEGORY: chess is listed under the MultiNations country row (India, Iran, Spain, Italy) on /games and /countries. The prep page (About, Who shaped this board, How to play) already ships; the Play button stays disabled until the on-chain game passes the benchmark.",
-            "DEFERRED TO MAINNET (explicitly NOT in this build): staking or entry-fee chess (would use Ephemeral SPL Token custody), private or hidden chess (not needed, chess is perfect information), deeper AI search, tournament pairing and ratings via SOAR, and any matchmaking beyond the existing M12 multiplayer rail. These are listed only so the build does not drift into them.",
-            "DEPENDENCIES: M1 (game core plus rules), M2 (result seam), M3 (points), M10 (lives), M12 (multiplayer rail), and the MagicBlock ER (delegation, session keys, ephemeral accounts, compute limits). No crank and no second program are required. Uses the existing sponsor relay and the region-agnostic RPC rules.",
-            "BUILD PHASES (LOCKED order; each phase must pass its own tests before the next begins, and no phase starts before the previous one is green): Phase 0 - ON-CHAIN DESIGN: seeds, account structs, instruction set, and the compute-budget plan (design doc approved before any program code). Phase 1 - ON-CHAIN CORE: the board account, full legal move generation, all special moves, and all end conditions, proven perft-correct and gasless on the ER. Phase 2 - SINGLE PLAYER: solo create and start, moves on the ER via the session key, the on-chain light AI, the on-chain lives gate, completion, the M2 seam, and the M3 win credit. Phase 3 - MULTIPLAYER: seats, join, seat authority, the M12 rail adapter, the on-chain clock plus permissionless claim_timeout (timeout forfeit), resignation and draw offers, and finish propagation to every device. Phase 4 - FRONTEND: the mobile-first display board and move input wired to the ER read and write, piece rendering, last-move and check indicators, and legal-move hints. Phase 5 - HARDENING: the full benchmark suite (perft counts, end conditions, castling, en passant and promotion, illegal-move rejection, permissionless timeout with no client online, lives gate, seam crediting, gasless 0-SOL writes), region-agnostic re-pin checks, and the completed A-Z recheck against this spec. M1 for Chess is called complete only after Phase 5 passes."
+            "DEFERRED TO MAINNET (explicitly NOT in this build): staking or entry-fee chess (would use Ephemeral SPL Token custody), private or hidden chess (not needed, chess is perfect information), deeper AI search, tournament pairing and ratings via SOAR, and any matchmaking beyond the existing arcv2m12 multiplayer rail. These are listed only so the build does not drift into them.",
+            "DEPENDENCIES: arcv2m1 (game core plus rules), arcv2m2 (result seam), arcv2m3 (points), arcv2m10 (lives), arcv2m12 (multiplayer rail), and the MagicBlock ER (delegation, session keys, ephemeral accounts, compute limits). No crank and no second program are required. Uses the existing sponsor relay and the region-agnostic RPC rules.",
+            "BUILD PHASES (LOCKED order; each phase must pass its own tests before the next begins, and no phase starts before the previous one is green): Phase 0 - ON-CHAIN DESIGN: seeds, account structs, instruction set, and the compute-budget plan (design doc approved before any program code). Phase 1 - ON-CHAIN CORE: the board account, full legal move generation, all special moves, and all end conditions, proven perft-correct and gasless on the ER. Phase 2 - SINGLE PLAYER: solo create and start, moves on the ER via the session key, the on-chain light AI, the on-chain lives gate, completion, the arcv2m2 seam, and the arcv2m3 win credit. Phase 3 - MULTIPLAYER: seats, join, seat authority, the arcv2m12 rail adapter, the on-chain clock plus permissionless claim_timeout (timeout forfeit), resignation and draw offers, and finish propagation to every device. Phase 4 - FRONTEND: the mobile-first display board and move input wired to the ER read and write, piece rendering, last-move and check indicators, and legal-move hints. Phase 5 - HARDENING: the full benchmark suite (perft counts, end conditions, castling, en passant and promotion, illegal-move rejection, permissionless timeout with no client online, lives gate, seam crediting, gasless 0-SOL writes), region-agnostic re-pin checks, and the completed A-Z recheck against this spec. arcv2m1 for Chess is called complete only after Phase 5 passes."
           ]
         }
       ]
     },
     {
-      "id": "M2",
+      "id": "arcv2m2",
       "title": "Universal result seam (the plug-and-play contract bus)",
       "status": "in-progress",
       "summary": "The single integration contract between every game and every reward module. One call per game finish, one subscription for all consumers. Standalone because it is the platform's wiring: 50 games = 1 reward plug, 1 competition plug.",
       "expectedOutput": {
-        "summary": "What M2 MUST emit after normalizing a game's envelope. Every downstream consumer (M3, M4, M7, future) receives exactly this normalized envelope.",
+        "summary": "What arcv2m2 MUST emit after normalizing a game's envelope. Every downstream consumer (arcv2m3, arcv2m4, arcv2m7, future) receives exactly this normalized envelope.",
         "items": [
           "NORMALIZED ENVELOPE (emitted to all subscribers via onGameResult callback + gfg:game-result DOM event): { schema: 'gfg:game-result@1', gameId: string, mode: string, startedAt: number|null, finishedAt: number, players: [{ seat: string, actor: 'user'|'house'|'local', position: number|null, score: number|null, identity: string|null }], proof: { method: string, chain: string, signature: string|null, pda: string|null } | null }",
-          "GAME_ID PASSTHROUGH: the gameId from the raw emit is preserved exactly. This is the PRIMARY KEY downstream modules use (M3 maps it to gameTag for on-chain seed, M4 maps it to source identity). M2 does NOT modify gameId.",
-          "WALLET IDENTITY ATTACHMENT: for every player where actor='user', the bus resolves the connected wallet address and attaches it as player.identity. Downstream modules (M3, M4) use this to find the correct on-chain PDA.",
-          "VALIDATION: M2 rejects malformed envelopes with clear error messages (missing gameId, empty players, invalid actor, missing position/score). Games fix their emit; downstream modules never see bad data.",
-          "SUBSCRIPTION API: window.onGameResult(handler) \u2192 returns unsubscribe function. handler receives the normalized envelope. Also: window.gfgLastGameResult (last result), gfg:game-result DOM CustomEvent."
+          "GAME_ID PASSTHROUGH: the gameId from the raw emit is preserved exactly. This is the PRIMARY KEY downstream modules use (arcv2m3 maps it to gameTag for on-chain seed, arcv2m4 maps it to source identity). arcv2m2 does NOT modify gameId.",
+          "WALLET IDENTITY ATTACHMENT: for every player where actor='user', the bus resolves the connected wallet address and attaches it as player.identity. Downstream modules (arcv2m3, arcv2m4) use this to find the correct on-chain PDA.",
+          "VALIDATION: arcv2m2 rejects malformed envelopes with clear error messages (missing gameId, empty players, invalid actor, missing position/score). Games fix their emit; downstream modules never see bad data.",
+          "SUBSCRIPTION API: window.onGameResult(handler) → returns unsubscribe function. handler receives the normalized envelope. Also: window.gfgLastGameResult (last result), gfg:game-result DOM CustomEvent."
         ]
       },
       "expectedInput": {
-        "summary": "What M2 RECEIVES from games (M1). This is the raw emit that M2 normalizes.",
+        "summary": "What arcv2m2 RECEIVES from games (arcv2m1). This is the raw emit that arcv2m2 normalizes.",
         "items": [
-          "RAW EMIT from window.publishGameResult({gameId, mode, startedAt, finishedAt, players[], proof}): the raw envelope from any M1 game. gameId is required. players[] must have 1-64 entries, each with seat + (position OR score). proof is optional.",
-          "GAME_ID: string identifying the game (e.g. 'ludo'). Must be stable, lowercase, no spaces. M2 passes it through unchanged.",
+          "RAW EMIT from window.publishGameResult({gameId, mode, startedAt, finishedAt, players[], proof}): the raw envelope from any arcv2m1 game. gameId is required. players[] must have 1-64 entries, each with seat + (position OR score). proof is optional.",
+          "GAME_ID: string identifying the game (e.g. 'ludo'). Must be stable, lowercase, no spaces. arcv2m2 passes it through unchanged.",
           "PLAYERS: array of seat objects. actor defaults to 'local' if omitted. position OR score required per player.",
           "PROOF: optional on-chain proof object. If present, must have method + chain. signature and pda are optional."
         ]
       },
       "details": [
-        "Standalone module: it does NOT fit under game core (M1) or any reward module. It is the bus every game emits into and every consumer subscribes to.",
+        "Standalone module: it does NOT fit under game core (arcv2m1) or any reward module. It is the bus every game emits into and every consumer subscribes to.",
         "Canonical envelope gfg:game-result@1: players[] with seat/actor (user|house|local)/position|score + optional on-chain proof. Implemented in public/universal/result-seam/game-result.js.",
-        "Every M1 game ends with one call: window.publishGameResult({gameId, players, proof}). The bus validates/normalizes, attaches wallet identity to 'user' seats, and fans the result out.",
-        "Consumers subscribe via window.onGameResult(handler) + a 'gfg:game-result' DOM event. M3/M4/M7 (local points, global ledgers, competitions) subscribe here and NEVER read game internals.",
+        "Every arcv2m1 game ends with one call: window.publishGameResult({gameId, players, proof}). The bus validates/normalizes, attaches wallet identity to 'user' seats, and fans the result out.",
+        "Consumers subscribe via window.onGameResult(handler) + a 'gfg:game-result' DOM event. arcv2m3/arcv2m4/arcv2m7 (local points, global ledgers, competitions) subscribe here and NEVER read game internals.",
         "No game ships its own reward/competition plug. Adding a new game = emit the same envelope; the platform does not change.",
         "Ludo (ludo-lab) now emits this envelope on match completion (replaces the ad-hoc onGfgMatchResult seam).",
-        "PHYSICAL HOME (universal/): every universal module lives under public/universal/ (result-seam/ = M2, points/ = M3, ledgers/ = M4, assets/ = M4 inventory wallet, subscription/ = M5, point-sources/ = M6, competitions/ = M7, escrow/ = M8). A game plugs in ONCE (window.publishGameResult); a universal module subscribes ONCE (window.onGameResult) and updates inside its own folder without ever touching a game. UNIVERSAL MEANS REUSABLE BY NAME: a universal module is game-agnostic - any M1 game (Ludo, Ayo Olopon, ...) plugs into it and reuses it; it is NEVER tailored to one game the way M1 game code is."
+        "PHYSICAL HOME (universal/): every universal module lives under public/universal/ (result-seam/ = arcv2m2, points/ = arcv2m3, ledgers/ = arcv2m4, assets/ = arcv2m4 inventory wallet, subscription/ = arcv2m5, point-sources/ = arcv2m6, competitions/ = arcv2m7, escrow/ = arcv2m8). A game plugs in ONCE (window.publishGameResult); a universal module subscribes ONCE (window.onGameResult) and updates inside its own folder without ever touching a game. UNIVERSAL MEANS REUSABLE BY NAME: a universal module is game-agnostic - any arcv2m1 game (Ludo, Ayo Olopon, ...) plugs into it and reuses it; it is NEVER tailored to one game the way arcv2m1 game code is."
       ]
     },
     {
-      "id": "M3",
+      "id": "arcv2m3",
       "title": "Local points (per game, PURE + SPENDABLE, on-chain via ER)",
       "status": "in-progress",
       "summary": "Two on-chain local ledgers per game per player, both gasless on the MagicBlock ER: (1) LOCAL PURE (unspendable lifetime): every verified win point ever earned in that game, never diluted, never spent - the native-gamer bragging-rights source of truth; (2) LOCAL SPENDABLE: the spendable split of that same game's earned points, drawn down only by that game's own in-game spends (future shop), never a bragging-rights number. Only the signed-in 'You' seat ever earns; computers and non-You humans earn nothing regardless of position.",
       "expectedInput": {
-        "summary": "What M3 RECEIVES from upstream modules and infrastructure. M3 subscribes to M2 and nothing else upstream.",
+        "summary": "What arcv2m3 RECEIVES from upstream modules and infrastructure. arcv2m3 subscribes to arcv2m2 and nothing else upstream.",
         "items": [
-          "FROM M2 SEAM (via window.onGameResult): the normalized envelope { schema, gameId, mode, startedAt, finishedAt, players[], proof }. M3 reads: (a) gameId \u2192 maps to its internal GAMES config to find gameTag + scoring table, (b) players[] \u2192 finds actor='user' seat to get position, (c) proof.signature \u2192 first 8 bytes become match_ref for on-chain idempotency guard.",
-          "GAME_ID (critical input): the gameId from the envelope (e.g. 'ludo') is M3's PRIMARY KEY. M3 looks it up in its GAMES config to get: gameTag (the on-chain PDA seed), scoring table (position \u2192 points mapping), reason codes. M3 does NOT receive sourceTag from anyone \u2014 it DERIVES gameTag from gameId via its own config.",
-          "PLAYER WALLET: resolved by M2 bus as player.identity for actor='user' seats. M3 uses this to derive the on-chain PlayerPoints PDA address [gfgpoints, gameTag, player].",
+          "FROM arcv2m2 SEAM (via window.onGameResult): the normalized envelope { schema, gameId, mode, startedAt, finishedAt, players[], proof }. arcv2m3 reads: (a) gameId → maps to its internal GAMES config to find gameTag + scoring table, (b) players[] → finds actor='user' seat to get position, (c) proof.signature → first 8 bytes become match_ref for on-chain idempotency guard.",
+          "GAME_ID (critical input): the gameId from the envelope (e.g. 'ludo') is arcv2m3's PRIMARY KEY. arcv2m3 looks it up in its GAMES config to get: gameTag (the on-chain PDA seed), scoring table (position → points mapping), reason codes. arcv2m3 does NOT receive sourceTag from anyone — it DERIVES gameTag from gameId via its own config.",
+          "PLAYER WALLET: resolved by arcv2m2 bus as player.identity for actor='user' seats. arcv2m3 uses this to derive the on-chain PlayerPoints PDA address [gfgpoints, gameTag, player].",
           "INFRASTRUCTURE: window.magicblockDice.recordPoints() for on-chain writes, .fetchPointsPda() for reads, .spendLocal() for spends, .matchRefFromSignature() for match_ref derivation. All gasless on the ER."
         ]
       },
       "expectedOutput": {
-        "summary": "What M3 MUST expose for downstream modules (M4, M5, M6, UI). This is the contract M4 and other modules depend on. M4 MUST NOT duplicate M3's scoring tables or source identity logic.",
+        "summary": "What arcv2m3 MUST expose for downstream modules (arcv2m4, arcv2m5, arcv2m6, UI). This is the contract arcv2m4 and other modules depend on. arcv2m4 MUST NOT duplicate arcv2m3's scoring tables or source identity logic.",
         "items": [
-          "WINDOW API (window.localPoints): the programmatic contract for downstream modules. get(gameTag) \u2192 {pureLifetime, spendableBalance, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, lastSpendTs, lastSpendRef, lastSpendReason}. fetch(gameTag) \u2192 blocking version. spend(gameTag, amount, reason, ref) \u2192 on-chain spend. subscribe(cb) \u2192 returns unsubscribe fn. lastAward/get lastSeenAward/get lastError/get lastError \u2192 ceremony state. clearTransient() \u2192 reset.",
-          "GAME_TAG (the source identity downstream modules need): M3 knows the gameTag for every award it computes (derived from gameId via its GAMES config). This gameTag is the canonical source identity that M4 SHOULD receive and store on-chain \u2014 NOT a hardcoded string. M3 exposes it in lastAward.gameTag and in the subscribe callback's first argument.",
-          "AWARD METADATA (passed to subscribers): { gameTag, points, position, reason, matchRef }. This is exactly what M4 needs to credit the global ledger. M4 should consume this from M3 (or from the shared M2 envelope) rather than recomputing it.",
-          "DOM SLOTS: [data-local-points-pure] \u2192 pureLifetime value, [data-local-points-spendable] \u2192 spendableBalance value, [data-local-points-game] \u2192 gameTag string, [data-local-points-last] \u2192 '+ N pts' or '\u2014'. Any game page can place these slots and M3 fills them.",
+          "WINDOW API (window.localPoints): the programmatic contract for downstream modules. get(gameTag) → {pureLifetime, spendableBalance, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, lastSpendTs, lastSpendRef, lastSpendReason}. fetch(gameTag) → blocking version. spend(gameTag, amount, reason, ref) → on-chain spend. subscribe(cb) → returns unsubscribe fn. lastAward/get lastSeenAward/get lastError/get lastError → ceremony state. clearTransient() → reset.",
+          "GAME_TAG (the source identity downstream modules need): arcv2m3 knows the gameTag for every award it computes (derived from gameId via its GAMES config). This gameTag is the canonical source identity that arcv2m4 SHOULD receive and store on-chain — NOT a hardcoded string. arcv2m3 exposes it in lastAward.gameTag and in the subscribe callback's first argument.",
+          "AWARD METADATA (passed to subscribers): { gameTag, points, position, reason, matchRef }. This is exactly what arcv2m4 needs to credit the global ledger. arcv2m4 should consume this from arcv2m3 (or from the shared arcv2m2 envelope) rather than recomputing it.",
+          "DOM SLOTS: [data-local-points-pure] → pureLifetime value, [data-local-points-spendable] → spendableBalance value, [data-local-points-game] → gameTag string, [data-local-points-last] → '+ N pts' or '—'. Any game page can place these slots and arcv2m3 fills them.",
           "ON-CHAIN: PlayerPoints PDA per game per player. Seed [gfgpoints, game_tag, player_authority]. Tracks: local_pure_lifetime (u64), local_spendable_balance (u64). Metadata: last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count. game_tag is IN THE SEED (not stored in the account).",
-          "NO DILUTION (hard rule, output guarantee): local pure NEVER receives signup bonus, purchases, referral, giveaways, or Active Tier multiplier. Those are M6\u2192M4 only. This is an output contract \u2014 any consumer can trust that local pure is always honest gameplay."
+          "NO DILUTION (hard rule, output guarantee): local pure NEVER receives signup bonus, purchases, referral, giveaways, or Active Tier multiplier. Those are arcv2m6→arcv2m4 only. This is an output contract — any consumer can trust that local pure is always honest gameplay."
         ]
       },
       "details": [
-        "BUILD ORDER: M3 is the FIRST universal consumer of the result seam (M2) - it proves the bus end-to-end. Build after M1 (Ludo complete) + M2 (seam live). D1/D2/D3 owner-locked 2026-08-16.",
-        "TWO-TRACK DESIGN (owner decision 2026-08-16): mirrors the global M4 lifetime/spendable split but PER GAME. Track 1 LOCAL PURE = cumulative lifetime won points in that game, unspendable, undiluted (no purchase/referral/giveaway/multiplier ever here) - source of truth for native-game competency. Track 2 LOCAL SPENDABLE = the spendable split of the same wins (credited together with pure on a verified win), decremented ONLY by that game's own in-game purchases/items (S3 shop), goes up and down, never a bragging-rights number. ONE PDA holds both tracks so one account = one delegation = one onboarding fee.",
-        "PROGRAM DECISION (owner-approved, MagicBlock-researched 2026-08-16): NO new program - EXTEND the existing delegated gfg program (it is game-agnostic: game_tag is data, not code). Rationale: MagicBlock public ER nodes are gasless (tx fee 0; only session 0.0003 SOL at undelegation + commit 0.0001 SOL are paid by the sponsor/delegator, never the user). One delegated program = ONE ER session per player = ONE onboarding fee (init+delegate ~0.0086 SOL for dice+points+result), every record_points / spend_local after that is FREE. A second program would force a second delegation + second onboarding per player per game - unsustainable for 50+ games. Modularity lives in the M3 universal module (public/universal/points/) + game_tag seeds, NOT a new program.",
+        "BUILD ORDER: arcv2m3 is the FIRST universal consumer of the result seam (arcv2m2) - it proves the bus end-to-end. Build after arcv2m1 (Ludo complete) + arcv2m2 (seam live). D1/D2/D3 owner-locked 2026-08-16.",
+        "TWO-TRACK DESIGN (owner decision 2026-08-16): mirrors the global arcv2m4 lifetime/spendable split but PER GAME. Track 1 LOCAL PURE = cumulative lifetime won points in that game, unspendable, undiluted (no purchase/referral/giveaway/multiplier ever here) - source of truth for native-game competency. Track 2 LOCAL SPENDABLE = the spendable split of the same wins (credited together with pure on a verified win), decremented ONLY by that game's own in-game purchases/items (S3 shop), goes up and down, never a bragging-rights number. ONE PDA holds both tracks so one account = one delegation = one onboarding fee.",
+        "PROGRAM DECISION (owner-approved, MagicBlock-researched 2026-08-16): NO new program - EXTEND the existing delegated gfg program (it is game-agnostic: game_tag is data, not code). Rationale: MagicBlock public ER nodes are gasless (tx fee 0; only session 0.0003 SOL at undelegation + commit 0.0001 SOL are paid by the sponsor/delegator, never the user). One delegated program = ONE ER session per player = ONE onboarding fee (init+delegate ~0.0086 SOL for dice+points+result), every record_points / spend_local after that is FREE. A second program would force a second delegation + second onboarding per player per game - unsustainable for 50+ games. Modularity lives in the arcv2m3 universal module (public/universal/points/) + game_tag seeds, NOT a new program.",
         "SEEDS (D2 locked): PlayerPoints PDA = [gfgpoints, game_tag, player_authority]. game_tag ('ludo', 'ayo_olopon') isolates each game's ledger; 50+ games each get their own. D2 originally said old untagged gfgpoints PDAs (pre-module Scope B) 'become stale - wipable, no migration' - SHIPPED STRONGER (2026-08-16): the program gained a permissionless, idempotent migrate_points instruction that copies the legacy [gfgpoints, player] account (old total_points layout) into the per-game [gfgpoints, game_tag, player] ledger as BOTH tracks (1:1 split), so no lifetime points are lost across the seed change; the legacy account is left as a tombstone (never closed). All tracked devnet players migrated live. Enforced by .opencode/rules/solana-upgrade-safety.md.",
-        "ACCOUNT (PlayerPoints rework, shipped): fields local_pure_lifetime (u64), local_spendable_balance (u64), last_points, last_reason, last_match_ref (first 8 bytes of the proof-roll sig as u64), last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count. game_tag is IN THE SEED, not stored (a re-tag would orphan the ledger). local_ prefix reserved so M4 globals can add global_* later.",
+        "ACCOUNT (PlayerPoints rework, shipped): fields local_pure_lifetime (u64), local_spendable_balance (u64), last_points, last_reason, last_match_ref (first 8 bytes of the proof-roll sig as u64), last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count. game_tag is IN THE SEED, not stored (a re-tag would orphan the ledger). local_ prefix reserved so arcv2m4 globals can add global_* later.",
         "INSTRUCTIONS (same program id, deployed 2026-08-16, 22 instructions): initialize_points(game_tag), delegate_points(game_tag) (seed [gfgpoints, game_tag, authority]), record_points(game_tag, points, reason, match_ref) - credits local_pure_lifetime AND local_spendable_balance together on a verified win + duplicate-match_ref guard, NEW spend_local(game_tag, amount, reason, spend_ref) - decrements local_spendable_balance ONLY (pure untouched), InsufficientBalance guard, runs gasless on ER (session key signs, 0 SOL), NEW migrate_points(game_tag) - permissionless base-layer data-preservation migration (see SEEDS above).",
         "RELAY: scripts/delegate-relay.mjs handleDelegate(player, gameTag='ludo') creates + delegates the tagged points PDA alongside dice + result PDAs in one idempotent call; handleMigratePoints(player, gameTag) runs the on-chain migration (sponsor pays); POST /api/delegate accepts gameTag, POST /api/migrate-points runs the migration; spend ledger + caps unchanged.",
         "CLIENT (src/magicblock-vrf.js): recordPoints(gameTag, points, reason, matchRef) [wrapper also accepts legacy (points, reason, matchRef) -> gameTag 'ludo'], fetchPointsPda(gameTag) reads both tracks + spend audit, NEW spendLocal(gameTag, amount, reason, spendRef), claimComp(compPda, winnerIndex, gameTag), SPEND_REASONS exposed on window.",
-        "SCORING TABLE (D1 locked, Ludo - lives in the M3 module config, NOT the game; M1 never knows points rules): 4P mode -> 1st=100, 2nd=50, 3rd=10, 4th=0 (the game auto-ends once 3 winners emerge - the last seat cannot play against itself, so 4th earns nothing); 2P mode -> 1st=100 only (2P auto-ends the moment 1st emerges, so 2nd earns nothing). Graduated 4P rewards are a retention device: 'You' keeps playing for 50/10 even if not 1st. ONLY the 'You' (actor 'user') seat earns, at its own finishing position; house ('house') and local-human ('local') seats earn NOTHING even if they finish 1st. Mode derived from the envelope's players[] length (2 vs 4) - no M2 envelope change needed.",
+        "SCORING TABLE (D1 locked, Ludo - lives in the arcv2m3 module config, NOT the game; arcv2m1 never knows points rules): 4P mode -> 1st=100, 2nd=50, 3rd=10, 4th=0 (the game auto-ends once 3 winners emerge - the last seat cannot play against itself, so 4th earns nothing); 2P mode -> 1st=100 only (2P auto-ends the moment 1st emerges, so 2nd earns nothing). Graduated 4P rewards are a retention device: 'You' keeps playing for 50/10 even if not 1st. ONLY the 'You' (actor 'user') seat earns, at its own finishing position; house ('house') and local-human ('local') seats earn NOTHING even if they finish 1st. Mode derived from the envelope's players[] length (2 vs 4) - no arcv2m2 envelope change needed.",
         "GATING: envelope.proof.signature (valid on-chain proof roll) required to bank; match_ref = first 8 bytes of that signature. IDEMPOTENT by match_ref: the module keeps a processed-match_ref set (in-memory + localStorage) so a reload or duplicate seam event never double-banks; the program guards via last_match_ref too.",
-        "NO DILUTION (hard rule): local pure NEVER receives signup bonus, purchases, referral, giveaways, Active Tier multiplier - those are M6 -> M4 only. spendable_balance only ever moves from verified local wins (credit) and that game's own spends (debit).",
-        "MODULE (public/universal/points/, game-agnostic - ANY M1 game plugs in): subscribes window.onGameResult once, computes the award from its per-game scoring config, banks via recordPoints(gameTag), exposes window.localPoints { get(gameTag) -> {pure, spendable}, spend(gameTag, amount, reason, ref), subscribe(cb) }, and fills DOM slots data-local-points-pure / data-local-points-spendable on any game page. A new game = add its scoring table to the module config + emit the seam; no game-side reward code.",
+        "NO DILUTION (hard rule): local pure NEVER receives signup bonus, purchases, referral, giveaways, Active Tier multiplier - those are arcv2m6 -> arcv2m4 only. spendable_balance only ever moves from verified local wins (credit) and that game's own spends (debit).",
+        "MODULE (public/universal/points/, game-agnostic - ANY arcv2m1 game plugs in): subscribes window.onGameResult once, computes the award from its per-game scoring config, banks via recordPoints(gameTag), exposes window.localPoints { get(gameTag) -> {pure, spendable}, spend(gameTag, amount, reason, ref), subscribe(cb) }, and fills DOM slots data-local-points-pure / data-local-points-spendable on any game page. A new game = add its scoring table to the module config + emit the seam; no game-side reward code.",
         "ludo-lab UI: hosts the local-points display slot on the game page (pure + spendable). The game ships NO reward code (already clean: win-detection only emits the seam + Scope C result).",
         "LEGACY (D3 locked): public/games/ludo/ is NOT touched at all - all module work targets ludo-lab only. Its pre-module record_points call (old signature) will soft-fail silently after the rework - accepted.",
-        "RECOVERY: Supabase backup is a LATER step (devnet-wipe recovery) - the on-chain records carry enough (game_tag, reason, match_ref, points) to rebuild both tracks; spend events are replayable too. Not built in the first M3 pass; tracked in the M3 build item.",
-        "TEST (benchmark = this spec): M3 module harness - simulated envelopes for 2P/4P x user 1st..4th x house/local seats -> exact award (100/50/10/0, user-only), idempotency on duplicate match_ref, spend_local decrements spendable only; on-chain ER harness (er-test pattern) - gasless record_points + spend_local on a tagged PDA from a 0-SOL session key.",
+        "RECOVERY: Supabase backup is a LATER step (devnet-wipe recovery) - the on-chain records carry enough (game_tag, reason, match_ref, points) to rebuild both tracks; spend events are replayable too. Not built in the first arcv2m3 pass; tracked in the arcv2m3 build item.",
+        "TEST (benchmark = this spec): arcv2m3 module harness - simulated envelopes for 2P/4P x user 1st..4th x house/local seats -> exact award (100/50/10/0, user-only), idempotency on duplicate match_ref, spend_local decrements spendable only; on-chain ER harness (er-test pattern) - gasless record_points + spend_local on a tagged PDA from a 0-SOL session key.",
         "[2026-08-16 hardening+display]: intermediate pre-deploy build zeroed legacy ledgers during migrate_points (read-before-write); root cause FIXED in current deployed build (read legacy fully, copy 1:1 to tagged, tombstone), ELF-verified, re-verified no-op on restored ledgers. Restore tool scripts/restore-points.mjs (explicit + --from-supabase) restores wiped/zeroed ledgers (used to restore 3 orphaned legacy accounts 400/200/5000, verified on-chain, idempotent skip-guard). Harnesses: er-points-harness.mjs PASS (gasless record_points+spend_local 0-SOL player, spendable-only decrement) + m3-module-harness.mjs 29/29 (locked scoring, user-only, idempotency, spend, resilience: retry-on-transient, confirm-timeout ledger read-back recovery, hard-failure surfacing). Display wired: module exposes lastAward + (gameTag,ledger,award) notify + re-fetch on gfg:auth-changed; global header chip via initGlobalHeader({localPointsTag}); client pointsPda(gameTag) powers the profile on-chain ledger card.",
         "[2026-08-16 live verify + resilience]: owner re-tested the 2P win live on mobile and the +100 banked; on-chain crosscheck of the test wallet (FBWcuv...VnbCN) confirms the ludo points PDA (7aGs8riYmxQsMy1jiaGavw7Rnx6pb8gFwmC9VH4RfHDB) holds pure=100 spendable=100 award_count=1 reason=WIN_1ST bound to the proof-roll match_ref (0x136f6555f6). The root cause of the earlier silent no-show was browser-path error-swallowing (the on-chain write path itself was proven by scripts/browser-path-repro.mjs, a 0-SOL player as ER fee payer). Bank is now resilient + observable: 3x retry (idempotent via the program's DuplicateMatchRef guard), confirm-timeout recovered by re-reading the ledger, failed state surfaced via lastError + a status:'failed' notification. CEREMONY NEVER-PROMISE RULE: the ludo-lab ceremony shows '+N points loading... don't refresh the page' while the write is in flight and a neutral no-amount pending line on failure; the definitive '+N banked on-chain' appears ONLY once the write is confirmed. clearTransient() resets the award/error state on Play Again. Browser write path kept as scripts/browser-path-repro.mjs regression proof.",
-        "[2026-08-18 DISPLAY STABILITY CONTRACT (owner-approved, ludo-lab \u2014 locks the display behavior, source of truth for the fix):] window.localPoints.get(gameTag) ALWAYS background-refreshes the ledger (it never returns null without starting a fetch); the last-known ledger is rendered into the data-local-points-* DOM slots immediately on load AND on a failed/not-yet-ready refresh (no static '0 / \u2014' text sitting in the DOM until the wallet connects); caches are WALLET-KEYED (gfg_local_points_cache_v2, wallet per user) so a shared browser can never show another signed-in user's numbers; the module re-fetches when the Dynamic session/wallet is detected as restored (bounded wallet-ready poll after DOMContentLoaded) in addition to gfg:auth-changed, because gfg:auth-changed fires only on interactive sign-in/out and a silently restored session otherwise leaves the display stuck. Reason codes are position-aware: 1st=WIN_1ST(1), 2nd=WIN_2ND(2), 3rd=WIN_3RD(3) (program stores any u8 reason; the old code labelled every placed award WIN_1ST). The ludo-lab ceremony keeps the M3 award line (lastSeenAward/lastAward + subscribe, never-promise rule)."
+        "[2026-08-18 DISPLAY STABILITY CONTRACT (owner-approved, ludo-lab — locks the display behavior, source of truth for the fix):] window.localPoints.get(gameTag) ALWAYS background-refreshes the ledger (it never returns null without starting a fetch); the last-known ledger is rendered into the data-local-points-* DOM slots immediately on load AND on a failed/not-yet-ready refresh (no static '0 / —' text sitting in the DOM until the wallet connects); caches are WALLET-KEYED (gfg_local_points_cache_v2, wallet per user) so a shared browser can never show another signed-in user's numbers; the module re-fetches when the Dynamic session/wallet is detected as restored (bounded wallet-ready poll after DOMContentLoaded) in addition to gfg:auth-changed, because gfg:auth-changed fires only on interactive sign-in/out and a silently restored session otherwise leaves the display stuck. Reason codes are position-aware: 1st=WIN_1ST(1), 2nd=WIN_2ND(2), 3rd=WIN_3RD(3) (program stores any u8 reason; the old code labelled every placed award WIN_1ST). The ludo-lab ceremony keeps the arcv2m3 award line (lastSeenAward/lastAward + subscribe, never-promise rule)."
       ]
     },
     {
-      "id": "M4",
+      "id": "arcv2m4",
       "title": "Global points (3 ledgers) + on-chain inventory wallet (site-wide, decoupled from gameplay)",
       "status": "in-progress",
-      "summary": "M4a Global Pure (sum of M3 local wins across all games, no multiplier, honest cross-game skill total). M4b Global Lifetime (unspendable) - every point ever earned from any source. M4c Global Spendable - the spendable split of lifetime. The 2x/3x/4x multiplier applies ONLY at M4 flow-up, never on M3 or M4a. M4 ALSO owns the player's on-chain inventory/asset wallet ([gfgassets, player]): skins/items/sounds living IN the account (media bytes on-chain), the embedded wallet owns, the platform frontend views the chain bytes directly - 'the wallet is a viewer'.",
+      "summary": "M4a Global Pure (sum of arcv2m3 local wins across all games, no multiplier, honest cross-game skill total). M4b Global Lifetime (unspendable) - every point ever earned from any source. M4c Global Spendable - the spendable split of lifetime. The 2x/3x/4x multiplier applies ONLY at arcv2m4 flow-up, never on arcv2m3 or M4a. arcv2m4 ALSO owns the player's on-chain inventory/asset wallet ([gfgassets, player]): skins/items/sounds living IN the account (media bytes on-chain), the embedded wallet owns, the platform frontend views the chain bytes directly - 'the wallet is a viewer'.",
       "expectedInput": {
-        "summary": "What M4 RECEIVES from upstream modules. M4 consumes the M2 seam (game wins) and receives programmatic credits from M5 (tier boosts) and M6 (signup/referral/giveaway). M4 does NOT recompute scoring or invent source identities.",
+        "summary": "What arcv2m4 RECEIVES from upstream modules. arcv2m4 consumes the arcv2m2 seam (game wins) and receives programmatic credits from arcv2m5 (tier boosts) and arcv2m6 (signup/referral/giveaway). arcv2m4 does NOT recompute scoring or invent source identities.",
         "items": [
-          "FROM M3 (via M2 seam, the primary game-win input): when M3 banks a verified user-seat win, the M2 envelope carries: gameId (e.g. 'ludo', 'ayo_olopon'), players[] with actor='user' seat and its finishing position, proof.signature (on-chain proof, first 8 bytes become match_ref). M4 receives this envelope and MUST use gameId as the source identity. M4 must NOT duplicate M3's scoring table \u2014 M3 already computed points from position via its GAMES config. M4 is the bank, not the scorer.",
-          "FROM M5 (Active Tier) via window.globalLedger.credit(): { kind: 1, source: 'tier_boost' (M5 defines the exact tag), points: (multiplier-1)*base_points, reason: 5, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). M4 receives this as-is and stores source on-chain.",
-          "FROM M6 (Point Sources) via window.globalLedger.credit(): { kind: 1, source: 'signup_bonus'|'referral'|'giveaway' (M6 defines exact tags), points: <amount>, reason: 2|3|4, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). M4 receives this as-is and stores source on-chain.",
-          "CRITICAL RULE (learned from the source_tag bug, fixed 2026-08-17): M4 must NEVER duplicate M3's scoring table or invent source identity strings. M4 reads M3's lastAward (gameTag, points, reason) \u2014 M3 is the scorer, M4 is the bank. For kind=0 game wins, M4 maps gameTag to source_code (u8 enum) and passes it to the program. For kind=1 credits, M5/M6 pass their own source_code. M4 is a BANK, not a scorer \u2014 it receives and stores, it does not compute.",
+          "FROM arcv2m3 (via arcv2m2 seam, the primary game-win input): when arcv2m3 banks a verified user-seat win, the arcv2m2 envelope carries: gameId (e.g. 'ludo', 'ayo_olopon'), players[] with actor='user' seat and its finishing position, proof.signature (on-chain proof, first 8 bytes become match_ref). arcv2m4 receives this envelope and MUST use gameId as the source identity. arcv2m4 must NOT duplicate arcv2m3's scoring table — arcv2m3 already computed points from position via its GAMES config. arcv2m4 is the bank, not the scorer.",
+          "FROM arcv2m5 (Active Tier) via window.globalLedger.credit(): { kind: 1, source: 'tier_boost' (arcv2m5 defines the exact tag), points: (multiplier-1)*base_points, reason: 5, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). arcv2m4 receives this as-is and stores source on-chain.",
+          "FROM arcv2m6 (Point Sources) via window.globalLedger.credit(): { kind: 1, source: 'signup_bonus'|'referral'|'giveaway' (arcv2m6 defines exact tags), points: <amount>, reason: 2|3|4, matchRef }. kind=1 means M4b+M4c ONLY (never M4a pure). arcv2m4 receives this as-is and stores source on-chain.",
+          "CRITICAL RULE (learned from the source_tag bug, fixed 2026-08-17): arcv2m4 must NEVER duplicate arcv2m3's scoring table or invent source identity strings. arcv2m4 reads arcv2m3's lastAward (gameTag, points, reason) — arcv2m3 is the scorer, arcv2m4 is the bank. For kind=0 game wins, arcv2m4 maps gameTag to source_code (u8 enum) and passes it to the program. For kind=1 credits, arcv2m5/arcv2m6 pass their own source_code. arcv2m4 is a BANK, not a scorer — it receives and stores, it does not compute.",
           "INFRASTRUCTURE: window.magicblockDice.recordGlobalPoints() for on-chain writes, .fetchGlobalPointsPda() for reads, .spendGlobal() for spends. All gasless on the ER."
         ]
       },
       "expectedOutput": {
-        "summary": "What M4 MUST expose for downstream modules (M5, M6, M7, UI). This is the contract that M5/M6 call into for credits and spends.",
+        "summary": "What arcv2m4 MUST expose for downstream modules (arcv2m5, arcv2m6, arcv2m7, UI). This is the contract that arcv2m5/arcv2m6 call into for credits and spends.",
         "items": [
-          "WINDOW API (window.globalLedger): the programmatic contract. get() \u2192 {pureLifetime, lifetime, spendableBalance, lastSource, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, ...}. fetch() \u2192 blocking version. credit({source, kind, points, reason, matchRef}) \u2192 on-chain credit (M5/M6 call this). spend(amount, reason, ref) \u2192 on-chain spend. subscribe(cb) \u2192 returns unsubscribe fn. lastCredit/get lastSeenCredit/get lastError \u2192 ceremony state. clearTransient() \u2192 reset.",
-          "CREDIT API (the key downstream contract): window.globalLedger.credit({source, kind, points, reason, matchRef}) \u2014 this is how M5 (tier boost) and M6 (signup/referral/giveaway) add points to M4. M4 stores source on-chain as-is. kind=0 (game win) credits M4a+M4b+M4c. kind=1 (other) credits M4b+M4c only.",
+          "WINDOW API (window.globalLedger): the programmatic contract. get() → {pureLifetime, lifetime, spendableBalance, lastSource, lastPoints, lastReason, lastMatchRef, lastRecordedTs, awardCount, spendCount, ...}. fetch() → blocking version. credit({source, kind, points, reason, matchRef}) → on-chain credit (arcv2m5/arcv2m6 call this). spend(amount, reason, ref) → on-chain spend. subscribe(cb) → returns unsubscribe fn. lastCredit/get lastSeenCredit/get lastError → ceremony state. clearTransient() → reset.",
+          "CREDIT API (the key downstream contract): window.globalLedger.credit({source, kind, points, reason, matchRef}) — this is how arcv2m5 (tier boost) and arcv2m6 (signup/referral/giveaway) add points to arcv2m4. arcv2m4 stores source on-chain as-is. kind=0 (game win) credits M4a+M4b+M4c. kind=1 (other) credits M4b+M4c only.",
           "ON-CHAIN: GlobalPoints PDA per player. Seed [gfgpoints, 'global', player_authority]. Tracks: global_pure_lifetime (u64), global_lifetime (u64), global_spendable_balance (u64). Metadata: last_source (u8 source_code enum stored on-chain), last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_ts, last_spend_ref, last_spend_reason, spend_count.",
-          "DOM SLOTS: [data-global-pure] \u2192 pureLifetime, [data-global-lifetime] \u2192 lifetime, [data-global-spendable] \u2192 spendableBalance, [data-global-last] \u2192 '+ N pts' or '\u2014'. Any page can place these and M4 fills them.",
-          "FLOW-UP GUARANTEE (output contract): M4a pure is NEVER multiplied or bonus-inflated. Multiplier (M5) applies only to M4b+M4c as kind=1 credits. M6 sources apply only to M4b+M4c as kind=1 credits. Any consumer can trust that global_pure_lifetime = sum of verified game wins across all games, period."
+          "DOM SLOTS: [data-global-pure] → pureLifetime, [data-global-lifetime] → lifetime, [data-global-spendable] → spendableBalance, [data-global-last] → '+ N pts' or '—'. Any page can place these and arcv2m4 fills them.",
+          "FLOW-UP GUARANTEE (output contract): M4a pure is NEVER multiplied or bonus-inflated. Multiplier (arcv2m5) applies only to M4b+M4c as kind=1 credits. arcv2m6 sources apply only to M4b+M4c as kind=1 credits. Any consumer can trust that global_pure_lifetime = sum of verified game wins across all games, period."
         ]
       },
       "details": [
-        "M4a GLOBAL PURE: strictly the sum of M3 local wins across all games. No multiplier, no purchases, no bonus. The honest 'how good are you across the whole platform' number.",
+        "M4a GLOBAL PURE: strictly the sum of arcv2m3 local wins across all games. No multiplier, no purchases, no bonus. The honest 'how good are you across the whole platform' number.",
         "M4b GLOBAL LIFETIME (unspendable): every point ever earned from ANY source (game wins, signup bonus, giveaways, referral, sub multiplier). Permanent reputation/level number.",
         "M4c GLOBAL SPENDABLE: the spendable split of lifetime. Purchases, Active Tier buys, comp entries, cosmetics all flow here. Goes up and down.",
-        "Active Tier 2x/3x/4x multiplier applies ONLY at M4 flow-up (lifetime + spendable), NEVER on M3 local or M4a pure.",
-        "Source-tagged: every M4 credit carries its game/event source. For game wins (kind=0), the source IS the gameId from the M2 envelope (e.g. 'ludo'). For other credits (kind=1), the source is the tag from M5/M6 (e.g. 'signup_bonus', 'referral', 'tier_boost'). The program stores source as a u8 at last_source. FIXED (2026-08-17): changed source_tag parameter from String to u8 enum (source_code) in the program, with explicit codes (1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost). No layout change needed (still u8 at offset 32). M4 client no longer duplicates M3's scoring table \u2014 reads M3's lastAward (gameTag, points, reason) and maps gameTag to source_code.",
-        "ON-CHAIN (owner-locked 2026-08-16): the 3 global ledgers live on-chain via the SAME delegated gfg program, NOT in Supabase. Reuse the M3 decision: one delegated program = one ER session per player = one onboarding fee; every record_global / spend_global is gasless on the ER (session key signs, 0 fees). No new program.",
-        "SEED (fits the existing per-game scheme, game_tag is data not code): GlobalPoints PDA = [gfgpoints, 'global', player_authority] - the reserved 'global' tag, documented so no future game uses it. NEW separate account type (GlobalPoints layout: global_pure_lifetime, global_lifetime, global_spendable_balance, last_source, last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_*, spend_count) - do NOT extend the PlayerPoints layout (upgrade-safety R2: layouts are versioned; a separate account avoids touching the live M3 schema). No migration needed: the old single global_points/lifetime_points was Supabase-only, there is no legacy on-chain global account.",
-        "INSTRUCTIONS (same program id, new capability): initialize_global_points, delegate_global_points (seed [gfgpoints, 'global', authority]), record_global_points(kind u8, source_code u8, points, reason, match_ref) where kind 0 = GAME WIN (credits M4a pure + M4b lifetime + M4c spendable) and kind 1 = OTHER credit (signup_bonus/referral/giveaway - credits M4b + M4c ONLY, never M4a pure), duplicate match_ref guard; source_code enum: 1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost. M4 reads M3's lastAward and maps gameTag to source_code; spend_global(amount, reason, spend_ref) decrements M4c spendable ONLY (M4a/M4b untouched), InsufficientBalance guard, idempotent spend_ref. All gasless on the ER.",
-        "FLOW-UP CONTRACT (multiplier-blind M4 - best option): M4 does NOT know tiers. The Active Tier 2x/3x/4x multiplier lives in M5 and is applied as a SECOND, distinct credit through the same API: M4 subscribes to the seam and banks the BASE unmultiplied win into M4a+M4b+M4c; M5's tier driver then records the boost as its own credit (source_code 13=tier_boost, kind 1, points = (multiplier-1)*base) into M4b+M4c only. M4a pure therefore can NEVER be multiplied, by construction. Both writes are gasless; both idempotent by match_ref.",
-        "MODULE (public/universal/ledgers/, game-agnostic): subscribes window.onGameResult once for the base win credit; exposes window.globalLedger = { get() -> {pure, lifetime, spendable}, credit({source, kind, points, matchRef}), spend(amount, reason, ref), subscribe(cb) } so M5/M6/M7 drive boosts/credits/spends through one API. Mirror of the M3 module patterns (retry, confirm-timeout read-back recovery, never-promise display).",
-        "SUPABASE ROLE (owner decision 2026-08-16): backup/restore ONLY for devnet-wipe recovery before mainnet (same recovery model as M3's restore tool). It is never the live source of truth for any ledger.",
-        "Current state to change: today there is ONE global_points + lifetime_points on the profile and a single point_transactions ledger; this becomes the 3-ledger M4 model.",
-        "ORDERING: M4 consumes the result seam (M2) so it must be live before M5 money work - build after M3 is stable/verified for Ludo, before M5. Already the build order (M1+M2+M3 -> M4 -> M5).",
+        "Active Tier 2x/3x/4x multiplier applies ONLY at arcv2m4 flow-up (lifetime + spendable), NEVER on arcv2m3 local or M4a pure.",
+        "Source-tagged: every arcv2m4 credit carries its game/event source. For game wins (kind=0), the source IS the gameId from the arcv2m2 envelope (e.g. 'ludo'). For other credits (kind=1), the source is the tag from arcv2m5/arcv2m6 (e.g. 'signup_bonus', 'referral', 'tier_boost'). The program stores source as a u8 at last_source. FIXED (2026-08-17): changed source_tag parameter from String to u8 enum (source_code) in the program, with explicit codes (1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost). No layout change needed (still u8 at offset 32). arcv2m4 client no longer duplicates arcv2m3's scoring table — reads arcv2m3's lastAward (gameTag, points, reason) and maps gameTag to source_code.",
+        "ON-CHAIN (owner-locked 2026-08-16): the 3 global ledgers live on-chain via the SAME delegated gfg program, NOT in Supabase. Reuse the arcv2m3 decision: one delegated program = one ER session per player = one onboarding fee; every record_global / spend_global is gasless on the ER (session key signs, 0 fees). No new program.",
+        "SEED (fits the existing per-game scheme, game_tag is data not code): GlobalPoints PDA = [gfgpoints, 'global', player_authority] - the reserved 'global' tag, documented so no future game uses it. NEW separate account type (GlobalPoints layout: global_pure_lifetime, global_lifetime, global_spendable_balance, last_source, last_points, last_reason, last_match_ref, last_recorded_ts, award_count, last_spend_*, spend_count) - do NOT extend the PlayerPoints layout (upgrade-safety R2: layouts are versioned; a separate account avoids touching the live arcv2m3 schema). No migration needed: the old single global_points/lifetime_points was Supabase-only, there is no legacy on-chain global account.",
+        "INSTRUCTIONS (same program id, new capability): initialize_global_points, delegate_global_points (seed [gfgpoints, 'global', authority]), record_global_points(kind u8, source_code u8, points, reason, match_ref) where kind 0 = GAME WIN (credits M4a pure + M4b lifetime + M4c spendable) and kind 1 = OTHER credit (signup_bonus/referral/giveaway - credits M4b + M4c ONLY, never M4a pure), duplicate match_ref guard; source_code enum: 1=ludo, 2=ayo_olopon, 10=signup_bonus, 11=referral, 12=giveaway, 13=tier_boost. arcv2m4 reads arcv2m3's lastAward and maps gameTag to source_code; spend_global(amount, reason, spend_ref) decrements M4c spendable ONLY (M4a/M4b untouched), InsufficientBalance guard, idempotent spend_ref. All gasless on the ER.",
+        "FLOW-UP CONTRACT (multiplier-blind arcv2m4 - best option): arcv2m4 does NOT know tiers. The Active Tier 2x/3x/4x multiplier lives in arcv2m5 and is applied as a SECOND, distinct credit through the same API: arcv2m4 subscribes to the seam and banks the BASE unmultiplied win into M4a+M4b+M4c; arcv2m5's tier driver then records the boost as its own credit (source_code 13=tier_boost, kind 1, points = (multiplier-1)*base) into M4b+M4c only. M4a pure therefore can NEVER be multiplied, by construction. Both writes are gasless; both idempotent by match_ref.",
+        "MODULE (public/universal/ledgers/, game-agnostic): subscribes window.onGameResult once for the base win credit; exposes window.globalLedger = { get() -> {pure, lifetime, spendable}, credit({source, kind, points, matchRef}), spend(amount, reason, ref), subscribe(cb) } so arcv2m5/arcv2m6/arcv2m7 drive boosts/credits/spends through one API. Mirror of the arcv2m3 module patterns (retry, confirm-timeout read-back recovery, never-promise display).",
+        "SUPABASE ROLE (owner decision 2026-08-16): backup/restore ONLY for devnet-wipe recovery before mainnet (same recovery model as arcv2m3's restore tool). It is never the live source of truth for any ledger.",
+        "Current state to change: today there is ONE global_points + lifetime_points on the profile and a single point_transactions ledger; this becomes the 3-ledger arcv2m4 model.",
+        "ORDERING: arcv2m4 consumes the result seam (arcv2m2) so it must be live before arcv2m5 money work - build after arcv2m3 is stable/verified for Ludo, before arcv2m5. Already the build order (arcv2m1+arcv2m2+arcv2m3 -> arcv2m4 -> arcv2m5).",
         "ON-CHAIN INVENTORY + ASSETS (owner-locked 2026-08-17, feasibility MagicBlock-researched): the player's on-chain item wallet - skins, cosmetics, items, sounds. The 'wallet is a viewer' model: the account IS the source of truth for BOTH ownership and (by default) the media bytes; the embedded wallet owns it, the platform frontend reads the account and renders the media directly (open the on-chain image/sound and see it, no external host in the path). Feasibility proven by MagicBlock docs + samples: the ER executes any Solana account model gasless (ER lifecycle: tx fee 0, ~50ms slots, ~100ms confirm; pricing: base 0 per tx, 0.0003 SOL per ER session at undelegation, 0.0001 SOL per commit, VRF on ER free); Solana Generals generates its map via an ER transaction (fully on-chain game, 100% serverless); Magic UNO deals/plays/draws every card on-chain gasless with VRF shuffles; Session Keys are the documented pattern for 'in-app NFTs purchase' (scoped, time-limited, gasless); the MagicBlock Asset Manager SDK ships exactly this storage pattern - 'store assets (images, animations, sounds, JSON metadata) directly in an Assets account on the ER' (base64 compression, IPFS optional, DApp loads assets directly from the ER). No new program - same delegated gfg program, one ER session per player, every grant/equip gasless.",
         "ASSET ACCOUNT (PlayerAssets): PDA [gfgassets, player_authority], NEW seed prefix gfgassets (immutable, upgrade-safety R1), site-wide (a skin owned once is owned across games; per-game scoping is an entry field, NOT the seed). Layout versioned from day one (R2): version u8, item_count u16, entries[] {asset_id u64, game_tag [u8;16], media_type u8 (png/webp/ogg/mp3/json), w u16, h u16, byte_len u32, data_offset u32, state u8 (owned/equipped/revoked), unlock_ts i64} + a media blob region holding the raw bytes (base64/compressed). Reads use getAccountInfo dataSlice so the profile fetches only one asset's byte range, never the whole account (read latency stays low regardless of account size).",
         "MEDIA-IN-ACCOUNT POLICY (owner decision): item media bytes live IN the account by default (the viewer opens the on-chain bytes directly - no IPFS/CDN simplification). Large full-res blobs (> ~128KB) become entry references (URL/CID) with ownership + entitlement still on-chain. Devnet = $0 at any size (faucet); mainnet cost = rent-exempt 0.00000696 SOL/byte (refundable if the account closes) + sponsor-absorbed session/commit micro-costs - so keep per-asset media lean and defer the size call until user counts are real. The account model is identical either way: zero rebuild, this is the mainnet-ready answer.",
         "INSTRUCTIONS (same program id, new capability, all gasless on the ER via the player's session key): initialize_assets, delegate_assets (seed [gfgassets, authority]), grant_asset(asset_id, media_type, w, h, data) - atomically writes an entry + its media bytes, update_asset_state(asset_id, state) - equip/unequip/revoke, add_asset_media(asset_id, offset, chunk) - chunked write for larger blobs. Ownership is program-enforced: only the account authority (session key) mutates.",
-        "MODULE (public/universal/assets/, game-agnostic, part of M4): window.gfgAssets = { list() -> owned items, open(assetId) -> {mediaType, blobUrl} (reads the account bytes with a sliced read, decodes, returns an object URL the UI renders in <img>/<audio>), equip(assetId), subscribe(cb) }. The profile page gains an 'Inventory wallet' card: grid of owned items, tap to open the media straight from the account bytes. Discovery/activation: the platform sees the item in the player's PDA and unlocks it in the UI - no separate DB truth. A new universal folder public/universal/assets/ homes it (mirrors into the M2 tree).",
-        "[2026-08-18 M4 FLOW-UP + DISPLAY STABILITY CONTRACT (owner-approved, ludo-lab \u2014 locks the behavior, source of truth for the fix):] M4 credits the GLOBAL ledger from the SAME seam envelope M3 banks from, with the award resolved by CROSS-MODULE match_ref (window.globalLedger never blindly credits): M4 reads M3's lastSeenAward/lastAward and accepts one ONLY when its match_ref equals THIS envelope's proof match_ref (bounded ~2s poll after the bus fires), so M4 banks exactly when M3 banks and can never credit a stale/other match's award. window.globalLedger.get() ALWAYS background-refreshes; the last-known ledger is rendered into [data-global-*] slots on load and on failed/wallet-not-ready refresh; cache is WALLET-KEYED (gfg_global_ledger_cache_v2); the module re-fetches on wallet-ready (bounded poll) + gfg:auth-changed. SITE-WIDE LOADING: the global-ledger module is loaded on EVERY page via the shared header (header.js injects it when absent) because the header pill is on every page and otherwise sits on 'Loading\u2026' permanently on pages without the module. The ludo-lab result ceremony shows an M4 credit line next to the M3 award line (banking / neutral pending / '+N global points banked on-chain', never-promise rule) and Play Again clears M4 transient state too."
+        "MODULE (public/universal/assets/, game-agnostic, part of arcv2m4): window.gfgAssets = { list() -> owned items, open(assetId) -> {mediaType, blobUrl} (reads the account bytes with a sliced read, decodes, returns an object URL the UI renders in <img>/<audio>), equip(assetId), subscribe(cb) }. The profile page gains an 'Inventory wallet' card: grid of owned items, tap to open the media straight from the account bytes. Discovery/activation: the platform sees the item in the player's PDA and unlocks it in the UI - no separate DB truth. A new universal folder public/universal/assets/ homes it (mirrors into the arcv2m2 tree).",
+        "[2026-08-18 arcv2m4 FLOW-UP + DISPLAY STABILITY CONTRACT (owner-approved, ludo-lab — locks the behavior, source of truth for the fix):] arcv2m4 credits the GLOBAL ledger from the SAME seam envelope arcv2m3 banks from, with the award resolved by CROSS-MODULE match_ref (window.globalLedger never blindly credits): arcv2m4 reads arcv2m3's lastSeenAward/lastAward and accepts one ONLY when its match_ref equals THIS envelope's proof match_ref (bounded ~2s poll after the bus fires), so arcv2m4 banks exactly when arcv2m3 banks and can never credit a stale/other match's award. window.globalLedger.get() ALWAYS background-refreshes; the last-known ledger is rendered into [data-global-*] slots on load and on failed/wallet-not-ready refresh; cache is WALLET-KEYED (gfg_global_ledger_cache_v2); the module re-fetches on wallet-ready (bounded poll) + gfg:auth-changed. SITE-WIDE LOADING: the global-ledger module is loaded on EVERY page via the shared header (header.js injects it when absent) because the header pill is on every page and otherwise sits on 'Loading…' permanently on pages without the module. The ludo-lab result ceremony shows an arcv2m4 credit line next to the arcv2m3 award line (banking / neutral pending / '+N global points banked on-chain', never-promise rule) and Play Again clears arcv2m4 transient state too."
       ]
     },
     {
-      "id": "M5",
+      "id": "arcv2m5",
       "title": "Subscription + Premium points (the money + launch engine)",
       "status": "in-progress",
-      "summary": "The consistent-money module: a monthly subscription (Active Tier, plan LADDER is CONFIG-DRIVEN (owner 2026-08-22) so more levels can be added later; launch ships Level-2 2x and Level-3 3x) bought with PREMIUM points, not global spendable. Premium points are their own on-chain ledger ([gfgprem, player]) acquired ONLY by direct purchase: premium_lifetime (credential, never spent) + premium_spendable (the subscription/special-purchase currency). The subscription powers the 2x win multiplier at M4 flow-up, the boosted daily reward and the bigger lives pool (both in M10). Non-cancellable, non-refundable. This is the LAUNCH GUIDE: every launch-critical piece (payment pipe, admin credit, receipts, 12-month affiliate, daily earn campaign) is specced here.",
+      "summary": "The consistent-money module: a monthly subscription (Active Tier, plan LADDER is CONFIG-DRIVEN (owner 2026-08-22) so more levels can be added later; launch ships Level-2 2x and Level-3 3x) bought with PREMIUM points, not global spendable. Premium points are their own on-chain ledger ([gfgprem, player]) acquired ONLY by direct purchase: premium_lifetime (credential, never spent) + premium_spendable (the subscription/special-purchase currency). The subscription powers the 2x win multiplier at arcv2m4 flow-up, the boosted daily reward and the bigger lives pool (both in arcv2m10). Non-cancellable, non-refundable. This is the LAUNCH GUIDE: every launch-critical piece (payment pipe, admin credit, receipts, 12-month affiliate, daily earn campaign) is specced here.",
       "expectedInput": {
-        "summary": "What M5 RECEIVES. Locked 2026-08-20 for the launch build.",
+        "summary": "What arcv2m5 RECEIVES. Locked 2026-08-20 for the launch build.",
         "items": [
           "FROM ADMIN (the ONLY way premium points enter the economy): after the owner verifies a manual Paystack bank-transfer payment, an admin-only page credits the player's premium ledger on-chain via a sponsor/ecror-authorized credit_premium_points instruction (writes premium_lifetime + premium_spendable together). $10 paid = 5,000 premium points credited (full on-chain worth), regardless of the Nigeria beta N5,000 cash value (15% of the $3 plan is the USD anchor): the plan's on-chain cost is fixed at 5,000P and the discount is a payment-side cash deal only.",
           "FROM PLAYER: buy intent (single 2x plan) submitted through the Paystack embed (owner supplies the embed code at build), Paystack set to MANUAL BANK TRANSFER ONLY (card payments disabled), the player emails the payment receipt to the owner for verification (activation typically within 24h).",
-          "FROM M4: window.globalLedger.get()/fetch() for balance display and reading base points at boost time. M4 is the bank, M5 only applies the multiplier there.",
-          "FROM M2 SEAM: the current verified game win's base points, to compute (multiplier-1)*base and then credit M4 with a kind=1, source_code 13 (tier_boost) credit. The multiplier is kind=1 only (M4b+M4c).",
-          "FROM M10: daily-reward and lives interactions read M5's subscription state (active level + days left) to enable the boosted values."
+          "FROM arcv2m4: window.globalLedger.get()/fetch() for balance display and reading base points at boost time. arcv2m4 is the bank, arcv2m5 only applies the multiplier there.",
+          "FROM arcv2m2 SEAM: the current verified game win's base points, to compute (multiplier-1)*base and then credit arcv2m4 with a kind=1, source_code 13 (tier_boost) credit. The multiplier is kind=1 only (M4b+M4c).",
+          "FROM arcv2m10: daily-reward and lives interactions read arcv2m5's subscription state (active level + days left) to enable the boosted values."
         ]
       },
       "expectedOutput": {
-        "summary": "What M5 MUST expose. Locked 2026-08-20 for the launch build.",
+        "summary": "What arcv2m5 MUST expose. Locked 2026-08-20 for the launch build.",
         "items": [
           "PREMIUM LEDGER (on-chain, gasless ER, same program id, NO new program): PDA [gfgprem, player_authority], immutable NEW seed prefix gfgprem (upgrade-safety R1), versioned layout (version u8 FIRST, R2). Fields: premium_lifetime u64 (never spendable), premium_spendable u64 (spendable), subscription_level u8 (0=free, 2=Level 2), subscription_active_until i64 (unix ts, hard 30-day window, NO auto-renew), last_credit_ts i64, last_credit_points u64, last_credit_ref u64, last_spend_ts i64, last_spend_ref u64, last_spend_reason u8, spend_count u64.",
           "INSTRUCTIONS (same program id): initialize_premium_points, delegate_premium_points (sponsor pays via relay), credit_premium_points(points, ref) (AUTHORITY-GATED signer = sponsor/ecror; writes both lifetime + spendable; idempotent ref), spend_premium_points(amount, reason, ref) (player session-key signed; InsufficientBalance guard; idempotent spend_ref), activate_subscription() (deducts 5,000 premium spendable, sets subscription_level=2 + active_until=now+30d), admin_cancel_subscription() (AUTHORITY-GATED, sets subscription_level=0 + active_until=0 to revoke a defective/perpetual sub, sponsor-signed, base-layer after undelegate if needed), undelegate_premium_points (RPC/region-agnostic rule: ships in the same build).",
           "WINDOW API: window.premiumPoints = { get() -> {premiumLifetime, premiumSpendable, subscriptionLevel, activeUntil, daysLeft}, fetch(), spend(amount, reason, ref), subscribe(cb) }, window.activeTier = { get() -> {level, expiry, daysLeft}, subscribe(cb) }.",
-          "MULTIPLIER AT M4 FLOW-UP ONLY: on each verified seam event while the sub is active, M5 applies window.globalLedger.credit({kind:1, source:'tier_boost', points:(multiplier-1)*base, reason:5, matchRef}). M5 never touches M3 or M4a pure (they stay honest).",
+          "MULTIPLIER AT arcv2m4 FLOW-UP ONLY: on each verified seam event while the sub is active, arcv2m5 applies window.globalLedger.credit({kind:1, source:'tier_boost', points:(multiplier-1)*base, reason:5, matchRef}). arcv2m5 never touches arcv2m3 or M4a pure (they stay honest).",
           "RECEIPT/LOG CONTRACT (hard): every activation records WHEN the token credit happened, the AMOUNT (5,000P), and the active-sub window (start + 30-day expiry) in a durable log (on-chain last_credit_* in the PDA + a Supabase audit row keyed by credit_ref). The profile page shows the active sub, days left, and the credit/activation history.",
           "NO-AUTO-RENEW GUARANTEE: subscription_active_until is a fixed 30-day window; nothing renews silently. Expiry is passive (level stays 2 but the window lapses and is treated as free until the next manual purchase/credit)."
         ]
       },
       "details": [
         "LOCKED LAUNCH PLANS (owner-approved 2026-08-20, plan ladder + prices updated 2026-08-22): the ladder is CONFIG-DRIVEN (more levels = data, never code). Launch ships Level-2 (2x) and Level-3 (3x). Level-2: real price $10 / 30 days, launch discount global $5, Nigeria beta N5,000 (was $3 / N4,000); the on-chain plan cost stays a fixed 5,000P. Level-3: actual $20, discount $10 / N13,500, Nigeria N8,000, activation premium cost TBD (proposed 10,000P). Digital membership, NON-cancellable and NON-refundable. The player pays via the payment processor on the site, support verifies, then credits the FULL 5,000 premium points on-chain (the discount never reduces what the chain recognizes; on-chain cost of 2x is 5,000P).",
-        "PREMIUM POINTS (owner 'payment onchain' decision): two tracks with NO free entry. premium_lifetime = a credential you keep forever (never spent, not a gameplay number). premium_spendable = what actually buys things. Acquired ONLY by direct purchase (admin credit). DUAL POWER: premium spendable is accepted anywhere global spendable is accepted AND in places global spendable can NEVER go: subscription activation and unlimited-life upgrades. Premium points never merge into global lifetime/spendable (M4) and never touch local (M3) or M4a pure.",
+        "PREMIUM POINTS (owner 'payment onchain' decision): two tracks with NO free entry. premium_lifetime = a credential you keep forever (never spent, not a gameplay number). premium_spendable = what actually buys things. Acquired ONLY by direct purchase (admin credit). DUAL POWER: premium spendable is accepted anywhere global spendable is accepted AND in places global spendable can NEVER go: subscription activation and unlimited-life upgrades. Premium points never merge into global lifetime/spendable (arcv2m4) and never touch local (arcv2m3) or M4a pure.",
         "SUBSCRIPTION STATE ON-CHAIN (not Supabase as truth): subscription_level + active_until live in the premium PDA, so any page reads the truth from the chain gaslessly. Supabase keeps only the payment/affiliate relationship + audit rows.",
-        "MULTIPLIER LADDER: launch ships Level 2 (2x). Future ladder (when tiers reopen): 2x/3x/4x/5x, i.e. a 100P base win banks 200/300/400/500. Applied ONLY at M4 flow-up as kind=1 tier_boost. Base unmultiplied wins already bank in M4 via the seam.",
-        "DAILY REWARD (M10, subscription-boosted, owner numbers 2026-08-20): free tier claims 25P once per day (must be signed in; 24h reset enforced, also via Dynamic sign-out). Level-2 subscriber claims 200P/day. Owner marketing note: frame the Level-2 daily jump as a strong upsell hook - it feeds the earn-competition feel and encourages the upgrade.",
-        "LIVES (M10, subscription-boosted, owner numbers 2026-08-20): free = 5 lives/day, Level 2 = 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC). A life is consumed ONLY when a match COMPLETES (a finished game); abandon, reset, and mid-game network disconnect NEVER cost a life. Universal: applies to Ludo 2P/4P and every future M1 game.",
-        "AFFILIATE (M6, launch marketing - 12 MONTHS, owner 2026-08-21): each user gets a unique referral code. When a referred player activates a paid subscription, the referrer earns 15% of that subscription on-chain, recurs for every monthly subscription the referral buys for up to 12 months after their first. HARDSHOT GATE: the referrer must hold an ACTIVE Level-2 subscription at the month the referral's payment activates, otherwise that month's 15% share is FORFEITED (never back-paid). PERMANENT PAIR FORFEIT: if the referral makes 2 consecutive subscription-payment periods (about 60 days) while the referrer was inactive, that specific affiliate->referral pair is closed permanently; even later via resubscription the referrer cannot resume earnings from that referred account. Any shorter inactive gap just pauses, and accruals resume from the next payment made while the referrer is active again (a payment made during an inactive month never accrues). AMOUNTS PEGGED TO USD: store every accrual on-chain in USD cents (15% of $3 = $0.45) so future price rises are automatic, and convert to Naira only at manual payout using that day's rate. ON-CHAIN AUDIT (immutable, sponsor/relay signs): per-affiliate ledger records each month's eligibility (active/inactive), the USD amount, status earned/pending/paid/forfeited, and withdrawals, so no one can accuse the platform of manipulating or not paying earnings. Payout manual (owner pays offline) within 3-7 days; automated later. Profile shows accruals and a withdraw control later.",
-        "UNLIMITED LIFE BOOSTER (M5, premium-purchased, owner 2026-08-21, PRICE 2026-08-22): $1 / 500P for 72 hours (3 days) of unlimited play, universal across every game on any plan (free or Level-2). Point base value is $0.002 per point (international USD rate, never Naira), so $1 = 500 points and $2 = 1,000 points; the booster costs 500P (= $1). Countdown starts only when the player taps Activate. NO win multiplier (owner: money buys time, never points; a multiplier may come later only if players ask). Points keep exact normal rates; pure local (M3) always untouched; global lifetime/spendable only grow from real wins. Value is time to play more and win more in the daily earn window (mastery-based). Purchase flow mirrors the sub: pay -> support verifies -> premium points credited at $0.002/pt -> Activate spends premium -> booster_active_until = now + 72h stored in the premium PDA; M10 lives shows UNLIMITED with a live countdown while active. PROGRAM: PremiumPoints v3 adds booster_active_until i64 via the same permissionless migration pattern as v2 (upgrade-safe), so the booster state is read by M10 and any module, like on-chain metadata.",
-        "EARN COMPETITION (M7, launch simplest - owner model 2026-08-21): ONE ENTRY PER PLAYER ACCOUNT PER WINDOW (no tickets, one membership). To enter: an ACTIVE Level-2 subscription (required) + a one-time spendable entry paid at unlock from the player's ledgers (base entry 500P global spendable, any spendable family works: global/local/premium). The entry list is DYNAMIC and PLUGGABLE so ANY platform feature can be an extra requirement later (e.g. also 100P local spendable, or a 'won {game} before' proof via local pure, etc.) without changing the competition core. LEADERBOARD IS WINDOW-FRESH: only verified game wins made after the window starts and before it expires count; pre-window and post-window points are ZERO for that board (10,000 historical points = 0 until they win inside the window). Applies only to the selected game (Ludo at launch; more added later). DAILY POOL (2026-08-21): $1-equivalent per day, Nigeria launch N1,500: 1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each. Price-agnostic (stored in USD cents) so payouts can later be stablecoin/embedded-wallet. Same account cannot take multiple ranks in a window; separate accounts each need their own sub + point payments + in-window grinding. Manual payout (cash/airtime) from the owner; optionally a daily profile win-eligibility form. The daily pool is sustained by active subscriptions alone, so only paying players join.",
+        "MULTIPLIER LADDER: launch ships Level 2 (2x). Future ladder (when tiers reopen): 2x/3x/4x/5x, i.e. a 100P base win banks 200/300/400/500. Applied ONLY at arcv2m4 flow-up as kind=1 tier_boost. Base unmultiplied wins already bank in arcv2m4 via the seam.",
+        "DAILY REWARD (arcv2m10, subscription-boosted, owner numbers 2026-08-20): free tier claims 25P once per day (must be signed in; 24h reset enforced, also via Dynamic sign-out). Level-2 subscriber claims 200P/day. Owner marketing note: frame the Level-2 daily jump as a strong upsell hook - it feeds the earn-competition feel and encourages the upgrade.",
+        "LIVES (arcv2m10, subscription-boosted, owner numbers 2026-08-20): free = 5 lives/day, Level 2 = 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC). A life is consumed ONLY when a match COMPLETES (a finished game); abandon, reset, and mid-game network disconnect NEVER cost a life. Universal: applies to Ludo 2P/4P and every future arcv2m1 game.",
+        "AFFILIATE (arcv2m6, launch marketing - 12 MONTHS, owner 2026-08-21): each user gets a unique referral code. When a referred player activates a paid subscription, the referrer earns 15% of that subscription on-chain, recurs for every monthly subscription the referral buys for up to 12 months after their first. HARDSHOT GATE: the referrer must hold an ACTIVE Level-2 subscription at the month the referral's payment activates, otherwise that month's 15% share is FORFEITED (never back-paid). PERMANENT PAIR FORFEIT: if the referral makes 2 consecutive subscription-payment periods (about 60 days) while the referrer was inactive, that specific affiliate->referral pair is closed permanently; even later via resubscription the referrer cannot resume earnings from that referred account. Any shorter inactive gap just pauses, and accruals resume from the next payment made while the referrer is active again (a payment made during an inactive month never accrues). AMOUNTS PEGGED TO USD: store every accrual on-chain in USD cents (15% of $3 = $0.45) so future price rises are automatic, and convert to Naira only at manual payout using that day's rate. ON-CHAIN AUDIT (immutable, sponsor/relay signs): per-affiliate ledger records each month's eligibility (active/inactive), the USD amount, status earned/pending/paid/forfeited, and withdrawals, so no one can accuse the platform of manipulating or not paying earnings. Payout manual (owner pays offline) within 3-7 days; automated later. Profile shows accruals and a withdraw control later.",
+        "UNLIMITED LIFE BOOSTER (arcv2m5, premium-purchased, owner 2026-08-21, PRICE 2026-08-22): $1 / 500P for 72 hours (3 days) of unlimited play, universal across every game on any plan (free or Level-2). Point base value is $0.002 per point (international USD rate, never Naira), so $1 = 500 points and $2 = 1,000 points; the booster costs 500P (= $1). Countdown starts only when the player taps Activate. NO win multiplier (owner: money buys time, never points; a multiplier may come later only if players ask). Points keep exact normal rates; pure local (arcv2m3) always untouched; global lifetime/spendable only grow from real wins. Value is time to play more and win more in the daily earn window (mastery-based). Purchase flow mirrors the sub: pay -> support verifies -> premium points credited at $0.002/pt -> Activate spends premium -> booster_active_until = now + 72h stored in the premium PDA; arcv2m10 lives shows UNLIMITED with a live countdown while active. PROGRAM: PremiumPoints v3 adds booster_active_until i64 via the same permissionless migration pattern as v2 (upgrade-safe), so the booster state is read by arcv2m10 and any module, like on-chain metadata.",
+        "EARN COMPETITION (arcv2m7, launch simplest - owner model 2026-08-21): ONE ENTRY PER PLAYER ACCOUNT PER WINDOW (no tickets, one membership). To enter: an ACTIVE Level-2 subscription (required) + a one-time spendable entry paid at unlock from the player's ledgers (base entry 500P global spendable, any spendable family works: global/local/premium). The entry list is DYNAMIC and PLUGGABLE so ANY platform feature can be an extra requirement later (e.g. also 100P local spendable, or a 'won {game} before' proof via local pure, etc.) without changing the competition core. LEADERBOARD IS WINDOW-FRESH: only verified game wins made after the window starts and before it expires count; pre-window and post-window points are ZERO for that board (10,000 historical points = 0 until they win inside the window). Applies only to the selected game (Ludo at launch; more added later). DAILY POOL (2026-08-21): $1-equivalent per day, Nigeria launch N1,500: 1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each. Price-agnostic (stored in USD cents) so payouts can later be stablecoin/embedded-wallet. Same account cannot take multiple ranks in a window; separate accounts each need their own sub + point payments + in-window grinding. Manual payout (cash/airtime) from the owner; optionally a daily profile win-eligibility form. The daily pool is sustained by active subscriptions alone, so only paying players join.",
         "CANNOT-FORGO AT LAUNCH (owner list 2026-08-20): the game itself, local points, global points, premium points, subscription (with all it needs to deliver: 12-month affiliate, pay within 3-7 days, Paystack manual-transfer-only, receipts/logs of token credit + amount + active sub), and the simplest earn competition.",
         "PAYMENT PIPE (lock at build): Paystack embed -> manual bank transfer ONLY (cards disabled at Paystack setup) -> player sees a temporary Paystack account -> pays -> emails receipt -> owner verifies -> admin-only credit page banks premium points + activates subscription on-chain -> receipt log + Supabase audit row. The owner supplies the Paystack embed code at build time.",
-        "IMPLEMENTATION PATH: (1) extend the gfg program: premium PDA + credit/spend/activate/admin_cancel_subscription/undelegate_premium_points (+ additive source_code 14 = daily_reward if a program-level guard is wanted) -> deploy + IDL sync; (2) relay: premium init+delegate + admin credit + admin cancel + admin credit+activate promo endpoints; (3) admin credit page (staff) + admin premium tracker dashboard/premium-tracker.html (staff-only, segments new/mid/ending/ended, filters year/month/search by Dynamic email/wallet, manual cancel + promo credit+activate); (4) client premiumPoints SDK + activate/sub UI on profile (choose plan, Paystack pay button, status card with days left); (5) multiplier wiring into M4 kind=1 tier_boost on each seam award; (6) M10 lives + daily (free 25 / Level-2 200); (7) M6 affiliate + M7 daily earn campaign page. AGENTS program deploy order rule (R5) applies: program -> IDL -> server -> client.",
+        "IMPLEMENTATION PATH: (1) extend the gfg program: premium PDA + credit/spend/activate/admin_cancel_subscription/undelegate_premium_points (+ additive source_code 14 = daily_reward if a program-level guard is wanted) -> deploy + IDL sync; (2) relay: premium init+delegate + admin credit + admin cancel + admin credit+activate promo endpoints; (3) admin credit page (staff) + admin premium tracker dashboard/premium-tracker.html (staff-only, segments new/mid/ending/ended, filters year/month/search by Dynamic email/wallet, manual cancel + promo credit+activate); (4) client premiumPoints SDK + activate/sub UI on profile (choose plan, Paystack pay button, status card with days left); (5) multiplier wiring into arcv2m4 kind=1 tier_boost on each seam award; (6) arcv2m10 lives + daily (free 25 / Level-2 200); (7) arcv2m6 affiliate + arcv2m7 daily earn campaign page. AGENTS program deploy order rule (R5) applies: program -> IDL -> server -> client.",
         "TEST (benchmark = this spec): credit-then-activate harness (admin credit 5,000P -> activate_subscription deducts -> level/serial fields set), idempotency (re-credit same ref = no-op, re-activate = InsufficientBalance), spend guard (cannot spend premium below balance; premium never feeds global), 30-day expiry pass-through, multiplier kind=1 never touching M4a pure, daily claim once-per-day, life consumed only on completion (abandon/reset/disconnect free), affiliate gate (referrer active-sub required at referral upgrade), competition mixed-spendable deduction + non-spendable filter, receipt log rows present.",
-        "BUILD ORDER NOTE: premium points must exist before activation; admin credit flow first (so balances + receipts are real), then activation/spend, then multiplier wiring, then M10 lives/daily, then the launch campaign (M6 affiliate + M7 simple comp).",
-        "ADMIN PREMIUM TRACKER (owner-approved 2026-08-21, staff-only): dashboard/premium-tracker.html lists every premium subscriber from the on-chain premium PDA ([gfgprem, player]) \u2014 Dynamic is the source of truth for email + embedded wallet (Supabase is only backup for devnet wipe restore). Segments: New (last 7 days), Mid (day 8-22), Ending soon (\u22647 days left), Ended (expired/never active). Filters: year/month (by lastCreditTs/activeUntil), search by Dynamic email or embedded wallet. Table shows premiumLifetime/premiumSpendable, level, activeUntil, daysLeft, status, lastCredit. Admin actions: Cancel subscription (admin_cancel_subscription on-chain, sponsor-signed, base-layer after undelegate if delegated, re-delegate after; idempotent) to revoke defective perpetual subs, and Promo giveaway (credit 5,000P + immediate activate in one admin flow, but still consumes 5,000 premium spendable via the normal activate check \u2014 no shortcut, spend reflected in lifetime/spendable, InsufficientBalance if not enough). Page lives under dashboard nav (staff-only) alongside premium credit.",
+        "BUILD ORDER NOTE: premium points must exist before activation; admin credit flow first (so balances + receipts are real), then activation/spend, then multiplier wiring, then arcv2m10 lives/daily, then the launch campaign (arcv2m6 affiliate + arcv2m7 simple comp).",
+        "ADMIN PREMIUM TRACKER (owner-approved 2026-08-21, staff-only): dashboard/premium-tracker.html lists every premium subscriber from the on-chain premium PDA ([gfgprem, player]) — Dynamic is the source of truth for email + embedded wallet (Supabase is only backup for devnet wipe restore). Segments: New (last 7 days), Mid (day 8-22), Ending soon (≤7 days left), Ended (expired/never active). Filters: year/month (by lastCreditTs/activeUntil), search by Dynamic email or embedded wallet. Table shows premiumLifetime/premiumSpendable, level, activeUntil, daysLeft, status, lastCredit. Admin actions: Cancel subscription (admin_cancel_subscription on-chain, sponsor-signed, base-layer after undelegate if delegated, re-delegate after; idempotent) to revoke defective perpetual subs, and Promo giveaway (credit 5,000P + immediate activate in one admin flow, but still consumes 5,000 premium spendable via the normal activate check — no shortcut, spend reflected in lifetime/spendable, InsufficientBalance if not enough). Page lives under dashboard nav (staff-only) alongside premium credit.",
         "PLAN LADDER (owner 2026-08-22, CONFIG-DRIVEN - plans are data, not code): every plan has {level, name, multiplier, livesPerDay, dailyReward, compFinalBoost (earn-competition final-points factor), adFree (no monetized ads while active), activationPremiumCost, usdRegular, usdDiscount, ngnDiscount, activeDays}. Adding a future level (e.g. L4) is a new plan row + a level selection in the UI, never a rewrite. Active subscription state stays on-chain (subscription_level + active_until). Activation writes go THROUGH AN ADDITIVE level-parameterized activate instruction (upgrade-safe; current activate_subscription hardcodes L2/window and ships unchanged for L2, the parameterized variant is clarifying-compatible with existing accounts).",
         "LEVEL 2 (2x) PRICING UPDATED (owner 2026-08-22): launch discount price is now $5 (was $3); Nigeria beta price is now N5,000 (was N4,000). Activation cost unchanged at 5,000P premium spendable. Regular/strike price remains $10. Per-day rewards and lives unchanged (200P daily, 10 lives).",
-        "LEVEL 3 (3x) NEW PLAN (owner-approved 2026-08-22): actual price $20, discounted $10 (N13,500), Nigeria beta price N8,000. ACTIVATION COST CONFIRMED: 10,000P premium spendable (double Level-2's 5,000P). Benefits: 3x win multiplier, 300P/day daily reward, 15 lives/day, 1.5x earn-competition final-points boost (M7 R17). The win multiplier is a TRUE MULTIPLIER on the base win points (100P base -> 300P logged to the global ledger), the same machinery as the Level-2 2x - so if the base win points are later raised or lowered, every plan scales automatically, never a flat-or-plan-fixed number. AD-FREE (owner 2026-08-22): active Level-3 pages suppress the Monetag ad tag sitewide (and unregister existing push service-workers), making \"no ads\" a Level-3 benefit alongside the 3x/300P/15-lives/1.5x stack; Free/L2 keep ads so the upgrade is visible."
+        "LEVEL 3 (3x) NEW PLAN (owner-approved 2026-08-22): actual price $20, discounted $10 (N13,500), Nigeria beta price N8,000. ACTIVATION COST CONFIRMED: 10,000P premium spendable (double Level-2's 5,000P). Benefits: 3x win multiplier, 300P/day daily reward, 15 lives/day, 1.5x earn-competition final-points boost (arcv2m7 R17). The win multiplier is a TRUE MULTIPLIER on the base win points (100P base -> 300P logged to the global ledger), the same machinery as the Level-2 2x - so if the base win points are later raised or lowered, every plan scales automatically, never a flat-or-plan-fixed number. AD-FREE (owner 2026-08-22): active Level-3 pages suppress the Monetag ad tag sitewide (and unregister existing push service-workers), making \"no ads\" a Level-3 benefit alongside the 3x/300P/15-lives/1.5x stack; Free/L2 keep ads so the upgrade is visible."
       ]
     },
     {
-      "id": "M6",
+      "id": "arcv2m6",
       "title": "Point-source modules (signup bonus + 12-month affiliate launch marketing; giveaway/social deferred)",
       "status": "in-progress",
-      "summary": "The other point sources that feed M4 (lifetime + spendable) but NEVER M3 local. Launch: signup bonus of 500P (so a new user can fund the daily earn-competition entry) and the AFFILIATE program (15% of each referred subscription for up to 12 months, referrer must hold an ACTIVE Level-2 subscription that month, USD-cents on-chain audit ledger, 60-day pair-forfeit rule, manual Naira payout 3-7 days). Giveaway and social-share earn are deferred past launch. All credits are kind=1: M4b + M4c only.",
+      "summary": "The other point sources that feed arcv2m4 (lifetime + spendable) but NEVER arcv2m3 local. Launch: signup bonus of 500P (so a new user can fund the daily earn-competition entry) and the AFFILIATE program (15% of each referred subscription for up to 12 months, referrer must hold an ACTIVE Level-2 subscription that month, USD-cents on-chain audit ledger, 60-day pair-forfeit rule, manual Naira payout 3-7 days). Giveaway and social-share earn are deferred past launch. All credits are kind=1: M4b + M4c only.",
       "expectedInput": {
-        "summary": "What M6 RECEIVES. Locked 2026-08-20; affiliate spec owner-updated 2026-08-21.",
+        "summary": "What arcv2m6 RECEIVES. Locked 2026-08-20; affiliate spec owner-updated 2026-08-21.",
         "items": [
           "FROM SUPABASE/PROFILES: referral relationships (unique code, who invited whom, upgrade events), signup events, payout bank/phone details (filled once, immutable).",
           "FROM ADMIN: manual payout approvals (the 15% affiliate shares + daily-winner payments flow through owner-managed payments).",
-          "FROM M5: the referred player's subscription activation/expiry events (triggers the referrer's monthly 15%, gated on the referrer's ACTIVE subscription that month).",
-          "FROM M4: window.globalLedger.credit() to write kind=1 credits into M4b + M4c."
+          "FROM arcv2m5: the referred player's subscription activation/expiry events (triggers the referrer's monthly 15%, gated on the referrer's ACTIVE subscription that month).",
+          "FROM arcv2m4: window.globalLedger.credit() to write kind=1 credits into M4b + M4c."
         ]
       },
       "expectedOutput": {
-        "summary": "What M6 MUST expose. Locked 2026-08-20; affiliate owner-updated 2026-08-21.",
+        "summary": "What arcv2m6 MUST expose. Locked 2026-08-20; affiliate owner-updated 2026-08-21.",
         "items": [
-          "SIGNUP BONUS: 500P credited to every new user via window.globalLedger.credit({kind:1, source:'signup_bonus', points:500, reason:2, matchRef}) - M4b+M4c only, never M3/M4a.",
+          "SIGNUP BONUS: 500P credited to every new user via window.globalLedger.credit({kind:1, source:'signup_bonus', points:500, reason:2, matchRef}) - M4b+M4c only, never arcv2m3/M4a.",
           "REFERRAL CODE: unique per-user referral code exposed through window.gfgReferral.getCode() and pasted into profile; a shareable auto link.",
           "AFFILIATE CREDIT (15%, 12 months): runway for each SUBSCRIPTION period a referred player pays. Only accrues for months the referrer holds an ACTIVE Level-2 subscription. Accrual pegged to USD cents; the pair closes permanently after 2 consecutive inactive periods. On-chain ledger {month, eligibility, amountUsdCents, status} per affiliate, signed by the relay.",
           "ON-CHAIN AFFILIATE AUDIT (immutable, relay-signed): per-affiliate account/PDA listing months active/inactive, USD amount, status earned/pending/paid/forfeited, and withdrawals, so earnings are provable forever.",
@@ -469,30 +469,30 @@
         ]
       },
       "details": [
-        "SIGNUP BONUS 500P (locked 2026-08-20): replaces the previous 0. Enough to fund the daily earn-competition entry (which accepts global/local/premium spendable), so a brand-new user can compete from day one. Never touches local (M3) or M4a pure.",
+        "SIGNUP BONUS 500P (locked 2026-08-20): replaces the previous 0. Enough to fund the daily earn-competition entry (which accepts global/local/premium spendable), so a brand-new user can compete from day one. Never touches local (arcv2m3) or M4a pure.",
         "AFFILIATE (owner 2026-08-21, launch marketing - 12 MONTHS): referral earns 15% of each subscription period the referred player pays, for up to 12 months after their first. 0 if the referral never subscribes. HARDSHIP GATE: the referrer must hold an ACTIVE Level-2 subscription that month or that month's 15% is forfeited (never back-paid). PERMANENT PAIR FORFEIT after 2 consecutive inactive periods (about 60 days) for that specific referred account, even on later resub of the referrer. Shorter gaps pause and resume on the next payment while active. AMOUNTS IN USD CENTS on-chain (15% of $3 = $0.45), converted to Naira at payout time with that day's rate, so a rising USD-Naira price increases them. Payout manual (Naira offline) within 3-7 days; automated later.",
         "WHY: there is no ad budget. The 12-month affiliate + the daily earn campaign are the launch growth engine (owner 2026-08-21).",
-        "Rule (unchanged): ALL M6 credits are kind=1 -> M4b + M4c only, never M3 local and never M4a pure. M3 stays strictly verified gameplay.",
+        "Rule (unchanged): ALL arcv2m6 credits are kind=1 -> M4b + M4c only, never arcv2m3 local and never M4a pure. arcv2m3 stays strictly verified gameplay.",
         "DEFERRED PAST LAUNCH: giveaway (lootbox-style, econ-001) and social-share earn (econ-005) - planned, not in the launch critical path.",
-        "AFFILIATE 20% DYNAMIC (owner-approved 2026-08-22, replaces the old fixed 15%/$3 anchor): the affiliate share is 20% of the referred plan\u2019s PAYABLE USD price, read LIVE from the config-driven plan ladder at settle time - raising or lowering any plan price (and any future plan) auto-updates its affiliate share with NO code change. Examples: Level-2 at $5 -> $1.00; Level-3 at $10 -> $2.00. The 12-month window, active-sub monthly gate and 60-day pair-forfeit rules stay. Historical rows recorded under the old 15%/$3 anchor remain exactly as recorded; only new accruals use the 20% dynamic rule. (BUILD NOTE: relay settle reads plan price from the plan ladder config; the on-chain ledger keeps USD-cent amounts unchanged in shape.)"
+        "AFFILIATE 20% DYNAMIC (owner-approved 2026-08-22, replaces the old fixed 15%/$3 anchor): the affiliate share is 20% of the referred plan’s PAYABLE USD price, read LIVE from the config-driven plan ladder at settle time - raising or lowering any plan price (and any future plan) auto-updates its affiliate share with NO code change. Examples: Level-2 at $5 -> $1.00; Level-3 at $10 -> $2.00. The 12-month window, active-sub monthly gate and 60-day pair-forfeit rules stay. Historical rows recorded under the old 15%/$3 anchor remain exactly as recorded; only new accruals use the 20% dynamic rule. (BUILD NOTE: relay settle reads plan price from the plan ladder config; the on-chain ledger keeps USD-cent amounts unchanged in shape.)"
       ]
     },
     {
-      "id": "M7",
+      "id": "arcv2m7",
       "title": "Competitions (on-chain, config-driven framework + admin creator; launch = Daily Ludo Earn)",
       "status": "in-progress",
-      "summary": "COMPETITION FRAMEWORK (owner-approved 2026-08-22). An on-chain, config-driven earn-competition system. Every competition is an ON-CHAIN INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects prefilling this framework\u2019s options); later the same open form is exposed to sponsor projects who pick the framework\u2019s available requirements for their own competitions. NO web2 db (no Supabase): the instance\u2019s identity, requirements, window, pool, winners and paid status live on-chain, so sponsors can later plug 30/70 rake (M8) and escrow without redesign. Launch instance: DAILY LUDO EARN \u2014 one entry per account per window, active Level-2 required (level is config), 500P spendable entry from any SELECTED family (global/local/premium \u2014 multi-select, one or many), window-fresh verified-wins leaderboard with AUTO-STOP at window end, pool $2 (200 USD cents = 1,000 pts at the $0.002/pt base) split TEN ways per the redemption table below, manual payout, redemption agnostic (naira now; points/crypto/merch later). gfgwin on-chain winner records (approved 2026-08-22).",
+      "summary": "COMPETITION FRAMEWORK (owner-approved 2026-08-22). An on-chain, config-driven earn-competition system. Every competition is an ON-CHAIN INSTANCE created through an ADMIN CREATOR UI (dropdowns + multi-selects prefilling this framework’s options); later the same open form is exposed to sponsor projects who pick the framework’s available requirements for their own competitions. NO web2 db (no Supabase): the instance’s identity, requirements, window, pool, winners and paid status live on-chain, so sponsors can later plug 30/70 rake (arcv2m8) and escrow without redesign. Launch instance: DAILY LUDO EARN — one entry per account per window, active Level-2 required (level is config), 500P spendable entry from any SELECTED family (global/local/premium — multi-select, one or many), window-fresh verified-wins leaderboard with AUTO-STOP at window end, pool $2 (200 USD cents = 1,000 pts at the $0.002/pt base) split TEN ways per the redemption table below, manual payout, redemption agnostic (naira now; points/crypto/merch later). gfgwin on-chain winner records (approved 2026-08-22).",
       "expectedInput": {
-        "summary": "What M7 RECEIVES (owner-approved 2026-08-22).",
+        "summary": "What arcv2m7 RECEIVES (owner-approved 2026-08-22).",
         "items": [
-          "FROM ADMIN CREATOR UI -> create_competition (on-chain instance params). The SAME open form is later exposed to sponsors; each creator is that instance\u2019s authority.",
-          "FROM M2 SEAM: window.onGameResult normalized envelope - M7 filters by the instance\u2019s games[] (multi, any M1 tag), player identity, position, and a WINDOW TIMESTAMP that MUST fall inside [starts_at, ends_at].",
-          "FROM M3/M4/M5 for entry gates: window.localPoints.spend / globalLedger.spend / premiumPoints.spend (any selected family - multi-select), plus M5 active tier read for require_tier (level is config, L2 at launch).",
+          "FROM ADMIN CREATOR UI -> create_competition (on-chain instance params). The SAME open form is later exposed to sponsors; each creator is that instance’s authority.",
+          "FROM arcv2m2 SEAM: window.onGameResult normalized envelope - arcv2m7 filters by the instance’s games[] (multi, any arcv2m1 tag), player identity, position, and a WINDOW TIMESTAMP that MUST fall inside [starts_at, ends_at].",
+          "FROM arcv2m3/arcv2m4/arcv2m5 for entry gates: window.localPoints.spend / globalLedger.spend / premiumPoints.spend (any selected family - multi-select), plus arcv2m5 active tier read for require_tier (level is config, L2 at launch).",
           "FROM ADMIN settle/pay: record_competition_winners + mark_winner_paid (payout manual now; escrow auto-pay later flips the same paid flag)."
         ]
       },
       "expectedOutput": {
-        "summary": "What M7 MUST expose (owner-approved 2026-08-22).",
+        "summary": "What arcv2m7 MUST expose (owner-approved 2026-08-22).",
         "items": [
           "ON-CHAIN COMPETITION INSTANCE [gfgcomp2, creator, seq]: name, games (source-code list), require_tier, entry {cost, familyBitSet}, window {start,end}, pool_usd_cents, prize_shares (ordered, sums to pool), redemption (u8), payout_mode (u8), status (open/closed/settled/cancelled).",
           "WINDOW-FRESH + AUTO-STOP LEADERBOARD: only verified seam wins whose finish is inside [start,end] count; after ends_at the module refuses further input and freezes the board (R16).",
@@ -504,111 +504,111 @@
         ]
       },
       "details": [
-        "OPEN CREATE FORM (/dashboard/competitions, admin now / sponsors later): fields are dropdowns + multi-selectors prefilled from the framework. Points requirement = MULTI-SELECT (global / local / premium - pick one or many); game(s) = multi-select (Ludo now, any M1 tag later); require tier = dropdown (L2 at launch, L3 in future is just a selection); entry cost = number; window = start/end picker; pool = USD cents; prize shares = ordered amounts summing to the pool; redemption + payout mode = dropdowns. Save -> create_competition on-chain. No server JSON/db (R13).",
+        "OPEN CREATE FORM (/dashboard/competitions, admin now / sponsors later): fields are dropdowns + multi-selectors prefilled from the framework. Points requirement = MULTI-SELECT (global / local / premium - pick one or many); game(s) = multi-select (Ludo now, any arcv2m1 tag later); require tier = dropdown (L2 at launch, L3 in future is just a selection); entry cost = number; window = start/end picker; pool = USD cents; prize shares = ordered amounts summing to the pool; redemption + payout mode = dropdowns. Save -> create_competition on-chain. No server JSON/db (R13).",
         "FUTURE-PROOF (R12): games[], requirements, tier level, entry, pool, shares, redemption, payout are INSTANCE DATA. A future L3-3x competition, a $25 pool, or a brand competition is a new instance, never a code change.",
         "AUTO-STOP (R16): the window end is authoritative; the module refuses wins after ends_at and freezes the board.",
-        "ON-CHAIN WINNERS (R15, approved): record_competition_winners + mark_winner_paid are additive instructions on the same program (gfgwin seed, no seed/layout change to live types, upgrade-safe R4 pattern). Later escrow auto-pay sets the same paid flag. The winner record carries points + USD share per winner, so the same slot can settle to cash, airtime, points, crypto or merch depending on the instance\u2019s redemption config.",
+        "ON-CHAIN WINNERS (R15, approved): record_competition_winners + mark_winner_paid are additive instructions on the same program (gfgwin seed, no seed/layout change to live types, upgrade-safe R4 pattern). Later escrow auto-pay sets the same paid flag. The winner record carries points + USD share per winner, so the same slot can settle to cash, airtime, points, crypto or merch depending on the instance’s redemption config.",
         "PRIZE VALUE (R14, owner 2026-08-22): pool is USD cents; $1 = N1,500 at launch = 500 pts ($0.002/point base). Redemption (naira now; points/crypto/merch later) is presentational, adjustable per instance.",
         "BUILD ORDER (guided by this spec): (1) program: competition-instance + gfgwin additive instructions; (2) relay/serverless create/settle/pay routes; (3) universal daily-earn module (window-fresh, auto-stop, seam); (4) admin creator UI + admin settle/pay page; (5) public competition page + past winners; (6) drawer/landing wiring; (7) launch deck = Daily Ludo Earn instance (games:[ludo], any-of {L2,L3}, entry 500P global, pool $2 = 1,000 pts, 10 winners, redemption table below).",
         "COMPETITION ADJUSTMENTS (owner 2026-08-22): (5.1) EVERYTHING configurable on the ADMIN UI at creation time, no code: allowed subscription levels (multi-select), requirement combinator (any-of / all-of), duration, window start/end, entry cost + spendable families (multi), pool USD, prize shares, redemption, payout mode. (5.2) BASE SUBSCRIPTION REQUIREMENT IS A MULTI-SELECT LEVEL PICK: pick one level (L2 only) or several (L2 + L3 + L5, any qualifies) and whatever count/combination the creator wants; the requirement executor supports \"have this OR that\" (any-of) and \"have this AND that\" (all-of) between requirement groups so new levels never need code. (5.3) DURATION IS A DROPDOWN, NOT FIXED: 6h,12h,24h,2d,3d,4d,5d,6d,7d,8d,9d,10d,15d,30d,1w,2w,3w,4w,1m (launch daily-earn instance switches 24h -> 72h). Stored on the instance; auto-stop at end (R16).",
         "(5.4) FINAL-POINTS RANKING WITH LIVE TIER CHECK: the leaderboard shows BOTH columns - \"Total Points\" (points earned inside the window) and \"Final Points\" (Total Points x boostFactor). boostFactor is read LIVE from the player's CURRENT active subscription: Level-3 x1.5, Level-2 x1.0 (no change), Level-1: EXCLUDED from the leaderboard (invisible) but NOT removed from the competition (a downgrade hides them until they resubscribe). Winner POSITIONS are decided by Final Points, never Total Points. Live check means a downgrade mid-window (e.g. L3 -> L2 at 47h59m) instantly recalculates their boost to 1x; L3 -> L1 removes them from the board instantly; staying L1 into the final-second freeze means no position, no win.",
-        "LAUNCH INSTANCE PRIZE TABLE (LUDO EARN 72h, owner 2026-08-22): TEN winners share the $2 pool (= 1,000 pts at $0.002/pt). Nigeria redemption (offline settle): 1st N1,000 cash, 2nd N600 cash, 3rd N300 cash, 4th N200 cash, 5th N150 cash, 6th-10th N100 airtime each (N2,750 total). On-chain winner records store each position\u2019s POINTS + USD-CENTS share (points = pool points x share/total; e.g. the first/second ranking prize ratios follow the table). The table is instance config (R12/R18), so any future competition picks its own winner count, pool and shares without code."
+        "LAUNCH INSTANCE PRIZE TABLE (LUDO EARN 72h, owner 2026-08-22): TEN winners share the $2 pool (= 1,000 pts at $0.002/pt). Nigeria redemption (offline settle): 1st N1,000 cash, 2nd N600 cash, 3rd N300 cash, 4th N200 cash, 5th N150 cash, 6th-10th N100 airtime each (N2,750 total). On-chain winner records store each position’s POINTS + USD-CENTS share (points = pool points x share/total; e.g. the first/second ranking prize ratios follow the table). The table is instance config (R12/R18), so any future competition picks its own winner count, pool and shares without code."
       ]
     },
     {
-      "id": "M8",
-      "title": "Sponsor escrow (optional plugin, separate from M7)",
+      "id": "arcv2m8",
+      "title": "Sponsor escrow (optional plugin, separate from arcv2m7)",
       "status": "planned",
-      "summary": "Brand-funded prize pool locked on-chain BEFORE the event, 30/70 rake at settle. A competition may use M8 or not. Optional plugin, not part of the core competition flow.",
+      "summary": "Brand-funded prize pool locked on-chain BEFORE the event, 30/70 rake at settle. A competition may use arcv2m8 or not. Optional plugin, not part of the core competition flow.",
       "expectedInput": {
-        "status": "pending discussion \u2014 finalize before M8 build",
-        "summary": "What M8 will RECEIVE. To be discussed and locked when M8 build starts.",
+        "status": "pending discussion — finalize before arcv2m8 build",
+        "summary": "What arcv2m8 will RECEIVE. To be discussed and locked when arcv2m8 build starts.",
         "items": [
-          "FROM M7: competition ID, winner list, payout amounts.",
+          "FROM arcv2m7: competition ID, winner list, payout amounts.",
           "FROM SPONSOR: SOL deposit to fund the escrow before the event.",
           "ON-CHAIN: Competition account (fund/close/settle/claim instructions)."
         ]
       },
       "expectedOutput": {
-        "status": "pending discussion \u2014 finalize before M8 build",
-        "summary": "What M8 MUST expose. To be discussed and locked when M8 build starts.",
+        "status": "pending discussion — finalize before arcv2m8 build",
+        "summary": "What arcv2m8 MUST expose. To be discussed and locked when arcv2m8 build starts.",
         "items": [
           "ON-CHAIN ESCROW: Competition PDA holding sponsor's SOL, split 70/30 on settle.",
           "CLAIM API: winners claim gasless via session key.",
-          "M7 ATTACHMENT: M7 optionally attaches M8 to a competition for brand-funded prizes."
+          "arcv2m7 ATTACHMENT: arcv2m7 optionally attaches arcv2m8 to a competition for brand-funded prizes."
         ]
       },
       "details": [
         "Program proof already built + verified on devnet (Competition account, fund/close/settle/claim, 70/30 winners bucket, one active comp per sponsor).",
         "Sponsor (brand) locks SOL on-chain before the event; winners claim gasless; platform keeps 30%.",
-        "Kept SEPARATE from M7: a competition runs without M8 (airtime / manual payout). M8 is attached only when a brand wants a guaranteed escrowed prize.",
+        "Kept SEPARATE from arcv2m7: a competition runs without arcv2m8 (airtime / manual payout). arcv2m8 is attached only when a brand wants a guaranteed escrowed prize.",
         "Mainnet legal framing: points entry + small fee, prizes in points, real value only via escrow with T&Cs."
       ]
     },
     {
-      "id": "M9",
+      "id": "arcv2m9",
       "title": "Player inventory",
       "status": "planned",
-      "summary": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like M1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). M1 games define their own item catalogs; M9 owns the wallet infrastructure.",
+      "summary": "On-chain player-owned inventory wallet [gfgassets, player]. Stores media bytes (skins, items, sounds) directly on-chain. Per-game item catalogs (like arcv2m1's game dropdown): Ludo skins, Ayo Olopon sounds, etc. Gasless grant/equip/revoke via session key, sliced reads (dataSlice). arcv2m1 games define their own item catalogs; arcv2m9 owns the wallet infrastructure.",
       "expectedInput": {
-        "status": "pending discussion \u2014 finalize before M9 build",
-        "summary": "What M9 will RECEIVE. To be discussed and locked when M9 build starts.",
+        "status": "pending discussion — finalize before arcv2m9 build",
+        "summary": "What arcv2m9 will RECEIVE. To be discussed and locked when arcv2m9 build starts.",
         "items": [
-          "FROM M1 GAMES: item catalog definitions (what items exist, media bytes, metadata).",
+          "FROM arcv2m1 GAMES: item catalog definitions (what items exist, media bytes, metadata).",
           "FROM USER: equip/unequip/revoke actions.",
-          "FROM M7 (OPTIONAL): competition rewards that are items (skins, sounds) instead of points.",
+          "FROM arcv2m7 (OPTIONAL): competition rewards that are items (skins, sounds) instead of points.",
           "INFRASTRUCTURE: window.magicblockDice for on-chain asset operations (grantAsset, updateAssetState, addAssetMedia)."
         ]
       },
       "expectedOutput": {
-        "status": "pending discussion \u2014 finalize before M9 build",
-        "summary": "What M9 MUST expose. To be discussed and locked when M9 build starts.",
+        "status": "pending discussion — finalize before arcv2m9 build",
+        "summary": "What arcv2m9 MUST expose. To be discussed and locked when arcv2m9 build starts.",
         "items": [
-          "WINDOW API: window.gfgAssets.list() \u2192 owned items. open(assetId) \u2192 {mediaType, blobUrl}. equip(assetId). subscribe(cb).",
+          "WINDOW API: window.gfgAssets.list() → owned items. open(assetId) → {mediaType, blobUrl}. equip(assetId). subscribe(cb).",
           "ON-CHAIN: PlayerAssets PDA [gfgassets, player] holding item entries + media bytes.",
-          "GAME INTEGRATION: M1 games read the player's inventory to apply skins/sounds/cosmetics in-game."
+          "GAME INTEGRATION: arcv2m1 games read the player's inventory to apply skins/sounds/cosmetics in-game."
         ]
       },
       "details": [
         "On-chain player-owned inventory. Media bytes stored directly in the account (the wallet is a viewer).",
-        "Per-game item catalogs: Ludo skins, Ayo Olopon sounds, etc. Games define their catalogs; M9 owns the wallet.",
+        "Per-game item catalogs: Ludo skins, Ayo Olopon sounds, etc. Games define their catalogs; arcv2m9 owns the wallet.",
         "Gasless grant/equip/revoke via session key. Sliced reads (dataSlice) for efficient media loading.",
-        "M1 games define their own item catalogs; M9 owns the wallet infrastructure."
+        "arcv2m1 games define their own item catalogs; arcv2m9 owns the wallet infrastructure."
       ]
     },
     {
-      "id": "M10",
-      "title": "Lives + daily rewards (subscription-boosted, ships with M5)",
+      "id": "arcv2m10",
+      "title": "Lives + daily rewards (subscription-boosted, ships with arcv2m5)",
       "status": "in-progress",
-      "summary": "The free-play meter and the recurring daily earn, both boosted by an active subscription. LIVES: free = 5/day, Level-2 subscriber = 10/day, Level-3 subscriber = 15/day, reset at GMT+00, consumed ONLY when a match COMPLETES (abandon/reset/network-disconnect never cost one), universal across every M1 game. DAILY REWARD: free claim 25P once per day, Level-2 subscribers 200P/day, Level-3 subscribers 300P/day (signed-in, 24h reset via Dynamic sign-out), . Both feed the 30-day launch earn campaign and give the subscription real recurring value.",
+      "summary": "The free-play meter and the recurring daily earn, both boosted by an active subscription. LIVES: free = 5/day, Level-2 subscriber = 10/day, Level-3 subscriber = 15/day, reset at GMT+00, consumed ONLY when a match COMPLETES (abandon/reset/network-disconnect never cost one), universal across every arcv2m1 game. DAILY REWARD: free claim 25P once per day, Level-2 subscribers 200P/day, Level-3 subscribers 300P/day (signed-in, 24h reset via Dynamic sign-out), . Both feed the 30-day launch earn campaign and give the subscription real recurring value.",
       "expectedInput": {
-        "summary": "What M10 RECEIVES. Locked 2026-08-20 with the launch build.",
+        "summary": "What arcv2m10 RECEIVES. Locked 2026-08-20 with the launch build.",
         "items": [
-          "FROM M2 SEAM: match completion signals (to consume a life ONLY on a finished game, never on abandon/reset/disconnect).",
-          "FROM M5: window.activeTier.get() to apply the boosted values (free 5L/25P vs Level-2 10L/200P).",
-          "FROM M4: window.globalLedger.credit() to bank the daily reward as a kind=1 credit (M4b+M4c only, never M3 or M4a pure).",
+          "FROM arcv2m2 SEAM: match completion signals (to consume a life ONLY on a finished game, never on abandon/reset/disconnect).",
+          "FROM arcv2m5: window.activeTier.get() to apply the boosted values (free 5L/25P vs Level-2 10L/200P).",
+          "FROM arcv2m4: window.globalLedger.credit() to bank the daily reward as a kind=1 credit (M4b+M4c only, never arcv2m3 or M4a pure).",
           "FROM USER: daily reward claim action; game-start requests checked against the lives pool."
         ]
       },
       "expectedOutput": {
-        "summary": "What M10 MUST expose. Locked 2026-08-20 with the launch build.",
+        "summary": "What arcv2m10 MUST expose. Locked 2026-08-20 with the launch build.",
         "items": [
-          "WINDOW API: window.gfgLives = { get() -> {livesLeft, totalForLevel, resetsInMs}, consume(), subscribe(cb) }, window.gfgDaily = { get() -> {claimedToday, amount, tierLevel}, claim() -> banks kind=1 daily_reward into M4, subscribe(cb) }.",
+          "WINDOW API: window.gfgLives = { get() -> {livesLeft, totalForLevel, resetsInMs}, consume(), subscribe(cb) }, window.gfgDaily = { get() -> {claimedToday, amount, tierLevel}, claim() -> banks kind=1 daily_reward into arcv2m4, subscribe(cb) }.",
           "LIVES GATE: a game request when livesLeft=0 is blocked until the GMT+00 reset (or an active Level-2 sub restores 10). Lives consumed ONLY on match completion.",
           "DAILY REWARD: one claim per 24h, signed-in required; free = 25P, Level-2 = 200P.",
-          "MAPS BY SOURCE: daily_reward is a NEW additive source_code (14) on the gfg program so the M4 ledger records it honestly next to signup/referral/tier_boost.",
+          "MAPS BY SOURCE: daily_reward is a NEW additive source_code (14) on the gfg program so the arcv2m4 ledger records it honestly next to signup/referral/tier_boost.",
           "HOME (universal/): public/universal/lives/ holds the module; slots [data-lives-left], [data-lives-total], [data-daily-amount], [data-daily-claimed] for any page."
         ]
       },
       "details": [
         "LIVES (owner numbers 2026-08-20): free = 5 lives/day; Level-2 subscriber = 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC). HARD RULE: a life is consumed ONLY when a match COMPLETES; abandon, reset, and mid-game network disconnect NEVER lose a life.",
         "DAILY REWARD (owner numbers 2026-08-20): free = 25P once per day; Level-2 = 200P once per day. Must be signed in; 24h reset enforced (also via Dynamic sign-out). Framed as an upsell hook for the Level-2 subscription.",
-        "WHY: lives meter free play so the recurring subscription has a reason to exist; the daily reward gives every signed-in user a reason to return each day. Both are launch-critical (shipped inside the M5 build window).",
-        "LADDER BY PLAN (owner 2026-08-22): LIVES free 5 / Level-2 10 / Level-3 15 per day (GMT+00 reset, consumed only on match completion). DAILY REWARD free 25P / Level-2 200P / Level-3 300P once per day. Values are driveable by the M5 plan ladder (plan config), not hardcoded per UI."
+        "WHY: lives meter free play so the recurring subscription has a reason to exist; the daily reward gives every signed-in user a reason to return each day. Both are launch-critical (shipped inside the arcv2m5 build window).",
+        "LADDER BY PLAN (owner 2026-08-22): LIVES free 5 / Level-2 10 / Level-3 15 per day (GMT+00 reset, consumed only on match completion). DAILY REWARD free 25P / Level-2 200P / Level-3 300P once per day. Values are driveable by the arcv2m5 plan ladder (plan config), not hardcoded per UI."
       ]
     },
     {
-      "id": "M11",
+      "id": "arcv2m11",
       "title": "Community (on-chain forum, UGC)",
       "status": "planned",
       "summary": "A UGC community around native games: categories (games, how-to, bugs, suggestions, feedback), posts stored ON-CHAIN on the ER (gasless, users never sign/pay; embedded Dynamic wallet), text-only payloads with LINK/EMBED rendering on the frontend. Identity stays concealed (GFG-XXXXXX handle). Searchable via server index.",
@@ -623,7 +623,7 @@
       ]
     },
     {
-      "id": "M12",
+      "id": "arcv2m12",
       "title": "Multiplayer (standalone game-agnostic rail)",
       "status": "in-progress",
       "summary": "A FREE multiplayer rail (match codes, gasless ER moves, turn clocks/forfeit, finish + seam) that ANY game plugs into with a small adapter. Standalone means it works with zero money and NO AGM: players train on exactly what they'll bet on later. AGM is a separate money/escrow plug that attaches the SAME match later; the game never changes.",
@@ -635,12 +635,12 @@
       "expectedOutput": {
         "onChainBoard": "per match: participants, move-hash checkpoints, turn times, finish order - written gasless on the ER (create+delegate once, then session-key gasless moves).",
         "listenLoop": "all players subscribe to the delegated board on the ER and re-render on change (like MagicBlock solana-generals).",
-        "seam": "publishGameResult emitted exactly as today (stake 0 / escrowRef null when free), so M3/M4/M7/AGM consume identically free or earn.",
+        "seam": "publishGameResult emitted exactly as today (stake 0 / escrowRef null when free), so arcv2m3/arcv2m4/arcv2m7/AGM consume identically free or earn.",
         "matchStateApi": "relay matchState(matchRef) for later AGM/escrow settlement."
       },
       "details": [
-        "MODULE = M12 (standalone; NOT inside M1). Canonical home: public/universal/multiplayer/ (README + multiplayer.js). Slice labels arc2m12a, arc2m12b...",
-        "MEMBERSHIP: M1 arc2m1d (board instructions start_match/begin_match/commit_move/finish_match, seeds gfgboard) and arc2m1f clocks were built as M1 game-core, but the STANDALONE multiplayer RAIL they feed is its own module (M12). Games do NOT implement multiplayer themselves - they write a small adapter.",
+        "MODULE = arcv2m12 (standalone; NOT inside arcv2m1). Canonical home: public/universal/multiplayer/ (README + multiplayer.js). Slice labels arc2m12a, arc2m12b...",
+        "MEMBERSHIP: arcv2m1 arc2m1d (board instructions start_match/begin_match/commit_move/finish_match, seeds gfgboard) and arc2m1f clocks were built as arcv2m1 game-core, but the STANDALONE multiplayer RAIL they feed is its own module (arcv2m12). Games do NOT implement multiplayer themselves - they write a small adapter.",
         "ER-FIRST: create match PDA once + delegate_board once (sponsor ~0.0003 SOL), then every move is a GASLESS ER tx signed by the acting player's session key; all players LISTEN to the delegated board on the ER. NEVER base-layer per-move writes.",
         "GAME-AGNOSTIC: rail only handles participants/move-hashes/turn-times/finish - never interprets a move. New games = new adapter ($100s not $thousands). Ludo adapter (games/ludo-lab/mechanics/state/multiplayer-adapter.js) is the reference.",
         "AGM PLUGS ON LATER: same match, added money/escrow; zero gameplay change. Same clocks/timers enforced free so players train on the real experience.",
@@ -671,23 +671,54 @@
         "LINKS back to the live product pages (games, economy, contact) so learners stay on the live site, not just the code.",
         "NO backend, no Supabase: the academy is static and client-side, consistent with the on-chain plus Vercel-only stack."
       ]
+    },
+    {
+      "id": "arcv2m14",
+      "title": "AGM (Automated Game Matcher: peer challenges + token escrow + stock rewards)",
+      "status": "planned",
+      "summary": "The invented Automated Game Matcher (AGM). Players make or take skill challenges on any native game, with ANY SPL token escrowed, matched maker-to-taker, and the winner rewarded (optionally as tokenized stock). AGM only matches and settles; it never changes gameplay. Revived from docs/architecture-2.0.md, rebuilt non-custodial on the ER (supersedes the earlier base-layer order book).",
+      "expectedInput": [
+        "Locked results from arcv2m2 (the seam) and the match facts from arcv2m12 (the multiplayer rail).",
+        "A maker challenge: game tag, SPL token mint (chosen from the embedded wallet or pasted), amount, optional reward mode (stake token, or a chosen tokenized stock), and a window."
+      ],
+      "expectedOutput": [
+        "A matched, escrow-locked challenge; on finish, ER settlement: 90% to the winner and 10% platform fee; in stock mode the profit portion is swapped into the chosen stock and priced by the Pyth Lazer oracle.",
+        "No platform-paid accounts, no custody by the platform, and no change to the game."
+      ],
+      "details": [
+        "WHAT IT IS: the Automated Game Matcher (invented by Solomon Foskaay). A game-agnostic matcher, not a game. Players prove proficiency at a native game by making or taking a challenge, maker/taker like a trading order book. It plugs into the SAME match (arcv2m12) and the SAME result (arcv2m2) and never changes gameplay.",
+        "MAKER/TAKER: a maker posts a challenge (game, token mint, amount, optional reward mode, window). It appears on a shared challenges table. Any taker may take it; on take, both stakes are escrowed. EXACT MATCH RULE: the taker must match the exact mint AND the exact amount (1,000 BONK can never take a 5 USDC challenge; a BONK challenge can only be taken with the same BONK amount).",
+        "ANY SPL TOKEN: the mint is chosen from the embedded wallet or pasted. USDC, USDT, SOL-wrapped, or a memecoin all work the same; the program validates the mint and the amount.",
+        "NON-CUSTODIAL ESCROW (rebuilt): a program-owned eATA (Ephemeral SPL Token program SPLxh1...) per challenge mint, delegated to the ER, with PDA-signed transfers. The platform never holds funds. This supersedes the earlier base-layer order book, which posted orders on base and cost per transaction.",
+        "FEE: flat 10% of the matched total to the platform treasury. The winner receives their own stake back plus the matched stake minus the fee.",
+        "STOCK-REWARD SETTLEMENT (the Stocklana innovation): the reward may be delivered as a tokenized stock (for example AAPLx/TSLx). At settlement the profit portion is swapped into the chosen stock mint and priced by the Pyth Lazer oracle on the ER, so the winner ends with their token AND a stock position. Example: 10 USDC plus 10 USDC, 2 fee, winner gets 10 USDC back plus 8 USDC of stock.",
+        "LANGUAGE/FRAMING (HARD RULE): never gambling or betting words. Use make or take a challenge, prove your proficiency, win the reward. Not bet, pot, or wager.",
+        "NO PLATFORM OVERHEAD: no platform-paid accounts. The challenge account rent is paid by the maker; the escrow is per challenge; it does not touch the Player Core account (arcv2m3/arcv2m4 redesign).",
+        "ON-CHAIN STATE: challenge PDA (seed gfgagm, seq), eATA escrow, optional stock mint, status machine (open -> matched -> locked -> settled/refunded), deadline plus a permissionless refund after expiry.",
+        "REUSE: consumes arcv2m12 (match) and arcv2m2 (result seam); the game is unchanged, free play and stake 0 still emit the same envelope.",
+        "P2C (availability filler, DEFERRED): the platform bank funds computer seats so a challenge always finds a counterpart. Honest break-even is 55.6%; P2C is never the profit center. Deferred behind P2P.",
+        "PROGRAM PLACEMENT: additive on the same gfg program (or a dedicated AGM module program later), NEW seed prefix, versioned layouts, undelegate_* for any new PDA, no live seed change.",
+        "REPUTATION: winner reputation keyed to the GFG handle only (never wallet, email, or name). Optional arcv2m9/SOAR records later.",
+        "HACKATHON FIT: skill challenges whose prize settles in tokenized stocks on Solana, a consumer/social use of tokenized equities (Stocklana).",
+        "DEFERRED: leverage/prop mode, N-way tournaments beyond 2, fiat on-ramp, and the P2C product."
+      ]
     }
   ],
   "rules": [
-    "M1 never calls M4: the game and rewards are separated. The game emits into the seam (M2) and knows nothing about how points work.",
-    "UNIVERSAL SEAM (M2) is the ONLY way out of a game: every game ends with the same call (window.publishGameResult, gfg:game-result@1 envelope). M3/M4/M7 subscribe to the bus (window.onGameResult) and never read game internals. No game ships its own reward/competition plug.",
-    "M7 needs no M8: competitions stand alone from sponsor; escrow is an optional plugin.",
-    "Local (M3) never diluted: no multiplier, no purchase, no bonus, no giveaway, no referral on local points.",
-    "Multiplier only at M4 flow-up: 2x/3x/4x touches M4b lifetime + M4c spendable, never M3 or M4a.",
+    "arcv2m1 never calls arcv2m4: the game and rewards are separated. The game emits into the seam (arcv2m2) and knows nothing about how points work.",
+    "UNIVERSAL SEAM (arcv2m2) is the ONLY way out of a game: every game ends with the same call (window.publishGameResult, gfg:game-result@1 envelope). arcv2m3/arcv2m4/arcv2m7 subscribe to the bus (window.onGameResult) and never read game internals. No game ships its own reward/competition plug.",
+    "arcv2m7 needs no arcv2m8: competitions stand alone from sponsor; escrow is an optional plugin.",
+    "Local (arcv2m3) never diluted: no multiplier, no purchase, no bonus, no giveaway, no referral on local points.",
+    "Multiplier only at arcv2m4 flow-up: 2x/3x/4x touches M4b lifetime + M4c spendable, never arcv2m3 or M4a.",
     "Everything slots together by source tag ('Ludo', 'Ayo Olopon', 'signup_bonus', 'referral').",
     "Modular + pluggable: each module is interchangeable and game-agnostic; no module is tailored to a single game.",
-    "Extensible: M1-M9 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (M10+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
-    "LOCKED PER-GAME SPECS ARE THE BENCHMARK (M1A rule): each game under M1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the M1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes M1 for that game when the build matches A-Z.",
+    "Extensible: arcv2m1-arcv2m9 cover the current roadmap. Any genuinely new domain (community/forum, support, profile, etc.) becomes a NEW module (arcv2m10+) recorded here FIRST. A feature is never 'unmodular' - it either slots into an existing module or earns a new one.",
+    "LOCKED PER-GAME SPECS ARE THE BENCHMARK (arcv2m1A rule): each game under arcv2m1A (Ludo locked, Ayo Olopon planned, ...) has its own LOCKED spec in the arcv2m1 game dropdown - the source of truth for building AND testing that game. The agent reads it before/during the build, checks the result against it, and only concludes/commits/pushes arcv2m1 for that game when the build matches A-Z.",
     "RPC/REGION-AGNOSTIC BUILD RULE (hard, locked 2026-08-18): every on-chain capability in ANY module MUST be RPC/region agnostic by construction. New per-player PDA types ship their own undelegate instruction in the same program build (so any account can leave a flaky/banned ER region and be re-pinned); client/relay/probe never hardcode one ER endpoint/region (resolve each account's hosting region from the Magic Router and target it; 3-region registry + failover is the base transport); delegate account maps use the relay's camelCase key form for #[delegate] helper accounts. Survived the 2026-08-18 US-route ban by re-pinning the fleet to AS. A banned region is a re-pin job, never a feature outage.",
-    "PREMIUM POINTS (M5) ARE THEIR OWN ECONOMY (locked 2026-08-20): premium_lifetime + premium_spendable live in the [gfgprem, player] PDA, acquired ONLY by direct purchase (admin/sponsor credit), never from gameplay, signup, referral, or giveaway. Premium spendable works wherever global spendable works PLUS places global NEVER can (subscription, lives). Premium never merges into global (M4) or local (M3) and never dilutes M4a pure.",
-    "SUBSCRIPTION STATE IS ON-CHAIN (locked 2026-08-20): subscription_level + active_until live in the premium PDA, never Supabase as truth. No auto-renew: a 30-day window lapses passively. Multiplier stays kind=1 at M4 flow-up only.",
+    "PREMIUM POINTS (arcv2m5) ARE THEIR OWN ECONOMY (locked 2026-08-20): premium_lifetime + premium_spendable live in the [gfgprem, player] PDA, acquired ONLY by direct purchase (admin/sponsor credit), never from gameplay, signup, referral, or giveaway. Premium spendable works wherever global spendable works PLUS places global NEVER can (subscription, lives). Premium never merges into global (arcv2m4) or local (arcv2m3) and never dilutes M4a pure.",
+    "SUBSCRIPTION STATE IS ON-CHAIN (locked 2026-08-20): subscription_level + active_until live in the premium PDA, never Supabase as truth. No auto-renew: a 30-day window lapses passively. Multiplier stays kind=1 at arcv2m4 flow-up only.",
     "R12 COMPETITION INSTANCES ARE CONFIG, NOT CODE (owner 2026-08-22): games[], requirements (multi-select spendable families + tier level), entry cost, window, USD pool, prize shares, redemption and payout mode are DATA on an on-chain instance. Changing them = new instance params, never a code rewrite.",
-    "R13 COMPETITIONS ARE ON-CHAIN ONLY (owner 2026-08-22): no web2 db (Supabase) for the competition lifecycle - identity, requirements, window, pool, winners and paid status are on-chain, so sponsors can plug 30/70 rake + escrow (M8) later.",
+    "R13 COMPETITIONS ARE ON-CHAIN ONLY (owner 2026-08-22): no web2 db (Supabase) for the competition lifecycle - identity, requirements, window, pool, winners and paid status are on-chain, so sponsors can plug 30/70 rake + escrow (arcv2m8) later.",
     "R14 PRIZES ARE USD/POINTS, REDEMPTION AGNOSTIC (owner 2026-08-22): pool value is USD cents ($1 = N1,500 = 500 pts at the $0.002/pt base, adjustable per instance without rebuild); redemption (naira now; points/crypto/merch later) is presentational only.",
     "R15 gfgwin WINNER RECORDS ARE ADDITIVE (approved 2026-08-22): [gfgwin, comp, rank] accounts + record_competition_winners + mark_winner_paid as additive instructions on the same program (no seed/layout change to live types; upgrade-safe per R4 / solana-upgrade-safety).",
     "R16 AUTO-STOP (owner 2026-08-22): an earn competition window REFUSES win input after ends_at; the leaderboard freezes and the ranking is final.",
@@ -696,12 +727,12 @@
     "R19 COMMUNITY POSTS ARE TEXT-ONLY ON-CHAIN (owner 2026-08-24): forum posts carry pure text + LINK/EMBED references only (video/images fetched and rendered on the frontend by URL); no media bytes stored on-chain, keeping chain data small and every post gasless on the ER."
   ],
   "implementationOrder": [
-    "1. M1 + M2 + M3 + M4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at M4 flow-up, 3 global ledgers. Test it.",
-    "2. M5 + M10 launch engine (launch gate - all build ahead of launch): premium points ledger [gfgprem, player] + admin credit + CONFIG-DRIVEN plan ladder (levels added as data): Level-2 $5 / Nigeria N5,000 + Level-3 3x $10 discount / Nigeria N8,000 + 30-day active sub (on-chain, no auto-renew) + multiplier at M4 flow-up + lives (5/10 per day, GMT+00 reset) + daily reward (25P/200P).",
-    "3. M6 launch sources (launch gate): 500P signup bonus (on-chain fence) + 12-month affiliate (15% of each referred subscription month in USD cents, referrer must hold an active Level-2 sub that month or the month is forfeited, 60-day inactive pair-forfeit, manual Naira payout 3-7 days).",
-    "4. M7 LAUNCH SIMPLEST (launch gate): one entry per account per window, active Level-2 plan required, dynamic pluggable spendable-requirement list, window-fresh leaderboard, daily pool $1-equiv Nigeria N1,500 (1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each), public leaderboard, manual payout.",
-    "5. M7 full game-agnostic competition platform (after launch stable): multi-game select, pluggable payout (airtime / manual / escrow).",
-    "6. M8 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize.",
-    "7. M9 player inventory (after launch stable): on-chain assets wallet, per-game catalogs."
+    "1. arcv2m1 + arcv2m2 + arcv2m3 + arcv2m4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at arcv2m4 flow-up, 3 global ledgers. Test it.",
+    "2. arcv2m5 + arcv2m10 launch engine (launch gate - all build ahead of launch): premium points ledger [gfgprem, player] + admin credit + CONFIG-DRIVEN plan ladder (levels added as data): Level-2 $5 / Nigeria N5,000 + Level-3 3x $10 discount / Nigeria N8,000 + 30-day active sub (on-chain, no auto-renew) + multiplier at arcv2m4 flow-up + lives (5/10 per day, GMT+00 reset) + daily reward (25P/200P).",
+    "3. arcv2m6 launch sources (launch gate): 500P signup bonus (on-chain fence) + 12-month affiliate (15% of each referred subscription month in USD cents, referrer must hold an active Level-2 sub that month or the month is forfeited, 60-day inactive pair-forfeit, manual Naira payout 3-7 days).",
+    "4. arcv2m7 LAUNCH SIMPLEST (launch gate): one entry per account per window, active Level-2 plan required, dynamic pluggable spendable-requirement list, window-fresh leaderboard, daily pool $1-equiv Nigeria N1,500 (1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each), public leaderboard, manual payout.",
+    "5. arcv2m7 full game-agnostic competition platform (after launch stable): multi-game select, pluggable payout (airtime / manual / escrow).",
+    "6. arcv2m8 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize.",
+    "7. arcv2m9 player inventory (after launch stable): on-chain assets wallet, per-game catalogs."
   ]
 }
