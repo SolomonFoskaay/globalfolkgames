@@ -578,7 +578,7 @@ impl ChessBoard {
     // The full move/position history does NOT live here (it would blow the 4 KB
     // stack frame on deserialize); per the locked spec it lives in a separate
     // Ephemeral Account in Phase 2/3.
-    pub const LEN: usize = 204;
+    pub const LEN: usize = 212;
 }
 
 // ---------- Phase 2: AI, apply/finish, contexts ----------
@@ -709,8 +709,6 @@ pub struct InitializeChessMatch<'info> {
     pub payer: Signer<'info>,
     /// CHECK: host wallet (seat 0, the human; seat 1 is the house for solo).
     pub host: AccountInfo<'info>,
-    #[account(mut, seeds = [LIVES_SEED, host.key().as_ref()], bump)]
-    pub lives: Account<'info, LivesAccount>,
     #[account(
         init,
         payer = payer,
@@ -880,5 +878,23 @@ mod tests {
         let mut count = 0;
         for i in 0..l.len { if l.get(i).from == 48 && l.get(i).to == 56 { count += 1; } }
         assert_eq!(count, 4, "N B R Q promotions");
+    }
+
+    #[test]
+    fn chessboard_len_matches_borsh() {
+        use anchor_lang::AnchorSerialize;
+        let b = ChessBoard {
+            version: 0, game: 0, status: 0, seat_count: 0, result: 0, end_reason: 0,
+            side_to_move: 0, castling: 0, ep: 0, check_flag: 0,
+            seats: [Pubkey::default(); 2],
+            position: [0u8; 64],
+            clock_ms: [0u64; 2],
+            increment_ms: 0, turn_started_at: 0, started_at: 0, finished_at: 0,
+            halfmove: 0, fullmove: 0, move_count: 0, last_hash: 0,
+            draw_offer: 0, last_request_ref: 0, bump: 0,
+        };
+        let mut buf = Vec::new();
+        b.serialize(&mut buf).unwrap();
+        assert_eq!(buf.len(), ChessBoard::LEN);
     }
 }

@@ -28,6 +28,7 @@ import verifyAndCredit from '../api_handlers/verify-and-credit.mjs';
 import payConfig from '../api_handlers/pay-config.mjs';
 import communityStats from '../api_handlers/community-stats.mjs';
 import multiplayer from '../api_handlers/multiplayer.mjs';
+import chess from '../api_handlers/chess.mjs';
 
 const routes = {
   '/api/competitions': competitions,
@@ -35,6 +36,7 @@ const routes = {
   '/api/pay-config': payConfig,
   '/api/community-stats': communityStats,
   '/api/multiplayer': multiplayer,
+  '/api/chess': chess,
   '/api/agm': agm,
   '/api/agm/balances': agm,
   '/api/verify-and-credit': verifyAndCredit,

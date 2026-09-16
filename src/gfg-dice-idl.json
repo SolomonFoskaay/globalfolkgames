@@ -3417,31 +3417,6 @@
           "name": "host"
         },
         {
-          "name": "lives",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  102,
-                  103,
-                  108,
-                  105,
-                  118,
-                  101,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "host"
-              }
-            ]
-          }
-        },
-        {
           "name": "board",
           "writable": true,
           "pda": {

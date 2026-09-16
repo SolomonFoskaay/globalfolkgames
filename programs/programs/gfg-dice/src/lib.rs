@@ -194,7 +194,6 @@ pub mod gfg_dice {
         increment_ms: u64,
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-        gate_lives(&ctx.accounts.lives, now)?;
         let b = &mut ctx.accounts.board;
         let init = Position::initial();
         b.version = 1;

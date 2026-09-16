@@ -903,6 +903,85 @@ function livesPdaFor(pubkey) {
   );
 }
 
+// ===== M1A Chess (single player, fully on-chain) =====
+// The relay creates + delegates the board once (sponsor); the player signs the
+// start and every move on the ER (gasless, session key). The house signs the
+// on-chain AI reply. All soft-fail friendly; the program enforces the rules.
+
+function chessPdaFor(matchRef) {
+  const refBuf = new BN(String(matchRef)).toArrayLike(Buffer, 'le', 8);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('gfgchess'), refBuf],
+    new PublicKey(config.programId),
+  );
+}
+
+async function chessRelay(action, payload) {
+  const res = await fetch('/api/chess', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action }, payload || {})),
+  });
+  if (!res.ok) throw new Error('chess relay error ' + res.status);
+  return res.json();
+}
+
+export async function createChessMatch(matchRef, hostPubkey, timeMs, incrementMs) {
+  return chessRelay('create', { matchRef, host: hostPubkey, timeMs, incrementMs });
+}
+
+export async function startChessMatch(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign start.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  const [lives] = livesPdaFor(wallet.publicKey);
+  await ensureDelegated(lives, wallet.publicKey);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('start_chess_match', async (eCtx) => eCtx.program.methods
+    .startChessMatch(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board, lives })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+export async function makeChessMove(matchRef, from, to, promo) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the move.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('make_chess_move', async (eCtx) => eCtx.program.methods
+    .makeChessMove(new BN(matchRef), from, to, promo || 0)
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+export async function aiChessMove(matchRef, level) {
+  return chessRelay('ai', { matchRef, level: level || 1 });
+}
+
+export async function claimChessTimeout(matchRef) {
+  const ctx = getErProgram();
+  if (!ctx) throw new Error('No connected wallet to sign the claim.');
+  const { wallet } = ctx;
+  const [board] = chessPdaFor(matchRef);
+  await waitForErPickup(board);
+  const regionUrl = await regionUrlFor(board);
+  const sig = await withErRetry('claim_chess_timeout', async (eCtx) => eCtx.program.methods
+    .claimChessTimeout(new BN(matchRef))
+    .accounts({ signer: wallet.publicKey, board })
+    .rpc(), { regionUrl });
+  return { ok: true, sig };
+}
+
+export async function readChessBoard(matchRef) {
+  return chessRelay('state', { matchRef });
+}
+
 // A player commits their seat's move (32-byte commit) gasless. The program
 // verifies signer == players[seat], so the wrong device is rejected on-chain.
 export async function commitBoardMove(game, matchRef, seat, moveCommit) {
@@ -1355,6 +1434,18 @@ export function initMagicBlockDice() {
     },
     readLivesFor(pubkey) {
       return readLivesFor(pubkey);
+    },
+
+    // M1A Chess (single player, fully on-chain): relay-create the board, then
+    // start / move / claim on the ER (gasless) and read the board state.
+    chess: {
+      pda(matchRef) { return chessPdaFor(matchRef); },
+      create(matchRef, hostPubkey, timeMs, incrementMs) { return createChessMatch(matchRef, hostPubkey, timeMs, incrementMs); },
+      start(matchRef) { return startChessMatch(matchRef); },
+      move(matchRef, from, to, promo) { return makeChessMove(matchRef, from, to, promo); },
+      ai(matchRef, level) { return aiChessMove(matchRef, level); },
+      claimTimeout(matchRef) { return claimChessTimeout(matchRef); },
+      read(matchRef) { return readChessBoard(matchRef); },
     },
 
     // M4 — global spendable draw-down (gasless ER write). Returns the spend receipt sig.
