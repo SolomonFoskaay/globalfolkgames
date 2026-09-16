@@ -103,8 +103,6 @@ use ephemeral_rollups_sdk::vrf::{
 // same program. Adds no instruction yet; Phase 2 wires the lifecycle.
 pub mod chess;
 pub use chess::*;
-pub mod probe;
-pub use probe::*;
 
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
@@ -178,6 +176,29 @@ fn gate_lives(l: &LivesAccount, now: i64) -> Result<()> {
     Ok(())
 }
 
+// M10 LIVES CHARGE (owner 2026): a life is spent AT GAME START, never held
+// until completion. The program charges the ledger the moment a player enters a
+// live match (join) or the host begins it, so win, lose, draw, or abandon all
+// spend that one life, a player must deliberate before starting, and a bare
+// frontend can never begin free. Unlimited (booster / premium active) still
+// draws nothing but stamps the ref. Callers charge only on a real transition
+// (lobby -> live, or a new seat), so a retry can never double-charge.
+fn charge_life(l: &mut LivesAccount, now: i64, match_ref: u64) -> Result<()> {
+    if l.unlimited_until > 0 && l.unlimited_until > now {
+        l.last_consumed_ref = match_ref;
+        l.last_consumed_ts = now;
+        return Ok(());
+    }
+    let day = now / 86400;
+    if l.day != day { l.day = day; l.used = 0; } // GMT+00 daily refill
+    require!(l.used < l.pool, PointsError::NoLives);
+    l.used = l.used.checked_add(1).ok_or(PointsError::Overflow)?;
+    l.last_consumed_ref = match_ref;
+    l.last_consumed_ts = now;
+    l.award_count = l.award_count.checked_add(1).ok_or(PointsError::Overflow)?;
+    Ok(())
+}
+
 #[ephemeral]
 #[program]
 pub mod gfg_dice {
@@ -243,13 +264,14 @@ pub mod gfg_dice {
     /// Gasless ER write; the host's session key signs.
     pub fn start_chess_match(ctx: Context<StartChessMatch>, match_ref: u64) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-        gate_lives(&ctx.accounts.lives, now)?;
         let b = &mut ctx.accounts.board;
         require!(b.status == STATUS_LOBBY, PointsError::NotOpen);
         require!(
             ctx.accounts.signer.key() == b.seats[0] || ctx.accounts.signer.key() == b.seats[1],
             PointsError::NotSeatAuthority
         );
+        // M10: charge the host's life AT START (never on completion).
+        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
         b.status = STATUS_PLAYING;
         b.started_at = now;
         b.turn_started_at = now;
@@ -319,11 +341,12 @@ pub mod gfg_dice {
     /// lives-gated. Refuses if seat 1 is taken or the joiner is the host.
     pub fn join_chess_match(ctx: Context<JoinChessMatch>, match_ref: u64) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-        gate_lives(&ctx.accounts.lives, now)?;
         let b = &mut ctx.accounts.board;
         require!(b.status == STATUS_LOBBY, PointsError::NotOpen);
         require!(b.seats[1] == Pubkey::default(), PointsError::AlreadyClaimed);
         require!(ctx.accounts.signer.key() != b.seats[0], PointsError::NotSeatAuthority);
+        // M10: charge the joiner's life AT JOIN (never on completion).
+        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
         b.seats[1] = ctx.accounts.signer.key();
         Ok(())
     }
@@ -375,34 +398,6 @@ pub mod gfg_dice {
         )
         .commit_and_undelegate(&[ctx.accounts.board.to_account_info()])
         .build_and_invoke()?;
-        Ok(())
-    }
-
-    // ===== TEMPORARY resize probe (Player Core dynamic vs bounded decision) =====
-    pub fn probe_init(ctx: Context<ProbeInitCtx>) -> Result<()> {
-        let p = &mut ctx.accounts.probe;
-        p.version = 1;
-        p.marker = 0xA5;
-        p.len_marker = ProbeAccount::LEN as u32;
-        Ok(())
-    }
-
-    pub fn probe_delegate(ctx: Context<ProbeDelegateCtx>) -> Result<()> {
-        let payer = ctx.accounts.payer.key();
-        ctx.accounts.delegate_probe(
-            &ctx.accounts.payer,
-            &[PROBE_SEED, payer.as_ref()],
-            DelegateConfig {
-                validator: ctx.remaining_accounts.first().map(|a| a.key()),
-                ..Default::default()
-            },
-        )?;
-        Ok(())
-    }
-
-    pub fn probe_resize(ctx: Context<ProbeResizeCtx>, new_len: u32) -> Result<()> {
-        let p = &mut ctx.accounts.probe;
-        p.len_marker = new_len;
         Ok(())
     }
 
@@ -1847,11 +1842,12 @@ pub mod gfg_dice {
         hbuf[..hb.len()].copy_from_slice(hb);
         b.handles[seat as usize] = hbuf;
         b.last_turn_ts[seat as usize] = Clock::get()?.unix_timestamp;
-        // M10 lives gate: the JOINER must have a life (or unlimited) before
-        // taking a seat - chain-enforced.
-        {
+        // M10 lives charge: the JOINER's life is spent AT JOIN (never on
+        // completion). A re-join by the same wallet on the same seat does not
+        // charge again.
+        if !already_holder {
             let now = Clock::get()?.unix_timestamp;
-            gate_lives(&ctx.accounts.lives, now)?;
+            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
         }
         Ok(())
     }
@@ -1868,11 +1864,11 @@ pub mod gfg_dice {
         // seats freely without transferring authority, and an invited player
         // accidentally seating at seat 0 can never become the creator.
         require!(b.creator == ctx.accounts.signer.key(), PointsError::NotSeatAuthority);
-        // M10 lives gate: the CREATOR must have a life (or unlimited) before the
-        // match goes live - chain-enforced so a bare frontend can't begin free.
+        // M10 lives charge: the CREATOR's life is spent AT BEGIN (never on
+        // completion), chain-enforced so a bare frontend can't begin free.
         {
             let now = Clock::get()?.unix_timestamp;
-            gate_lives(&ctx.accounts.lives, now)?;
+            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
         }
         // current_turn stays 255 (none yet): the SEAT THAT JUST MOVED is unused
         // until the first commit. Both devices therefore derive the displayed

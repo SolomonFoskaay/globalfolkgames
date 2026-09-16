@@ -226,49 +226,21 @@
     }
 
     // ---- M2 seam (the one plug) --------------------------------------------
-    // A completed match consumes one life. Dedupe guards against the seam's
-    // onGameResult handlers AND the gfg:game-result DOM event both landing for
-    // the same finish (they fire together in publishGameResult).
-    // M10 ON-CHAIN: the authoritative consume happens on-chain via consumeLife;
-    // the local meter is then re-synced to the on-chain ledger so a) a third-
-    // party frontend using the public program still pays lives, and b) our own
-    // display never drifts from the chain. Soft-fail: if the chain write fails,
-    // the local meter still draws (a completed game always costs a life).
-    function consumeRefFor(env) {
-        try {
-            if (window.magicblockDice && typeof window.magicblockDice.matchRefFromSignature === 'function' &&
-                env.proof && env.proof.signature) {
-                var r = window.magicblockDice.matchRefFromSignature(env.proof.signature);
-                if (r) return String(r);
-            }
-        } catch (e) { /* fall through */ }
-        // Stable fallback so the same completion is always the same idempotency key.
-        var src = String(env.gameId || '') + '@' + String(env.finishedAt || '');
-        var h = 0x811c9dc5;
-        for (var i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
-        return String(h >>> 0);
-    }
+    // M10 (owner 2026): the life is charged ON-CHAIN AT GAME START (begin /
+    // join / start), never on completion. The frontend does NOT consume; it only
+    // re-syncs the display to the on-chain ledger so the user sees the life that
+    // was already spent when the game began. A third-party frontend cannot play
+    // free either, because the program charges at start.
     function onFinish(env) {
         if (!env || env.schema !== 'gfg:game-result@1') return;
         var key = String(env.gameId || '') + '@' + String(env.finishedAt || '');
         if (lastHandled === key) return;
         lastHandled = key;
-        // Only consume when the signed-in user actually played the match.
         var userPlayed = (env.players || []).some(function (p) {
             return p && p.actor === 'user';
         });
         if (!userPlayed) return;
-        // On-chain authoritative consume (gasless; prevents on-chain loops).
-        var md = window.magicblockDice;
-        if (md && typeof md.consumeLife === 'function') {
-            var refNum = consumeRefFor(env);
-            md.consumeLife(String(env.gameId || ''), refNum).then(function () {
-                // Sync the local meter to the on-chain ledger after the write.
-                syncFromChain();
-            }).catch(function () { consume(); });
-        } else {
-            consume();
-        }
+        syncFromChain();
     }
 
     // Re-read the on-chain lives ledger and mirror it into the local meter so the
