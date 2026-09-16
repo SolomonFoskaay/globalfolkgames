@@ -103,6 +103,8 @@ use ephemeral_rollups_sdk::vrf::{
 // same program. Adds no instruction yet; Phase 2 wires the lifecycle.
 pub mod chess;
 pub use chess::*;
+pub mod pcore;
+pub use pcore::*;
 
 declare_id!("CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ");
 
@@ -397,6 +399,61 @@ pub mod gfg_dice {
             ctx.accounts.magic_program.to_account_info(),
         )
         .commit_and_undelegate(&[ctx.accounts.board.to_account_info()])
+        .build_and_invoke()?;
+        Ok(())
+    }
+
+    // ===== PLAYER CORE (arcv2m3, the law) =====
+    pub fn initialize_player_core(ctx: Context<InitializeCoreCtx>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.core;
+        c.version = 1;
+        c.player = ctx.accounts.player_authority.key();
+        c.created_at = now;
+        c.lives_day = now / 86400;
+        c.lives_used = 0;
+        c.lives_pool = CORE_DEFAULT_POOL;
+        c.unlimited_until = 0;
+        c.last_life_ref = 0;
+        c.last_life_ts = 0;
+        c.lives_award_count = 0;
+        c.global_pure = 0;
+        c.global_lifetime = 0;
+        c.global_spendable = 0;
+        c.premium_lifetime = 0;
+        c.premium_spendable = 0;
+        c.subscription_level = 0;
+        c.subscription_active_until = 0;
+        c.booster_active_until = 0;
+        c.last_credit_ref = 0;
+        c.last_match_ref = 0;
+        c.last_finish_digest = [0u8; 8];
+        c.bucket_count = 0;
+        c.buckets = [GameBucket::default(); CORE_BUCKETS];
+        c.bump = ctx.bumps.core;
+        Ok(())
+    }
+
+    pub fn delegate_player_core(ctx: Context<DelegateCoreCtx>) -> Result<()> {
+        let authority = ctx.accounts.player_authority.key();
+        ctx.accounts.delegate_core(
+            &ctx.accounts.payer,
+            &[CORE_SEED, authority.as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    pub fn undelegate_player_core(ctx: Context<CommitAndUndelegateCoreCtx>) -> Result<()> {
+        MagicIntentBundleBuilder::new(
+            ctx.accounts.payer.to_account_info(),
+            ctx.accounts.magic_context.to_account_info(),
+            ctx.accounts.magic_program.to_account_info(),
+        )
+        .commit_and_undelegate(&[ctx.accounts.core.to_account_info()])
         .build_and_invoke()?;
         Ok(())
     }
@@ -3689,4 +3746,6 @@ pub enum PointsError {
     IllegalMove,
     #[msg("not your turn")]
     NotYourTurn,
+    #[msg("player core bucket table is full (24 games); open a page-2 core")]
+    CoreBucketsFull,
 }

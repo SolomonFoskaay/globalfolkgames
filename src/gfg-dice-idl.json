@@ -2579,6 +2579,177 @@
       "args": []
     },
     {
+      "name": "delegate_player_core",
+      "discriminator": [
+        19,
+        126,
+        175,
+        3,
+        15,
+        142,
+        130,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "buffer_core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "core"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                167,
+                146,
+                27,
+                177,
+                248,
+                7,
+                2,
+                147,
+                77,
+                151,
+                155,
+                16,
+                35,
+                50,
+                231,
+                202,
+                132,
+                94,
+                37,
+                234,
+                9,
+                134,
+                168,
+                218,
+                74,
+                71,
+                128,
+                148,
+                201,
+                14,
+                47,
+                245
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "core"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "core"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "core",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "CH8JepNPAqpp3X67bxujngUSdmFy7Dq1BWxrBu8wgAuJ"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "delegate_points",
       "docs": [
         "Delegates the player's per-game POINTS PDA into an ER session (base",
@@ -3803,6 +3974,58 @@
                   118,
                   101,
                   115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_player_core",
+      "discriminator": [
+        50,
+        61,
+        191,
+        66,
+        39,
+        46,
+        75,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
                 ]
               },
               {
@@ -6606,6 +6829,63 @@
       "args": []
     },
     {
+      "name": "undelegate_player_core",
+      "discriminator": [
+        59,
+        152,
+        107,
+        10,
+        146,
+        132,
+        25,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "undelegate_points",
       "docs": [
         "Commits the latest state and returns the per-game POINTS PDA to this",
@@ -6989,6 +7269,19 @@
       ]
     },
     {
+      "name": "PlayerCore",
+      "discriminator": [
+        83,
+        94,
+        117,
+        64,
+        77,
+        192,
+        100,
+        196
+      ]
+    },
+    {
       "name": "PlayerDice",
       "discriminator": [
         251,
@@ -7255,6 +7548,11 @@
       "code": 6034,
       "name": "NotYourTurn",
       "msg": "not your turn"
+    },
+    {
+      "code": 6035,
+      "name": "CoreBucketsFull",
+      "msg": "player core bucket table is full (24 games); open a page-2 core"
     }
   ],
   "types": [
@@ -7739,6 +8037,37 @@
       }
     },
     {
+      "name": "GameBucket",
+      "docs": [
+        "One per-game bucket: 24 bytes. Keyed by the 8-byte game tag so no numeric",
+        "registry exists and a new game needs no program change. A runtime vector of",
+        "protocol metadata needs large stack space; this anchor's small fixed array",
+        "alone generates a tiny frame, so keep it in the account data (not on stack)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_tag",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "local_pure",
+            "type": "u64"
+          },
+          {
+            "name": "local_spendable",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "GlobalPoints",
       "docs": [
         "On-chain GLOBAL points ledger for one player (M4 — site-wide three-ledger",
@@ -8070,6 +8399,124 @@
           {
             "name": "updated_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerCore",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "lives_day",
+            "type": "i64"
+          },
+          {
+            "name": "lives_used",
+            "type": "u16"
+          },
+          {
+            "name": "lives_pool",
+            "type": "u16"
+          },
+          {
+            "name": "unlimited_until",
+            "type": "i64"
+          },
+          {
+            "name": "last_life_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_life_ts",
+            "type": "i64"
+          },
+          {
+            "name": "lives_award_count",
+            "type": "u64"
+          },
+          {
+            "name": "global_pure",
+            "type": "u64"
+          },
+          {
+            "name": "global_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "global_spendable",
+            "type": "u64"
+          },
+          {
+            "name": "premium_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "premium_spendable",
+            "type": "u64"
+          },
+          {
+            "name": "subscription_level",
+            "type": "u8"
+          },
+          {
+            "name": "subscription_active_until",
+            "type": "i64"
+          },
+          {
+            "name": "booster_active_until",
+            "type": "i64"
+          },
+          {
+            "name": "last_credit_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_finish_digest",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "bucket_count",
+            "type": "u8"
+          },
+          {
+            "name": "buckets",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "GameBucket"
+                  }
+                },
+                24
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
