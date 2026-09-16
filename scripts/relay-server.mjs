@@ -638,6 +638,35 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  // Chess relay (M1A Chess): create + delegate the board, house AI, state read.
+  if ((req.method === 'POST' || req.method === 'GET') && req.url.split('?')[0] === '/api/chess') {
+    let params = {};
+    try {
+      if (req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        params = JSON.parse(body || '{}');
+      } else {
+        const url = new URL(req.url, `http://localhost:${PORT}`);
+        params = {
+          action: url.searchParams.get('action'),
+          matchRef: Number(url.searchParams.get('matchRef')),
+          host: url.searchParams.get('host'),
+          timeMs: Number(url.searchParams.get('timeMs') || 0) || 0,
+          incrementMs: Number(url.searchParams.get('incrementMs') || 0) || 0,
+          level: Number(url.searchParams.get('level') || 1) || 1,
+        };
+      }
+      const { dispatch } = await import('./chess-relay.mjs');
+      const r = await dispatch(params.action, params);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(r));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
   if (req.method === 'GET' && req.url === '/api/multiplayer') {
     try {
       const url = new URL(req.url, `http://localhost:${PORT}`);
