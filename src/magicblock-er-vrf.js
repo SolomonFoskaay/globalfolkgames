@@ -377,6 +377,7 @@ function decodeCore(d) {
       level: d[133],
       activeUntil: Number(d.readBigInt64LE(134)),
       boosterUntil: Number(d.readBigInt64LE(142)),
+      lastCreditRef: Number(d.readBigUInt64LE(150)),
     },
     buckets,
   };
@@ -399,6 +400,29 @@ async function readCoreByAddress(walletAddress) {
     if (info && info.data && info.data.length >= 8 + 784) return decodeCore(info.data);
   } catch (e) { /* no core */ }
   return null;
+}
+
+// Shape the core's premium fields like the legacy premium decoder so the
+// profile premium card is unchanged.
+function premiumViewFromCore(core) {
+  if (!core) return null;
+  return {
+    version: 1,
+    adminAuthority: '',
+    premiumLifetime: core.premium.lifetime,
+    premiumSpendable: core.premium.spendable,
+    subscriptionLevel: core.premium.level,
+    subscriptionActiveUntil: core.premium.activeUntil * 1000,
+    lastCreditTs: 0,
+    lastCreditPoints: 0,
+    lastCreditRef: String(core.premium.lastCreditRef || '0'),
+    lastSpendTs: 0,
+    lastSpendRef: '0',
+    lastSpendReason: 0,
+    spendCount: 0,
+    lastCreditReason: 1,
+    boosterActiveUntil: core.premium.boosterUntil * 1000,
+  };
 }
 
 // M3/M4 READ STABILITY FIX (2026-08-19, mirrors the recovery page EXACTLY):
@@ -1681,20 +1705,16 @@ export function initMagicBlockDice() {
     //   lastSpendReason, spendCount }
     // or null if the PDA isn't visible yet.
     async fetchPremiumPointsPda() {
-      // Prefer the version-aware raw read (works for both v1 and v2 layouts, and
-      // surfaces lastCreditReason); typed Anchor fetch requires the exact current
-      // layout, so a legacy account would otherwise fail.
       const wallet = getSolanaWalletAccount();
       if (!wallet) return null;
-      return (await readPremiumPointsByAddress(wallet.publicKey.toBase58())) || null;
+      return premiumViewFromCore(await readCoreByAddress(wallet.publicKey.toBase58()));
     },
 
-    // M5 — read the PREMIUM ledger BY WALLET ADDRESS, no Dynamic signing
-    // session needed. Mirrors fetchGlobalPointsPdaFor. Falls back to the
-    // sign-in-scoped fetch when no address is given.
+    // M5 — read the PREMIUM ledger BY WALLET ADDRESS (now the core's premium
+    // fields), no Dynamic signing session needed.
     async fetchPremiumPointsPdaFor(walletAddress) {
       if (!walletAddress) return this.fetchPremiumPointsPda();
-      return readPremiumPointsByAddress(walletAddress);
+      return premiumViewFromCore(await readCoreByAddress(String(walletAddress)));
     },
 
     // M5 — premium spendable draw-down on the player's PREMIUM points PDA

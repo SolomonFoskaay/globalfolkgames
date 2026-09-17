@@ -485,6 +485,13 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   FIRST step of the task is to record it in the changelog Feature Tracker —
   before any implementation. Never start coding a new agreed feature without
   first adding its roadmap entry.
+- **Todo status is always visible (HARD RULE, see .opencode/rules/todo-status.md).**
+  Before any multi-step task, output a full todo list; update it in real time
+  (one step in progress); and EVERY time you report, commit, or push, re-output
+  the FULL list with done items marked `[x]`, pending `[ ]`, and the single
+  current step marked `[•]` (in progress). Never output only the delta. On
+  interruption/resume, output the current full todo status first, then continue.
+  This keeps long, interrupted work recoverable.
 - **Two views of every feature, always:**
   - *Dev view (admin):* precise, technical details (bullets) — what's changing
     under the hood, files, trade-offs, remaining work.
