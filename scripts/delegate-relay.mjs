@@ -163,7 +163,7 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   const premiumStatus = await retry(() => getDelegationStatus(conn, premiumPointsPda));
   const livesStatus = await retry(() => getDelegationStatus(conn, livesPda));
   const coreStatus = await retry(() => getDelegationStatus(conn, corePda));
-  if (status && status.isDelegated && pointsStatus && pointsStatus.isDelegated && resultStatus && resultStatus.isDelegated && globalStatus && globalStatus.isDelegated && premiumStatus && premiumStatus.isDelegated && livesStatus && livesStatus.isDelegated && coreStatus && coreStatus.isDelegated) {
+  if (status && status.isDelegated && coreStatus && coreStatus.isDelegated) {
     return { pda: pda.toString(), pointsPda: pointsPda.toString(), resultPda: resultPda.toString(), globalPointsPda: globalPointsPda.toString(), premiumPointsPda: premiumPointsPda.toString(), livesPda: livesPda.toString(), corePda: corePda.toString(), gameTag, delegated: true, steps: [] };
   }
 
@@ -175,11 +175,6 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
   // Scope B adds points, Scope C adds result, M4 adds global, M5 adds premium.
   const plannedSteps =
     (status && status.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pda)) ? 1 : 2)) +
-    (pointsStatus && pointsStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(pointsPda)) ? 1 : 2)) +
-    (resultStatus && resultStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(resultPda)) ? 1 : 2)) +
-    (globalStatus && globalStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(globalPointsPda)) ? 1 : 2)) +
-    (premiumStatus && premiumStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(premiumPointsPda)) ? 1 : 2)) +
-    (livesStatus && livesStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(livesPda)) ? 1 : 2)) +
     (coreStatus && coreStatus.isDelegated ? 0 : (await retry(() => conn.getAccountInfo(corePda)) ? 1 : 2));
   const budgetLamports = plannedSteps * ESTIMATED_STEP_COST_LAMPORTS;
   authorizeSpend(player.toBase58(), budgetLamports);
@@ -204,65 +199,10 @@ export async function handleDelegate(playerPubkey, gameTag = 'ludo') {
     if (sig) steps.push({ step: 'delegate', sig });
   }
 
-  // Points PDA: create if missing, then delegate if not delegated (Scope B).
-  if (!(pointsStatus && pointsStatus.isDelegated)) {
-    const pinfo = await retry(() => conn.getAccountInfo(pointsPda));
-    if (!pinfo) {
-      const sig = await sendAndConfirmBase(conn, sponsor,
-        await program.methods.initializePoints(gameTag)
-          .accounts({ points: pointsPda, payer: sponsor.publicKey, playerAuthority: player })
-          .transaction()
-      );
-      steps.push({ step: 'initialize_points', sig });
-    }
-    const sig = await delegatePointsPda(program, conn, sponsor, player, pointsPda, gameTag);
-    if (sig) steps.push({ step: 'delegate_points', sig });
-  }
-
-  // Result PDA: create if missing, then delegate if not delegated (Scope C).
-  if (!(resultStatus && resultStatus.isDelegated)) {
-    const rinfo = await retry(() => conn.getAccountInfo(resultPda));
-    if (!rinfo) {
-      const sig = await sendAndConfirmBase(conn, sponsor,
-        await program.methods.initializeResult()
-          .accounts({ result: resultPda, payer: sponsor.publicKey, playerAuthority: player })
-          .transaction()
-      );
-      steps.push({ step: 'initialize_result', sig });
-    }
-    const sig = await delegateResultPda(program, conn, sponsor, player, resultPda);
-    if (sig) steps.push({ step: 'delegate_result', sig });
-  }
-
-  // Global Points PDA: create if missing, then delegate if not delegated (M4).
-  if (!(globalStatus && globalStatus.isDelegated)) {
-    const ginfo = await retry(() => conn.getAccountInfo(globalPointsPda));
-    if (!ginfo) {
-      const sig = await sendAndConfirmBase(conn, sponsor,
-        await program.methods.initializeGlobalPoints()
-          .accounts({ globalPoints: globalPointsPda, payer: sponsor.publicKey, playerAuthority: player })
-          .transaction()
-      );
-      steps.push({ step: 'initialize_global_points', sig });
-    }
-    const sig = await delegateGlobalPointsPda(program, conn, sponsor, player, globalPointsPda);
-    if (sig) steps.push({ step: 'delegate_global_points', sig });
-  }
-
-  // Premium Points PDA: create if missing, then delegate if not delegated (M5).
-  if (!(premiumStatus && premiumStatus.isDelegated)) {
-    const pinfo = await retry(() => conn.getAccountInfo(premiumPointsPda));
-    if (!pinfo) {
-      const sig = await sendAndConfirmBase(conn, sponsor,
-        await program.methods.initializePremiumPoints()
-          .accounts({ premiumPoints: premiumPointsPda, payer: sponsor.publicKey, playerAuthority: player })
-          .transaction()
-      );
-      steps.push({ step: 'initialize_premium_points', sig });
-    }
-    const sig = await delegatePremiumPointsPda(program, conn, sponsor, player, premiumPointsPda);
-    if (sig) steps.push({ step: 'delegate_premium_points', sig });
-  }
+  // arcv2m3: the legacy points/result/global/premium PDAs are RETIRED from
+  // onboarding. Lives, points, global, and premium all live in the Player Core,
+  // so onboarding is just dice (VRF) + the core: a low, constant one-time
+  // sponsor cost that does not grow as the platform adds games.
 
   // Player Core PDA (arcv2m3): create if missing, then delegate. This is the
   // SINGLE per-player account (lives + global + premium + per-game point
