@@ -273,7 +273,7 @@ pub mod gfg_dice {
             PointsError::NotSeatAuthority
         );
         // M10: charge the host's life AT START (never on completion).
-        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+        ctx.accounts.core.charge_life(now, match_ref)?;
         b.status = STATUS_PLAYING;
         b.started_at = now;
         b.turn_started_at = now;
@@ -348,7 +348,7 @@ pub mod gfg_dice {
         require!(b.seats[1] == Pubkey::default(), PointsError::AlreadyClaimed);
         require!(ctx.accounts.signer.key() != b.seats[0], PointsError::NotSeatAuthority);
         // M10: charge the joiner's life AT JOIN (never on completion).
-        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+        ctx.accounts.core.charge_life(now, match_ref)?;
         b.seats[1] = ctx.accounts.signer.key();
         Ok(())
     }
@@ -427,6 +427,7 @@ pub mod gfg_dice {
         c.booster_active_until = 0;
         c.last_credit_ref = 0;
         c.last_match_ref = 0;
+        c.last_global_ref = 0;
         c.last_finish_digest = [0u8; 8];
         c.bucket_count = 0;
         c.buckets = [GameBucket::default(); CORE_BUCKETS];
@@ -455,6 +456,68 @@ pub mod gfg_dice {
         )
         .commit_and_undelegate(&[ctx.accounts.core.to_account_info()])
         .build_and_invoke()?;
+        Ok(())
+    }
+
+    /// Bank a per-game local award into the player's core bucket (gasless ER).
+    /// Additive mirror of record_points; the bucket is keyed by the game tag so
+    /// no per-game PDA is ever created. Idempotent by match_ref.
+    pub fn record_core_points(
+        ctx: Context<RecordCorePointsCtx>,
+        game_tag: String,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let tag = game_tag8(&game_tag);
+        let c = &mut ctx.accounts.core;
+        require!(c.last_match_ref != match_ref, PointsError::DuplicateMatchRef);
+        let i = c.ensure_bucket(&tag)?;
+        c.buckets[i].local_pure = c.buckets[i]
+            .local_pure
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        c.buckets[i].local_spendable = c.buckets[i]
+            .local_spendable
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        c.last_match_ref = match_ref;
+        let _ = reason;
+        Ok(())
+    }
+
+    /// Credit the player's global ledgers in the core (gasless ER). kind 0 = a
+    /// game win (pure + lifetime + spendable); kind 1 = other sources. Additive
+    /// mirror of record_global_points; no separate global PDA.
+    pub fn record_core_global(
+        ctx: Context<RecordCoreGlobalCtx>,
+        kind: u8,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        require!(kind <= 1, PointsError::InvalidGameTag);
+        let c = &mut ctx.accounts.core;
+        require!(c.last_global_ref != match_ref, PointsError::DuplicateMatchRef);
+        c.record_global(kind, points, match_ref)?;
+        let _ = reason;
+        Ok(())
+    }
+
+    /// Spend from the core's global spendable balance (gasless ER).
+    pub fn spend_core_global(
+        ctx: Context<SpendCoreGlobalCtx>,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        let c = &mut ctx.accounts.core;
+        c.spend_global(amount)?;
+        let _ = (reason, spend_ref);
         Ok(())
     }
 
@@ -1904,7 +1967,7 @@ pub mod gfg_dice {
         // charge again.
         if !already_holder {
             let now = Clock::get()?.unix_timestamp;
-            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+            ctx.accounts.core.charge_life(now, match_ref)?;
         }
         Ok(())
     }
@@ -1925,7 +1988,7 @@ pub mod gfg_dice {
         // completion), chain-enforced so a bare frontend can't begin free.
         {
             let now = Clock::get()?.unix_timestamp;
-            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+            ctx.accounts.core.charge_life(now, match_ref)?;
         }
         // current_turn stays 255 (none yet): the SEAT THAT JUST MOVED is unused
         // until the first commit. Both devices therefore derive the displayed
@@ -2609,17 +2672,14 @@ pub struct JoinMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
-    // M10 lives gate: the JOINER must have an available life (or be unlimited).
-    // The ledger is created + delegated ONCE by the relay during onboarding
-    // (initialize_lives + delegate_lives), so a fresh wallet already has its
-    // base pool (5) with used=0 and passes; after the pool is consumed the
-    // program rejects (NoLives) whether or not the caller is our frontend.
+    // arcv2m3 Player Core: the JOINER's life is charged from their single core
+    // account at join (never on completion).
     #[account(
         mut,
-        seeds = [LIVES_SEED, signer.key().as_ref()],
+        seeds = [CORE_SEED, signer.key().as_ref()],
         bump
     )]
-    pub lives: Account<'info, LivesAccount>,
+    pub core: Account<'info, PlayerCore>,
 }
 
 /// Context for `begin_match`.
@@ -2630,15 +2690,14 @@ pub struct BeginMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
-    // M10 lives gate: the HOST (creator) must have an available life (or be
-    // unlimited) before the match goes live. Chain-enforced - an external
-    // frontend calling the program cannot begin without lives.
+    // arcv2m3 Player Core: the HOST's life is charged from their single core
+    // account at begin (never on completion).
     #[account(
         mut,
-        seeds = [LIVES_SEED, signer.key().as_ref()],
+        seeds = [CORE_SEED, signer.key().as_ref()],
         bump
     )]
-    pub lives: Account<'info, LivesAccount>,
+    pub core: Account<'info, PlayerCore>,
 }
 
 /// Context for `commit_move`.

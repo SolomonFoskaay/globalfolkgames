@@ -17,7 +17,7 @@ import { chessCreate, chessPda, chessState } from './chess-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
-const LIVES = Buffer.from('gfglives');
+const LIVES = Buffer.from('gfgcore');
 const sponsor = loadSponsor();
 const wallet = {
   publicKey: sponsor.publicKey,
@@ -62,7 +62,7 @@ async function main() {
   if (!await waitDelegated(pda, 20000)) throw new Error('board did not delegate');
 
   console.log('[2/4] start (1.5s clock)...');
-  await erSend(() => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, lives: livesFor(host) }).transaction(), guest);
+  await erSend(() => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, core: livesFor(host) }).transaction(), guest);
 
   console.log('[3/4] wait 2.6s for white to run out (no moves)...');
   await sleep(2600);

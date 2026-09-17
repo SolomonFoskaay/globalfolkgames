@@ -17,7 +17,7 @@ import { chessCreate, chessPda, chessState } from './chess-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
-const LIVES = Buffer.from('gfglives');
+const LIVES = Buffer.from('gfgcore');
 const sponsor = loadSponsor();
 const sponsorWallet = {
   publicKey: sponsor.publicKey,
@@ -89,7 +89,7 @@ async function main() {
 
   console.log('[3/7] black joins (0-SOL key signs on ER)...');
   const joinSig = await erSend(joinerProg, joiner, () => joinerProg.methods.joinChessMatch(new BN(lastRef))
-    .accounts({ signer: joiner.publicKey, board: pda, lives: livesFor(joiner.publicKey) }).transaction());
+    .accounts({ signer: joiner.publicKey, board: pda, core: livesFor(joiner.publicKey) }).transaction());
   console.log('      join sig:', joinSig);
 
   let s = await chessState({ matchRef: lastRef });
@@ -97,7 +97,7 @@ async function main() {
 
   console.log('[4/7] host starts (ER)...');
   await erSend(hostProg, hostG, () => hostProg.methods.startChessMatch(new BN(lastRef))
-    .accounts({ signer: hostG.publicKey, board: pda, lives: livesFor(hostG.publicKey) }).transaction());
+    .accounts({ signer: hostG.publicKey, board: pda, core: livesFor(hostG.publicKey) }).transaction());
   s = await chessState({ matchRef: lastRef });
   console.log('      status:', s.status, 'sideToMove:', s.sideToMove);
 

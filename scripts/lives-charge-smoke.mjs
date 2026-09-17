@@ -17,7 +17,7 @@ import { chessCreate, chessPda } from './chess-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
 const PROGRAM = new PublicKey(idl.address);
-const LIVES_SEED = Buffer.from('gfglives');
+const LIVES_SEED = Buffer.from('gfgcore');
 const sponsor = loadSponsor();
 const conn = createConnection(baseRpcUrl(), 'confirmed');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -36,7 +36,7 @@ async function readUsed(pubkey) {
   if (!info) info = await conn.getAccountInfo(pda).catch(() => null);
   if (!info) return null;
   const d = info.data;
-  return { day: Number(d.readBigInt64LE(8 + 1 + 32)), used: d.readUInt16LE(8 + 1 + 32 + 8), pool: d.readUInt16LE(8 + 1 + 32 + 8 + 2) };
+  return { day: Number(d.readBigInt64LE(49)), used: d.readUInt16LE(57), pool: d.readUInt16LE(59) };
 }
 async function waitDelegated(pda, t) {
   const end = Date.now() + t;
@@ -86,7 +86,7 @@ async function main() {
   console.log('[3/5] lives BEFORE start (create must not charge):', JSON.stringify(mid));
 
   console.log('[4/5] START (must charge 1)...');
-  await erSend(guestProg, guest, () => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, lives: livesPda(host) }).transaction());
+  await erSend(guestProg, guest, () => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, core: livesPda(host) }).transaction());
 
   const after = await readUsed(host);
   console.log('[5/5] lives AFTER start:', JSON.stringify(after));

@@ -403,7 +403,7 @@
           }
         },
         {
-          "name": "lives",
+          "name": "core",
           "writable": true,
           "pda": {
             "seeds": [
@@ -413,11 +413,10 @@
                   103,
                   102,
                   103,
-                  108,
-                  105,
-                  118,
-                  101,
-                  115
+                  99,
+                  111,
+                  114,
+                  101
                 ]
               },
               {
@@ -4332,7 +4331,7 @@
           }
         },
         {
-          "name": "lives",
+          "name": "core",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4342,11 +4341,10 @@
                   103,
                   102,
                   103,
-                  108,
-                  105,
-                  118,
-                  101,
-                  115
+                  99,
+                  111,
+                  114,
+                  101
                 ]
               },
               {
@@ -4421,7 +4419,7 @@
           }
         },
         {
-          "name": "lives",
+          "name": "core",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4431,11 +4429,10 @@
                   103,
                   102,
                   103,
-                  108,
-                  105,
-                  118,
-                  101,
-                  115
+                  99,
+                  111,
+                  114,
+                  101
                 ]
               },
               {
@@ -5187,6 +5184,146 @@
       ]
     },
     {
+      "name": "record_core_global",
+      "docs": [
+        "Credit the player's global ledgers in the core (gasless ER). kind 0 = a",
+        "game win (pure + lifetime + spendable); kind 1 = other sources. Additive",
+        "mirror of record_global_points; no separate global PDA."
+      ],
+      "discriminator": [
+        251,
+        157,
+        204,
+        189,
+        221,
+        86,
+        140,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "record_core_points",
+      "docs": [
+        "Bank a per-game local award into the player's core bucket (gasless ER).",
+        "Additive mirror of record_points; the bucket is keyed by the game tag so",
+        "no per-game PDA is ever created. Idempotent by match_ref."
+      ],
+      "discriminator": [
+        107,
+        68,
+        127,
+        211,
+        126,
+        57,
+        85,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        },
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "match_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "record_global_points",
       "docs": [
         "Credits the player's GLOBAL POINTS PDA. Runs GASLESS on the ER (session",
@@ -5780,6 +5917,70 @@
       ]
     },
     {
+      "name": "spend_core_global",
+      "docs": [
+        "Spend from the core's global spendable balance (gasless ER)."
+      ],
+      "discriminator": [
+        232,
+        70,
+        251,
+        197,
+        230,
+        195,
+        166,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "spend_global",
       "docs": [
         "(M4 — global spendable) Draws down the SPENDABLE track of the global",
@@ -6054,7 +6255,7 @@
           }
         },
         {
-          "name": "lives",
+          "name": "core",
           "writable": true,
           "pda": {
             "seeds": [
@@ -6064,11 +6265,10 @@
                   103,
                   102,
                   103,
-                  108,
-                  105,
-                  118,
-                  101,
-                  115
+                  99,
+                  111,
+                  114,
+                  101
                 ]
               },
               {
@@ -8486,6 +8686,10 @@
           },
           {
             "name": "last_match_ref",
+            "type": "u64"
+          },
+          {
+            "name": "last_global_ref",
             "type": "u64"
           },
           {

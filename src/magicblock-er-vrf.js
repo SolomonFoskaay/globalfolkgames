@@ -823,13 +823,13 @@ export async function joinBoardMatch(game, matchRef, seat, handle) {
   // delegates it (BUNDLED with dice/points/result/global/premium in the SAME
   // first-time onboarding - sponsor pays once per player lifetime, then every
   // lives write is a 0-fee ER tx). The program enforces the gate itself.
-  const [lives] = livesPdaFor(wallet.publicKey);
-  await ensureDelegated(lives, wallet.publicKey);
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   await withErRetry('join_match', async (eCtx) => eCtx.program.methods
     .joinMatch(game, new BN(matchRef), seat, String(handle || ''))
-    .accounts({ signer: wallet.publicKey, board, lives })
+    .accounts({ signer: wallet.publicKey, board, core })
     .rpc(), { regionUrl });
   return { ok: true, seat };
 }
@@ -842,13 +842,13 @@ export async function beginBoardMatch(game, matchRef) {
   if (!ctx) throw new Error('No connected wallet to sign begin.');
   const { wallet } = ctx;
   const [board] = boardPdaFor(game, matchRef);
-  const [lives] = livesPdaFor(wallet.publicKey);
-  await ensureDelegated(lives, wallet.publicKey);
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   const sig = await withErRetry('begin_match', async (eCtx) => eCtx.program.methods
     .beginMatch(game, new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, board, lives })
+    .accounts({ signer: wallet.publicKey, board, core })
     .rpc(), { regionUrl });
   return { ok: true, sig };
 }
@@ -874,38 +874,45 @@ export async function consumeLife(game, matchRef) {
 // Read a wallet's on-chain lives ledger (own or any public address, gasless).
 // Returns {ok, day, used, pool, unlimitedUntil, awardCount} or {ok:false}.
 export async function readLivesFor(pubkey) {
-  const [lives] = livesPdaFor(pubkey);
+  const [core] = corePdaFor(pubkey);
   try {
-    // Read from the account's HOSTING ER region (the lives PDA is delegated),
-    // falling back to base. Reading base for a delegated account returns the
-    // last committed (stale) copy, which would make the displayed lives drift.
+    // Lives now live in the arcv2m3 Player Core account [gfgcore, player]. Read
+    // from its HOSTING ER region (fallback base) so the display never drifts.
     let info = null;
     try {
-      const url = await regionUrlFor(lives);
+      const url = await regionUrlFor(core);
       const c = createConnection(url, 'confirmed', 8000);
-      info = await c.getAccountInfo(lives);
+      info = await c.getAccountInfo(core);
     } catch (e) { /* fall back to base */ }
     if (!info) {
       const cb = createConnection(baseRpcUrl(), 'confirmed');
-      info = await cb.getAccountInfo(lives).catch(() => null);
+      info = await cb.getAccountInfo(core).catch(() => null);
     }
-    if (!info || !info.data) return { ok: false, error: 'lives ledger not found' };
+    if (!info || !info.data) return { ok: false, error: 'player core not found' };
     const d = info.data;
-    if (d.length < 8 + LivesAccountSize) return { ok: false, error: 'lives ledger too small' };
+    if (d.length < 8 + 744) return { ok: false, error: 'player core too small' };
     return {
       ok: true,
-      day: Number(d.readBigInt64LE(8 + 1 + 32)),
-      used: d.readUInt16LE(8 + 1 + 32 + 8),
-      pool: d.readUInt16LE(8 + 1 + 32 + 8 + 2),
-      unlimitedUntil: Number(d.readBigInt64LE(8 + 1 + 32 + 8 + 2 + 2)),
-      lastRef: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8)),
-      awardCount: Number(d.readBigUInt64LE(8 + 1 + 32 + 8 + 2 + 2 + 8 + 8 + 8)),
+      day: Number(d.readBigInt64LE(49)),
+      used: d.readUInt16LE(57),
+      pool: d.readUInt16LE(59),
+      unlimitedUntil: Number(d.readBigInt64LE(61)),
+      lastRef: Number(d.readBigUInt64LE(69)),
+      awardCount: Number(d.readBigUInt64LE(85)),
     };
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
 }
+
 const LivesAccountSize = 1 + 32 + 8 + 2 + 2 + 8 + 8 + 8 + 8; // == LivesAccount::INIT_SPACE
+
+function corePdaFor(pubkey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('gfgcore'), pubkey.toBytes()],
+    new PublicKey(config.programId),
+  );
+}
 
 function livesPdaFor(pubkey) {
   return PublicKey.findProgramAddressSync(
@@ -947,13 +954,13 @@ export async function joinChessMatch(matchRef) {
   if (!ctx) throw new Error('No connected wallet to sign the join.');
   const { wallet } = ctx;
   const [board] = chessPdaFor(matchRef);
-  const [lives] = livesPdaFor(wallet.publicKey);
-  await ensureDelegated(lives, wallet.publicKey);
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   await withErRetry('join_chess_match', async (eCtx) => eCtx.program.methods
     .joinChessMatch(new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, board, lives })
+    .accounts({ signer: wallet.publicKey, board, core })
     .rpc(), { regionUrl });
   return { ok: true };
 }
@@ -1005,13 +1012,13 @@ export async function startChessMatch(matchRef) {
   if (!ctx) throw new Error('No connected wallet to sign start.');
   const { wallet } = ctx;
   const [board] = chessPdaFor(matchRef);
-  const [lives] = livesPdaFor(wallet.publicKey);
-  await ensureDelegated(lives, wallet.publicKey);
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
   await waitForErPickup(board);
   const regionUrl = await regionUrlFor(board);
   const sig = await withErRetry('start_chess_match', async (eCtx) => eCtx.program.methods
     .startChessMatch(new BN(matchRef))
-    .accounts({ signer: wallet.publicKey, board, lives })
+    .accounts({ signer: wallet.publicKey, board, core })
     .rpc(), { regionUrl });
   return { ok: true, sig };
 }
