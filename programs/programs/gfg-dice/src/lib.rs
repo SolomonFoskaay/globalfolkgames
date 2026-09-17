@@ -427,6 +427,7 @@ pub mod gfg_dice {
         c.booster_active_until = 0;
         c.last_credit_ref = 0;
         c.last_match_ref = 0;
+        c.last_global_ref = 0;
         c.last_finish_digest = [0u8; 8];
         c.bucket_count = 0;
         c.buckets = [GameBucket::default(); CORE_BUCKETS];
@@ -484,6 +485,39 @@ pub mod gfg_dice {
             .ok_or(PointsError::Overflow)?;
         c.last_match_ref = match_ref;
         let _ = reason;
+        Ok(())
+    }
+
+    /// Credit the player's global ledgers in the core (gasless ER). kind 0 = a
+    /// game win (pure + lifetime + spendable); kind 1 = other sources. Additive
+    /// mirror of record_global_points; no separate global PDA.
+    pub fn record_core_global(
+        ctx: Context<RecordCoreGlobalCtx>,
+        kind: u8,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        require!(kind <= 1, PointsError::InvalidGameTag);
+        let c = &mut ctx.accounts.core;
+        require!(c.last_global_ref != match_ref, PointsError::DuplicateMatchRef);
+        c.record_global(kind, points, match_ref)?;
+        let _ = reason;
+        Ok(())
+    }
+
+    /// Spend from the core's global spendable balance (gasless ER).
+    pub fn spend_core_global(
+        ctx: Context<SpendCoreGlobalCtx>,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        let c = &mut ctx.accounts.core;
+        c.spend_global(amount)?;
+        let _ = (reason, spend_ref);
         Ok(())
     }
 

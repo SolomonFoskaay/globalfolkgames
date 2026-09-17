@@ -35,14 +35,14 @@ async function readCore(pda) {
   if (!info) info = await conn.getAccountInfo(pda).catch(() => null);
   if (!info) return null;
   const d = info.data;
-  const bucketCount = d[174];
+  const bucketCount = d[182];
   const buckets = [];
   for (let i = 0; i < bucketCount; i++) {
-    const o = 175 + i * 24;
+    const o = 183 + i * 24;
     const tag = Buffer.from(d.subarray(o, o + 8)).toString('utf8').replace(/\0+$/, '');
     buckets.push({ tag, pure: Number(d.readBigUInt64LE(o + 8)), spendable: Number(d.readBigUInt64LE(o + 16)) });
   }
-  return { day: Number(d.readBigInt64LE(49)), used: d.readUInt16LE(57), pool: d.readUInt16LE(59), bucketCount, buckets };
+  return { day: Number(d.readBigInt64LE(49)), used: d.readUInt16LE(57), pool: d.readUInt16LE(59), bucketCount, buckets, globalPure: Number(d.readBigUInt64LE(93)), globalLifetime: Number(d.readBigUInt64LE(101)), globalSpendable: Number(d.readBigUInt64LE(109)) };
 }
 
 async function main() {
@@ -79,7 +79,19 @@ async function main() {
   const after = await readCore(core);
   console.log('[4/4] core after:', JSON.stringify(after));
   const b = after && after.buckets.find(x => x.tag === 'ludo');
-  if (after && after.bucketCount === 1 && b && b.pure === 100 && b.spendable === 100) console.log('[core-points-smoke] PASS: bucket written, no per-game PDA');
-  else { console.log('[core-points-smoke] FAIL'); process.exit(1); }
+  // global-ledger write on the core
+  const gRef = Date.now() + 1;
+  console.log('[5/5] record_core_global kind 0 (ER)...');
+  const tx2 = await guestProg.methods.recordCoreGlobal(0, new BN(100), 1, new BN(gRef)).accounts({ payer: host, playerAuthority: host, core }).transaction();
+  tx2.feePayer = host; tx2.recentBlockhash = bh.blockhash; tx2.lastValidBlockHeight = bh.lastValidBlockHeight; tx2.partialSign(guest);
+  const sig2 = await c.sendRawTransaction(tx2.serialize(), { skipPreflight: true });
+  await c.confirmTransaction({ signature: sig2 }, 'confirmed');
+  await sleep(700);
+  const g = await readCore(core);
+  console.log('      global pure/lifetime/spendable:', g.globalPure, g.globalLifetime, g.globalSpendable);
+  const okPts = after && after.bucketCount === 1 && b && b.pure === 100 && b.spendable === 100;
+  const okGlob = g && g.globalPure === 100 && g.globalLifetime === 100 && g.globalSpendable === 100;
+  if (okPts && okGlob) console.log('[core-points-smoke] PASS: bucket + global ledgers written on the core, no per-game PDA');
+  else { console.log('[core-points-smoke] FAIL pts=' + okPts + ' glob=' + okGlob); process.exit(1); }
 }
 main().catch(e => { console.error('[core-points-smoke] FAIL:', e.message); process.exit(1); });

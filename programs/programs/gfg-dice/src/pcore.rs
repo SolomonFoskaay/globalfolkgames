@@ -54,8 +54,9 @@ pub struct PlayerCore {
     pub subscription_active_until: i64,
     pub booster_active_until: i64,
     pub last_credit_ref: u64,
-    // last result (for the seam / profile)
+    // last result (for the seam / profile) + idempotency refs
     pub last_match_ref: u64,
+    pub last_global_ref: u64,
     pub last_finish_digest: [u8; 8],
     // per-game point buckets
     pub bucket_count: u8,
@@ -69,7 +70,7 @@ impl PlayerCore {
         + 8 + 2 + 2 + 8 + 8 + 8 + 8              // lives
         + 8 + 8 + 8                              // global
         + 8 + 8 + 1 + 8 + 8 + 8                  // premium
-        + 8 + 8                                  // last result
+        + 8 + 8 + 8                              // last result (match_ref, global_ref, digest)
         + 1 + (8 + 8 + 8) * CORE_BUCKETS         // bucket_count + buckets
         + 1; // bump
 
@@ -109,6 +110,26 @@ impl PlayerCore {
         self.last_life_ref = match_ref;
         self.last_life_ts = now;
         self.lives_award_count = self.lives_award_count.checked_add(1).ok_or(crate::PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Credit the global ledgers. kind 0 = game win (pure + lifetime +
+    /// spendable); kind 1 = other sources (lifetime + spendable only, never
+    /// pure). Idempotent by `last_global_ref`.
+    pub fn record_global(&mut self, kind: u8, points: u64, match_ref: u64) -> Result<()> {
+        if kind == 0 {
+            self.global_pure = self.global_pure.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        }
+        self.global_lifetime = self.global_lifetime.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        self.global_spendable = self.global_spendable.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        self.last_global_ref = match_ref;
+        Ok(())
+    }
+
+    /// Spend from the global spendable balance.
+    pub fn spend_global(&mut self, amount: u64) -> Result<()> {
+        require!(self.global_spendable >= amount, crate::PointsError::InsufficientBalance);
+        self.global_spendable = self.global_spendable.checked_sub(amount).ok_or(crate::PointsError::InsufficientBalance)?;
         Ok(())
     }
 }
@@ -167,6 +188,28 @@ pub struct CommitAndUndelegateCoreCtx<'info> {
 /// bucket. Idempotent by match_ref (global last-match guard).
 #[derive(Accounts)]
 pub struct RecordCorePointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Credit the global ledgers into the player's core (gasless ER). kind 0 = win.
+#[derive(Accounts)]
+pub struct RecordCoreGlobalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Spend from the core's global spendable balance (gasless ER).
+#[derive(Accounts)]
+pub struct SpendCoreGlobalCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: the player wallet authority (seed basis for the PDA).
