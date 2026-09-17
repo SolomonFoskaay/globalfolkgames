@@ -1623,6 +1623,15 @@ export function initMagicBlockDice() {
       return globalPointsPdaFor(wallet.publicKey)[0].toBase58();
     },
 
+    // The player's arcv2m3 Player Core account address [gfgcore, player]
+    // (own-account profile view). Lives, global, premium, and every per-game
+    // point bucket live in this ONE account, so the profile cards link here.
+    corePda() {
+      const wallet = getSolanaWalletAccount();
+      if (!wallet) return null;
+      return corePdaFor(wallet.publicKey)[0].toBase58();
+    },
+
     // The player's on-chain points PDA address for `gameTag` (own-account
     // profile view).
     pointsPda(gameTag = 'ludo') {

@@ -67,8 +67,8 @@
             : (ledger.lastReason === 2 ? 'Match won (2nd place)'
             : (ledger.lastReason === 3 ? 'Match won (3rd place)'
             : (ledger.lastReason ? 'Award (' + ledger.lastReason + ')' : '—')));
-        const pda = window.magicblockDice && typeof window.magicblockDice.pointsPda === 'function'
-            ? window.magicblockDice.pointsPda(gameTag) : null;
+        const pda = window.magicblockDice && typeof window.magicblockDice.corePda === 'function'
+            ? window.magicblockDice.corePda() : null;
         const pdaLink = (pda && window.gfgExplorer)
             ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
         el.innerHTML = `
@@ -98,7 +98,7 @@
                     <b>${ledger.spendCount}</b>
                 </div>` : ''}
                 <div style="padding:8px 0;">
-                    <span style="color:var(--muted); font-size:0.82rem;">Ledger account (yours, game: ${esc(gameTag)})</span>
+                    <span style="color:var(--muted); font-size:0.82rem;">Your Player Core account (all games)</span>
                     <div style="margin-top:4px;">${pdaLink}</div>
                 </div>`;
     }
@@ -164,8 +164,8 @@
     function renderGlobalLedgerCard(el, ledger) {
         const lastTs = ledger.lastRecordedTs
             ? new Date(ledger.lastRecordedTs).toLocaleString() : '—';
-        const pda = window.magicblockDice && typeof window.magicblockDice.globalPointsPda === 'function'
-            ? window.magicblockDice.globalPointsPda() : null;
+        const pda = window.magicblockDice && typeof window.magicblockDice.corePda === 'function'
+            ? window.magicblockDice.corePda() : null;
         const pdaLink = (pda && window.gfgExplorer)
             ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
         const fmt = (n) => (n ?? 0).toLocaleString();
@@ -257,7 +257,7 @@
         const subLabel = ledger.subscriptionLevel ? 'Level ' + ledger.subscriptionLevel : 'Level 0 (free)';
         const daysLeft = ledger.subscriptionActiveUntil && ledger.subscriptionActiveUntil > Date.now() ? Math.ceil((ledger.subscriptionActiveUntil - Date.now())/86400000) : 0;
         const subStatus = ledger.subscriptionLevel > 0 && daysLeft > 0 ? `Active — ${daysLeft}d left` : (ledger.subscriptionLevel > 0 ? 'Expired' : 'No active subscription');
-        const pda = window.magicblockDice && typeof window.magicblockDice.premiumPointsPda === 'function' ? window.magicblockDice.premiumPointsPda() : null;
+        const pda = window.magicblockDice && typeof window.magicblockDice.corePda === 'function' ? window.magicblockDice.corePda() : null;
         const pdaLink = (pda && window.gfgExplorer) ? window.gfgExplorer.accountLink(pda) : (pda ? esc(pda) : '—');
         el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
