@@ -1,14 +1,18 @@
 // scripts/er-points-harness.mjs
-// M3 — on-chain harness proving record_points + spend_local run gasless on the
-// MagicBlock ER for a 0-SOL player (sponsor signs, mirroring the client's
-// session-key write path) and land on the correct two-track ledger.
+// M3 — on-chain harness proving record_core_points + spend_core_local run gasless
+// on the MagicBlock ER for a 0-SOL player (sponsor signs, mirroring the client's
+// session-key write path) and land on the correct two-track CORE bucket.
+//
+// arcv2m3 (2026-09): the per-game points PDA [gfgpoints, game_tag, player] is
+// RETIRED; every local award now lands in the player's Player Core
+// [gfgcore, player]. This harness targets the core bucket for 'ludo'.
 //
 // Flow:
 //   1. Generate a fresh player keypair (holds 0 SOL, like every real player).
-//   2. handleDelegate (idempotent) creates + delegates the tagged points PDA.
-//   3. record_points +150 twice  -> pure=300, spendable=300, award_count=2.
-//   4. spend_local 40            -> spendable=260, pure=300 (unchanged).
-//   5. Read back + assert every field from the ER-hosted copy.
+//   2. handleDelegate (idempotent) creates + delegates the dice PDA AND the core.
+//   3. record_core_points +150 twice -> bucket pure=300, spendable=300.
+//   4. spend_core_local 40           -> bucket spendable=260, pure=300.
+//   5. Read back + assert from the ER-hosted copy.
 
 import { readFileSync } from 'fs';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
@@ -28,13 +32,16 @@ function erProgram(sponsor) {
   return { program: new Program(idl, provider), conn };
 }
 
-const decodeLedger = (data) => ({
-  pure: data.length >= 16 ? Number(data.readBigUInt64LE(8)) : 0,
-  spendable: data.length >= 24 ? Number(data.readBigUInt64LE(16)) : 0,
-  last_points: data.length >= 32 ? Number(data.readBigUInt64LE(24)) : 0,
-  reason: data.length >= 33 ? data[32] : 0,
-  award_count: data.length >= 57 ? Number(data.readBigUInt64LE(49)) : 0,
-});
+// Read one game bucket out of a decoded Player Core account.
+const bucketOf = (acc, tag = 'ludo') => {
+  for (let i = 0; i < acc.bucketCount; i++) {
+    const t = Buffer.from(acc.buckets[i].gameTag).toString('utf8').replace(/\0+$/, '');
+    if (t === tag) {
+      return { pure: acc.buckets[i].localPure.toNumber(), spendable: acc.buckets[i].localSpendable.toNumber() };
+    }
+  }
+  return { pure: 0, spendable: 0 };
+};
 
 async function waitErPickup(pda, tries = 20, delay = 500) {
   for (let i = 0; i < tries; i++) {
@@ -60,45 +67,47 @@ async function main() {
   const player = Keypair.generate();
   console.log(`player: ${player.publicKey.toBase58()} (balance: ${await createConnection(baseRpcUrl()).getBalance(player.publicKey)} lamports — expect 0)`);
 
-  const { pointsPda } = await handleDelegate(player.publicKey.toBase58(), 'ludo');
-  console.log(`pointsPda: ${pointsPda}`);
+  await handleDelegate(player.publicKey.toBase58(), 'ludo');
+  const [corePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('gfgcore'), player.publicKey.toBytes()], new PublicKey(idl.address));
+  console.log(`corePda: ${corePda.toBase58()}`);
 
   const { program } = erProgram(sponsor);
-  await waitErPickup(new PublicKey(pointsPda));
+  await waitErPickup(corePda);
 
-  const read = async () => decodeLedger((await new Connection(ER_URL, 'confirmed').getAccountInfo(new PublicKey(pointsPda))).data);
+  const read = async () => bucketOf(await program.account.playerCore.fetch(corePda));
 
   const A = await read();
   console.log('after delegate:', JSON.stringify(A));
 
   const s1 = await write(program, sponsor,
-    program.methods.recordPoints('ludo', new BN(150), 1, new BN(1)).accounts({
-      points: new PublicKey(pointsPda), payer: sponsor.publicKey, playerAuthority: player.publicKey,
+    program.methods.recordCorePoints('ludo', new BN(150), 1, new BN(1)).accounts({
+      core: corePda, payer: sponsor.publicKey, playerAuthority: player.publicKey,
     }).transaction());
   await sleep(1500);
   const B = await read();
-  console.log(`record_points(+150) ${s1.slice(0, 12)} -> ${JSON.stringify(B)}`);
+  console.log(`record_core_points(+150) ${s1.slice(0, 12)} -> ${JSON.stringify(B)}`);
 
   const s2 = await write(program, sponsor,
-    program.methods.recordPoints('ludo', new BN(150), 1, new BN(2)).accounts({
-      points: new PublicKey(pointsPda), payer: sponsor.publicKey, playerAuthority: player.publicKey,
+    program.methods.recordCorePoints('ludo', new BN(150), 1, new BN(2)).accounts({
+      core: corePda, payer: sponsor.publicKey, playerAuthority: player.publicKey,
     }).transaction());
   await sleep(1500);
   const C = await read();
-  console.log(`record_points(+150) ${s2.slice(0, 12)} -> ${JSON.stringify(C)}`);
+  console.log(`record_core_points(+150) ${s2.slice(0, 12)} -> ${JSON.stringify(C)}`);
 
   const s3 = await write(program, sponsor,
-    program.methods.spendLocal('ludo', new BN(40), 5, new BN(7)).accounts({
-      points: new PublicKey(pointsPda), payer: sponsor.publicKey, playerAuthority: player.publicKey,
+    program.methods.spendCoreLocal('ludo', new BN(40), 5, new BN(7)).accounts({
+      core: corePda, payer: sponsor.publicKey, playerAuthority: player.publicKey,
     }).transaction());
   await sleep(1500);
   const D = await read();
-  console.log(`spend_local(-40)   ${s3.slice(0, 12)} -> ${JSON.stringify(D)}`);
+  console.log(`spend_core_local(-40)   ${s3.slice(0, 12)} -> ${JSON.stringify(D)}`);
 
   const ok =
-    B.pure === 150 && B.spendable === 150 && B.award_count === 1 &&
-    C.pure === 300 && C.spendable === 300 && C.award_count === 2 &&
-    D.pure === 300 && D.spendable === 260 && D.award_count === 2;
+    B.pure === 150 && B.spendable === 150 &&
+    C.pure === 300 && C.spendable === 300 &&
+    D.pure === 300 && D.spendable === 260;
   console.log(ok ? '\nHARNESS PASS' : '\nHARNESS FAIL');
   process.exit(ok ? 0 : 1);
 }

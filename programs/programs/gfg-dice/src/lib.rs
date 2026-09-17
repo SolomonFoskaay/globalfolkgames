@@ -566,6 +566,78 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Spend from the core's per-game local spendable bucket (gasless ER).
+    /// Additive mirror of spend_local; the retired per-game PDA is never used.
+    pub fn spend_core_local(
+        ctx: Context<SpendCoreLocalCtx>,
+        game_tag: String,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let c = &mut ctx.accounts.core;
+        c.spend_local(&game_tag8(&game_tag), amount)?;
+        let _ = (reason, spend_ref);
+        Ok(())
+    }
+
+    /// Spend from the core's premium spendable balance (gasless ER). Additive
+    /// mirror of spend_premium_points.
+    pub fn spend_core_premium(
+        ctx: Context<SpendCorePremiumCtx>,
+        amount: u64,
+        reason: u8,
+        spend_ref: u64,
+    ) -> Result<()> {
+        require!(amount > 0, PointsError::ZeroAmount);
+        let c = &mut ctx.accounts.core;
+        c.spend_premium(amount)?;
+        let _ = (reason, spend_ref);
+        Ok(())
+    }
+
+    /// Migration (2026-09, permissionless + idempotent): fold the RETIRED
+    /// per-game points ledger into the core bucket, then zero the source so a
+    /// re-run copies zero. Reads the old bytes fully BEFORE writing.
+    pub fn migrate_core_bucket(ctx: Context<MigrateCoreBucketCtx>, game_tag: String) -> Result<()> {
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let pure = ctx.accounts.legacy_points.local_pure_lifetime;
+        let spendable = ctx.accounts.legacy_points.local_spendable_balance;
+        ctx.accounts.core.migrate_bucket(game_tag8(&game_tag), pure, spendable)?;
+        ctx.accounts.legacy_points.local_pure_lifetime = 0;
+        ctx.accounts.legacy_points.local_spendable_balance = 0;
+        Ok(())
+    }
+
+    /// Migration: fold the RETIRED global ledger into the core's globals, then
+    /// zero the source. Permissionless + idempotent.
+    pub fn migrate_core_global(ctx: Context<MigrateCoreGlobalCtx>) -> Result<()> {
+        let pure = ctx.accounts.legacy_global.global_pure_lifetime;
+        let lifetime = ctx.accounts.legacy_global.global_lifetime;
+        let spendable = ctx.accounts.legacy_global.global_spendable_balance;
+        ctx.accounts.core.migrate_global(pure, lifetime, spendable)?;
+        ctx.accounts.legacy_global.global_pure_lifetime = 0;
+        ctx.accounts.legacy_global.global_lifetime = 0;
+        ctx.accounts.legacy_global.global_spendable_balance = 0;
+        Ok(())
+    }
+
+    /// Migration: fold the RETIRED premium ledger into the core's premium track,
+    /// then zero the source balances. Permissionless + idempotent.
+    pub fn migrate_core_premium(ctx: Context<MigrateCorePremiumCtx>) -> Result<()> {
+        let lifetime = ctx.accounts.legacy_premium.premium_lifetime;
+        let spendable = ctx.accounts.legacy_premium.premium_spendable;
+        let level = ctx.accounts.legacy_premium.subscription_level;
+        let until = ctx.accounts.legacy_premium.subscription_active_until;
+        let booster_until = ctx.accounts.legacy_premium.booster_active_until;
+        ctx.accounts.core.migrate_premium(lifetime, spendable, level, until, booster_until)?;
+        ctx.accounts.legacy_premium.premium_lifetime = 0;
+        ctx.accounts.legacy_premium.premium_spendable = 0;
+        Ok(())
+    }
+
     /// Idempotent: creates the player's dice PDA if it does not exist yet.
     /// The payer (sponsor) pays rent; the account belongs to `player_authority`.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

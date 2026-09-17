@@ -53,36 +53,38 @@ async function waitErPickup(pda, tries = 20, delay = 500) {
 async function creditPoints(sponsor, playerPubkey, gameTag, points) {
   if (!(points > 0)) throw new Error('points must be > 0');
 
-  const { pda: dicePda, pointsPda } = await handleDelegate(playerPubkey.toBase58(), gameTag);
-  void dicePda;
+  // arcv2m3: the per-game points PDA is RETIRED - every local award now lands in
+  // the player's Player Core bucket [gfgcore, player]. handleDelegate is
+  // idempotent and creates + delegates BOTH the dice PDA and the core, so this
+  // is the same one-time onboarding the game itself uses.
+  await handleDelegate(playerPubkey.toBase58(), gameTag);
+  const [corePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('gfgcore'), playerPubkey.toBytes()], new PublicKey(idl.address));
 
   const { program } = erProgram(sponsor);
-  await waitErPickup(new PublicKey(pointsPda));
+  await waitErPickup(corePda);
 
-  // Anchor layout (packed borsh): 8-byte discriminator, then local_pure_lifetime
-  // (u64 @8), local_spendable_balance (u64 @16), last_points (u64 @24),
-  // last_reason (u8 @32), last_match_ref (u64 @33), last_recorded_ts (i64 @41),
-  // award_count (u64 @49). u8 fields do NOT pad the following u64s.
-  const decodeLedger = (data) => ({
-    pure: data.length >= 16 ? Number(data.readBigUInt64LE(8)) : 0,
-    spendable: data.length >= 24 ? Number(data.readBigUInt64LE(16)) : 0,
-    award_count: data.length >= 57 ? Number(data.readBigUInt64LE(49)) : 0,
-  });
-
-  const erConn = new Connection(ER_URL, 'confirmed');
-  const info = await erConn.getAccountInfo(new PublicKey(pointsPda));
-  if (info) {
-    const before = decodeLedger(info.data);
-    if (before.pure > 0 && !process.argv.includes('--force')) {
-      console.log(`[restore] SKIP ${playerPubkey.toBase58().slice(0, 8)} (${gameTag}): ledger already holds ${before.pure} pure / ${before.spendable} spendable`);
-      return { skipped: true, before };
+  // Read the bucket through the program's own decoder (no raw offsets).
+  const bucketOf = (acc) => {
+    for (let i = 0; i < acc.bucketCount; i++) {
+      const t = Buffer.from(acc.buckets[i].gameTag).toString('utf8').replace(/\0+$/, '');
+      if (t === gameTag) {
+        return { pure: acc.buckets[i].localPure.toNumber(), spendable: acc.buckets[i].localSpendable.toNumber() };
+      }
     }
+    return { pure: 0, spendable: 0 };
+  };
+
+  const before = bucketOf(await program.account.playerCore.fetch(corePda));
+  if (before.pure > 0 && !process.argv.includes('--force')) {
+    console.log(`[restore] SKIP ${playerPubkey.toBase58().slice(0, 8)} (${gameTag}): core bucket already holds ${before.pure} pure / ${before.spendable} spendable`);
+    return { skipped: true, before };
   }
 
   const tx = await program.methods
-    .recordPoints(gameTag, new BN(points), 1, new BN(0))
+    .recordCorePoints(gameTag, new BN(points), 1, new BN(Date.now()))
     .accounts({
-      points: new PublicKey(pointsPda),
+      core: corePda,
       payer: sponsor.publicKey,
       playerAuthority: playerPubkey,
     })
@@ -91,9 +93,8 @@ async function creditPoints(sponsor, playerPubkey, gameTag, points) {
   const sig = await sendMagicTx(program.provider.connection, tx, [sponsor], { skipPreflight: true });
   await program.provider.connection.confirmTransaction({ signature: sig }, 'confirmed');
 
-  const afterInfo = await erConn.getAccountInfo(new PublicKey(pointsPda));
-  const after = decodeLedger(afterInfo.data);
-  console.log(`[restore] CREDITED ${playerPubkey.toBase58().slice(0, 8)} (${gameTag}): +${points} -> pure ${after.pure}, spendable ${after.spendable}, awards ${after.award_count}`);
+  const after = bucketOf(await program.account.playerCore.fetch(corePda));
+  console.log(`[restore] CREDITED ${playerPubkey.toBase58().slice(0, 8)} (${gameTag}): +${points} -> core pure ${after.pure}, spendable ${after.spendable}`);
   console.log(`[restore] tx ${sig}`);
   return { sig, after };
 }
