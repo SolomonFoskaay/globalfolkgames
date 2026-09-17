@@ -123,6 +123,123 @@
       ]
     },
     {
+      "name": "activate_core_booster",
+      "docs": [
+        "DIRECT booster activation (unlimited lives for `hours`). Admin-gated."
+      ],
+      "discriminator": [
+        39,
+        24,
+        173,
+        125,
+        35,
+        193,
+        66,
+        117
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "hours",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "activate_core_plan",
+      "docs": [
+        "DIRECT plan activation (pay -> active in ONE step, no premium points):",
+        "set the level + expiry on the core. Admin-gated (verified payment)."
+      ],
+      "discriminator": [
+        194,
+        172,
+        134,
+        201,
+        126,
+        20,
+        14,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "level",
+          "type": "u8"
+        },
+        {
+          "name": "days",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "activate_subscription",
       "docs": [
         "(M5) Activates the Level-2 (2x) subscription from PREMIUM spendable.",
@@ -1274,6 +1391,70 @@
         },
         {
           "name": "payout_mode",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "credit_core_premium",
+      "docs": [
+        "Admin-gated premium credit on the core (promos/overflow)."
+      ],
+      "discriminator": [
+        72,
+        91,
+        224,
+        223,
+        202,
+        139,
+        50,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "points",
+          "type": "u64"
+        },
+        {
+          "name": "credit_ref",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
           "type": "u8"
         }
       ]
@@ -8721,6 +8902,15 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "admin_authority",
+            "docs": [
+              "The admin/operator authority (set to the initializer = sponsor relay).",
+              "Gates premium credit and plan/booster activation (direct, after a",
+              "verified payment). Kept LAST so earlier offsets never shift."
+            ],
+            "type": "pubkey"
           }
         ]
       }
