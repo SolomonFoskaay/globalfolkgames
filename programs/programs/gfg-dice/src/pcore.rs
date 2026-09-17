@@ -62,6 +62,10 @@ pub struct PlayerCore {
     pub bucket_count: u8,
     pub buckets: [GameBucket; CORE_BUCKETS],
     pub bump: u8,
+    /// The admin/operator authority (set to the initializer = sponsor relay).
+    /// Gates premium credit and plan/booster activation (direct, after a
+    /// verified payment). Kept LAST so earlier offsets never shift.
+    pub admin_authority: Pubkey,
 }
 
 impl PlayerCore {
@@ -72,7 +76,8 @@ impl PlayerCore {
         + 8 + 8 + 1 + 8 + 8 + 8                  // premium
         + 8 + 8 + 8                              // last result (match_ref, global_ref, digest)
         + 1 + (8 + 8 + 8) * CORE_BUCKETS         // bucket_count + buckets
-        + 1; // bump
+        + 1                                       // bump
+        + 32; // admin_authority (last; keeps earlier offsets stable)
 
     /// Find the bucket index for a game tag, or None.
     pub fn find_bucket(&self, tag: &[u8; 8]) -> Option<usize> {
@@ -130,6 +135,32 @@ impl PlayerCore {
     pub fn spend_global(&mut self, amount: u64) -> Result<()> {
         require!(self.global_spendable >= amount, crate::PointsError::InsufficientBalance);
         self.global_spendable = self.global_spendable.checked_sub(amount).ok_or(crate::PointsError::InsufficientBalance)?;
+        Ok(())
+    }
+
+    /// Credit premium points (admin/operated). The direct-activation flow keeps
+    /// this for promos; a purchase activates the plan directly (no middleman).
+    pub fn credit_premium(&mut self, points: u64, credit_ref: u64) -> Result<()> {
+        require!(self.last_credit_ref != credit_ref, crate::PointsError::DuplicateCreditRef);
+        self.premium_lifetime = self.premium_lifetime.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        self.premium_spendable = self.premium_spendable.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        self.last_credit_ref = credit_ref;
+        Ok(())
+    }
+
+    /// DIRECT activation: set the plan level + expiry in ONE step (pay -> active,
+    /// no premium-points middleman, no second click). Lives pool follows the
+    /// tier (free/other 5, L2 10, L3 15).
+    pub fn activate_plan(&mut self, level: u8, until: i64) -> Result<()> {
+        self.subscription_level = level;
+        self.subscription_active_until = until;
+        self.lives_pool = if level >= 3 { 15 } else if level == 2 { 10 } else { 5 };
+        Ok(())
+    }
+
+    /// DIRECT booster activation (unlimited lives until `until`).
+    pub fn activate_booster(&mut self, until: i64) -> Result<()> {
+        if until > self.booster_active_until { self.booster_active_until = until; }
         Ok(())
     }
 }
@@ -210,6 +241,19 @@ pub struct RecordCoreGlobalCtx<'info> {
 /// Spend from the core's global spendable balance (gasless ER).
 #[derive(Accounts)]
 pub struct SpendCoreGlobalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Admin-gated premium credit + DIRECT plan/booster activation on the core. The
+/// payer must equal the core's stored `admin_authority` (the sponsor relay),
+/// which signs only after a verified payment.
+#[derive(Accounts)]
+pub struct CoreAdminCtx<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: the player wallet authority (seed basis for the PDA).

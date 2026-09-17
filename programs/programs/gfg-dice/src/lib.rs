@@ -432,6 +432,7 @@ pub mod gfg_dice {
         c.bucket_count = 0;
         c.buckets = [GameBucket::default(); CORE_BUCKETS];
         c.bump = ctx.bumps.core;
+        c.admin_authority = ctx.accounts.payer.key();
         Ok(())
     }
 
@@ -518,6 +519,42 @@ pub mod gfg_dice {
         let c = &mut ctx.accounts.core;
         c.spend_global(amount)?;
         let _ = (reason, spend_ref);
+        Ok(())
+    }
+
+    /// Admin-gated premium credit on the core (promos/overflow).
+    pub fn credit_core_premium(
+        ctx: Context<CoreAdminCtx>,
+        points: u64,
+        credit_ref: u64,
+        reason: u8,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        let c = &mut ctx.accounts.core;
+        require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        c.credit_premium(points, credit_ref)?;
+        let _ = reason;
+        Ok(())
+    }
+
+    /// DIRECT plan activation (pay -> active in ONE step, no premium points):
+    /// set the level + expiry on the core. Admin-gated (verified payment).
+    pub fn activate_core_plan(ctx: Context<CoreAdminCtx>, level: u8, days: u16) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.core;
+        require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        let until = now + (days as i64) * 86400;
+        c.activate_plan(level, until)?;
+        Ok(())
+    }
+
+    /// DIRECT booster activation (unlimited lives for `hours`). Admin-gated.
+    pub fn activate_core_booster(ctx: Context<CoreAdminCtx>, hours: u16) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let c = &mut ctx.accounts.core;
+        require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        let until = now + (hours as i64) * 3600;
+        c.activate_booster(until)?;
         Ok(())
     }
 
