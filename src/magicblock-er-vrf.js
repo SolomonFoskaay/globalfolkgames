@@ -342,6 +342,65 @@ function decodeGlobalPoints(acct) {
   };
 }
 
+// arcv2m3 Player Core raw decode (the SINGLE per-player account). One read
+// yields lives + global ledgers + premium + every game bucket. Offsets are the
+// frozen layout from architecture.json arcv2m3 (version 1, LEN 784).
+function decodeCore(d) {
+  const n = d[182];
+  const buckets = {};
+  for (let i = 0; i < n; i++) {
+    const o = 183 + i * 24;
+    let tag = '';
+    for (let k = 0; k < 8; k++) { const ch = d[o + k]; if (ch === 0) break; tag += String.fromCharCode(ch); }
+    buckets[tag] = {
+      pureLifetime: Number(d.readBigUInt64LE(o + 8)),
+      spendableBalance: Number(d.readBigUInt64LE(o + 16)),
+    };
+  }
+  return {
+    lives: {
+      day: Number(d.readBigInt64LE(49)),
+      used: d.readUInt16LE(57),
+      pool: d.readUInt16LE(59),
+      unlimitedUntil: Number(d.readBigInt64LE(61)),
+      lastRef: Number(d.readBigUInt64LE(69)),
+      awardCount: Number(d.readBigUInt64LE(85)),
+    },
+    global: {
+      pureLifetime: Number(d.readBigUInt64LE(93)),
+      lifetime: Number(d.readBigUInt64LE(101)),
+      spendableBalance: Number(d.readBigUInt64LE(109)),
+    },
+    premium: {
+      lifetime: Number(d.readBigUInt64LE(117)),
+      spendable: Number(d.readBigUInt64LE(125)),
+      level: d[133],
+      activeUntil: Number(d.readBigInt64LE(134)),
+      boosterUntil: Number(d.readBigInt64LE(142)),
+    },
+    buckets,
+  };
+}
+
+// Read the Player Core by wallet address over the ER regions (base fallback).
+async function readCoreByAddress(walletAddress) {
+  const [core] = corePdaFor(new PublicKey(walletAddress));
+  const candidates = await regionCandidatesFor(core);
+  for (const url of candidates) {
+    try {
+      const c = createConnection(url, 'confirmed', 8000);
+      const info = await c.getAccountInfo(core);
+      if (info && info.data && info.data.length >= 8 + 784) return decodeCore(info.data);
+    } catch (e) { /* try next region */ }
+  }
+  try {
+    const c = createConnection(baseRpcUrl(), 'confirmed');
+    const info = await c.getAccountInfo(core);
+    if (info && info.data && info.data.length >= 8 + 784) return decodeCore(info.data);
+  } catch (e) { /* no core */ }
+  return null;
+}
+
 // M3/M4 READ STABILITY FIX (2026-08-19, mirrors the recovery page EXACTLY):
 // fetch *BY WALLET ADDRESS* over the ER using the SAME raw `getAccountInfo` +
 // byte-offset decode the working recovery page (dashboard/recovery.html) uses
@@ -741,20 +800,19 @@ export async function recordPoints(gameTag = 'ludo', points, reason, matchRef, p
   const authority = (playerPubkey && playerPubkey.constructor && playerPubkey.constructor.name === 'PublicKey')
     ? playerPubkey
     : (playerPubkey ? new PublicKey(playerPubkey) : wallet.publicKey);
-  const [pointsPda] = pointsPdaFor(gameTag, authority);
+  // arcv2m3: bank the per-game award into the player's CORE bucket (no per-game
+  // PDA). ensureDelegated triggers the relay which creates + delegates the core
+  // in the same one-time onboarding; the write is gasless ER.
+  const [core] = corePdaFor(authority);
+  await ensureDelegated(core, authority);
+  await waitForErPickup(core);
 
-  // Relay is idempotent per PDA; it creates + delegates the points PDA if
-  // missing, and is a no-op when already delegated. Once the ER validator has
-  // picked the account up, the write below runs gasless.
-  await ensureDelegated(pointsPda, authority);
-  await waitForErPickup(pointsPda);
+  const regionUrl = await regionUrlFor(core);
 
-  const regionUrl = await regionUrlFor(pointsPda);
-
-  const sig = await withErRetry('record_points', async (ctx) => ctx.program.methods
-    .recordPoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+  const sig = await withErRetry('record_core_points', async (ctx) => ctx.program.methods
+    .recordCorePoints(gameTag, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
-      points: pointsPda,
+      core,
       payer: wallet.publicKey,
       playerAuthority: authority,
     })
@@ -1147,17 +1205,17 @@ export async function recordGlobalPoints(kind, sourceCode, points, reason, match
   const authority = (playerPubkey && playerPubkey.constructor && playerPubkey.constructor.name === 'PublicKey')
     ? playerPubkey
     : (playerPubkey ? new PublicKey(playerPubkey) : wallet.publicKey);
-  const [globalPda] = globalPointsPdaFor(authority);
+  const [core] = corePdaFor(authority);
 
-  await ensureDelegated(globalPda, authority);
-  await waitForErPickup(globalPda);
+  await ensureDelegated(core, authority);
+  await waitForErPickup(core);
 
-  const regionUrl = await regionUrlFor(globalPda);
+  const regionUrl = await regionUrlFor(core);
 
-  const sig = await withErRetry('record_global_points', async (ctx) => ctx.program.methods
-    .recordGlobalPoints(kind, sourceCode, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
+  const sig = await withErRetry('record_core_global', async (ctx) => ctx.program.methods
+    .recordCoreGlobal(kind, new BN(points), reason, matchRef instanceof BN ? matchRef : new BN(matchRef.toString()))
     .accounts({
-      globalPoints: globalPda,
+      core,
       payer: wallet.publicKey,
       playerAuthority: authority,
     })
@@ -1174,17 +1232,17 @@ export async function spendGlobal(amount, reason, spendRef) {
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { wallet } = ctx;
-  const [globalPda] = globalPointsPdaFor(wallet.publicKey);
+  const [core] = corePdaFor(wallet.publicKey);
 
-  await ensureDelegated(globalPda, wallet.publicKey);
-  await waitForErPickup(globalPda);
+  await ensureDelegated(core, wallet.publicKey);
+  await waitForErPickup(core);
 
-  const regionUrl = await regionUrlFor(globalPda);
+  const regionUrl = await regionUrlFor(core);
 
-  const sig = await withErRetry('spend_global', async (ctx) => ctx.program.methods
-    .spendGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+  const sig = await withErRetry('spend_core_global', async (ctx) => ctx.program.methods
+    .spendCoreGlobal(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
-      globalPoints: globalPda,
+      core,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
@@ -1566,28 +1624,21 @@ export function initMagicBlockDice() {
       const ctx = getErProgram();
       if (!ctx) return null;
       const { wallet } = ctx;
-      const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
-      const candidates = await regionCandidatesFor(pointsPda);
-      for (const url of candidates) {
-        try {
-          const regionCtx = getErProgramFor(url);
-          const acct = await regionCtx.program.account.playerPoints.fetch(pointsPda);
-          return decodePlayerPoints(acct);
-        } catch (e) {
-          // Account not on this region yet (or region down) — try the next one,
-          // so a Router miss can never fake a "no ledger" zero.
-        }
-      }
-      return null;
+      const core = await readCoreByAddress(wallet.publicKey.toBase58());
+      const b = core && core.buckets[gameTag];
+      if (!b) return null;
+      return { pureLifetime: b.pureLifetime, spendableBalance: b.spendableBalance, lastPoints: 0, lastReason: 0, lastMatchRef: '0', lastRecordedTs: 0, awardCount: 0, lastSpendTs: 0, lastSpendRef: '0', lastSpendReason: 0, spendCount: 0 };
     },
 
     // READ STABILITY (2026-08-19): read the player's per-game points ledger BY
-    // WALLET ADDRESS, no Dynamic signing session needed. Mirrors the recovery
-    // page. Falls back to the sign-in-scoped fetch when no address is given.
-    // Shaped exactly like fetchPointsPda(); used by the universal M3 module.
+    // WALLET ADDRESS, no Dynamic signing session needed. arcv2m3: reads the
+    // bucket inside the Player Core. Falls back to the sign-in-scoped fetch.
     async fetchPointsPdaFor(gameTag = 'ludo', walletAddress) {
       if (!walletAddress) return this.fetchPointsPda(gameTag);
-      return readPlayerPointsByAddress(gameTag, walletAddress);
+      const core = await readCoreByAddress(String(walletAddress));
+      const b = core && core.buckets[gameTag];
+      if (!b) return null;
+      return { pureLifetime: b.pureLifetime, spendableBalance: b.spendableBalance, lastPoints: 0, lastReason: 0, lastMatchRef: '0', lastRecordedTs: 0, awardCount: 0, lastSpendTs: 0, lastSpendRef: '0', lastSpendReason: 0, spendCount: 0 };
     },
 
     // M4 — reads the player's on-chain GLOBAL points ledger from the ER
@@ -1600,26 +1651,18 @@ export function initMagicBlockDice() {
       const ctx = getErProgram();
       if (!ctx) return null;
       const { wallet } = ctx;
-      const [globalPda] = globalPointsPdaFor(wallet.publicKey);
-      const candidates = await regionCandidatesFor(globalPda);
-      for (const url of candidates) {
-        try {
-          const regionCtx = getErProgramFor(url);
-          const acct = await regionCtx.program.account.globalPoints.fetch(globalPda);
-          return decodeGlobalPoints(acct);
-        } catch (e) {
-          // Account not on this region yet (or region down) — try the next one.
-        }
-      }
-      return null;
+      const core = await readCoreByAddress(wallet.publicKey.toBase58());
+      if (!core) return null;
+      return { ...core.global, lastSource: 0, lastPoints: 0, lastReason: 0, lastMatchRef: '0', lastRecordedTs: 0, awardCount: 0, lastSpendTs: 0, lastSpendRef: '0', lastSpendReason: 0, spendCount: 0 };
     },
 
     // READ STABILITY (2026-08-19): read the global ledger BY WALLET ADDRESS, no
-    // Dynamic signing session needed. Mirrors the recovery page. Falls back to
-    // the sign-in-scoped fetch when no address is given.
+    // Dynamic signing session needed. arcv2m3: reads the core's globals.
     async fetchGlobalPointsPdaFor(walletAddress) {
       if (!walletAddress) return this.fetchGlobalPointsPda();
-      return readGlobalPointsByAddress(walletAddress);
+      const core = await readCoreByAddress(String(walletAddress));
+      if (!core) return null;
+      return { ...core.global, lastSource: 0, lastPoints: 0, lastReason: 0, lastMatchRef: '0', lastRecordedTs: 0, awardCount: 0, lastSpendTs: 0, lastSpendRef: '0', lastSpendReason: 0, spendCount: 0 };
     },
 
     // M5 — the player's on-chain PREMIUM points PDA address ([gfgprem, player],
