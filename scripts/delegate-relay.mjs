@@ -620,168 +620,99 @@ async function delegateCorePda(program, conn, sponsor, player, corePda) {
 // credit base-layer -> re-delegate to AS so the player's ER spends keep
 // working. This mirrors the migrate-to-as pattern.
 // Returns { player, points, creditRef, sig, undelegated, redelegated }.
+// arcv2m3: ensure the player's Player Core exists + is delegated. Idempotent;
+// sponsor pays the one-time rent + session. Used by the premium admin ops.
+async function ensureCoreReady(program, conn, sponsor, player) {
+  const [corePda] = PublicKey.findProgramAddressSync([CORE_SEED, player.toBytes()], PROGRAM_ID);
+  const info = await conn.getAccountInfo(corePda).catch(() => null);
+  if (!info) {
+    await sendAndConfirmBase(conn, sponsor,
+      await program.methods.initializePlayerCore()
+        .accounts({ core: corePda, payer: sponsor.publicKey, playerAuthority: player, systemProgram: SystemProgram.programId })
+        .transaction()
+    );
+  }
+  const st = await getDelegationStatus(conn, corePda).catch(() => null);
+  if (!(st && st.isDelegated)) {
+    await delegateCorePda(program, conn, sponsor, player, corePda);
+  }
+  return corePda;
+}
+
+const __retry = async (fn, n = 4, delay = 400) => {
+  for (let i = 0; i < n; i++) { try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); } }
+  return null;
+};
+
+// Send a core admin instruction GASSLESS on the ER when the core is delegated,
+// else on base. Sponsor signs; the user never pays.
+async function sendCoreAdmin(program, conn, sponsor, player, corePda, method) {
+  const status = await __retry(() => getDelegationStatus(conn, corePda));
+  const wasDelegated = !!(status && status.isDelegated);
+  if (wasDelegated) {
+    const regionUrl = (await resolvedRegionUrl(corePda, conn)) || pickErRpcUrl();
+    const erProgram = erProgramForSponsor(regionUrl, sponsor);
+    const sig = await method(erProgram, false);
+    return { sig, wasDelegated };
+  }
+  const tx = await method(program, true);
+  const sig = await sendAndConfirmBase(conn, sponsor, tx);
+  return { sig, wasDelegated };
+}
+
+// M5 premium credit on the CORE (promos/overflow). Admin-gated by the core's
+// stored admin_authority (= the sponsor that initialized it).
 export async function handleCreditPremium(playerPubkey, points, creditRef, reason = 1) {
   if (!Number.isInteger(points) || points <= 0) throw new Error(`invalid points: ${points}`);
   if (!Number.isInteger(creditRef) || creditRef <= 0) throw new Error(`invalid creditRef: ${creditRef}`);
   const player = new PublicKey(playerPubkey);
-  if (player.toBase58() !== String(playerPubkey || '').trim()) {
-    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
-  }
+  if (player.toBase58() !== String(playerPubkey || '').trim()) throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
   const sponsor = loadSponsor();
   const conn = createConnection(BASE_URL, 'confirmed');
-  const provider = new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
-  const program = new Program(idl, provider);
-
-  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
-
-  const retry = async (fn, n = 4, delay = 400) => {
-    for (let i = 0; i < n; i++) {
-      try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); }
-    }
-    return null;
-  };
-
-  // Ensure the premium PDA exists (init if missing, v2). The sponsor is the payer,
-  // so the account's stored adminAuthority = sponsor key = our credit signer.
-  let info = await retry(() => conn.getAccountInfo(premiumPointsPda));
-  if (!info) {
-    await sendAndConfirmBase(conn, sponsor,
-      await program.methods.initializePremiumPoints()
-        .accounts({ premiumPoints: premiumPointsPda, payer: sponsor.publicKey, playerAuthority: player })
-        .transaction()
-    );
-    info = await retry(() => conn.getAccountInfo(premiumPointsPda));
-  }
-  // v1 legacy account -> migrate to v2 first (permissionless, sponsor pays rent delta).
-  if (info && info.data.length && info.data.length < 124) {
-    await sendAndConfirmBase(conn, sponsor,
-      await program.methods.upgradePremiumPoints()
-        .accounts({ payer: sponsor.publicKey, premiumPoints: premiumPointsPda, systemProgram: SystemProgram.programId })
-        .transaction()
-    );
-  }
-
-  // Gasless ER rule: if the premium PDA is delegated, the credit runs GASLESS on its hosting ER region (sponsor is payer, user never pays).
-  // If not delegated, it runs base-layer. No undelegate dance for the ER path.
-  const status = await retry(() => getDelegationStatus(conn, premiumPointsPda));
-  const wasDelegated = !!(status && status.isDelegated);
-  let sig = null;
-  const buildArgs = [new BN(points), new BN(creditRef), reason];
-  if (wasDelegated) {
-    const regionUrl = (await resolvedRegionUrl(premiumPointsPda, conn)) || pickErRpcUrl();
-    const erProgram = erProgramForSponsor(regionUrl, sponsor);
-    sig = await erProgram.methods.creditPremiumPoints(...buildArgs)
-      .accounts({
-        admin: sponsor.publicKey,
-        playerAuthority: player,
-        premiumPoints: premiumPointsPda,
-      })
-      .rpc();
-    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on ER ${regionUrl} (creditRef ${creditRef}, reason ${reason}, sig ${sig})`);
-  } else {
-    sig = await sendAndConfirmBase(conn, sponsor,
-      await program.methods.creditPremiumPoints(...buildArgs)
-        .accounts({
-          admin: sponsor.publicKey,
-          playerAuthority: player,
-          premiumPoints: premiumPointsPda,
-        })
-        .transaction()
-    );
-    console.log(`[relay] credited ${player.toBase58()} +${points} premium points on base (creditRef ${creditRef}, reason ${reason}, sig ${sig})`);
-  }
+  const program = new Program(idl, new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true }));
+  const corePda = await ensureCoreReady(program, conn, sponsor, player);
+  const { sig, wasDelegated } = await sendCoreAdmin(program, conn, sponsor, player, corePda, (prog, asTx) => {
+    const m = prog.methods.creditCorePremium(new BN(points), new BN(creditRef), reason)
+      .accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
+    return asTx ? m.transaction() : m.rpc();
+  });
+  console.log(`[relay] credited ${player.toBase58()} +${points} premium on the CORE (creditRef ${creditRef}, sig ${sig})`);
   return { player: player.toBase58(), points, creditRef, reason, sig, wasDelegated, gasless: wasDelegated };
 }
 
-// M5 admin cancel: revoke a defective perpetual sub (authority-gated, gasless on ER).
-// If the premium PDA is delegated, the cancel runs GASLESS on its hosting ER region (sponsor is payer, user never pays).
-// If not delegated, it runs base-layer (first-time case). No undelegate dance for the ER path.
+// M5 admin cancel on the CORE.
 export async function handleCancelPremium(playerPubkey) {
   const player = new PublicKey(playerPubkey);
-  if (player.toBase58() !== String(playerPubkey || '').trim()) {
-    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
-  }
+  if (player.toBase58() !== String(playerPubkey || '').trim()) throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
   const sponsor = loadSponsor();
-  const baseConn = createConnection(BASE_URL, 'confirmed');
-  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
-  const retry = async (fn, n = 4, delay = 400) => {
-    for (let i = 0; i < n; i++) { try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); } }
-    return null;
-  };
-  const info = await retry(() => baseConn.getAccountInfo(premiumPointsPda));
-  if (!info) throw new Error('premium PDA not found for player');
-  const status = await retry(() => getDelegationStatus(baseConn, premiumPointsPda));
-  const wasDelegated = !!(status && status.isDelegated);
-  let sig = null;
-  if (wasDelegated) {
-    // Gasless ER write on the PDA's hosting region (sponsor pays, user 0 SOL)
-    const regionUrl = (await resolvedRegionUrl(premiumPointsPda, baseConn)) || pickErRpcUrl();
-    const erProgram = erProgramForSponsor(regionUrl, sponsor);
-    sig = await erProgram.methods.adminCancelSubscription()
-      .accounts({ admin: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
-      .rpc();
-    console.log(`[relay] cancelled subscription for ${player.toBase58()} on ER ${regionUrl} (sig ${sig})`);
-  } else {
-    const provider = new AnchorProvider(baseConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
-    const program = new Program(idl, provider);
-    sig = await sendAndConfirmBase(baseConn, sponsor,
-      await program.methods.adminCancelSubscription()
-        .accounts({ admin: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
-        .transaction()
-    );
-    console.log(`[relay] cancelled subscription for ${player.toBase58()} on base (sig ${sig})`);
-  }
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const program = new Program(idl, new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true }));
+  const corePda = await ensureCoreReady(program, conn, sponsor, player);
+  const { sig, wasDelegated } = await sendCoreAdmin(program, conn, sponsor, player, corePda, (prog, asTx) => {
+    const m = prog.methods.cancelCorePlan().accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
+    return asTx ? m.transaction() : m.rpc();
+  });
+  console.log(`[relay] cancelled subscription for ${player.toBase58()} on the CORE (sig ${sig})`);
   return { player: player.toBase58(), sig, wasDelegated, redelegated: false, gasless: wasDelegated };
 }
 
-// M5 promo: admin gives subscription via the normal 5000P route. Gasless on ER when delegated.
-// First credit 5000P (if needed) then activate — both respect the 5000 spend check, so no shortcut.
-export async function handleAdminActivatePremium(playerPubkey, level = 1) {
+// M5 DIRECT activation on the CORE (pay -> active in one step, no premium
+// points). Admin-gated by the core's admin_authority.
+export async function handleAdminActivatePremium(playerPubkey, level = 1, days = 30) {
   const player = new PublicKey(playerPubkey);
-  if (player.toBase58() !== String(playerPubkey || '').trim()) {
-    throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
-  }
+  if (player.toBase58() !== String(playerPubkey || '').trim()) throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
   const sponsor = loadSponsor();
-  const baseConn = createConnection(BASE_URL, 'confirmed');
-  const [premiumPointsPda] = PublicKey.findProgramAddressSync([PREMIUM_SEED, player.toBytes()], PROGRAM_ID);
-  const retry = async (fn, n = 4, delay = 400) => {
-    for (let i = 0; i < n; i++) { try { return await fn(); } catch (e) { await new Promise(r => setTimeout(r, delay)); } }
-    return null;
-  };
-  const info = await retry(() => baseConn.getAccountInfo(premiumPointsPda));
-  if (!info) throw new Error('premium PDA not found for player');
-  // v1 legacy account -> migrate to v3 first so activate (v3 layout) works.
-  if (info.data && info.data.length && info.data.length < 124) {
-    const provider0 = new AnchorProvider(baseConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
-    const program0 = new Program(idl, provider0);
-    await sendAndConfirmBase(baseConn, sponsor,
-      await program0.methods.upgradePremiumPointsV3()
-        .accounts({ payer: sponsor.publicKey, premiumPoints: premiumPointsPda, systemProgram: SystemProgram.programId })
-        .transaction()
-    );
-  }
-  const status = await retry(() => getDelegationStatus(baseConn, premiumPointsPda));
-  const wasDelegated = !!(status && status.isDelegated);
-  let sig = null;
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const program = new Program(idl, new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true }));
+  const corePda = await ensureCoreReady(program, conn, sponsor, player);
   const lvl = Math.min(3, Math.max(1, Number(level) || 1));
-  if (wasDelegated) {
-    const regionUrl = (await resolvedRegionUrl(premiumPointsPda, baseConn)) || pickErRpcUrl();
-    const erProgram = erProgramForSponsor(regionUrl, sponsor);
-    sig = await erProgram.methods.activateSubscriptionLevel(new BN(lvl))
-      .accounts({ payer: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
-      .rpc();
-    console.log(`[relay] admin activated Level ${lvl} for ${player.toBase58()} on ER ${regionUrl} (sig ${sig})`);
-  } else {
-    const provider = new AnchorProvider(baseConn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true });
-    const program = new Program(idl, provider);
-    sig = await sendAndConfirmBase(baseConn, sponsor,
-      await program.methods.activateSubscriptionLevel(new BN(lvl))
-        .accounts({ payer: sponsor.publicKey, playerAuthority: player, premiumPoints: premiumPointsPda })
-        .transaction()
-    );
-    console.log(`[relay] admin activated Level ${lvl} for ${player.toBase58()} on base (sig ${sig})`);
-  }
-  return { player: player.toBase58(), level: lvl, sig, wasDelegated, redelegated: false, gasless: wasDelegated };
+  const d = Math.min(365, Math.max(1, Number(days) || 30));
+  const { sig, wasDelegated } = await sendCoreAdmin(program, conn, sponsor, player, corePda, (prog, asTx) => {
+    const m = prog.methods.activateCorePlan(lvl, d).accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
+    return asTx ? m.transaction() : m.rpc();
+  });
+  console.log(`[relay] activated Level ${lvl} for ${player.toBase58()} on the CORE (${d}d, sig ${sig})`);
+  return { player: player.toBase58(), level: lvl, days: d, sig, wasDelegated, redelegated: false, gasless: wasDelegated };
 }
 
 // Undelegate the premium PDA back to base (runs commit+undelegate on its

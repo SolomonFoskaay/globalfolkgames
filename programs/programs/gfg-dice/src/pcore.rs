@@ -163,6 +163,14 @@ impl PlayerCore {
         if until > self.booster_active_until { self.booster_active_until = until; }
         Ok(())
     }
+
+    /// Admin cancel: clear the plan (level 0, no active window, base pool).
+    pub fn cancel_plan(&mut self) -> Result<()> {
+        self.subscription_level = 0;
+        self.subscription_active_until = 0;
+        self.lives_pool = 5;
+        Ok(())
+    }
 }
 
 /// Pad a game tag string into the fixed 8-byte slot (idempotent).

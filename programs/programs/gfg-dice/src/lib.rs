@@ -558,6 +558,14 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Admin cancel: clear the plan on the core (level 0, base pool).
+    pub fn cancel_core_plan(ctx: Context<CoreAdminCtx>) -> Result<()> {
+        let c = &mut ctx.accounts.core;
+        require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        c.cancel_plan()?;
+        Ok(())
+    }
+
     /// Idempotent: creates the player's dice PDA if it does not exist yet.
     /// The payer (sponsor) pays rent; the account belongs to `player_authority`.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

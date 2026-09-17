@@ -656,6 +656,57 @@
       ]
     },
     {
+      "name": "cancel_core_plan",
+      "docs": [
+        "Admin cancel: clear the plan on the core (level 0, base pool)."
+      ],
+      "discriminator": [
+        109,
+        27,
+        91,
+        207,
+        44,
+        196,
+        28,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_chess_timeout",
       "docs": [
         "PERMISSIONLESS timeout claim. Anyone may call it; the program verifies",
