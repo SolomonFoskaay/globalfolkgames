@@ -585,7 +585,7 @@ impl ChessBoard {
 
 // ---------- Phase 2: AI, apply/finish, contexts ----------
 
-use crate::{LivesAccount, PointsError, LIVES_SEED};
+use crate::{PointsError, PlayerCore, CORE_SEED};
 use ephemeral_rollups_sdk::anchor::{commit, delegate};
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
 use ephemeral_rollups_sdk::ephem::MagicIntentBundleBuilder;
@@ -753,8 +753,8 @@ pub struct StartChessMatch<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, ChessBoard>,
-    #[account(mut, seeds = [LIVES_SEED, signer.key().as_ref()], bump)]
-    pub lives: Account<'info, LivesAccount>,
+    #[account(mut, seeds = [CORE_SEED, signer.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
 }
 
 #[derive(Accounts)]
@@ -791,8 +791,8 @@ pub struct JoinChessMatch<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [CHESS_SEED, &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, ChessBoard>,
-    #[account(mut, seeds = [LIVES_SEED, signer.key().as_ref()], bump)]
-    pub lives: Account<'info, LivesAccount>,
+    #[account(mut, seeds = [CORE_SEED, signer.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
 }
 
 /// Seat-holder action (resign, offer draw, accept draw). The handler checks the

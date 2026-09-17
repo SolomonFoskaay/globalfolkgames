@@ -273,7 +273,7 @@ pub mod gfg_dice {
             PointsError::NotSeatAuthority
         );
         // M10: charge the host's life AT START (never on completion).
-        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+        ctx.accounts.core.charge_life(now, match_ref)?;
         b.status = STATUS_PLAYING;
         b.started_at = now;
         b.turn_started_at = now;
@@ -348,7 +348,7 @@ pub mod gfg_dice {
         require!(b.seats[1] == Pubkey::default(), PointsError::AlreadyClaimed);
         require!(ctx.accounts.signer.key() != b.seats[0], PointsError::NotSeatAuthority);
         // M10: charge the joiner's life AT JOIN (never on completion).
-        charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+        ctx.accounts.core.charge_life(now, match_ref)?;
         b.seats[1] = ctx.accounts.signer.key();
         Ok(())
     }
@@ -1904,7 +1904,7 @@ pub mod gfg_dice {
         // charge again.
         if !already_holder {
             let now = Clock::get()?.unix_timestamp;
-            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+            ctx.accounts.core.charge_life(now, match_ref)?;
         }
         Ok(())
     }
@@ -1925,7 +1925,7 @@ pub mod gfg_dice {
         // completion), chain-enforced so a bare frontend can't begin free.
         {
             let now = Clock::get()?.unix_timestamp;
-            charge_life(&mut ctx.accounts.lives, now, match_ref)?;
+            ctx.accounts.core.charge_life(now, match_ref)?;
         }
         // current_turn stays 255 (none yet): the SEAT THAT JUST MOVED is unused
         // until the first commit. Both devices therefore derive the displayed
@@ -2609,17 +2609,14 @@ pub struct JoinMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
-    // M10 lives gate: the JOINER must have an available life (or be unlimited).
-    // The ledger is created + delegated ONCE by the relay during onboarding
-    // (initialize_lives + delegate_lives), so a fresh wallet already has its
-    // base pool (5) with used=0 and passes; after the pool is consumed the
-    // program rejects (NoLives) whether or not the caller is our frontend.
+    // arcv2m3 Player Core: the JOINER's life is charged from their single core
+    // account at join (never on completion).
     #[account(
         mut,
-        seeds = [LIVES_SEED, signer.key().as_ref()],
+        seeds = [CORE_SEED, signer.key().as_ref()],
         bump
     )]
-    pub lives: Account<'info, LivesAccount>,
+    pub core: Account<'info, PlayerCore>,
 }
 
 /// Context for `begin_match`.
@@ -2630,15 +2627,14 @@ pub struct BeginMatchCtx<'info> {
     pub signer: Signer<'info>,
     #[account(mut, seeds = [MATCHBOARD2_SEED, &game.to_le_bytes(), &match_ref.to_le_bytes()], bump)]
     pub board: Account<'info, MatchBoard>,
-    // M10 lives gate: the HOST (creator) must have an available life (or be
-    // unlimited) before the match goes live. Chain-enforced - an external
-    // frontend calling the program cannot begin without lives.
+    // arcv2m3 Player Core: the HOST's life is charged from their single core
+    // account at begin (never on completion).
     #[account(
         mut,
-        seeds = [LIVES_SEED, signer.key().as_ref()],
+        seeds = [CORE_SEED, signer.key().as_ref()],
         bump
     )]
-    pub lives: Account<'info, LivesAccount>,
+    pub core: Account<'info, PlayerCore>,
 }
 
 /// Context for `commit_move`.

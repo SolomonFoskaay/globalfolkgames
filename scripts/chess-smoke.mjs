@@ -78,7 +78,7 @@ async function main() {
   if (!await waitDelegated(pda, 20000)) throw new Error('board did not delegate');
 
   console.log('[3/6] start (guest signs on ER, charges 1 life)...');
-  await erSend(guestProg, guest, () => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, lives: PublicKey.findProgramAddressSync([Buffer.from('gfglives'), host.toBytes()], PROGRAM)[0] }).transaction());
+  await erSend(guestProg, guest, () => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, core: PublicKey.findProgramAddressSync([Buffer.from('gfgcore'), host.toBytes()], PROGRAM)[0] }).transaction());
 
   console.log('[4/6] white e2-e4...');
   await erSend(guestProg, guest, () => guestProg.methods.makeChessMove(new BN(lastRef), 12, 28, 0).accounts({ signer: host, board: pda }).transaction());

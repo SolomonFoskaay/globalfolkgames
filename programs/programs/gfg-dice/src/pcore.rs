@@ -92,6 +92,25 @@ impl PlayerCore {
         self.bucket_count = (n + 1) as u8;
         Ok(n)
     }
+
+    /// Charge ONE life AT GAME START (never on completion). Unlimited (booster
+    /// or premium active) draws nothing but stamps the ref. Callers charge only
+    /// on a real transition so a retry can never double-charge.
+    pub fn charge_life(&mut self, now: i64, match_ref: u64) -> Result<()> {
+        if self.unlimited_until > 0 && self.unlimited_until > now {
+            self.last_life_ref = match_ref;
+            self.last_life_ts = now;
+            return Ok(());
+        }
+        let day = now / 86400;
+        if self.lives_day != day { self.lives_day = day; self.lives_used = 0; } // GMT+00 refill
+        require!(self.lives_used < self.lives_pool, crate::PointsError::NoLives);
+        self.lives_used = self.lives_used.checked_add(1).ok_or(crate::PointsError::Overflow)?;
+        self.last_life_ref = match_ref;
+        self.last_life_ts = now;
+        self.lives_award_count = self.lives_award_count.checked_add(1).ok_or(crate::PointsError::Overflow)?;
+        Ok(())
+    }
 }
 
 /// Pad a game tag string into the fixed 8-byte slot (idempotent).
