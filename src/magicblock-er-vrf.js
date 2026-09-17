@@ -854,17 +854,19 @@ export async function spendLocal(gameTag = 'ludo', amount, reason, spendRef) {
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { wallet } = ctx;
-  const [pointsPda] = pointsPdaFor(gameTag, wallet.publicKey);
+  // arcv2m3: spend from the player's CORE bucket for this game (the retired
+  // per-game points PDA is gone). ensureDelegated triggers the relay which
+  // creates + delegates the core in the same one-time onboarding.
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
+  await waitForErPickup(core);
 
-  await ensureDelegated(pointsPda, wallet.publicKey);
-  await waitForErPickup(pointsPda);
+  const regionUrl = await regionUrlFor(core);
 
-  const regionUrl = await regionUrlFor(pointsPda);
-
-  const sig = await withErRetry('spend_local', async (ctx) => ctx.program.methods
-    .spendLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+  const sig = await withErRetry('spend_core_local', async (ctx) => ctx.program.methods
+    .spendCoreLocal(gameTag, new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
-      points: pointsPda,
+      core,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })
@@ -1283,17 +1285,18 @@ export async function spendPremiumPoints(amount, reason, spendRef) {
   if (!ctx) throw new Error('MagicBlock VRF is not configured or no wallet is connected.');
 
   const { wallet } = ctx;
-  const [premiumPda] = premiumPointsPdaFor(wallet.publicKey);
+  // M5: spend from the player's CORE premium spendable (the retired premium
+  // PDA is gone). Gasless ER write signed by the player's session key.
+  const [core] = corePdaFor(wallet.publicKey);
+  await ensureDelegated(core, wallet.publicKey);
+  await waitForErPickup(core);
 
-  await ensureDelegated(premiumPda, wallet.publicKey);
-  await waitForErPickup(premiumPda);
+  const regionUrl = await regionUrlFor(core);
 
-  const regionUrl = await regionUrlFor(premiumPda);
-
-  const sig = await withErRetry('spend_premium_points', async (ctx) => ctx.program.methods
-    .spendPremiumPoints(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
+  const sig = await withErRetry('spend_core_premium', async (ctx) => ctx.program.methods
+    .spendCorePremium(new BN(amount), reason, spendRef instanceof BN ? spendRef : new BN(spendRef.toString()))
     .accounts({
-      premiumPoints: premiumPda,
+      core,
       payer: wallet.publicKey,
       playerAuthority: wallet.publicKey,
     })

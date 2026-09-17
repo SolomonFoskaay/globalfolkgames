@@ -4824,6 +4824,259 @@
       ]
     },
     {
+      "name": "migrate_core_bucket",
+      "docs": [
+        "Migration (2026-09, permissionless + idempotent): fold the RETIRED",
+        "per-game points ledger into the core bucket, then zero the source so a",
+        "re-run copies zero. Reads the old bytes fully BEFORE writing."
+      ],
+      "discriminator": [
+        105,
+        121,
+        221,
+        51,
+        30,
+        63,
+        113,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "legacy_points",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_tag"
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "migrate_core_global",
+      "docs": [
+        "Migration: fold the RETIRED global ledger into the core's globals, then",
+        "zero the source. Permissionless + idempotent."
+      ],
+      "discriminator": [
+        32,
+        38,
+        159,
+        146,
+        73,
+        147,
+        245,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "legacy_global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  111,
+                  105,
+                  110,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrate_core_premium",
+      "docs": [
+        "Migration: fold the RETIRED premium ledger into the core's premium track,",
+        "then zero the source balances. Permissionless + idempotent."
+      ],
+      "discriminator": [
+        19,
+        133,
+        224,
+        154,
+        211,
+        192,
+        113,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "legacy_premium",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  112,
+                  114,
+                  101,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "migrate_points",
       "docs": [
         "(M3 — data preservation, see .opencode/rules/solana-upgrade-safety.md)",
@@ -6162,6 +6415,140 @@
         195,
         166,
         34
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "spend_core_local",
+      "docs": [
+        "Spend from the core's per-game local spendable bucket (gasless ER).",
+        "Additive mirror of spend_local; the retired per-game PDA is never used."
+      ],
+      "discriminator": [
+        105,
+        254,
+        21,
+        67,
+        128,
+        184,
+        144,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "game_tag",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        },
+        {
+          "name": "spend_ref",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "spend_core_premium",
+      "docs": [
+        "Spend from the core's premium spendable balance (gasless ER). Additive",
+        "mirror of spend_premium_points."
+      ],
+      "discriminator": [
+        24,
+        28,
+        108,
+        37,
+        80,
+        147,
+        193,
+        218
       ],
       "accounts": [
         {

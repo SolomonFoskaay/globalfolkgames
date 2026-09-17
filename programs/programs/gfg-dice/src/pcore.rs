@@ -138,6 +138,73 @@ impl PlayerCore {
         Ok(())
     }
 
+    /// Spend `amount` of the local SPENDABLE track for `tag` (never the pure
+    /// track). The game's bucket must already exist.
+    pub fn spend_local(&mut self, tag: &[u8; 8], amount: u64) -> Result<()> {
+        let i = self.find_bucket(tag).ok_or(crate::PointsError::InvalidGameTag)?;
+        require!(self.buckets[i].local_spendable >= amount, crate::PointsError::InsufficientBalance);
+        self.buckets[i].local_spendable = self.buckets[i]
+            .local_spendable
+            .checked_sub(amount)
+            .ok_or(crate::PointsError::InsufficientBalance)?;
+        Ok(())
+    }
+
+    /// Spend `amount` of the PREMIUM spendable track (never `premium_lifetime`).
+    pub fn spend_premium(&mut self, amount: u64) -> Result<()> {
+        require!(self.premium_spendable >= amount, crate::PointsError::InsufficientBalance);
+        self.premium_spendable = self.premium_spendable
+            .checked_sub(amount)
+            .ok_or(crate::PointsError::InsufficientBalance)?;
+        Ok(())
+    }
+
+    /// Migration (arcv2m3, 2026-09): fold a retired per-game points ledger into
+    /// this player's bucket for `tag`. The caller zeroes the source afterwards,
+    /// which is what makes the migration idempotent (a re-run adds zero).
+    pub fn migrate_bucket(&mut self, tag: [u8; 8], pure: u64, spendable: u64) -> Result<()> {
+        let i = self.ensure_bucket(&tag)?;
+        self.buckets[i].local_pure = self.buckets[i]
+            .local_pure
+            .checked_add(pure)
+            .ok_or(crate::PointsError::Overflow)?;
+        self.buckets[i].local_spendable = self.buckets[i]
+            .local_spendable
+            .checked_add(spendable)
+            .ok_or(crate::PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Migration: fold the retired global ledger into the core's globals.
+    pub fn migrate_global(&mut self, pure: u64, lifetime: u64, spendable: u64) -> Result<()> {
+        self.global_pure = self.global_pure.checked_add(pure).ok_or(crate::PointsError::Overflow)?;
+        self.global_lifetime = self.global_lifetime.checked_add(lifetime).ok_or(crate::PointsError::Overflow)?;
+        self.global_spendable = self.global_spendable.checked_add(spendable).ok_or(crate::PointsError::Overflow)?;
+        Ok(())
+    }
+
+    /// Migration: fold the retired premium ledger into the core's premium track.
+    /// An active plan/booster on the source is carried over ONLY when the core
+    /// has none, so a live core subscription is never overwritten.
+    pub fn migrate_premium(
+        &mut self,
+        lifetime: u64,
+        spendable: u64,
+        level: u8,
+        until: i64,
+        booster_until: i64,
+    ) -> Result<()> {
+        self.premium_lifetime = self.premium_lifetime.checked_add(lifetime).ok_or(crate::PointsError::Overflow)?;
+        self.premium_spendable = self.premium_spendable.checked_add(spendable).ok_or(crate::PointsError::Overflow)?;
+        if self.subscription_active_until == 0 && until > 0 {
+            self.subscription_level = level;
+            self.subscription_active_until = until;
+            self.lives_pool = if level >= 3 { 15 } else if level == 2 { 10 } else { 5 };
+        }
+        if booster_until > self.booster_active_until { self.booster_active_until = booster_until; }
+        Ok(())
+    }
+
     /// Credit premium points (admin/operated). The direct-activation flow keeps
     /// this for promos; a purchase activates the plan directly (no middleman).
     pub fn credit_premium(&mut self, points: u64, credit_ref: u64) -> Result<()> {
@@ -255,6 +322,87 @@ pub struct SpendCoreGlobalCtx<'info> {
     pub player_authority: AccountInfo<'info>,
     #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
     pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Spend from the core's per-game local spendable bucket (gasless ER).
+#[derive(Accounts)]
+pub struct SpendCoreLocalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Spend from the core's premium spendable balance (gasless ER).
+#[derive(Accounts)]
+pub struct SpendCorePremiumCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}
+
+/// Migration (arcv2m3, 2026-09): fold the RETIRED per-game points ledger
+/// [gfgpoints, game_tag, player] into the core bucket, then zero the source.
+/// Permissionless (any payer may run it for any player) and idempotent (a
+/// re-run copies zero). Runs on the ER so the write is gasless; both the core
+/// and the legacy points PDA must be delegated.
+#[derive(Accounts)]
+#[instruction(game_tag: String)]
+pub struct MigrateCoreBucketCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for both PDAs).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+    #[account(
+        mut,
+        seeds = [crate::POINTS, game_tag.as_bytes(), player_authority.key().as_ref()],
+        bump
+    )]
+    pub legacy_points: Box<Account<'info, crate::PlayerPoints>>,
+}
+
+/// Migration: fold the RETIRED global ledger [gfgpoints, 'global', player] into
+/// the core's globals, then zero the source. Permissionless + idempotent.
+#[derive(Accounts)]
+pub struct MigrateCoreGlobalCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for both PDAs).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+    #[account(
+        mut,
+        seeds = [crate::POINTS, crate::GLOBAL_TAG, player_authority.key().as_ref()],
+        bump
+    )]
+    pub legacy_global: Box<Account<'info, crate::GlobalPoints>>,
+}
+
+/// Migration: fold the RETIRED premium ledger [gfgprem, player] into the core's
+/// premium track, then zero the source balances. Permissionless + idempotent.
+/// A v1/v2 premium account must be upgraded first (upgrade_premium_points_v3).
+#[derive(Accounts)]
+pub struct MigrateCorePremiumCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for both PDAs).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+    #[account(
+        mut,
+        seeds = [crate::PREMIUM_SEED, player_authority.key().as_ref()],
+        bump
+    )]
+    pub legacy_premium: Box<Account<'info, crate::PremiumPoints>>,
 }
 
 /// Admin-gated premium credit + DIRECT plan/booster activation on the core. The
