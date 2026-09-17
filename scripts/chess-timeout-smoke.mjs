@@ -7,12 +7,12 @@
 // Run: node scripts/chess-timeout-smoke.mjs
 
 import './load-env.mjs';
-import { PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@anchor-lang/core';
 import { BN } from 'bn.js';
 import { readFileSync } from 'fs';
 import { baseRpcUrl, createConnection, getDelegationStatus, regionUrlForFqdn, pickErRpcUrl } from '../src/gfg-rpc.js';
-import { loadSponsor } from './delegate-relay.mjs';
+import { loadSponsor, handleDelegate } from './delegate-relay.mjs';
 import { chessCreate, chessPda, chessState } from './chess-relay.mjs';
 
 const idl = JSON.parse(readFileSync(new URL('../src/gfg-dice-idl.json', import.meta.url), 'utf8'));
@@ -31,32 +31,38 @@ let lastRef = 0;
 function livesFor(k) { return PublicKey.findProgramAddressSync([LIVES, k.toBytes()], PROGRAM)[0]; }
 async function erUrl(pda) { try { const st = await getDelegationStatus(conn, pda); if (st && st.fqdn) { const u = regionUrlForFqdn(st.fqdn); if (u) return u; } } catch (e) {} return pickErRpcUrl(); }
 async function waitDelegated(pda, t) { const d = Date.now() + t; while (Date.now() < d) { try { const st = await getDelegationStatus(conn, pda); if (st && st.isDelegated) return true; } catch (e) {} await sleep(700); } return false; }
-async function erSend(buildTx) {
+async function erSend(buildTx, signer) {
+  signer = signer || sponsor;
   const pda = chessPda(lastRef);
   const url = await erUrl(pda);
   const c = createConnection(url, 'confirmed', 9000);
   const bh = await c.getLatestBlockhash('confirmed');
   const tx = await buildTx();
-  tx.feePayer = sponsor.publicKey;
+  tx.feePayer = signer.publicKey;
   tx.recentBlockhash = bh.blockhash;
   tx.lastValidBlockHeight = bh.lastValidBlockHeight;
-  tx.partialSign(sponsor);
+  tx.partialSign(signer);
   const sig = await c.sendRawTransaction(tx.serialize(), { skipPreflight: true });
   await c.confirmTransaction({ signature: sig }, 'confirmed');
   return sig;
 }
 
 async function main() {
+  const guest = Keypair.generate();
+  const host = guest.publicKey;
   lastRef = Date.now();
-  console.log('[timeout] matchRef =', lastRef, '| host =', sponsor.publicKey.toBase58());
-  const c = await chessCreate({ matchRef: lastRef, host: sponsor.publicKey.toBase58(), timeMs: 1500, incrementMs: 0, solo: 1 });
+  console.log('[timeout] matchRef =', lastRef, '| fresh host =', host.toBase58());
+  await handleDelegate(host.toBase58(), 'ludo');
+  const guestWallet = { publicKey: host, signTransaction: async (t) => { t.partialSign(guest); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(guest)); return ts; } };
+  const guestProg = new Program(idl, new AnchorProvider(conn, guestWallet, { commitment: 'confirmed', skipPreflight: true }));
+  const c = await chessCreate({ matchRef: lastRef, host: host.toBase58(), timeMs: 1500, incrementMs: 0, solo: 1 });
   console.log('[1/4] create:', JSON.stringify(c));
   if (!c.ok) throw new Error(c.error);
   const pda = chessPda(lastRef);
   if (!await waitDelegated(pda, 20000)) throw new Error('board did not delegate');
 
   console.log('[2/4] start (1.5s clock)...');
-  await erSend(() => prog.methods.startChessMatch(new BN(lastRef)).accounts({ signer: sponsor.publicKey, board: pda, lives: livesFor(sponsor.publicKey) }).transaction());
+  await erSend(() => guestProg.methods.startChessMatch(new BN(lastRef)).accounts({ signer: host, board: pda, lives: livesFor(host) }).transaction(), guest);
 
   console.log('[3/4] wait 2.6s for white to run out (no moves)...');
   await sleep(2600);

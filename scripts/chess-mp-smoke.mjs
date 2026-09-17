@@ -59,6 +59,7 @@ async function erSend(progInst, signer, buildTx) {
 }
 
 async function main() {
+  const hostG = Keypair.generate();
   const joiner = Keypair.generate();
   lastRef = Date.now();
   console.log('[mp] host(white) =', sponsor.publicKey.toBase58());
@@ -66,6 +67,7 @@ async function main() {
 
   console.log('[1/7] onboard joiner (sponsor pays, all PDAs incl. lives)...');
   const { handleDelegate } = await import('./delegate-relay.mjs');
+  const hostSteps = await handleDelegate(hostG.publicKey.toBase58(), 'ludo');
   const steps = await handleDelegate(joiner.publicKey.toBase58(), 'ludo');
   console.log('      steps:', (steps.steps || []).map(s => s.step).join(', ') || 'already delegated');
 
@@ -75,9 +77,11 @@ async function main() {
     signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(joiner)); return ts; },
   };
   const joinerProg = new Program(idl, new AnchorProvider(conn, joinerWallet, { commitment: 'confirmed', skipPreflight: true }));
+  const hostWallet = { publicKey: hostG.publicKey, signTransaction: async (t) => { t.partialSign(hostG); return t; }, signAllTransactions: async (ts) => { ts.forEach(t => t.partialSign(hostG)); return ts; } };
+  const hostProg = new Program(idl, new AnchorProvider(conn, hostWallet, { commitment: 'confirmed', skipPreflight: true }));
 
   console.log('[2/7] create + delegate MP board (solo=0, sponsor pays)...');
-  const created = await chessCreate({ matchRef: lastRef, host: sponsor.publicKey.toBase58(), timeMs: 600000, incrementMs: 0, solo: 0 });
+  const created = await chessCreate({ matchRef: lastRef, host: hostG.publicKey.toBase58(), timeMs: 600000, incrementMs: 0, solo: 0 });
   console.log('      create:', JSON.stringify(created));
   if (!created.ok) throw new Error(created.error);
   const pda = chessPda(lastRef);
@@ -92,14 +96,14 @@ async function main() {
   console.log('      seats:', s.seats.join(' , '));
 
   console.log('[4/7] host starts (ER)...');
-  await erSend(prog, sponsor, () => prog.methods.startChessMatch(new BN(lastRef))
-    .accounts({ signer: sponsor.publicKey, board: pda, lives: livesFor(sponsor.publicKey) }).transaction());
+  await erSend(hostProg, hostG, () => hostProg.methods.startChessMatch(new BN(lastRef))
+    .accounts({ signer: hostG.publicKey, board: pda, lives: livesFor(hostG.publicKey) }).transaction());
   s = await chessState({ matchRef: lastRef });
   console.log('      status:', s.status, 'sideToMove:', s.sideToMove);
 
   console.log('[5/7] white e2-e4, then black e7-e5 (both sign on ER)...');
-  await erSend(prog, sponsor, () => prog.methods.makeChessMove(new BN(lastRef), 12, 28, 0)
-    .accounts({ signer: sponsor.publicKey, board: pda }).transaction());
+  await erSend(hostProg, hostG, () => hostProg.methods.makeChessMove(new BN(lastRef), 12, 28, 0)
+    .accounts({ signer: hostG.publicKey, board: pda }).transaction());
   await erSend(joinerProg, joiner, () => joinerProg.methods.makeChessMove(new BN(lastRef), 52, 36, 0)
     .accounts({ signer: joiner.publicKey, board: pda }).transaction());
   s = await chessState({ matchRef: lastRef });
