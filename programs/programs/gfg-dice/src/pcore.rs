@@ -161,3 +161,16 @@ pub struct CommitAndUndelegateCoreCtx<'info> {
     #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
     pub core: Account<'info, PlayerCore>,
 }
+
+/// Record a per-game local award into the player's core bucket (gasless ER).
+/// Payer is the sponsor/payer (relay); the credit lands on `player_authority`'s
+/// bucket. Idempotent by match_ref (global last-match guard).
+#[derive(Accounts)]
+pub struct RecordCorePointsCtx<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the player wallet authority (seed basis for the PDA).
+    pub player_authority: AccountInfo<'info>,
+    #[account(mut, seeds = [CORE_SEED, player_authority.key().as_ref()], bump)]
+    pub core: Box<Account<'info, PlayerCore>>,
+}

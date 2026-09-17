@@ -458,6 +458,35 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Bank a per-game local award into the player's core bucket (gasless ER).
+    /// Additive mirror of record_points; the bucket is keyed by the game tag so
+    /// no per-game PDA is ever created. Idempotent by match_ref.
+    pub fn record_core_points(
+        ctx: Context<RecordCorePointsCtx>,
+        game_tag: String,
+        points: u64,
+        reason: u8,
+        match_ref: u64,
+    ) -> Result<()> {
+        require!(points > 0, PointsError::ZeroPoints);
+        require!(is_valid_game_tag(&game_tag), PointsError::InvalidGameTag);
+        let tag = game_tag8(&game_tag);
+        let c = &mut ctx.accounts.core;
+        require!(c.last_match_ref != match_ref, PointsError::DuplicateMatchRef);
+        let i = c.ensure_bucket(&tag)?;
+        c.buckets[i].local_pure = c.buckets[i]
+            .local_pure
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        c.buckets[i].local_spendable = c.buckets[i]
+            .local_spendable
+            .checked_add(points)
+            .ok_or(PointsError::Overflow)?;
+        c.last_match_ref = match_ref;
+        let _ = reason;
+        Ok(())
+    }
+
     /// Idempotent: creates the player's dice PDA if it does not exist yet.
     /// The payer (sponsor) pays rent; the account belongs to `player_authority`.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
