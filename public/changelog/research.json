@@ -23,11 +23,31 @@
             "Per player is the part that scales. Measured onboarding is 0.010048 SOL, about 1.05 USD per player, and it is not refunded while the player's accounts live (dice account + Player Core rent + delegation records)."
           ],
           "table": {
-            "headers": ["Players", "Program (once)", "Player onboarding", "Total"],
+            "headers": [
+              "Players",
+              "Program (once)",
+              "Player onboarding",
+              "Total"
+            ],
             "rows": [
-              ["100", "1,009 USD", "105 USD", "about 1,114 USD"],
-              ["1,000", "1,009 USD", "1,046 USD", "about 2,055 USD"],
-              ["10,000", "1,009 USD", "10,460 USD", "about 11,469 USD"]
+              [
+                "100",
+                "1,009 USD",
+                "105 USD",
+                "about 1,114 USD"
+              ],
+              [
+                "1,000",
+                "1,009 USD",
+                "1,046 USD",
+                "about 2,055 USD"
+              ],
+              [
+                "10,000",
+                "1,009 USD",
+                "10,460 USD",
+                "about 11,469 USD"
+              ]
             ]
           },
           "bullets": [
@@ -50,13 +70,37 @@
         {
           "heading": "3. Deploy cost: Arc wins by roughly 100x",
           "table": {
-            "headers": ["", "Solana mainnet", "Arc mainnet"],
+            "headers": [
+              "",
+              "Solana mainnet",
+              "Arc mainnet"
+            ],
             "rows": [
-              ["Program/contract deploy", "about 1,009 USD locked rent", "gas only, about 0.10 to 0.65 USD per contract (est.)"],
-              ["Contract size cap", "large (.so, 1.39 MB)", "24 KB (EIP-170), so split into many contracts"],
-              ["Player onboarding", "about 1.05 USD each (rent)", "storage gas, about 0.002 USD each (est., sponsored)"],
-              ["A game action", "gasless on ER (devnet free)", "about 0.003 to 0.01 USD gas (est.), sponsored"],
-              ["Fee currency", "SOL (volatile)", "USDC (stable)"]
+              [
+                "Program/contract deploy",
+                "about 1,009 USD locked rent",
+                "gas only, about 0.10 to 0.65 USD per contract (est.)"
+              ],
+              [
+                "Contract size cap",
+                "large (.so, 1.39 MB)",
+                "24 KB (EIP-170), so split into many contracts"
+              ],
+              [
+                "Player onboarding",
+                "about 1.05 USD each (rent)",
+                "storage gas, about 0.002 USD each (est., sponsored)"
+              ],
+              [
+                "A game action",
+                "gasless on ER (devnet free)",
+                "about 0.003 to 0.01 USD gas (est.), sponsored"
+              ],
+              [
+                "Fee currency",
+                "SOL (volatile)",
+                "USDC (stable)"
+              ]
             ]
           },
           "paragraphs": [
@@ -74,16 +118,52 @@
         {
           "heading": "5. Current stack vs Arc",
           "table": {
-            "headers": ["Tech we use", "Ports to Arc?", "Notes / alternative"],
+            "headers": [
+              "Tech we use",
+              "Ports to Arc?",
+              "Notes / alternative"
+            ],
             "rows": [
-              ["Anchor/Rust programs (gfg-dice, points, comps, chess, escrow)", "No, full rewrite", "Solidity (Foundry/Hardhat supported). 24 KB cap means splitting 1.39 MB into about 10 to 20 contracts; the module layout helps"],
-              ["Alchemy RPC", "Yes", "Alchemy has a full Arc page: RPC, WebSockets, Token/Transfers/NFT APIs, Webhooks, Bundler, Gas Manager"],
-              ["Dynamic (email OTP wallet)", "Yes", "Dynamic is listed in Arc's AA providers with native ERC-4337 support. Alternatives: Privy, Crossmint, Para, MetaMask Embedded Wallets, Circle Wallets"],
-              ["MagicBlock ER (gasless + ER VRF)", "No", "Gasless becomes a paymaster; ER VRF becomes Chainlink VRF or Pyth Entropy"],
-              ["Vercel + Node + HTML/Vite frontend", "Yes, unchanged", "Only the chain client changes (web3.js/Anchor to viem/ethers + ABIs)"],
-              ["Supabase (backup/audit)", "Yes, unchanged", "No change"],
-              ["USDC payments", "Better fit", "Arc is USDC-native; Circle App Kit adds onramp, bridge and unified balance"],
-              ["USDC bridging/liquidity", "Yes", "CCTP and Arc's bridge; institutional validators"]
+              [
+                "Anchor/Rust programs (gfg-dice, points, comps, chess, escrow)",
+                "No, full rewrite",
+                "Solidity (Foundry/Hardhat supported). 24 KB cap means splitting 1.39 MB into about 10 to 20 contracts; the module layout helps"
+              ],
+              [
+                "Alchemy RPC",
+                "Yes",
+                "Alchemy has a full Arc page: RPC, WebSockets, Token/Transfers/NFT APIs, Webhooks, Bundler, Gas Manager"
+              ],
+              [
+                "Dynamic (email OTP wallet)",
+                "Yes",
+                "Dynamic is listed in Arc's AA providers with native ERC-4337 support. Alternatives: Privy, Crossmint, Para, MetaMask Embedded Wallets, Circle Wallets"
+              ],
+              [
+                "MagicBlock ER (gasless + ER VRF)",
+                "No",
+                "Gasless becomes a paymaster; ER VRF becomes Chainlink VRF or Pyth Entropy"
+              ],
+              [
+                "Vercel + Node + HTML/Vite frontend",
+                "Yes, unchanged",
+                "Only the chain client changes (web3.js/Anchor to viem/ethers + ABIs)"
+              ],
+              [
+                "Supabase (backup/audit)",
+                "Yes, unchanged",
+                "No change"
+              ],
+              [
+                "USDC payments",
+                "Better fit",
+                "Arc is USDC-native; Circle App Kit adds onramp, bridge and unified balance"
+              ],
+              [
+                "USDC bridging/liquidity",
+                "Yes",
+                "CCTP and Arc's bridge; institutional validators"
+              ]
             ]
           }
         },
@@ -95,6 +175,166 @@
             "Arc House / Architects Program (75,000+ members) for early builder visibility.",
             "Recommended: do not fund Solana mainnet yet. Build a small Arc mainnet proof of concept (dice with a VRF, a Dynamic smart wallet, an Alchemy Gas Manager sponsorship, minimal Ludo), enter Arc Microgrants before 2026-10-14, then apply to Circle Developer Grants with the demo.",
             "Price the VRF per roll first. If it is cents, Arc is clearly the better home for this project."
+          ]
+        },
+        {
+          "heading": "7. MagicBlock ER + ER VRF REAL costs on mainnet (verified from docs, source checked 2026-08-20)",
+          "paragraphs": [
+            "IMPORTANT correction to the earlier worry: on Solana the gasless layer is NOT the expensive part. MagicBlock mainnet pricing is: ER transaction base fee 0 SOL (current release, public nodes), and ER VRF (under 50ms) is FREE per randomness request. Only delegation/commits cost, and the real drag is account RENT."
+          ],
+          "table": {
+            "headers": [
+              "What",
+              "Cost",
+              "When"
+            ],
+            "rows": [
+              [
+                "ER transaction (every roll, move, point write)",
+                "0 SOL",
+                "now, public nodes"
+              ],
+              [
+                "ER VRF (under 50ms)",
+                "FREE per request",
+                "now"
+              ],
+              [
+                "Delegation session",
+                "0.0003 SOL (about 0.03 USD)",
+                "at undelegate, from the deposit"
+              ],
+              [
+                "Commit after the first",
+                "0.0001 SOL each (about 0.01 USD)",
+                "at undelegate"
+              ],
+              [
+                "Live commit from number 26",
+                "0.0001 SOL per account",
+                "from a delegated fee payer"
+              ],
+              [
+                "Solana base-layer VRF (fallback)",
+                "0.0005 to 0.0008 SOL per roll",
+                "only when not on the ER"
+              ]
+            ]
+          },
+          "bullets": [
+            "What the measured 0.010048 SOL per player is made of: about 0.0054 SOL (about 0.56 USD) is PERMANENT rent (dice account plus Player Core), and about 0.0046 SOL (about 0.48 USD) is the delegation DEPOSIT (record plus metadata), which is REFUNDED at undelegate minus the 0.0003 session fee and 0.0001 per commit.",
+            "The 1,009 USD program cost is also rent and is refundable if the program is ever closed.",
+            "So Solana is: about 1,009 USD refundable upfront, about 0.56 USD spent per player, about 0.48 USD refundable per player, and 0 forever after with free randomness.",
+            "Conclusion: the Solana problem is the UPFRONT RENT, not per-game cost. On the ER, per-roll and per-move cost is genuinely zero."
+          ]
+        },
+        {
+          "heading": "8. The two EVM cost centers: dice rolls AND player moves (the design goal)",
+          "paragraphs": [
+            "On an EVM chain every dice roll and every player move is a transaction, and each one costs gas. In Ludo there are roughly two moves for every roll; chess has no dice but many moves; across 50+ games the move count dominates everything. Paying even a fraction of a cent per action is not sustainable and it destroys the web2 \"never think about fees\" flow.",
+            "So the design goal is exactly this: PAY ONCE per game (or per session), then ALL dice rolls, ALL moves and ALL point writes inside the game are FREE, then settle or commit back to the base chain when the game ends."
+          ]
+        },
+        {
+          "heading": "9. The combined design: a Game Session Channel (open once, free inside, settle at the end)",
+          "paragraphs": [
+            "This is the EVM equivalent of what MagicBlock ER does for Solana, built WITHOUT running any RPC or validator of our own. It is the classic state-channel pattern applied per match, and it is well documented on ethereum.org: only two on-chain interactions per channel lifecycle, everything else is free off-chain signed messages.",
+            "How a match runs: (1) OPEN, one on-chain transaction that starts the game session and commits a randomness seed hash. (2) PLAY, every dice roll and every move is a signed off-chain message between the players and the app, free and instant, with dice derived deterministically from the committed seed. (3) SETTLE, one on-chain transaction at game end that reveals the seed, submits the final signed state, writes points and rewards, and recommits the result to the base chain."
+          ],
+          "bullets": [
+            "Cost per match: 2 transactions, roughly 0.01 USD total on Arc, instead of one transaction per move.",
+            "Batch settlement: one settle transaction can finalise MANY matches at once using a Merkle root of results, which drops the cost to about 0.0001 USD per match. This is how it stays effectively free at scale.",
+            "No infrastructure to run: no RPC provider, no validator, no rollup node. The existing app server (Vercel functions) can act as the optional matchmaking hub, and the public Arc RPC is free.",
+            "Fairness is preserved: the seed is committed before play and revealed after, so the app cannot change rolls after seeing moves; players cosign the final state so a dishonest player cannot rewrite it; a short on-chain dispute window lets either player submit a newer signed state.",
+            "Build size: a GameSession contract (open, join, signed-state submit, settle, dispute) plus a commit-reveal randomness module, roughly 500 to 1,500 lines of Solidity. The off-chain game logic already exists in the repo (Ludo, chess) and is reused with signed-state serialization."
+          ]
+        },
+        {
+          "heading": "10. Custom randomness (the mini-VRF): four ways to make rolls free",
+          "paragraphs": [
+            "Arc has NO on-chain randomness (PREVRANDAO always returns 0), so randomness must be provided. But it does not have to cost per roll."
+          ],
+          "bullets": [
+            "1. BATCH ONE SEED PER MATCH (recommended, cheapest): request or commit ONE verifiable seed per match, then derive every in-match roll on-chain from it with a hash chain, hash(seed, counter). This removes per-roll cost entirely and is 50 to 100 times cheaper than per-roll randomness.",
+            "2. COMMIT-REVEAL with no provider: the app commits hash(secret) at open, the player adds entropy, the app reveals at settle, both combine. Cost is gas only, and the commit binds the app so it cannot adapt after seeing the player input. Downside: the app could stall by not revealing.",
+            "3. BLS BEACON VERIFIER (drand style): verify a threshold signature from a public randomness beacon on-chain. Cost is verification gas only, no per-request fee, and it is trustless. Requires building and auditing a verifier.",
+            "4. PROVIDER (Pyth Entropy or Chainlink VRF): easiest, but a recurring per-request fee. Entropy fees are dynamic and paid in the native gas token; Chainlink VRF is paid in LINK. Use only as a fallback or for high-value matches."
+          ]
+        },
+        {
+          "heading": "11. Other EVM venues surveyed (Ethereum, BNB, L2s)",
+          "table": {
+            "headers": [
+              "Venue",
+              "Fee character",
+              "Fit for this project"
+            ],
+            "rows": [
+              [
+                "Ethereum L1",
+                "High per tx (dollars)",
+                "No, per-move impossible"
+              ],
+              [
+                "BNB Smart Chain",
+                "Among the lowest EVM L1 fees; 2026 roadmap targets about 0.001 USD and 20k TPS; also runs a 0 Fee Carnival for plain stablecoin transfers",
+                "Cheap, but gas token is BNB not USDC, and no first-class Circle USDC stack"
+              ],
+              [
+                "opBNB (OP Stack L2)",
+                "Very low L2 fees",
+                "Cheap, but again BNB gas and another ecosystem"
+              ],
+              [
+                "Base / Arbitrum / Polygon",
+                "Low L2 fees",
+                "Cheap, but ETH or POL gas, not USDC"
+              ],
+              [
+                "Arc (Circle)",
+                "USDC gas, sub-second finality, EIP-1559 with EWMA, min 20 Gwei, target about 0.001 USD per transfer",
+                "Best fit: stable fees, Circle ecosystem, USDC-native, mainnet live"
+              ]
+            ]
+          },
+          "bullets": [
+            "zkVM option (strongest guarantee): RISC Zero, SP1 or OpenVM prove the whole match off-chain and verify one proof on-chain. Provider proof cost in 2026 runs from about 0.02 USD (SP1 Hypercube class) to about 0.4 USD (ZkCloud), plus verification gas on Arc. That is cents per MATCH, not per move, and it removes trust in both players and the app. Good later upgrade, not required at launch."
+          ]
+        },
+        {
+          "heading": "12. Cost crossover and recommendation",
+          "table": {
+            "headers": [
+              "Model",
+              "Per player",
+              "Per match",
+              "Per move / roll"
+            ],
+            "rows": [
+              [
+                "Solana mainnet (MagicBlock ER)",
+                "about 0.56 USD permanent (half refundable deposit)",
+                "0 (2 free txs)",
+                "0"
+              ],
+              [
+                "Arc + Game Session Channel",
+                "about 0.002 USD",
+                "about 0.01 USD, or about 0.0001 batched",
+                "0"
+              ],
+              [
+                "Arc + naive one tx per action",
+                "about 0.002 USD",
+                "about 0.003 to 0.01 USD per action",
+                "not sustainable"
+              ]
+            ]
+          },
+          "bullets": [
+            "Recommendation: build the Game Session Channel with batched per-match randomness (option 1 in section 10) and batched settlement. That gives \"pay a fraction of a cent once per game, everything inside free, settle at the end\" with no infrastructure to run and no per-action cost, which is exactly the MagicBlock ER feel.",
+            "This design is chain-agnostic, so it works on Arc today and could later be exposed as an open RPC service for other builders, which is the future opportunity the owner flagged.",
+            "ZK-proving is the trustless upgrade later; it costs cents per match and needs no per-move fee, so the architecture above will not have to be thrown away."
           ]
         }
       ]
@@ -129,18 +369,62 @@
         {
           "heading": "3. Top 10 card types, plainly named",
           "table": {
-            "headers": ["#", "Card / collection", "Why it matters"],
+            "headers": [
+              "#",
+              "Card / collection",
+              "Why it matters"
+            ],
             "rows": [
-              ["1", "1999 Pokemon Base Set Charizard", "The most famous card on earth; mint graded copies are six figures and up"],
-              ["2", "Pikachu Illustrator (1998 promo)", "The record holder at 16.49 million USD"],
-              ["3", "Other 1st Edition / Shadowless Pokemon sets", "Old, rare, heavily collected"],
-              ["4", "Modern Pokemon chase cards (for example Moonbreon)", "New art cards collectors hunt"],
-              ["5", "Yu-Gi-Oh first prints (Blue-Eyes White Dragon)", "Same idea, different fandom"],
-              ["6", "Magic: The Gathering Power Nine (Black Lotus)", "Oldest and priciest game cards"],
-              ["7", "Sports rookie cards (Jordan, LeBron, Messi, newest NBA rookies)", "Condition decides everything"],
-              ["8", "Graded slabs in general (PSA/BGS/SGC)", "The plastic case and the number ARE the value"],
-              ["9", "Digital card games (Pokemon TCG Pocket, Marvel Snap, Hearthstone)", "Free cards inside an app, not tradeable for cash"],
-              ["10", "On-chain collectibles (NBA Top Shot, Sorare, Gods Unchained)", "Digital cards you truly own and can trade"]
+              [
+                "1",
+                "1999 Pokemon Base Set Charizard",
+                "The most famous card on earth; mint graded copies are six figures and up"
+              ],
+              [
+                "2",
+                "Pikachu Illustrator (1998 promo)",
+                "The record holder at 16.49 million USD"
+              ],
+              [
+                "3",
+                "Other 1st Edition / Shadowless Pokemon sets",
+                "Old, rare, heavily collected"
+              ],
+              [
+                "4",
+                "Modern Pokemon chase cards (for example Moonbreon)",
+                "New art cards collectors hunt"
+              ],
+              [
+                "5",
+                "Yu-Gi-Oh first prints (Blue-Eyes White Dragon)",
+                "Same idea, different fandom"
+              ],
+              [
+                "6",
+                "Magic: The Gathering Power Nine (Black Lotus)",
+                "Oldest and priciest game cards"
+              ],
+              [
+                "7",
+                "Sports rookie cards (Jordan, LeBron, Messi, newest NBA rookies)",
+                "Condition decides everything"
+              ],
+              [
+                "8",
+                "Graded slabs in general (PSA/BGS/SGC)",
+                "The plastic case and the number ARE the value"
+              ],
+              [
+                "9",
+                "Digital card games (Pokemon TCG Pocket, Marvel Snap, Hearthstone)",
+                "Free cards inside an app, not tradeable for cash"
+              ],
+              [
+                "10",
+                "On-chain collectibles (NBA Top Shot, Sorare, Gods Unchained)",
+                "Digital cards you truly own and can trade"
+              ]
             ]
           },
           "paragraphs": [

@@ -47,3 +47,21 @@ workspace, which holds explorations that happen BEFORE they become modules in
 7. **Record the archive.** When research is adopted into a module, add a note in
    the module's `details` in `architecture.json` that it came from the Research
    library (with the entry id), so the trail is traceable.
+8. **OPEN SOURCE MEANS THE DATA IS PUBLIC (hard rule).** This repository is
+   public, so a staff page gate protects only the SCREEN, never the bytes: a
+   client-served JSON (`research.json`, `architecture.json`, `changelog.json`,
+   `economics.json`) is readable by anyone who guesses the URL. Therefore
+   business-sensitive discussions MUST NOT be written into a client-served file
+   or committed unless the owner explicitly approves it for the public repo IN
+   THAT TURN. This includes: pricing, fundraising and collection sizes, private
+   strategy, partner or sponsorship terms, financial modelling, and anything
+   the owner calls "a private discussion". Default = keep it in chat and do NOT
+   record it. When it comes up, ASK: "Do you want this recorded, and where
+   (private note vs the public repo)?"
+9. **ALWAYS RECONFIRM BEFORE COMMITTING RESEARCH (hard rule).** Research,
+   economics, architecture and roadmap content is committed to a public repo, so
+   before any `git add`/`git commit` that includes such content, the agent MUST
+   re-state exactly what is being committed and ask the owner to confirm. Never
+   bundle a private business discussion, or a solution the owner is still
+   evaluating, into a commit silently. An unpushed commit can be undone with
+   `git reset --mixed` when the owner asks (never rewrite pushed history).

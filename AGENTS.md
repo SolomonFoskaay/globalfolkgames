@@ -509,7 +509,16 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   `architecture.json` or updating an existing module, and surface anything
   relevant to the owner FIRST; (c) keep it mobile-friendly (every table in the
   scrollable `.research-table-wrap`, no horizontal page overflow) and never put
-  secrets or unfixed security detail in it (client-served).
+  secrets or unfixed security detail in it (client-served). **OPEN SOURCE = THE
+  DATA IS PUBLIC (hard rule):** a staff page gate protects only the screen, not
+  the JSON bytes, so business-sensitive discussions (pricing, fundraising and
+  collection sizes, private strategy, partner terms, financial modelling) are
+  NEVER written into a client-served file or committed without the owner's
+  explicit approval in that turn. Default: keep it in chat and ask first.
+  **ALWAYS RECONFIRM BEFORE COMMITTING** research/economics/architecture
+  content: re-state exactly what is going into the commit and get the owner's
+  confirmation. Never bundle a private discussion or an unapproved solution into
+  a commit silently.
 - **Two views of every feature, always:**
   - *Dev view (admin):* precise, technical details (bullets) — what's changing
     under the hood, files, trade-offs, remaining work.
