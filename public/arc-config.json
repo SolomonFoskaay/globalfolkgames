@@ -1,0 +1,17 @@
+{
+  "note": "PUBLIC Arc rail config. These are contract addresses and endpoints only, safe to serve to any browser. NEVER put secrets here (keys, tokens, .env values). Secrets stay in the server env.",
+  "rails": {
+    "evm": {
+      "name": "Arc Testnet",
+      "chainId": 5042002,
+      "rpc": "https://rpc.testnet.arc.io",
+      "explorer": "https://explorer.testnet.arc.io",
+      "usdcDecimalsNative": 18,
+      "usdcDecimalsErc20": 6,
+      "contracts": {
+        "gameRegistry": "0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb",
+        "randomness": "0xb406295b4F7E5B513b656122AfFF29AF720E9E23"
+      }
+    }
+  }
+}
