@@ -18,10 +18,22 @@ const COLORS = {
 // (a) Box separators: darker + DOUBLE thickness so each box reads clearly.
 const GRID_LINE_COLOR = '#2f2f3a';
 const GRID_LINE_WIDTH = 2;
-// (b) Token size: DOUBLE the previous radius (was CELL_SIZE * 0.35).
-const TOKEN_RADIUS_FACTOR = 0.70;
-// Stacked tokens still shrink, but keep inside the 2x2 cluster offsets.
-const TOKEN_STACK_RADIUS_FACTOR = 0.20;
+// (b) FLEXIBLE token size (owner follow-up 2026-09): big in the home yard,
+// fitted to the small track boxes once a token is out, and automatically big
+// again the moment it is sent back home. The size is derived from pathIndex on
+// every frame, so nothing is stored and mechanics are untouched.
+const TOKEN_RADIUS_FACTOR = 0.70;        // home yard (homebox): the big size
+const TOKEN_PATH_RADIUS_FACTOR = 0.42;   // on the track: fits inside the box
+const TOKEN_STACK_RADIUS_FACTOR = 0.20;  // several tokens stacked on one box
+const TOKEN_YARD_SPREAD = 0.75;          // yard 2x2 offset, keeps big tokens apart
+
+// Top-left cell of each colour's 6x6 home yard (for the spread home layout).
+const YARD_START = {
+    green:  { c: 0, r: 0 },
+    yellow: { c: 9, r: 0 },
+    blue:   { c: 9, r: 9 },
+    red:    { c: 0, r: 9 }
+};
 
 // Purely cosmetic arrow overlays (native Ludo look). NEVER affect mechanics:
 // they only tell the player which way pieces travel (clockwise track) and
@@ -200,34 +212,52 @@ function drawBigYard(startCol, startRow, colorName) {
     }
 }
 
-// CENTRE AS A DICE BUTTON (owner 2026-09, COSMETIC + input only; mechanics
-// untouched). The middle 3x3 block draws a die face so the idle centre reads as
-// a tappable roll button. Tapping it calls the SAME rollDiceEngine() as the
-// existing #diceBtn, so both stay in sync and the engine's own guards (plus the
-// button's disabled state) make a double roll impossible. The original dice
-// button stays in place until the owner confirms this one feels right.
+// CENTRE AS THE DICE BUTTON (owner 2026-09, COSMETIC + input only; mechanics
+// untouched). This is now the SINGLE dice source of truth: the old #diceBtn is
+// removed from the page, so this centre die is the only roll control. It shows
+// the text ROLL / DICE, and while it is a human seat's turn it BLINKS in that
+// player's colour (green / yellow / blue / red). The text keeps a dark outline
+// so it stays readable on every one of those backgrounds.
 const CENTER_HIT_CELLS = [6, 9]; // cols/rows 6..8 = the centre 3x3 block
+let centerTurnColor = null;      // set each draw to the blinking player colour
 
-function centerRollEnabled() {
+// Can a manual roll happen right now? Mirrors rollDiceEngine's own guards, which
+// remain the authority; this is only for the visual state (blink / dim).
+function canRollNow() {
     try {
-        const btn = document.getElementById('diceBtn');
-        return !!(btn && !btn.disabled);
+        if (typeof setupConfigurationLocked !== 'undefined' && !setupConfigurationLocked) return false;
+        if (typeof matchOver !== 'undefined' && matchOver) return false;
+        if (typeof isGamePaused !== 'undefined' && isGamePaused) return false;
+        if (typeof isChainDown !== 'undefined' && isChainDown) return false;
+        if (typeof displayDiceOnBoard === 'boolean' && displayDiceOnBoard) return false;
+        if (typeof isDiceRolled !== 'undefined' && isDiceRolled) return false;
+        if (typeof currentTurn === 'undefined' || typeof playerProfiles === 'undefined' || !playerProfiles[currentTurn]) return false;
+        if (playerProfiles[currentTurn].mode !== 'human') return false; // computer seats roll themselves
+        if (typeof window.gfgRemoteTurn === 'function' && window.gfgRemoteTurn()) return false;
+        return true;
     } catch (e) { return false; }
 }
 
 function drawCenterDiceAffordance() {
     const mid = 7.5 * CELL_SIZE;
-    const enabled = centerRollEnabled();
+    const active = canRollNow();
+    centerTurnColor = active ? currentTurn : null;
     const size = CELL_SIZE * 1.5;
     const half = size / 2;
-    const r = CELL_SIZE * 0.22;
 
     ctx.save();
-    ctx.globalAlpha = enabled ? 0.98 : 0.55;
-    // Die face (white rounded square, like the physical dice on the board).
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = enabled ? '#f39c12' : 'rgba(60,72,88,0.5)';
-    ctx.lineWidth = enabled ? Math.max(2, CELL_SIZE * 0.07) : Math.max(1.5, CELL_SIZE * 0.05);
+    ctx.globalAlpha = 0.98;
+    // Dice background: white when idle, the current player's colour while it is
+    // their turn (the whole die pulses via globalBlinkAlpha).
+    if (active) {
+        ctx.globalAlpha = 0.35 + 0.65 * (typeof globalBlinkAlpha === 'number' ? globalBlinkAlpha : 1);
+        ctx.fillStyle = COLORS[currentTurn] || '#ffffff';
+    } else {
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = '#ffffff';
+    }
+    ctx.strokeStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(60,72,88,0.5)';
+    ctx.lineWidth = active ? Math.max(2, CELL_SIZE * 0.07) : Math.max(1.5, CELL_SIZE * 0.05);
     ctx.beginPath();
     if (typeof ctx.roundRect === 'function') {
         ctx.roundRect(mid - half, mid - half, size, size, size * 0.22);
@@ -237,14 +267,20 @@ function drawCenterDiceAffordance() {
     ctx.fill();
     ctx.stroke();
 
-    // Pips (a "5" face reads as a dice at a glance).
-    ctx.fillStyle = enabled ? '#1a1a24' : 'rgba(26,26,36,0.6)';
-    const off = size * 0.28;
-    [[-off, -off], [off, -off], [0, 0], [-off, off], [off, off]].forEach(function (p) {
-        ctx.beginPath();
-        ctx.arc(mid + p[0], mid + p[1], r, 0, Math.PI * 2);
-        ctx.fill();
-    });
+    // "ROLL" / "DICE", two bold lines. White fill + a dark outline so the text
+    // reads on green, yellow, blue and red alike. The BACKGROUND pulses; the
+    // text stays at full opacity so it never fades out.
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.round(CELL_SIZE * 0.42)}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    ctx.lineWidth = Math.max(2, CELL_SIZE * 0.08);
+    ctx.strokeStyle = 'rgba(20,20,28,0.85)';
+    ctx.fillStyle = '#ffffff';
+    const l1 = mid - CELL_SIZE * 0.26;
+    const l2 = mid + CELL_SIZE * 0.26;
+    ctx.strokeText('ROLL', mid, l1); ctx.fillText('ROLL', mid, l1);
+    ctx.strokeText('DICE', mid, l2); ctx.fillText('DICE', mid, l2);
     ctx.restore();
 }
 
@@ -256,36 +292,74 @@ function drawCenterTriangles() {
     ctx.fillStyle = COLORS.red; ctx.beginPath(); ctx.moveTo(centerStart, centerEnd); ctx.lineTo(mid, mid); ctx.lineTo(centerEnd, centerEnd); ctx.fill();
 }
 
+// Draw ONE token at an explicit centre + radius (shared by yard and track).
+function drawOneToken(piece, cx, cy, radius) {
+    let canThisPieceMove = false;
+    if (typeof isTokenMovable === 'function') {
+        canThisPieceMove = isTokenMovable(piece.color, piece.token, piece.index);
+    }
+    ctx.save();
+    if (canThisPieceMove) {
+        ctx.globalAlpha = globalBlinkAlpha;
+        ctx.fillStyle = '#ffffff'; ctx.beginPath();
+        ctx.arc(cx, cy, radius + 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx + 1, cy + 1, radius, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COLORS[piece.color]; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, cy, radius * 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+}
+
 function drawAllTokens() {
-    // 1. Cluster all active pieces by their current grid cell position
+    // 1. Cluster the tokens that are OUT on the track by their grid cell. Tokens
+    //    still in the home yard are handled separately so they can stay big.
     let gridOccupancyMap = {};
+    const yardPieces = [];
 
     Object.keys(tokens).forEach(color => {
         if (!isSeatActive(color)) return; // 2P: inactive seats show NO tokens
         tokens[color].forEach((token, index) => {
             if (token.stepsWalked >= 57) return; // Hide completed tokens that reached the center
-
+            const piece = { color: color, token: token, index: index };
+            if (typeof isTokenInHomeYard === 'function' && isTokenInHomeYard(color, token)) {
+                yardPieces.push(piece);
+                return;
+            }
             const coordKey = `${token.c}_${token.r}`;
             if (!gridOccupancyMap[coordKey]) gridOccupancyMap[coordKey] = [];
-            gridOccupancyMap[coordKey].push({ color: color, token: token, index: index });
+            gridOccupancyMap[coordKey].push(piece);
         });
     });
 
-    // 2. Render clustered pieces with dynamic side-by-side offsets
+    // 2. HOME YARD tokens: keep the big size, spread in a fixed 2x2 around the
+    //    home circle so the bigger pawns never overlap each other. The layout is
+    //    purely positional, so a captured token that returns home (pathIndex -1)
+    //    grows back to this size on the very next frame.
+    yardPieces.forEach(piece => {
+        const start = YARD_START[piece.color] || YARD_START.green;
+        const cx = (start.c + 3) * CELL_SIZE;
+        const cy = (start.r + 3) * CELL_SIZE;
+        const d = CELL_SIZE * TOKEN_YARD_SPREAD;
+        const slot = piece.index % 4;
+        const dx = (slot === 0 || slot === 2) ? -d : d;
+        const dy = (slot < 2) ? -d : d;
+        drawOneToken(piece, cx + dx, cy + dy, CELL_SIZE * TOKEN_RADIUS_FACTOR);
+    });
+
+    // 3. TRACK tokens: fitted to the box, with the 2x2 shrink when several share
+    //    one box, so a big home token never spills onto the next box out here.
     Object.keys(gridOccupancyMap).forEach(coordKey => {
-        let occupants = gridOccupancyMap[coordKey];
-        let totalOccupantsCount = occupants.length;
+        const occupants = gridOccupancyMap[coordKey];
+        const totalOccupantsCount = occupants.length;
 
         occupants.forEach((piece, subIndex) => {
             let baseCenterX = (piece.token.c * CELL_SIZE) + (CELL_SIZE / 2);
             let baseCenterY = (piece.token.r * CELL_SIZE) + (CELL_SIZE / 2);
-            let radius = CELL_SIZE * TOKEN_RADIUS_FACTOR;
+            let radius = CELL_SIZE * TOKEN_PATH_RADIUS_FACTOR;
 
-            // Apply dynamic rendering offsets if multiple tokens occupy the same cell
-            if (totalOccupantsCount > 1 && piece.token.pathIndex !== -1) {
-                radius = CELL_SIZE * TOKEN_STACK_RADIUS_FACTOR; // Shrink pawn radius (stacked)
-                
-                // Distribute layout coordinates symmetrically in a 2x2 grid format inside the cell square
+            if (totalOccupantsCount > 1) {
+                radius = CELL_SIZE * TOKEN_STACK_RADIUS_FACTOR;
                 let offsetShift = CELL_SIZE * 0.22;
                 if (subIndex === 0) { baseCenterX -= offsetShift; baseCenterY -= offsetShift; }
                 if (subIndex === 1) { baseCenterX += offsetShift; baseCenterY -= offsetShift; }
@@ -293,23 +367,7 @@ function drawAllTokens() {
                 if (subIndex === 3) { baseCenterX += offsetShift; baseCenterY += offsetShift; }
             }
 
-            let canThisPieceMove = false;
-            if (typeof isTokenMovable === 'function') {
-                canThisPieceMove = isTokenMovable(piece.color, piece.token, piece.index);
-            }
-
-            ctx.save();
-            if (canThisPieceMove) {
-                ctx.globalAlpha = globalBlinkAlpha;
-                ctx.fillStyle = '#ffffff'; ctx.beginPath();
-                ctx.arc(baseCenterX, baseCenterY, radius + 3, 0, Math.PI * 2); ctx.fill();
-            }
-
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(baseCenterX + 1, baseCenterY + 1, radius, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = COLORS[piece.color]; ctx.beginPath(); ctx.arc(baseCenterX, baseCenterY, radius, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(baseCenterX, baseCenterY, radius * 0.4, 0, Math.PI * 2); ctx.fill();
-            ctx.restore();
+            drawOneToken(piece, baseCenterX, baseCenterY, radius);
         });
     });
 }
@@ -347,7 +405,9 @@ function runBlinkAnimationEngine() {
     } else {
         globalBlinkAlpha -= 0.05; if (globalBlinkAlpha <= 0.3) blinkGrowing = true;
     }
-    const needsBlink = anyTokenBlinkNeeded();
+    // The loop also runs while the centre die should blink (a human seat's turn),
+    // so the pulse is alive exactly when a roll is possible.
+    const needsBlink = anyTokenBlinkNeeded() || canRollNow();
     // While dice are on the board the physics loop owns rendering (it self
     // renders every tick), so the blink loop stands down to avoid double
     // drawing the whole canvas. It is restarted by the drawLudoLayout wrapper
@@ -363,14 +423,11 @@ function runBlinkAnimationEngine() {
     }
 }
 
-// Centre tap -> the SAME roll path as #diceBtn. Guarded on the button's own
-// disabled state, so:
-//   - it only fires when a manual roll is actually allowed (your turn, dice not
-//     yet rolled, match running, online);
-//   - after the roll the button is disabled, so a centre tap falls through to
-//     the normal token-movement click;
-//   - the engine's isDiceRolled/hasRolledThisTurn guard blocks any same-tick
-//     double trigger, so centre + button can never roll twice.
+// Centre tap -> the ONLY roll control now (the old #diceBtn is removed). The
+// guard mirrors the engine's own rules (your turn, dice not rolled yet, match
+// running, online); after a roll this returns false, so a centre tap falls
+// through to the normal token-movement click. rollDiceEngine keeps its own
+// isDiceRolled / hasRolledThisTurn guard, so no double roll is possible.
 function handleCenterRollTap(event) {
     if (!canvas || !CELL_SIZE) return;
     const rect = canvas.getBoundingClientRect();
@@ -381,7 +438,7 @@ function handleCenterRollTap(event) {
     const row = Math.floor(y / CELL_SIZE);
     if (col < CENTER_HIT_CELLS[0] || col >= CENTER_HIT_CELLS[1]) return;
     if (row < CENTER_HIT_CELLS[0] || row >= CENTER_HIT_CELLS[1]) return;
-    if (!centerRollEnabled()) return; // not your roll (or already rolled)
+    if (!canRollNow()) return; // not your roll (or already rolled)
     if (typeof rollDiceEngine === 'function') rollDiceEngine('CENTER_TAP');
 }
 
