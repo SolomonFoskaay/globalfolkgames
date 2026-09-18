@@ -413,6 +413,73 @@
       "args": []
     },
     {
+      "name": "admin_fix_core_premium",
+      "docs": [
+        "Admin correction (2026-09): SET the core's premium balances outright and",
+        "optionally clear the plan. Repairs an account corrupted by the 2026-08",
+        "frontend bug that credited an absurd premium amount, and covers refunds.",
+        "Admin-gated: the payer must equal the core's stored admin_authority."
+      ],
+      "discriminator": [
+        97,
+        91,
+        14,
+        211,
+        127,
+        217,
+        22,
+        104
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_authority"
+        },
+        {
+          "name": "core",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  102,
+                  103,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "lifetime",
+          "type": "u64"
+        },
+        {
+          "name": "spendable",
+          "type": "u64"
+        },
+        {
+          "name": "clear_plan",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "ai_chess_move",
       "docs": [
         "House-signed on-chain AI reply (single player). The signer must be the",
@@ -8285,91 +8352,96 @@
     },
     {
       "code": 6018,
+      "name": "CreditTooLarge",
+      "msg": "credit exceeds the on-chain maximum (single credit or lifetime ceiling)"
+    },
+    {
+      "code": 6019,
       "name": "InvalidCompetition",
       "msg": "invalid competition configuration"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "NotCreator",
       "msg": "only the competition creator can do this"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "CompetitionNotClosed",
       "msg": "competition must be closed before winners are recorded"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "CompetitionNotSettled",
       "msg": "competition must be settled before paying winners"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "RankOutOfRange",
       "msg": "prize rank is out of range for this competition"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "NotAdmin",
       "msg": "premium points credit requires the admin authority signer"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "DuplicateCreditRef",
       "msg": "premium points credit_ref already used (duplicate credit guard)"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "InsufficientPremiumBalance",
       "msg": "insufficient premium spendable balance"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "AlreadyActive",
       "msg": "subscription already active - one plan at a time, re-upgrade only after expiry"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "NeedsUpgrade",
       "msg": "premium account needs upgrade_premium_points (v2 layout) first"
     },
     {
-      "code": 6028,
+      "code": 6029,
       "name": "DuplicateAffiliatePeriod",
       "msg": "affiliate period for this referral already recorded"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "AffiliateOnceOnly",
       "msg": "affiliate reward is one-time per referral (first upgrade only)"
     },
     {
-      "code": 6030,
+      "code": 6031,
       "name": "DuplicateHandle",
       "msg": "profile handle already taken"
     },
     {
-      "code": 6031,
+      "code": 6032,
       "name": "InvalidHandle",
       "msg": "profile handle is invalid (5-24 chars, letters/numbers only)"
     },
     {
-      "code": 6032,
+      "code": 6033,
       "name": "NoLives",
       "msg": "no lives left today - refill at midnight GMT or go Premium"
     },
     {
-      "code": 6033,
+      "code": 6034,
       "name": "IllegalMove",
       "msg": "illegal chess move"
     },
     {
-      "code": 6034,
+      "code": 6035,
       "name": "NotYourTurn",
       "msg": "not your turn"
     },
     {
-      "code": 6035,
+      "code": 6036,
       "name": "CoreBucketsFull",
       "msg": "player core bucket table is full (24 games); open a page-2 core"
     }

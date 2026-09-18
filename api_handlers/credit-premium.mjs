@@ -38,7 +38,13 @@ export default async function handler(req, res) {
       return;
     }
     if (!body.player) throw new Error('missing "player" pubkey');
+    // Upper bound matters: the 2026-08 bug passed a unix TIMESTAMP as the
+    // amount (1,787,192,740), which credited a live account with ~1.8 billion
+    // points. The program now hard-caps a single credit; this is the matching
+    // server-side guard so a bad caller is rejected before any signing.
+    const MAX_CREDIT_POINTS = 1_000_000;
     if (!Number.isInteger(body.points) || body.points <= 0) throw new Error('invalid points');
+    if (body.points > MAX_CREDIT_POINTS) throw new Error(`points exceed the ${MAX_CREDIT_POINTS} per-credit maximum`);
     if (!Number.isInteger(body.creditRef) || body.creditRef <= 0) throw new Error('invalid creditRef');
     const result = await handleCreditPremium(body.player, body.points, body.creditRef);
     res.status(200).json(result);

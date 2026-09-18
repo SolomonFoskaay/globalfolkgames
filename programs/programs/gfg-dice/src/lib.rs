@@ -566,6 +566,22 @@ pub mod gfg_dice {
         Ok(())
     }
 
+    /// Admin correction (2026-09): SET the core's premium balances outright and
+    /// optionally clear the plan. Repairs an account corrupted by the 2026-08
+    /// frontend bug that credited an absurd premium amount, and covers refunds.
+    /// Admin-gated: the payer must equal the core's stored admin_authority.
+    pub fn admin_fix_core_premium(
+        ctx: Context<CoreAdminCtx>,
+        lifetime: u64,
+        spendable: u64,
+        clear_plan: bool,
+    ) -> Result<()> {
+        let c = &mut ctx.accounts.core;
+        require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        c.fix_premium(lifetime, spendable, clear_plan)?;
+        Ok(())
+    }
+
     /// Spend from the core's per-game local spendable bucket (gasless ER).
     /// Additive mirror of spend_local; the retired per-game PDA is never used.
     pub fn spend_core_local(
@@ -3888,6 +3904,8 @@ pub enum PointsError {
     SignupAlreadyClaimed,
     #[msg("unsupported subscription level (2 or 3 at launch)")]
     InvalidLevel,
+    #[msg("credit exceeds the on-chain maximum (single credit or lifetime ceiling)")]
+    CreditTooLarge,
     #[msg("invalid competition configuration")]
     InvalidCompetition,
     #[msg("only the competition creator can do this")]

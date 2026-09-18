@@ -18,6 +18,14 @@ use ephemeral_rollups_sdk::ephem::MagicIntentBundleBuilder;
 pub const CORE_SEED: &[u8] = b"gfgcore";
 pub const CORE_BUCKETS: usize = 24;
 pub const CORE_DEFAULT_POOL: u16 = 5;
+/// Highest plan level (the config ladder tops out at L3). An unvalidated level
+/// once reached 112 on a live account; the boundary now refuses it.
+pub const MAX_PLAN_LEVEL: u8 = 3;
+/// Hard ceiling for a SINGLE premium credit. A frontend bug once credited an
+/// absurd amount to one account; this makes a repeat impossible ON-CHAIN.
+pub const MAX_PREMIUM_CREDIT: u64 = 1_000_000;
+/// Hard ceiling for the accumulated premium lifetime on one account.
+pub const MAX_PREMIUM_LIFETIME: u64 = 100_000_000;
 
 /// One per-game bucket: 24 bytes. Keyed by the 8-byte game tag so no numeric
 /// registry exists and a new game needs no program change. A runtime vector of
@@ -196,7 +204,8 @@ impl PlayerCore {
     ) -> Result<()> {
         self.premium_lifetime = self.premium_lifetime.checked_add(lifetime).ok_or(crate::PointsError::Overflow)?;
         self.premium_spendable = self.premium_spendable.checked_add(spendable).ok_or(crate::PointsError::Overflow)?;
-        if self.subscription_active_until == 0 && until > 0 {
+        // A junk level (e.g. 112 from the 2026-08 bug) is never carried over.
+        if self.subscription_active_until == 0 && until > 0 && level >= 1 && level <= MAX_PLAN_LEVEL {
             self.subscription_level = level;
             self.subscription_active_until = until;
             self.lives_pool = if level >= 3 { 15 } else if level == 2 { 10 } else { 5 };
@@ -209,9 +218,25 @@ impl PlayerCore {
     /// this for promos; a purchase activates the plan directly (no middleman).
     pub fn credit_premium(&mut self, points: u64, credit_ref: u64) -> Result<()> {
         require!(self.last_credit_ref != credit_ref, crate::PointsError::DuplicateCreditRef);
-        self.premium_lifetime = self.premium_lifetime.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        // HARD CAPS (on-chain, not client-side): one credit can never be absurd,
+        // and the lifetime can never accumulate past a sane ceiling.
+        require!(points <= MAX_PREMIUM_CREDIT, crate::PointsError::CreditTooLarge);
+        let next_lifetime = self.premium_lifetime.checked_add(points).ok_or(crate::PointsError::Overflow)?;
+        require!(next_lifetime <= MAX_PREMIUM_LIFETIME, crate::PointsError::CreditTooLarge);
+        self.premium_lifetime = next_lifetime;
         self.premium_spendable = self.premium_spendable.checked_add(points).ok_or(crate::PointsError::Overflow)?;
         self.last_credit_ref = credit_ref;
+        Ok(())
+    }
+
+    /// Admin correction (2026-09): SET the premium balances outright and
+    /// optionally clear the plan. Used to repair an account corrupted by the
+    /// 2026-08 frontend bug that credited an absurd premium amount, and to
+    /// issue refunds/corrections. Admin-gated at the instruction boundary.
+    pub fn fix_premium(&mut self, lifetime: u64, spendable: u64, clear_plan: bool) -> Result<()> {
+        self.premium_lifetime = lifetime;
+        self.premium_spendable = spendable;
+        if clear_plan { self.cancel_plan()?; }
         Ok(())
     }
 
@@ -219,6 +244,9 @@ impl PlayerCore {
     /// no premium-points middleman, no second click). Lives pool follows the
     /// tier (free/other 5, L2 10, L3 15).
     pub fn activate_plan(&mut self, level: u8, until: i64) -> Result<()> {
+        // The ladder tops out at L3. Without this a bad caller could park any
+        // u8 level on the account (a live account once held level 112).
+        require!(level <= MAX_PLAN_LEVEL, crate::PointsError::InvalidLevel);
         self.subscription_level = level;
         self.subscription_active_until = until;
         self.lives_pool = if level >= 3 { 15 } else if level == 2 { 10 } else { 5 };
