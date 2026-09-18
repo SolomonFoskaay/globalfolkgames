@@ -53,3 +53,28 @@ Batched per game (100 games sharing one open tx and one settle tx): about
 **0.000019 USDC**, roughly **50,000 games per USDC**. Single (unbatched) game:
 about 0.005 USDC. This confirms the batching design beats the 0.0001 USD/game
 target by roughly 5x.
+
+## Phase 2 — PlayerCore + sponsored (gasless) session, measured 2026-09-18
+
+- PlayerCore (single per-player account): `0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc`
+  (admin = the self-hosted relayer `0xAd0A4348...86EB4`).
+
+Full game, sponsored by our own relayer (`node scripts/arc-relayer.mjs`):
+
+| Action | Gas | USDC |
+| --- | --- | --- |
+| openGame (match starts, TTL) | 96,937 | 0.002423425 |
+| commitSeed (dice locked) | 46,041 | 0.001151025 |
+| chargeLife (one life) | 94,403 | 0.002360075 |
+| revealSeed (dice revealed) | 48,554 | 0.001213850 |
+| recordPoints (bucket + global) | 104,925 | 0.002623125 |
+| settleGame (match ends) | 50,494 | 0.001262350 |
+| **total per game (unbatched)** | | **0.011033850** |
+
+The player signed nothing and paid nothing (balance unchanged). On-chain result
+verified: life 1/5, bucket pure 100, global lifetime 100, roll derived from the
+revealed seed.
+
+Cost falls sharply with batching: the open and the settle become one tx for many
+games (about 0.00002 USDC each per game), and the per-player writes cluster the
+same way, so a batched game is roughly 0.0001 USDC or less.

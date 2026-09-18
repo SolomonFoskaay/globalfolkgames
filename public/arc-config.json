@@ -10,7 +10,8 @@
       "usdcDecimalsErc20": 6,
       "contracts": {
         "gameRegistry": "0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb",
-        "randomness": "0xb406295b4F7E5B513b656122AfFF29AF720E9E23"
+        "randomness": "0xb406295b4F7E5B513b656122AfFF29AF720E9E23",
+        "playerCore": "0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc"
       }
     }
   }
