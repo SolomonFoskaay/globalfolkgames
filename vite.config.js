@@ -58,6 +58,7 @@ export default defineConfig({
         'changelog-architecture-v2-arcv2m13': './changelog/architecture-v2-arcv2m13.html',
         'changelog-architecture-v2-arcv2m14': './changelog/architecture-v2-arcv2m14.html',
         'changelog-architecture-v2-arcv2m15': './changelog/architecture-v2-arcv2m15.html',
+        'changelog-architecture-v2-arcv2m16': './changelog/architecture-v2-arcv2m16.html',
         agm: './agm/index.html',
         competitions: './competitions/index.html',
         games: './games/index.html',
