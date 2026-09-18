@@ -25,6 +25,31 @@
 
         <div class="dash-grid">
 
+        <section class="game-card" style="border:1px solid rgba(155,89,182,0.4);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Your wallets</h3>
+            </div>
+            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-top:4px; margin-bottom:10px;">These are the wallets behind your sign-in. Tap an address or its Copy button to copy it.</p>
+
+            <div style="margin-bottom:10px;">
+                <div style="font-size:0.72rem; color:#888; margin-bottom:4px; font-weight:700;">EVM wallet (Arc)</div>
+                <div style="display:flex; align-items:center; gap:8px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; cursor:pointer; user-select:all;" id="evm-wallet-chip" title="Tap to copy EVM wallet address">
+                    <span id="evm-wallet-address" style="flex:1; font-family:monospace; font-size:0.82rem; color:#7838f8; word-break:break-all;">Checking wallet...</span>
+                    <button id="evm-wallet-copy-btn" type="button" style="background:#7838f8; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:0.75rem; font-weight:bold; cursor:pointer; flex-shrink:0;" title="Copy EVM wallet address to clipboard">Copy</button>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-size:0.72rem; color:#888; margin-bottom:4px; font-weight:700;">Solana wallet</div>
+                <div style="display:flex; align-items:center; gap:8px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; cursor:pointer; user-select:all;" id="wallet-chip" title="Tap to copy wallet address">
+                    <span id="wallet-address" style="flex:1; font-family:monospace; font-size:0.82rem; color:#f87818; word-break:break-all;">Checking wallet...</span>
+                    <button id="wallet-copy-btn" type="button" style="background:#7838f8; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:0.75rem; font-weight:bold; cursor:pointer; flex-shrink:0;" title="Copy wallet address to clipboard">Copy</button>
+                </div>
+            </div>
+
+            <p id="wallet-copy-msg" style="color:var(--muted); font-size:0.75rem; margin-top:6px;"></p>
+        </section>
+
         <section class="game-card">
             <h3>Welcome to your profile</h3>
             <p style="color:var(--muted); font-size:0.88rem; line-height:1.6; margin-top:8px;">Use the menu on the left to explore the details of your profile:</p>
@@ -35,18 +60,6 @@
                 <li><a href="/profile/affiliate.html" style="color:#f87818;">Affiliate earnings</a> (referral link + 20% on-chain earnings)</li>
                 <li><a href="/profile/activity.html" style="color:#f87818;">On-chain activity</a> (every roll and reward, verifiable)</li>
             </ul>
-        </section>
-
-        <section class="game-card" style="border:1px solid rgba(155,89,182,0.4);">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Your on-chain wallet</h3>
-            </div>
-            <p style="color:var(--muted); font-size:0.82rem; line-height:1.5; margin-top:4px; margin-bottom:10px;">This is the wallet behind your sign-in. Every roll and reward is recorded on this address. Tap it or the copy button to copy it.</p>
-            <div style="display:flex; align-items:center; gap:8px; background:#1a1a24; border:1px solid #333; border-radius:8px; padding:10px 12px; cursor:pointer; user-select:all;" id="wallet-chip" title="Tap to copy wallet address">
-                <span id="wallet-address" style="flex:1; font-family:monospace; font-size:0.82rem; color:#f87818; word-break:break-all;">Checking wallet...</span>
-                <button id="wallet-copy-btn" type="button" style="background:#7838f8; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:0.75rem; font-weight:bold; cursor:pointer; flex-shrink:0;" title="Copy wallet address to clipboard">Copy</button>
-            </div>
-            <p id="wallet-copy-msg" style="color:var(--muted); font-size:0.75rem; margin-top:6px;"></p>
         </section>
 
         </div>
@@ -75,36 +88,35 @@
 
             const statusEl = document.getElementById('profile-status');
 
-            const walletChip = document.getElementById('wallet-chip');
-            const walletAddrEl = document.getElementById('wallet-address');
-            const walletCopyBtn = document.getElementById('wallet-copy-btn');
+            // --- Wallets: EVM (Arc) first, then Solana ---
+            const evmChip = document.getElementById('evm-wallet-chip');
+            const evmAddrEl = document.getElementById('evm-wallet-address');
+            const evmCopyBtn = document.getElementById('evm-wallet-copy-btn');
+            const solChip = document.getElementById('wallet-chip');
+            const solAddrEl = document.getElementById('wallet-address');
+            const solCopyBtn = document.getElementById('wallet-copy-btn');
             const walletCopyMsg = document.getElementById('wallet-copy-msg');
 
-            // Resolve the connected wallet the same way the changelog and header
-            // do, so the profile always reflects the signed-in chain identity.
-            // Normalizes to a STRING address (Dynamic may return an object with
-            // an `.address` property, which would render as "[object Object]").
-            function currentWallet() {
+            // Normalizes an SDK wallet (string OR object with .address) to a
+            // STRING so nothing ever renders as "[object Object]".
+            function readAddr(getter) {
                 try {
-                    let addr = null;
-                    if (window.getDynamicSolanaWallet) {
-                        const w = window.getDynamicSolanaWallet();
-                        if (w) addr = (typeof w === 'string') ? w : (w.address ? String(w.address) : null);
-                    }
-                    if (!addr && window.currentProfile && window.currentProfile.solana_wallet) {
-                        addr = String(window.currentProfile.solana_wallet);
-                    }
-                    return addr;
-                } catch (e) { /* ignore */ }
+                    if (typeof getter !== 'function') return null;
+                    const w = getter();
+                    if (!w) return null;
+                    return (typeof w === 'string') ? w : (w.address ? String(w.address) : null);
+                } catch (e) { return null; }
+            }
+            function evmWallet() { return readAddr(window.getDynamicEvmWallet); }
+            function solWallet() {
+                const a = readAddr(window.getDynamicSolanaWallet);
+                if (a) return a;
+                if (window.currentProfile && window.currentProfile.solana_wallet) return String(window.currentProfile.solana_wallet);
                 return null;
             }
 
-            function copyWallet() {
-                const addr = currentWallet();
-                if (!addr) {
-                    walletCopyMsg.textContent = 'No wallet connected yet.';
-                    return;
-                }
+            function copyText(addr, el) {
+                if (!addr) { walletCopyMsg.textContent = 'No wallet connected yet.'; return; }
                 const done = () => { walletCopyMsg.textContent = 'Wallet copied!'; };
                 const fail = () => { walletCopyMsg.textContent = 'Press and hold to copy manually.'; };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -114,7 +126,7 @@
                     // fall back to a select-all prompt so the user can copy.
                     try {
                         const range = document.createRange();
-                        range.selectNodeContents(walletAddrEl);
+                        range.selectNodeContents(el);
                         const sel = window.getSelection();
                         sel.removeAllRanges();
                         sel.addRange(range);
@@ -123,54 +135,53 @@
                 }
             }
 
-            function renderWallet() {
-                const addr = currentWallet();
-                if (!addr) {
-                    if (window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet())) {
-                        walletAddrEl.textContent = 'Wallet still restoring...';
-                        walletCopyMsg.textContent = 'Your wallet is loading. If it stays here, tap Copy after it appears.';
-                        walletChip.title = 'Wallet is loading';
-                    } else {
-                        walletAddrEl.textContent = 'No wallet connected yet.';
-                        walletCopyMsg.textContent = 'Sign in above to see your wallet address.';
-                    }
-                    return;
+            function renderOne(addr, el, chip, label) {
+                if (!el) return false;
+                if (addr) {
+                    el.textContent = addr;
+                    el.title = addr;
+                    if (chip) chip.title = 'Tap to copy ' + label + ' address';
+                    return true;
                 }
-                walletAddrEl.textContent = addr;
-                walletAddrEl.title = addr;
-                walletChip.title = 'Tap to copy wallet address';
-                walletCopyMsg.textContent = '';
+                const loading = !!(window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()));
+                el.textContent = loading ? 'Wallet still restoring...' : 'No wallet connected yet.';
+                return false;
             }
 
-            if (walletChip) walletChip.addEventListener('click', copyWallet);
-            if (walletCopyBtn) walletCopyBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                copyWallet();
-            });
+            function renderWallets() {
+                const gotEvm = renderOne(evmWallet(), evmAddrEl, evmChip, 'EVM');
+                const gotSol = renderOne(solWallet(), solAddrEl, solChip, 'Solana');
+                if (walletCopyMsg && (gotEvm || gotSol)) walletCopyMsg.textContent = '';
+            }
 
-                        // Re-render the wallet when auth changes (sign-in / sign-out on the
+            if (evmChip) evmChip.addEventListener('click', () => copyText(evmWallet(), evmAddrEl));
+            if (evmCopyBtn) evmCopyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(evmWallet(), evmAddrEl); });
+            if (solChip) solChip.addEventListener('click', () => copyText(solWallet(), solAddrEl));
+            if (solCopyBtn) solCopyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(solWallet(), solAddrEl); });
+
+            // Re-render the wallets when auth changes (sign-in / sign-out on the
             // same page) or the header refreshes the session.
             const safeRender = function () { try { if (typeof render === 'function') render(); } catch (e) { /* ignore */ } };
             safeRender();
-            renderWallet();
+            renderWallets();
             if (window.refreshAuthHeader) {
                 window.refreshAuthHeader().then(() => {
                     safeRender();
-                    renderWallet();
-                }).catch(() => { safeRender(); renderWallet(); });
+                    renderWallets();
+                }).catch(() => { safeRender(); renderWallets(); });
             }
             if (typeof window.addEventListener === 'function') {
-                window.addEventListener('gfg:auth-changed', () => { safeRender(); renderWallet(); });
+                window.addEventListener('gfg:auth-changed', () => { safeRender(); renderWallets(); });
             }
 
             // Dynamic restores a silent session AFTER DOMContentLoaded; a bounded
-            // poll keeps the wallet chip + status honest (no RPC involved, just
-            // the client), so the body never stays stuck "signed out" while the
+            // poll keeps both wallet rows honest (no RPC involved, just the
+            // client), so the body never stays stuck "signed out" while the
             // header already shows the user as signed in.
             let walletPoll = 0;
-            (function pollWallet() {
-                if (currentWallet()) { safeRender(); renderWallet(); return; }
-                if (walletPoll++ < 36) setTimeout(pollWallet, 500); // ~18s budget
+            (function pollWallets() {
+                if (evmWallet() || solWallet()) { safeRender(); renderWallets(); return; }
+                if (walletPoll++ < 36) setTimeout(pollWallets, 500); // ~18s budget
             })();
         });
     </script>
