@@ -8,7 +8,9 @@
     "dev:tunnel": "node scripts/dev-tunnel.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "relay": "node scripts/relay-server.mjs"
+    "relay": "node scripts/relay-server.mjs",
+    "evm:build": "cd evm && forge build",
+    "evm:test": "cd evm && forge test"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.1.2",
