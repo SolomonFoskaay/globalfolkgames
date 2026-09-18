@@ -343,6 +343,44 @@ Daily Ludo Earn, all launch gates in that order) -> arcv2m9
 -> S3 rails (on-ramp, cosmetics) -> S4 ads -> S5 stake -> S6 licence. Never
 build ahead of its module status.
 
+## Arc track (osv1Arc, owner decision 2026-09-18)
+
+The project is going all-in on **Arc** (Circle's EVM L1 where USDC is the gas
+token) on the **`osv1Arc`** branch. Solana is frozen on `osv1` as the fallback.
+
+- **One chain in production at a time.** A game needs one home for points,
+  tiers, competitions and the backer NFT, so never run Solana and Arc together,
+  and never give a user two wallets. Decide with test numbers first; flip
+  production only once, when proven.
+- **The player experience does not change:** email signup, auto wallet, play,
+  earn, never pay gas. The app sponsors the tiny fee. Only the layer behind the
+  UI changes.
+- **Keep the frontend and game logic chain-agnostic.** Ludo/chess logic stays
+  shared. New code lives in an `evm/` folder plus a small chain adapter. Do NOT
+  delete the Solana code: it stays in place (unused) so a revert stays trivial.
+- **Structure:** ONE module list (arcv2m1..m15) plus a `rails` dimension
+  (`svm` live, `evm` proposed). New module **arcv2m16 "EVM rail (Arc)"** owns
+  the adapter, the Solidity contracts, the paymaster, the batching, the TTL and
+  the build phases. Never duplicate the module tree per chain.
+- **Phases are build order, not modules.** arcv2m1A already means "per-game
+  sub-module of the game core" (Ludo locked, Ayo planned), so never reuse those
+  letters for phases.
+- **Arc facts (verified 2026-09-18):** Testnet chain id 5042002,
+  `https://rpc.testnet.arc.io`, faucet `faucet.circle.com`; Mainnet chain id
+  5042, `https://rpc.mainnet.arc.io`. USDC is gas (min 20 Gwei). NO on-chain
+  randomness (`PREVRANDAO` returns 0), so dice need a batched commit/reveal or a
+  beacon. ERC-4337 paymasters (Alchemy/Biconomy/Pimlico/Dynamic) replace
+  MagicBlock ER for gasless. Contract size cap 24 KB (EIP-170), so contracts
+  must be split. Native USDC is 18 decimals while the ERC-20 view is 6, so never
+  mix the two in one calculation.
+- **Test on Vercel preview deployments, never by moving production.** Push
+  `osv1Arc` and use the branch preview URL; add that origin to Dynamic and set
+  the Preview env vars (Arc chain + Arc RPC + paymaster key). Production stays
+  on the Solana line until Arc is proven, so revert is automatic.
+- **Research first:** the fee findings live in the Research library
+  (`/changelog/research.html`); the build phases belong to arcv2m16, and
+  architecture.json changes need the owner's explicit approval.
+
 ## Core architecture (current)
 
 - **Player identity:** Solana wallet via Dynamic wallet (email OTP). Session-key
@@ -722,12 +760,19 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
 - **No cron / no external automation (HARD RULE):** NEVER introduce Vercel cron jobs, scheduled workflows, or Supabase-triggered automation to move game/economy state. Everything that automated (affiliate monthly settlement, competition window rolls, payouts) is run MANUALLY by the owner: an admin dashboard button or a local script (`node scripts/...`). Paid/subscription flows stay manual-on-chain like today. If a task would need a cron/scheduler to work, STOP and tell the owner that route is being proposed (they may decline); it is never added silently.
 - **No new platform/stack without telling the owner:** before introducing any new backing service, dependency, or infra (e.g. a scheduler, queue, external API), explicitly state in the plan that it is a NEW dependency and get approval. The current stack is fixed: Solana/Anchor + MagicBlock ER (gasless), Vite, Node, Vercel (one function), dynamic-auth, Supabase (backup/restore only, never live truth).
 - **Never amend a pushed commit without explicit owner approval.** If the commit is already on the remote, make a new commit instead.
-- **Open-source branch + PR-only merges (HARD RULE, 2026):** the repo is public
-  and `main` is protected. All work now happens on the `osv1` branch (open
-  source version 1). Commit and push to `osv1`, then open a pull request from
-  `osv1` to `main`; the OWNER merges. Never commit or push directly to `main`.
+- **Open-source branches + PR-only merges (HARD RULE, updated 2026-09-18):** the
+  repo is public and `main` is protected. There are now TWO rails:
+  - **Solana (FROZEN):** the `osv1` branch is the known-good Solana build and is
+    frozen (no new features). The immutable fallback is the tag
+    `solana-working-2026-09-18`. Do not develop on `osv1` anymore.
+  - **Arc (ACTIVE):** all work now happens on the `osv1Arc` branch. Commit and
+    push to `osv1Arc`, then open a pull request from `osv1Arc` to `main`; the
+    OWNER merges. Never commit or push directly to `main`. Keep using `osv1Arc`
+    until the owner explicitly starts a new line.
   The agent creates the branch, commits, pushes, and opens the PR, but the owner
-  reviews and merges. Keep using `osv1` until the owner explicitly starts a v2.
+  reviews and merges. Only ONE chain is live in production at a time (a game
+  needs a single home for points, tiers and the backer NFT), so never run Solana
+  and Arc in production together, and never give a user two wallets.
 - **Always ask before pushing or opening a PR (HARD RULE):** after committing,
   the agent MUST ASK the owner before `git push` and before opening a pull
   request. Do not push or open a PR automatically; confirm first, every time.
