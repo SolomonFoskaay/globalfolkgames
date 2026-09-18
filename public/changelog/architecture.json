@@ -741,6 +741,43 @@
         "REUSE: called by arcv2m5 (subscriptions) and arcv2m14 (AGM); the games and the seam are untouched.",
         "DEPENDENCIES: arcv2m5, arcv2m6, arcv2m7, arcv2m14, arcv2m3 (Player Core), and the ER (gasless, PDA-signed transfers)."
       ]
+    },
+    {
+      "id": "arcv2m16",
+      "title": "EVM rail (Arc): chain adapter, contracts, gasless paymaster, batching",
+      "status": "planned",
+      "summary": "The chain-agnostic rail that lets the same web2 experience (email signup, auto wallet, play, earn, never pay gas) run on Arc, Circle EVM L1 where USDC is the gas token. One module list, two rails: every other module keeps its rules and gains a rails entry saying how it is implemented on each chain. Game mechanics, scoring, economics and the UX do not change; only the layer behind the UI is swapped.",
+      "expectedInput": {
+        "summary": "What arcv2m16 receives from upstream modules and from the owner.",
+        "items": [
+          "FROM arcv2m2 SEAM: the same gfg:game-result@1 envelope every game already emits. The rail never reads game internals.",
+          "FROM the game engines (arcv2m1): deterministic match state plus signed move states (browser), so only the start and the end need the chain.",
+          "FROM THE OWNER: approval of the Chain Portability Map before Phase 0, and of each phase gate (measured cost) before the next phase."
+        ]
+      },
+      "expectedOutput": {
+        "summary": "What arcv2m16 produces for the platform.",
+        "items": [
+          "A chain adapter (src/chain/) with ONE interface and two implementations (svm = Solana as today, evm = Arc), selected by a config switch (VITE_GFG_CHAIN).",
+          "Arc contracts (evm/): Game Registry with batched open/settle Merkle roots, TTL plus permissionless expire, batched randomness (one seed per batch, rolls derived by hash), points/lives/premium state, and ERC-4337 paymaster wiring.",
+          "A measured Arc Testnet cost report (deploy, per open, per settle, per batch at N=1/20/100/1000, sponsored cost per game), which is the gate for mainnet.",
+          "Every other module gains a rails entry (svm live, evm planned/live) with a one-line implementation note. No module is duplicated per chain."
+        ]
+      },
+      "details": [
+        "CHAIN PORTABILITY MAP (must be approved before Phase 0): per module, how the Solana account model maps to EVM. Game rules, scoring, tiers, competition rules and the UX do not change; only the implementation does.",
+        "GASLESS: an ERC-4337 smart account plus a paymaster (Alchemy Gas Manager, or Pimlico/Biconomy) replaces MagicBlock ER delegation. The app sponsors the tiny fee; the player never holds gas. Paymaster caps replace the relay spend caps.",
+        "RANDOMNESS: Arc has no on-chain randomness (PREVRANDAO returns 0). One seed is committed per batch and revealed at settle; each roll is hash(seed, gameId, counter). No per-roll randomness cost.",
+        "MOVES: off-chain signed states (free). Only start and end touch the chain. A short dispute window protects players.",
+        "BATCHING: opens and results are collected into Merkle roots; one transaction commits many games (O(1) gas). Target about 0.0001 USD per game, roughly 1 USD per tens of thousands of games.",
+        "MAX GAME TIME: every game carries deadline = start + MAX_TTL. After it, expire(gameId) is permissionless, so abandoned games never grow the tree. No cron.",
+        "NO VERCEL COMPUTE: the game engine runs in the browser; Vercel stays static hosting plus the existing thin endpoints. Batch submission is permissionless.",
+        "CONTRACT SIZE: 24 KB per contract (EIP-170), so contracts are split by module concern.",
+        "DECIMALS: Arc native USDC is 18-decimal while the ERC-20 view is 6-decimal. One canonical accounting rule, never mix the two.",
+        "BRANCH: built on osv1Arc. The agent pushes osv1Arc only; the owner opens the PR to main and approves go-live.",
+        "PHASES (build order, not modules): Phase 0 scaffold plus local tests; Phase 1 one Ludo match on Arc Testnet plus measured cost; Phase 2 gasless paymaster plus sponsored cost; Phase 3 batching plus TTL plus scale cost; Phase 4 viability report; Phase 5 mainnet deploy and flip each module rails.evm to live.",
+        "RESEARCH SOURCE: the fee findings live in the Research library (/changelog/research.html, research/arc). This module holds the build."
+      ]
     }
   ],
   "rules": [
@@ -772,6 +809,21 @@
     "4. arcv2m7 LAUNCH SIMPLEST (launch gate): one entry per account per window, active Level-2 plan required, dynamic pluggable spendable-requirement list, window-fresh leaderboard, daily pool $1-equiv Nigeria N1,500 (1st N500 cash, 2nd N300 cash, 3rd N200 cash, 4th-8th N100 airtime each), public leaderboard, manual payout.",
     "5. arcv2m7 full game-agnostic competition platform (after launch stable): multi-game select, pluggable payout (airtime / manual / escrow).",
     "6. arcv2m8 sponsor escrow plugin (program proof already exists) - attached only when a brand wants an escrowed prize.",
-    "7. arcv2m9 player inventory (after launch stable): on-chain assets wallet, per-game catalogs."
-  ]
+    "7. arcv2m9 player inventory (after launch stable): on-chain assets wallet, per-game catalogs.",
+    "8. arcv2m16 EVM rail (Arc): adapter, contracts, paymaster, batching, TTL. Built on osv1Arc; testnet first, mainnet only on measured viability."
+  ],
+  "rails": {
+    "svm": {
+      "name": "Solana (MagicBlock ER)",
+      "status": "live",
+      "chain": "solana-devnet",
+      "note": "Frozen on the osv1 branch. The fallback."
+    },
+    "evm": {
+      "name": "Arc (Circle EVM, USDC gas)",
+      "status": "proposed",
+      "chain": "arc-testnet",
+      "note": "Built on the osv1Arc branch. Proven on testnet before any production flip."
+    }
+  }
 }
