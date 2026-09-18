@@ -765,8 +765,9 @@
         ]
       },
       "details": [
+        "PLAYERCORE (owner 2026-09-18): ONE contract per chain holding each player's lives, points, premium and per-game buckets, keyed by address, mirroring the Solana Player Core (one account per player, not one account per feature per game). Matches and randomness are separate on purpose (shared services), exactly like the Solana board accounts and the shared VRF.",
         "CHAIN PORTABILITY MAP (must be approved before Phase 0): per module, how the Solana account model maps to EVM. Game rules, scoring, tiers, competition rules and the UX do not change; only the implementation does.",
-        "GASLESS: an ERC-4337 smart account plus a paymaster (Alchemy Gas Manager, or Pimlico/Biconomy) replaces MagicBlock ER delegation. The app sponsors the tiny fee; the player never holds gas. Paymaster caps replace the relay spend caps.",
+        "GASLESS (owner decision 2026-09-18): the APP pays the tiny USDC gas directly through its own self-hosted relayer. No paid third-party sponsorship plan (Dynamic sponsorship, Alchemy Gas Manager, Pimlico) is required. An ERC-4337 paymaster is optional later, never a dependency. The player never holds or pays gas. Goal: as cheap as MagicBlock ER or cheaper, because we run ONE relayer instead of many per-player accounts.",
         "RANDOMNESS: Arc has no on-chain randomness (PREVRANDAO returns 0). One seed is committed per batch and revealed at settle; each roll is hash(seed, gameId, counter). No per-roll randomness cost.",
         "MOVES: off-chain signed states (free). Only start and end touch the chain. A short dispute window protects players.",
         "BATCHING: opens and results are collected into Merkle roots; one transaction commits many games (O(1) gas). Target about 0.0001 USD per game, roughly 1 USD per tens of thousands of games.",
