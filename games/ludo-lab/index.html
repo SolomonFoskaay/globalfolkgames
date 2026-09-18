@@ -145,13 +145,14 @@
 
                 <!-- Rearranged Mobile Action Dashboard Row Grid -->
                 <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex: 1;">
-                    <!-- 1. Dice Button First -->
-                    <button id="diceBtn" onclick="rollDiceEngine()" style="background: #f87818; color: #000; border: none; width: 45px; height: 40px; border-radius: 8px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 6px rgba(0,0,0,0.4);" disabled>🎲</button>
+                    <!-- The old #diceBtn is REMOVED (owner 2026-09): the board
+                         centre is now the single dice source of truth, so there
+                         is no second roll control to double-tap or desync. -->
 
-                    <!-- 2. Start Match / Match Active Button Second -->
+                    <!-- 1. Start Match / Match Active Button -->
                     <button id="startMatchBtn" onclick="initiateArenaMatch()" style="background: #2ecc71; color: #fff; border: none; padding: 0 10px; height: 40px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.4); white-space: nowrap;">Start Arena Match</button>
 
-                    <!-- 3. Pause/Resume Button Last -->
+                    <!-- 2. Pause/Resume Button Last -->
                     <button id="pauseBtn" class="panel-control-btn" onclick="toggleArenaPauseState()">⏸ Pause</button>
                 </div>
             </div>
