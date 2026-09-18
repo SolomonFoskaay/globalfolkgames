@@ -14,6 +14,15 @@ const COLORS = {
     dark: '#1a1a1a'
 };
 
+// COSMETICS (owner 2026-09, off-chain only: rendering, never mechanics).
+// (a) Box separators: darker + DOUBLE thickness so each box reads clearly.
+const GRID_LINE_COLOR = '#2f2f3a';
+const GRID_LINE_WIDTH = 2;
+// (b) Token size: DOUBLE the previous radius (was CELL_SIZE * 0.35).
+const TOKEN_RADIUS_FACTOR = 0.70;
+// Stacked tokens still shrink, but keep inside the 2x2 cluster offsets.
+const TOKEN_STACK_RADIUS_FACTOR = 0.20;
+
 // Purely cosmetic arrow overlays (native Ludo look). NEVER affect mechanics:
 // they only tell the player which way pieces travel (clockwise track) and
 // which way the home column leads into the center.
@@ -32,7 +41,7 @@ function drawLudoLayout() {
 
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            ctx.strokeStyle = COLORS.gray; ctx.lineWidth = 1;
+            ctx.strokeStyle = GRID_LINE_COLOR; ctx.lineWidth = GRID_LINE_WIDTH;
             ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
     }
@@ -59,6 +68,7 @@ function drawLudoLayout() {
     drawCell(6, 13, COLORS.red); 
 
     drawCenterTriangles();
+    drawCenterDiceAffordance();
     drawPathArrows();
     drawAllTokens();
 }
@@ -121,7 +131,8 @@ function drawPathArrows() {
 
 function drawCell(col, row, color) {
     ctx.fillStyle = color; ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    ctx.strokeStyle = COLORS.gray; ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    ctx.strokeStyle = GRID_LINE_COLOR; ctx.lineWidth = GRID_LINE_WIDTH;
+    ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
 // function drawBigYard(startCol, startRow, color) {
@@ -189,6 +200,54 @@ function drawBigYard(startCol, startRow, colorName) {
     }
 }
 
+// CENTRE AS A DICE BUTTON (owner 2026-09, COSMETIC + input only; mechanics
+// untouched). The middle 3x3 block draws a die face so the idle centre reads as
+// a tappable roll button. Tapping it calls the SAME rollDiceEngine() as the
+// existing #diceBtn, so both stay in sync and the engine's own guards (plus the
+// button's disabled state) make a double roll impossible. The original dice
+// button stays in place until the owner confirms this one feels right.
+const CENTER_HIT_CELLS = [6, 9]; // cols/rows 6..8 = the centre 3x3 block
+
+function centerRollEnabled() {
+    try {
+        const btn = document.getElementById('diceBtn');
+        return !!(btn && !btn.disabled);
+    } catch (e) { return false; }
+}
+
+function drawCenterDiceAffordance() {
+    const mid = 7.5 * CELL_SIZE;
+    const enabled = centerRollEnabled();
+    const size = CELL_SIZE * 1.5;
+    const half = size / 2;
+    const r = CELL_SIZE * 0.22;
+
+    ctx.save();
+    ctx.globalAlpha = enabled ? 0.98 : 0.55;
+    // Die face (white rounded square, like the physical dice on the board).
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = enabled ? '#f39c12' : 'rgba(60,72,88,0.5)';
+    ctx.lineWidth = enabled ? Math.max(2, CELL_SIZE * 0.07) : Math.max(1.5, CELL_SIZE * 0.05);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(mid - half, mid - half, size, size, size * 0.22);
+    } else {
+        ctx.rect(mid - half, mid - half, size, size);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // Pips (a "5" face reads as a dice at a glance).
+    ctx.fillStyle = enabled ? '#1a1a24' : 'rgba(26,26,36,0.6)';
+    const off = size * 0.28;
+    [[-off, -off], [off, -off], [0, 0], [-off, off], [off, off]].forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(mid + p[0], mid + p[1], r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.restore();
+}
+
 function drawCenterTriangles() {
     const centerStart = 6 * CELL_SIZE; const centerEnd = 9 * CELL_SIZE; const mid = 7.5 * CELL_SIZE;
     ctx.fillStyle = COLORS.green; ctx.beginPath(); ctx.moveTo(centerStart, centerStart); ctx.lineTo(mid, mid); ctx.lineTo(centerStart, centerEnd); ctx.fill();
@@ -220,11 +279,11 @@ function drawAllTokens() {
         occupants.forEach((piece, subIndex) => {
             let baseCenterX = (piece.token.c * CELL_SIZE) + (CELL_SIZE / 2);
             let baseCenterY = (piece.token.r * CELL_SIZE) + (CELL_SIZE / 2);
-            let radius = CELL_SIZE * 0.35;
+            let radius = CELL_SIZE * TOKEN_RADIUS_FACTOR;
 
             // Apply dynamic rendering offsets if multiple tokens occupy the same cell
             if (totalOccupantsCount > 1 && piece.token.pathIndex !== -1) {
-                radius = CELL_SIZE * 0.18; // Shrink pawn radius
+                radius = CELL_SIZE * TOKEN_STACK_RADIUS_FACTOR; // Shrink pawn radius (stacked)
                 
                 // Distribute layout coordinates symmetrically in a 2x2 grid format inside the cell square
                 let offsetShift = CELL_SIZE * 0.22;
@@ -304,9 +363,35 @@ function runBlinkAnimationEngine() {
     }
 }
 
+// Centre tap -> the SAME roll path as #diceBtn. Guarded on the button's own
+// disabled state, so:
+//   - it only fires when a manual roll is actually allowed (your turn, dice not
+//     yet rolled, match running, online);
+//   - after the roll the button is disabled, so a centre tap falls through to
+//     the normal token-movement click;
+//   - the engine's isDiceRolled/hasRolledThisTurn guard blocks any same-tick
+//     double trigger, so centre + button can never roll twice.
+function handleCenterRollTap(event) {
+    if (!canvas || !CELL_SIZE) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+    const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+    const col = Math.floor(x / CELL_SIZE);
+    const row = Math.floor(y / CELL_SIZE);
+    if (col < CENTER_HIT_CELLS[0] || col >= CENTER_HIT_CELLS[1]) return;
+    if (row < CENTER_HIT_CELLS[0] || row >= CENTER_HIT_CELLS[1]) return;
+    if (!centerRollEnabled()) return; // not your roll (or already rolled)
+    if (typeof rollDiceEngine === 'function') rollDiceEngine('CENTER_TAP');
+}
+
 function initBoard() {
     canvas = document.getElementById('ludoCanvas'); if (!canvas) return;
     ctx = canvas.getContext('2d'); CELL_SIZE = canvas.width / GRID_SIZE;
+    // Registered before movement.js's own canvas click (script order), and
+    // movement.js returns early while the dice are unrolled, so a centre tap
+    // can never be treated as a token tap.
+    canvas.addEventListener('click', handleCenterRollTap);
     drawLudoLayout();
 }
 

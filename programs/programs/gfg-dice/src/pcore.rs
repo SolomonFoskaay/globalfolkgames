@@ -111,7 +111,14 @@ impl PlayerCore {
     /// or premium active) draws nothing but stamps the ref. Callers charge only
     /// on a real transition so a retry can never double-charge.
     pub fn charge_life(&mut self, now: i64, match_ref: u64) -> Result<()> {
-        if self.unlimited_until > 0 && self.unlimited_until > now {
+        // Unlimited when EITHER the lives window (unlimited_until) or an active
+        // M5 booster (booster_active_until) is live. The booster used to write
+        // only booster_active_until, which this gate ignored, so a paying
+        // booster player was still charged lives on-chain while the UI showed
+        // unlimited. (Fix 2026-09; no layout change.)
+        if (self.unlimited_until > 0 && self.unlimited_until > now)
+            || (self.booster_active_until > 0 && self.booster_active_until > now)
+        {
             self.last_life_ref = match_ref;
             self.last_life_ts = now;
             return Ok(());

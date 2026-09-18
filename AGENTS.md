@@ -491,7 +491,14 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   the FULL list with done items marked `[x]`, pending `[ ]`, and the single
   current step marked `[•]` (in progress). Never output only the delta. On
   interruption/resume, output the current full todo status first, then continue.
-  This keeps long, interrupted work recoverable.
+  This keeps long, interrupted work recoverable. **NESTED + PERSISTENT (owner
+  2026-09):** mirror the owner's numbering exactly (`(1)`, `(1i)`, `(1ii)`,
+  `(2)`, `(2i)`, ...). A todo GROWS, it is never broken apart: when fixing a
+  parent uncovers sub-issues, append them under the SAME parent (`(2iii)`,
+  `(2iv)`) and keep the parent open until every sub-step is truly done. Never
+  renumber, merge, flatten, or spin sub-issues out into new top-level todos, and
+  never work out of order (no digression). Full nested list re-output on every
+  report/commit/push.
 - **Two views of every feature, always:**
   - *Dev view (admin):* precise, technical details (bullets) — what's changing
     under the hood, files, trade-offs, remaining work.
