@@ -499,6 +499,17 @@ Node 18 + web3.js needs `"overrides": {"uuid": "^8.3.2"}` in package.json
   renumber, merge, flatten, or spin sub-issues out into new top-level todos, and
   never work out of order (no digression). Full nested list re-output on every
   report/commit/push.
+- **Research library (HARD RULE, see .opencode/rules/research.md).** The staff
+  **Research** workspace (`/changelog/research.html`, data
+  `public/changelog/research.json`) holds pre-architecture explorations the
+  owner reads on mobile and decides on later (currently Arc mainnet migration
+  and earned trading cards). The agent MUST: (a) always ASK before filing any
+  research/analysis into it, never auto-add; (b) read it and check for pending
+  (`researching`/`parked`) research BEFORE adding a new module to
+  `architecture.json` or updating an existing module, and surface anything
+  relevant to the owner FIRST; (c) keep it mobile-friendly (every table in the
+  scrollable `.research-table-wrap`, no horizontal page overflow) and never put
+  secrets or unfixed security detail in it (client-served).
 - **Two views of every feature, always:**
   - *Dev view (admin):* precise, technical details (bullets) — what's changing
     under the hood, files, trade-offs, remaining work.

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Research | GlobalFolkGames</title>
+    <meta property="og:title" content="Research | GlobalFolkGames">
+    <meta property="og:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/changelog/research.html">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Research | GlobalFolkGames">
+    <meta name="twitter:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
+    <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        /* Research library styles (mobile-first). Tables scroll INSIDE their card
+           so a wide table never makes the page wider than the phone screen. */
+        .research-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+        .research-card { display: block; text-decoration: none; color: inherit; background: var(--card-bg, #1a1a24); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; }
+        .research-card:active { transform: scale(0.995); }
+        .research-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+        .research-card-title { margin: 2px 0 6px; font-size: 1.02rem; }
+        .research-card-summary { margin: 0 0 10px; color: var(--muted, #aaa); font-size: 0.86rem; line-height: 1.55; }
+        .research-card-open { color: #f87818; font-weight: 700; font-size: 0.84rem; }
+        .research-entry { overflow-wrap: anywhere; word-break: break-word; }
+        .research-h4 { margin: 16px 0 6px; font-size: 0.98rem; color: #f87818; }
+        .research-p { margin: 6px 0; font-size: 0.88rem; line-height: 1.6; color: var(--muted, #bbb); }
+        .research-list { margin: 6px 0 6px 18px; padding: 0; font-size: 0.86rem; line-height: 1.65; color: var(--muted, #bbb); }
+        .research-list li { margin-bottom: 5px; }
+        .research-decision { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: rgba(243,156,18,0.10); border: 1px solid rgba(243,156,18,0.35); color: #ffe1a1; font-size: 0.84rem; font-weight: 600; }
+        .research-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 10px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; }
+        .research-table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 0.8rem; }
+        .research-table th, .research-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+        .research-table th { color: #f87818; font-weight: 800; white-space: nowrap; }
+        .research-table tr:last-child td { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content changelog-page admin">
+        <section class="changelog-head">
+            <a href="/dashboard/" class="changelog-back">← Dashboard</a>
+            <h2>Research, staff workspace</h2>
+            <p class="changelog-sub">Pre-architecture research. These are things being explored BEFORE any module is added to the architecture, kept here so they can be re-read on mobile and used as guidance when a direction is adopted (for example the Arc migration). Adding an entry is a decision, so the agent always asks first.</p>
+            <div class="changelog-meta">
+                <span id="changelog-role" class="changelog-role"></span>
+                <a href="/changelog/architecture-v2.html" class="changelog-admin-link">Architecture V2 →</a>
+                <a href="/changelog/economics.html" class="changelog-admin-link">Game Economics →</a>
+            </div>
+        </section>
+
+        <div id="research-items" class="changelog-entries">
+            <p class="empty">Checking access…</p>
+        </div>
+
+        <p style="margin-top:16px; font-size:0.8rem; color:#888;">
+            <a href="/changelog/research.html" style="color:#f87818;">Research (this workspace)</a>
+            &nbsp;·&nbsp; <a href="/changelog/architecture-v2.html" style="color:#7838f8;">Architecture V2</a>
+            &nbsp;·&nbsp; <a href="/changelog/economics.html" style="color:#2ecc71;">Game Economics</a>
+        </p>
+    </main>
+
+    <!-- Global scripts (needed for points + auth → wallet role) -->
+    <script src="/global_header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/changelog/research.js"></script>
+    <script src="/changelog/research-nav.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.requireStaffAccess) {
+                const role = await window.requireStaffAccess();
+                if (role && window.renderResearch) window.renderResearch();
+            } else if (window.renderResearch) {
+                window.renderResearch();
+            }
+            if (window.GFG_RESEARCH_NAV) window.GFG_RESEARCH_NAV.render();
+        });
+    </script>
+</body>
+</html>

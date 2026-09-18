@@ -55,6 +55,11 @@
                 { key: 'arch-v2', label: '🚀 Architecture V2', href: '/changelog/architecture-v2.html' }
             ] });
         }
+        if (!sections.some(sec => (sec.items || []).some(it => it.key === 'research'))) {
+            sections.push({ heading: 'Research', items: [
+                { key: 'research', label: '🔬 Research (pre-architecture)', href: '/changelog/research.html' }
+            ] });
+        }
         if (!sections.some(sec => (sec.items || []).some(it => it.key === 'run-sheet'))) {
             sections.push({ heading: 'Tools', items: [
                 { key: 'run-sheet', label: '🧾 Launch run sheet', href: '/dashboard/run-sheet.md' }

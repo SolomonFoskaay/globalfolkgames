@@ -30,6 +30,7 @@ export default defineConfig({
         'changelog-admin': './changelog/admin.html',
         'changelog-economics': './changelog/economics.html',
                 'changelog-architecture': './changelog/architecture.html',
+        'changelog-research': './changelog/research.html',
         'changelog-architecture-v2': './changelog/architecture-v2.html',
         'changelog-architecture-arcv1m1': './changelog/architecture-arcv1m1.html',
         'changelog-architecture-arcv1m2': './changelog/architecture-arcv1m2.html',
