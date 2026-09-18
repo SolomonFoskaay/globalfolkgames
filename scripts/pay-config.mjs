@@ -52,12 +52,17 @@ export const USDC_DECIMALS = 6;
 
 // Points credited per paid plan/booster (mirrors the on-chain ladder at
 // 500 pts = $1, based on the ACTUAL price, never the discount).
+// DIRECT ACTIVATION (M5 spec): the paid plan/booster is written to the Player
+// Core in ONE admin instruction right after the payment is verified, so the
+// purchase flow no longer relies on premium points. `points` is kept for the
+// optional promo/admin credit path and for the legacy cards; `level`/`days`
+// and `hours` are the direct-activation targets.
 export const PAY_PLANS = {
-  l1: { points: 5000,  usdCents: 500,  kind: 'plan',  reason: 1 }, // $5 payable / $10 actual -> 5,000P
-  l2: { points: 10000, usdCents: 1000, kind: 'plan',  reason: 1 }, // $10 payable / $20 actual -> 10,000P
-  l3: { points: 15000, usdCents: 1500, kind: 'plan',  reason: 1 }, // $15 payable / $30 actual -> 15,000P
-  b24: { points: 500,   usdCents: 100,  kind: 'booster', reason: 4 }, // 24h unlimited -> 500P
-  b72: { points: 1500,  usdCents: 200,  kind: 'booster', reason: 4 }, // 72h unlimited -> 1,500P
+  l1: { points: 5000,  usdCents: 500,  kind: 'plan',  reason: 1, level: 1, days: 30 }, // Level 1, 30 days
+  l2: { points: 10000, usdCents: 1000, kind: 'plan',  reason: 1, level: 2, days: 30 }, // Level 2, 30 days
+  l3: { points: 15000, usdCents: 1500, kind: 'plan',  reason: 1, level: 3, days: 30 }, // Level 3, 30 days
+  b24: { points: 500,   usdCents: 100, kind: 'booster', reason: 4, hours: 24 }, // 24h unlimited lives
+  b72: { points: 1500,  usdCents: 200, kind: 'booster', reason: 4, hours: 72 }, // 72h unlimited lives
 };
 
 export function payPlan(key) {

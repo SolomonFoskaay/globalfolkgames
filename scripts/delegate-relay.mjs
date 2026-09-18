@@ -638,7 +638,7 @@ export async function handleCancelPremium(playerPubkey) {
 
 // M5 DIRECT activation on the CORE (pay -> active in one step, no premium
 // points). Admin-gated by the core's admin_authority.
-export async function handleAdminActivatePremium(playerPubkey, level = 1, days = 30) {
+export async function handleAdminActivatePremium(playerPubkey, level = 1, days = 30, paymentRef = 0) {
   const player = new PublicKey(playerPubkey);
   if (player.toBase58() !== String(playerPubkey || '').trim()) throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
   const sponsor = loadSponsor();
@@ -647,12 +647,32 @@ export async function handleAdminActivatePremium(playerPubkey, level = 1, days =
   const corePda = await ensureCoreReady(program, conn, sponsor, player);
   const lvl = Math.min(3, Math.max(1, Number(level) || 1));
   const d = Math.min(365, Math.max(1, Number(days) || 30));
+  const ref = new BN(Math.max(0, Number(paymentRef) || 0));
   const { sig, wasDelegated } = await sendCoreAdmin(program, conn, sponsor, player, corePda, (prog, asTx) => {
-    const m = prog.methods.activateCorePlan(lvl, d).accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
+    const m = prog.methods.activateCorePlan(lvl, d, ref).accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
     return asTx ? m.transaction() : m.rpc();
   });
-  console.log(`[relay] activated Level ${lvl} for ${player.toBase58()} on the CORE (${d}d, sig ${sig})`);
-  return { player: player.toBase58(), level: lvl, days: d, sig, wasDelegated, redelegated: false, gasless: wasDelegated };
+  console.log(`[relay] activated Level ${lvl} for ${player.toBase58()} on the CORE (${d}d, ref ${ref.toString()}, sig ${sig})`);
+  return { player: player.toBase58(), level: lvl, days: d, paymentRef: ref.toString(), sig, wasDelegated, redelegated: false, gasless: wasDelegated };
+}
+
+/// DIRECT booster activation (M5): unlimited lives for `hours` (24 or 72),
+/// admin-gated like the plan. `paymentRef` makes a replayed payment a no-op.
+export async function handleAdminActivateBooster(playerPubkey, hours = 72, paymentRef = 0) {
+  const player = new PublicKey(playerPubkey);
+  if (player.toBase58() !== String(playerPubkey || '').trim()) throw new Error('invalid wallet address: base58 is case-sensitive, the string must match the canonical address exactly');
+  const sponsor = loadSponsor();
+  const conn = createConnection(BASE_URL, 'confirmed');
+  const program = new Program(idl, new AnchorProvider(conn, mkWallet(sponsor), { commitment: 'confirmed', skipPreflight: true }));
+  const corePda = await ensureCoreReady(program, conn, sponsor, player);
+  const h = Math.min(720, Math.max(1, Number(hours) || 72));
+  const ref = new BN(Math.max(0, Number(paymentRef) || 0));
+  const { sig, wasDelegated } = await sendCoreAdmin(program, conn, sponsor, player, corePda, (prog, asTx) => {
+    const m = prog.methods.activateCoreBooster(h, ref).accounts({ payer: sponsor.publicKey, playerAuthority: player, core: corePda });
+    return asTx ? m.transaction() : m.rpc();
+  });
+  console.log(`[relay] activated ${h}h booster for ${player.toBase58()} on the CORE (ref ${ref.toString()}, sig ${sig})`);
+  return { player: player.toBase58(), hours: h, paymentRef: ref.toString(), sig, wasDelegated, redelegated: false, gasless: wasDelegated };
 }
 
 // Undelegate the premium PDA back to base (runs commit+undelegate on its

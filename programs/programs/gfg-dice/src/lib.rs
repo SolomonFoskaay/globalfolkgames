@@ -539,20 +539,41 @@ pub mod gfg_dice {
 
     /// DIRECT plan activation (pay -> active in ONE step, no premium points):
     /// set the level + expiry on the core. Admin-gated (verified payment).
-    pub fn activate_core_plan(ctx: Context<CoreAdminCtx>, level: u8, days: u16) -> Result<()> {
+    pub fn activate_core_plan(
+        ctx: Context<CoreAdminCtx>,
+        level: u8,
+        days: u16,
+        payment_ref: u64,
+    ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let c = &mut ctx.accounts.core;
         require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        // DIRECT ACTIVATION (spec M5): the verified payment's ref makes the
+        // activation idempotent, so a re-submitted tx can never extend the plan
+        // twice. payment_ref = 0 means a manual admin op (no guard).
+        if payment_ref != 0 {
+            require!(c.last_credit_ref != payment_ref, PointsError::DuplicateCreditRef);
+            c.last_credit_ref = payment_ref;
+        }
         let until = now + (days as i64) * 86400;
         c.activate_plan(level, until)?;
         Ok(())
     }
 
     /// DIRECT booster activation (unlimited lives for `hours`). Admin-gated.
-    pub fn activate_core_booster(ctx: Context<CoreAdminCtx>, hours: u16) -> Result<()> {
+    /// `payment_ref` guards replay exactly like activate_core_plan.
+    pub fn activate_core_booster(
+        ctx: Context<CoreAdminCtx>,
+        hours: u16,
+        payment_ref: u64,
+    ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let c = &mut ctx.accounts.core;
         require!(ctx.accounts.payer.key() == c.admin_authority, PointsError::NotAdmin);
+        if payment_ref != 0 {
+            require!(c.last_credit_ref != payment_ref, PointsError::DuplicateCreditRef);
+            c.last_credit_ref = payment_ref;
+        }
         let until = now + (hours as i64) * 3600;
         c.activate_booster(until)?;
         Ok(())

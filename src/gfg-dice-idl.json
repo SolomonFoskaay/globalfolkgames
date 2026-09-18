@@ -125,7 +125,8 @@
     {
       "name": "activate_core_booster",
       "docs": [
-        "DIRECT booster activation (unlimited lives for `hours`). Admin-gated."
+        "DIRECT booster activation (unlimited lives for `hours`). Admin-gated.",
+        "`payment_ref` guards replay exactly like activate_core_plan."
       ],
       "discriminator": [
         39,
@@ -175,6 +176,10 @@
         {
           "name": "hours",
           "type": "u16"
+        },
+        {
+          "name": "payment_ref",
+          "type": "u64"
         }
       ]
     },
@@ -236,6 +241,10 @@
         {
           "name": "days",
           "type": "u16"
+        },
+        {
+          "name": "payment_ref",
+          "type": "u64"
         }
       ]
     },
