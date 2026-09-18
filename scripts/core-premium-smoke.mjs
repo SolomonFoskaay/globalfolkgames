@@ -69,13 +69,13 @@ async function main() {
   console.log('[2/5] before:', JSON.stringify(before));
 
   console.log('[3/5] sponsor activates plan L2 for 30 days (admin-gated)...');
-  await erSend(sponsorProg, sponsor, () => sponsorProg.methods.activateCorePlan(2, 30).accounts({ payer: sponsor.publicKey, playerAuthority: host, core: corePda }).transaction());
+  await erSend(sponsorProg, sponsor, () => sponsorProg.methods.activateCorePlan(2, 30, new BN(0)).accounts({ payer: sponsor.publicKey, playerAuthority: host, core: corePda }).transaction());
   await sleep(700);
   const afterPlan = await readCore(corePda);
   console.log('      after plan:', JSON.stringify(afterPlan));
 
   console.log('[4/5] sponsor activates a 72h booster...');
-  await erSend(sponsorProg, sponsor, () => sponsorProg.methods.activateCoreBooster(72).accounts({ payer: sponsor.publicKey, playerAuthority: host, core: corePda }).transaction());
+  await erSend(sponsorProg, sponsor, () => sponsorProg.methods.activateCoreBooster(72, new BN(0)).accounts({ payer: sponsor.publicKey, playerAuthority: host, core: corePda }).transaction());
   await sleep(700);
   const afterBoost = await readCore(corePda);
   console.log('      after booster:', JSON.stringify(afterBoost));
@@ -83,7 +83,7 @@ async function main() {
   console.log('[5/5] non-admin (guest) tries to activate -> must fail...');
   let rejected = false;
   try {
-    await erSend(guestProg, guest, () => guestProg.methods.activateCorePlan(3, 30).accounts({ payer: host, playerAuthority: host, core: corePda }).transaction());
+    await erSend(guestProg, guest, () => guestProg.methods.activateCorePlan(3, 30, new BN(0)).accounts({ payer: host, playerAuthority: host, core: corePda }).transaction());
   } catch (e) { rejected = true; console.log('      rejected:', (e.message || '').slice(0, 80)); }
 
   const now = Math.floor(Date.now() / 1000);

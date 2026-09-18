@@ -24,7 +24,7 @@ import pkg from '@solana/web3.js';
 const { PublicKey, Connection } = pkg;
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { payPlan, payRpcEndpoints, usdcBaseForCents, PAY_TREASURY_PUBKEY, USDC_MINT, PAY_ACCEPTED_DESTINATIONS, PAY_NETWORK } from '../scripts/pay-config.mjs';
-import { handleCreditPremium } from '../scripts/delegate-relay.mjs';
+import { handleAdminActivatePremium, handleAdminActivateBooster } from '../scripts/delegate-relay.mjs';
 import { ensureTreasuryUsdcAta } from './../scripts/delegate-relay.mjs';
 
 const FRESHNESS_MS = 30 * 60 * 1000;    // payment must be < 30 min old
@@ -166,14 +166,34 @@ export async function verifyAndCredit({ owner, plan, txSignature, token }) {
   // if the treasury address or cluster was switched (devnet <-> mainnet swap).
   await ensureTreasuryUsdcAta();
 
-  const result = await handleCreditPremium(oKey.toBase58(), p.points, creditRef, p.reason);
+  // DIRECT ACTIVATION (M5 spec): the verified payment activates the plan or the
+  // booster on the Player Core in ONE admin instruction. Premium points are no
+  // longer part of the purchase flow. creditRef is derived from the tx
+  // signature, and the on-chain payment_ref guard makes a re-submitted tx a
+  // clean no-op (never a double activation / window extension).
+  if (p.kind === 'booster') {
+    const result = await handleAdminActivateBooster(oKey.toBase58(), p.hours || 72, creditRef);
+    return {
+      ok: true,
+      plan,
+      kind: p.kind,
+      activated: 'booster',
+      hours: result && result.hours,
+      paymentRef: String(creditRef),
+      sig: result && result.sig,
+    };
+  }
+
+  const result = await handleAdminActivatePremium(oKey.toBase58(), p.level || 2, p.days || 30, creditRef);
   return {
     ok: true,
     plan,
-    points: p.points,
     kind: p.kind,
-    creditRef,
-    creditSig: result && result.sig,
+    activated: 'plan',
+    level: result && result.level,
+    days: result && result.days,
+    paymentRef: String(creditRef),
+    sig: result && result.sig,
   };
 }
 
