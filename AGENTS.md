@@ -765,14 +765,14 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
   - **Solana (FROZEN):** the `osv1` branch is the known-good Solana build and is
     frozen (no new features). The immutable fallback is the tag
     `solana-working-2026-09-18`. Do not develop on `osv1` anymore.
-  - **Arc (ACTIVE):** all work now happens on the `osv1Arc` branch. Commit and
-    push to `osv1Arc`, then open a pull request from `osv1Arc` to `main`; the
-    OWNER merges. Never commit or push directly to `main`. Keep using `osv1Arc`
-    until the owner explicitly starts a new line.
-  The agent creates the branch, commits, pushes, and opens the PR, but the owner
-  reviews and merges. Only ONE chain is live in production at a time (a game
-  needs a single home for points, tiers and the backer NFT), so never run Solana
-  and Arc in production together, and never give a user two wallets.
+  - **Arc (ACTIVE):** all work now happens on the `osv1Arc` branch. The agent
+    commits and pushes to `osv1Arc` ONLY. The OWNER creates the pull request
+    from `osv1Arc` to `main` and approves it to go live. Never commit or push
+    directly to `main`, and never open a pull request unless the owner asks.
+    Keep using `osv1Arc` until the owner explicitly starts a new line.
+  Only ONE chain is live in production at a time (a game needs a single home for
+  points, tiers and the backer NFT), so never run Solana and Arc in production
+  together, and never give a user two wallets.
 - **Always ask before pushing or opening a PR (HARD RULE):** after committing,
   the agent MUST ASK the owner before `git push` and before opening a pull
   request. Do not push or open a PR automatically; confirm first, every time.
