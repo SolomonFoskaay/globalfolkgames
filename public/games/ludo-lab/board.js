@@ -27,6 +27,20 @@ const TOKEN_PATH_RADIUS_FACTOR = 0.42;   // on the track: fits inside the box
 const TOKEN_STACK_RADIUS_FACTOR = 0.20;  // several tokens stacked on one box
 const TOKEN_YARD_SPREAD = 0.75;          // yard 2x2 offset, keeps big tokens apart
 
+// Darken a hex colour toward black by `factor` (0 = unchanged, 1 = black).
+// Used for the centre-die blink so the pulse stays the SAME hue as the player's
+// colour (never a different colour, so the board colour is never confusing).
+function shadeHex(hex, factor) {
+    try {
+        const h = String(hex).replace('#', '');
+        const r = parseInt(h.slice(0, 2), 16);
+        const g = parseInt(h.slice(2, 4), 16);
+        const b = parseInt(h.slice(4, 6), 16);
+        const k = Math.max(0, Math.min(1, 1 - factor));
+        return 'rgb(' + Math.round(r * k) + ',' + Math.round(g * k) + ',' + Math.round(b * k) + ')';
+    } catch (e) { return hex; }
+}
+
 // Top-left cell of each colour's 6x6 home yard (for the spread home layout).
 const YARD_START = {
     green:  { c: 0, r: 0 },
@@ -171,8 +185,11 @@ function drawBigYard(startCol, startRow, colorName) {
     ctx.fillStyle = inactive ? 'rgba(118,118,128,0.5)' : color;
     ctx.fillRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
 
-    ctx.strokeStyle = COLORS.white;
-    ctx.lineWidth = 2;
+    // Same dark bold edge as the small track boxes (owner 2026-09): the yard
+    // square now reads with the identical line colour + thickness. The yard
+    // FILL (its colour) is untouched.
+    ctx.strokeStyle = GRID_LINE_COLOR;
+    ctx.lineWidth = GRID_LINE_WIDTH;
     ctx.strokeRect(startCol * CELL_SIZE, startRow * CELL_SIZE, CELL_SIZE * 6, CELL_SIZE * 6);
 
     // White circle in the middle of the yard
@@ -245,19 +262,25 @@ function drawCenterDiceAffordance() {
     const size = CELL_SIZE * 1.5;
     const half = size / 2;
 
+    // Blink driver: globalBlinkAlpha pulses 0.3..1.0. The WHOLE die (background,
+    // border and text) blinks together, and the background blinks by shading the
+    // player's OWN colour deeper (same hue) instead of fading to transparent, so
+    // it stays solid, deep and attention-grabbing.
+    const pulse = (typeof globalBlinkAlpha === 'number') ? globalBlinkAlpha : 1;
+
     ctx.save();
-    ctx.globalAlpha = 0.98;
-    // Dice background: white when idle, the current player's colour while it is
-    // their turn (the whole die pulses via globalBlinkAlpha).
     if (active) {
-        ctx.globalAlpha = 0.35 + 0.65 * (typeof globalBlinkAlpha === 'number' ? globalBlinkAlpha : 1);
-        ctx.fillStyle = COLORS[currentTurn] || '#ffffff';
+        const base = COLORS[currentTurn] || '#ffffff';
+        // pulse 1 -> the pure player colour; pulse 0.3 -> a deeper shade of it.
+        ctx.fillStyle = shadeHex(base, 0.45 * (1 - pulse));
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(2, CELL_SIZE * 0.08);
     } else {
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(60,72,88,0.5)';
+        ctx.lineWidth = Math.max(1.5, CELL_SIZE * 0.05);
     }
-    ctx.strokeStyle = active ? 'rgba(255,255,255,0.9)' : 'rgba(60,72,88,0.5)';
-    ctx.lineWidth = active ? Math.max(2, CELL_SIZE * 0.07) : Math.max(1.5, CELL_SIZE * 0.05);
     ctx.beginPath();
     if (typeof ctx.roundRect === 'function') {
         ctx.roundRect(mid - half, mid - half, size, size, size * 0.22);
@@ -267,10 +290,25 @@ function drawCenterDiceAffordance() {
     ctx.fill();
     ctx.stroke();
 
-    // "ROLL" / "DICE", two bold lines. White fill + a dark outline so the text
-    // reads on green, yellow, blue and red alike. The BACKGROUND pulses; the
-    // text stays at full opacity so it never fades out.
-    ctx.globalAlpha = 1;
+    // A halo ring in the same player colour so the die pops out of the board
+    // centre while it blinks (same hue, deeper shade).
+    if (active) {
+        ctx.globalAlpha = 0.35 + 0.45 * pulse;
+        ctx.strokeStyle = shadeHex(COLORS[currentTurn] || '#ffffff', 0.25);
+        ctx.lineWidth = Math.max(2, CELL_SIZE * 0.10);
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(mid - half - CELL_SIZE * 0.10, mid - half - CELL_SIZE * 0.10, size + CELL_SIZE * 0.20, size + CELL_SIZE * 0.20, size * 0.24);
+        } else {
+            ctx.rect(mid - half - CELL_SIZE * 0.10, mid - half - CELL_SIZE * 0.10, size + CELL_SIZE * 0.20, size + CELL_SIZE * 0.20);
+        }
+        ctx.stroke();
+    }
+
+    // "ROLL" / "DICE", two bold lines, white with a dark outline so the text
+    // reads on green, yellow, blue and red alike. The text blinks with the die
+    // (its opacity follows the same pulse) but never drops below readable.
+    ctx.globalAlpha = active ? (0.68 + 0.32 * pulse) : 0.55;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = `900 ${Math.round(CELL_SIZE * 0.42)}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
