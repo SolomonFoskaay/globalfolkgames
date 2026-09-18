@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "relay": "node scripts/relay-server.mjs",
     "evm:build": "cd evm && forge build",
-    "evm:test": "cd evm && forge test"
+    "evm:test": "cd evm && forge test",
+    "arc:wallet": "node scripts/arc-wallet.mjs",
+    "arc:wallet:mainnet": "node scripts/arc-wallet.mjs mainnet",
+    "arc:sponsor:new": "node scripts/arc-sponsor-wallet.mjs"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.1.2",
