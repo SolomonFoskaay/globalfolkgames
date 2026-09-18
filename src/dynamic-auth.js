@@ -5,6 +5,7 @@
 import { createDynamicClient, sendEmailOTP, verifyOTP, logout, getWalletAccounts } from '@dynamic-labs-sdk/client';
 import { generateSessionKeys, getSessionKeys, getSignedSessionId } from '@dynamic-labs-sdk/client/core';
 import { addSolanaExtension } from '@dynamic-labs-sdk/solana';
+import { addEvmExtension } from '@dynamic-labs-sdk/evm';
 import { createWaasWalletAccounts, getChainsMissingWaasWalletAccounts } from '@dynamic-labs-sdk/client/waas';
 
 const ENVIRONMENT_ID = '0fd49c9c-1b54-4dc5-88a0-924dd3607bf3'; // ← your real ID
@@ -18,6 +19,11 @@ const dynamicClient = createDynamicClient({
 });
 
 addSolanaExtension();
+// EVM extension: lets Dynamic create + read the embedded EVM wallet for the
+// Arc rail (Arc / Sepolia) alongside the Solana wallet. Wallet creation stays
+// FREE (no gas sponsorship): the app sponsors gas itself, never a paid
+// third-party sponsorship plan.
+addEvmExtension();
 window.dynamicClient = dynamicClient;
 
 console.log('Dynamic client initialized');
@@ -53,6 +59,32 @@ async function waitForSolanaWallet(timeoutMs = 10000) {
 
 // Expose for profiles.js so it reads the wallet through the same reliable path
 window.getDynamicSolanaWallet = getSolanaWallet;
+
+// Read the current session's embedded EVM wallet address (Arc rail). Dynamic
+// reports EVM accounts with chain === 'EVM'.
+function getEvmWallet() {
+    try {
+        const accounts = getWalletAccounts(dynamicClient);
+        const evm = accounts.find(w => w.chain === 'EVM' && w.address);
+        return evm ? evm.address : null;
+    } catch (e) {
+        console.warn('Could not read EVM wallet', e);
+        return null;
+    }
+}
+
+async function waitForEvmWallet(timeoutMs = 10000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const address = getEvmWallet();
+        if (address) return address;
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    return null;
+}
+
+// Expose so any page can show the EVM wallet next to the Solana one.
+window.getDynamicEvmWallet = getEvmWallet;
 
 // ---------- Session keys ----------
 // Session keys let the embedded wallet sign on-chain actions (VRF dice rolls,
@@ -196,7 +228,7 @@ async function handleVerifyOTP() {
     const missingChains = getChainsMissingWaasWalletAccounts();
     if (missingChains && missingChains.length > 0) {
       await createWaasWalletAccounts({ chains: missingChains });
-      console.log('Embedded Solana wallet created');
+      console.log('Embedded wallets created for:', missingChains.join(', '));
     } else if (!getSolanaWallet()) {
       // No missing chains reported but wallet not visible yet — create for Solana
       await createWaasWalletAccounts({ chains: ['SOL'] });
@@ -206,10 +238,22 @@ async function handleVerifyOTP() {
     console.error('Wallet creation error:', walletErr);
   }
 
-  // Wait until Dynamic exposes the created wallet account, so the profile is
+  // EVM wallet (Arc / Sepolia): ensure it exists so the Arc rail has a session.
+  try {
+    if (!getEvmWallet()) {
+      await createWaasWalletAccounts({ chains: ['EVM'] });
+      console.log('Embedded EVM wallet created');
+    }
+  } catch (evmErr) {
+    console.error('EVM wallet creation error:', evmErr);
+  }
+
+  // Wait until Dynamic exposes the created wallet accounts, so the profile is
   // saved with the real address instead of null.
   const walletAddress = await waitForSolanaWallet();
   console.log('Solana wallet ready:', walletAddress || 'not yet available');
+  const evmWalletAddress = await waitForEvmWallet();
+  console.log('EVM wallet ready:', evmWalletAddress || 'not yet available');
 
   // Ensure session keys exist so future on-chain actions sign without prompts
   const sessionKeys = await ensureSessionKeys();
