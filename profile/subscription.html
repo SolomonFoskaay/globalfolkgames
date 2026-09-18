@@ -65,10 +65,10 @@
             <h3>How to get a plan</h3>
             <ol style="color:var(--muted); font-size:0.85rem; line-height:1.8; padding-left:18px; margin:8px 0 0;">
                 <li>Tap <b style="color:#f87818;">Pay</b> under your plan. This opens the crypto payment guide with simple, beginner-friendly steps (even if you have never used crypto before).</li>
-                <li>You pay from <b style="color:#f87818;">your own embedded wallet</b> on the site, so support always knows it was you - the wallet that pays is the wallet that gets the points.</li>
-                <li>You are redirected to the confirmation page - pick the same plan you paid for and send the receipt to support.</li>
-                <li>Support verifies within 24 hours and credits your premium points on-chain.</li>
-                <li>Go to your <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>, refresh, and tap <b>Activate</b> to start your 30 days.</li>
+                <li>You pay from <b style="color:#f87818;">your own embedded wallet</b> on the site, so the wallet that pays is the wallet that gets the plan.</li>
+                <li>The site checks the payment and activates your plan on-chain in one step, usually within seconds.</li>
+                <li>Your level, lives and rewards start right away. You can follow it on your <a href="/profile/upgrade.html" style="color:#f87818;">Upgrade page</a>.</li>
+                <li>No receipt emails and no waiting: the payment and the activation happen together.</li>
             </ol>
             <p class="fine">No auto-renew and non-refundable. Nothing charges again unless you choose it. All prices are in US dollars (USDC).</p>
         </section>
@@ -76,8 +76,8 @@
         <section class="game-card" style="margin-top:16px;">
             <h3>Common questions</h3>
             <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Why do higher levels cost more?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">Each step up adds bigger rewards: more lives per day, a higher daily reward and win multiplier, and the competition boost (Level 2 = 1.25x, Level 3 = 1.5x). All levels keep ads (you help keep the platform free); higher levels show fewer of them.</p></details>
-            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Is this the price forever?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">The launch beta discount is limited time. The regular price shows struck through on each plan. When the beta ends, the discount is removed. Your activation points always follow the actual price, so the program never needs changing.</p></details>
-            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">I have never used crypto. Is this hard?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">No. Tap Pay and the guide walks you through it in five simple steps. You top up your embedded wallet once with a little SOL (about $1-2 for future fees), fund it with the exact USDC you need, and pay from the site. The wallet that pays is the wallet that gets the points.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Is this the price forever?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">The launch beta discount is limited time. The regular price shows struck through on each plan. When the beta ends, the discount is removed. The price you pay at checkout is the price of the plan, and your payment activates it directly.</p></details>
+            <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">I have never used crypto. Is this hard?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">No. Tap Pay and the guide walks you through it in five simple steps. You top up your embedded wallet once with a little SOL (about $1-2 for future fees), fund it with the exact USDC you need, and pay from the site. The wallet that pays is the wallet that gets the plan.</p></details>
             <details style="margin-top:10px;"><summary style="cursor:pointer; color:#f87818; font-weight:700;">Can I switch plans?</summary><p style="color:var(--muted); font-size:0.84rem; margin-top:6px; line-height:1.6;">You run one plan at a time for its 30 days, then choose what to activate next - no auto-renew, so you are never charged on autopilot.</p></details>
             <p style="margin-top:14px;"><a href="/privacy.html" style="color:#f87818; font-size:0.84rem;">Privacy Policy</a> · <a href="/support/" style="color:#f87818; font-size:0.84rem;">Support</a></p>
         </section>
@@ -120,7 +120,8 @@
                     var hot = lvl === 2;
                     var pop = lvl === 3;
                     var isFree = lvl === 0;
-                    var ptsTxt = (p.activationPremiumCost||0).toLocaleString();
+                    // Direct activation: each paid plan maps to a pay-config key.
+                    var PLAN_KEY = { 1: 'l1', 2: 'l2', 3: 'l3' };
                     var boosts = { 1: 1.0, 2: 1.25, 3: 1.5 };
                     var features = (isFree
                             ? '<b>1x</b> every win · <b>' + p.dailyReward + 'P</b> daily reward · <b>' + p.livesPerDay + '</b> lives a day · full ads'
@@ -135,12 +136,12 @@
                             ? '<div class="price-now" style="color:#2ecc71;">$0 <small>/ free forever</small></div>' +
                               '<div style="font-size:0.78rem; color:#888; margin-top:4px;">Regular <span style="text-decoration:line-through; color:#888;">$' + regTxt + '</span> · every new account starts here</div>'
                             : '<div class="price-now">$' + usdTxt + ' <small>/ 30 days</small></div>' +
-                              '<div style="font-size:0.78rem; color:#888; margin-top:4px;">Regular <span style="text-decoration:line-through; color:#888;">$' + regTxt + '</span> · launch discount · needs <b style="color:#f87818;">' + ptsTxt + ' premium points</b></div>') +
+                              '<div style="font-size:0.78rem; color:#888; margin-top:4px;">Regular <span style="text-decoration:line-through; color:#888;">$' + regTxt + '</span> · launch discount · activates on-chain in one step</div>') +
                         '<div class="benefit-line" style="margin-top:8px;">' + features + '</div>' +
                         (isFree
                             ? '<a class="launch-btn onchain cta" href="/games/">Play free</a>'
-                            : '<a class="launch-btn onchain cta" href="/payment/?plan=' + lvl + '">Pay $' + usdTxt + '</a>' +
-                              '<a class="launch-btn cta" style="background:#1a1a24; border:1px solid #333; color:#bbb;" href="/subscription-paid/">Manual · I have paid</a>') +
+                            : '<a class="launch-btn onchain cta" href="/payment/?plan=' + (PLAN_KEY[lvl] || ('l' + lvl)) + '">Pay $' + usdTxt + '</a>' +
+                              '<a class="launch-btn cta" style="background:#1a1a24; border:1px solid #333; color:#bbb;" href="/subscription-paid/">Manual payment help</a>') +
                         '</div>';
                 });
                 box.innerHTML += '</div>';

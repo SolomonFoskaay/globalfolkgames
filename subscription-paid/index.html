@@ -50,8 +50,8 @@
     <main class="mobile-container">
         <section class="onboarding-billboard">
             <h2>Payment received, thank you!</h2>
-            <p id="pay-hero-line">Your payment has gone through. One last step unlocks your purchase.</p>
-            <p style="font-size:0.78rem; color:#888; margin-top:6px; line-height:1.5;">Beta pricing is limited time. Pick what you paid for below, fill the short form, and our support team credits your account, usually within 24 hours.</p>
+            <p id="pay-hero-line">Your payment has gone through. This page gets it activated if the automatic step did not finish.</p>
+            <p style="font-size:0.78rem; color:#888; margin-top:6px; line-height:1.5;">Beta pricing is limited time. Pick what you paid for below, fill the short form, and support confirms the payment and activates it for you, usually within 24 hours. The automatic path normally activates it in seconds, so this page is only needed if that did not happen.</p>
         </section>
 
         <section class="game-card">
@@ -59,10 +59,10 @@
             <ul class="steps">
                 <li>Fill the short form below. It tells us the plan you paid for and your wallet, so we can match it to your GlobalFolkGames account.</li>
                 <li>Your account email and wallet are filled in for you when you are signed in. If they look empty, sign in with the buttons at the top, then refresh this page.</li>
-                <li id="next-reward-line">Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 1 plan for 30 days.</li>
+                <li id="next-reward-line">Our support team confirms the payment and activates your <b>Level 1 plan</b> for 30 days on-chain for you.</li>
                 <li>You will see your plan on your <a href="/profile/subscription.html" style="color:#f87818;">Premium subscription</a> page (or on the <a href="/profile/booster.html" style="color:#2ecc71;">booster page</a> for the unlimited-lives packs). <b>No auto-renew and non-refundable</b> — nothing charges again without you choosing it.</li>
             </ul>
-            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">All prices are in US dollars (USDC) and are the same for every player. Level 1 (5,000 premium points) is now $5 (regular $10). Level 2 (10,000 premium points) is now $10 (regular $20). Level 3 (15,000 premium points) is now $15 (regular $30). The 24h unlimited-lives booster is $1 for 500 points and the 72h booster is $2 (regular $3) for 1,500 points. Limited time.</p>
+            <p style="font-size:0.78rem; color:#888; margin-top:8px; line-height:1.5; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:8px; padding:8px 10px;">All prices are in US dollars (USDC) and are the same for every player. Level 1 is now $5 (regular $10). Level 2 is now $10 (regular $20). Level 3 is now $15 (regular $30). The 24h unlimited-lives booster is $1 and the 72h booster is $2 (regular $3). Limited time.</p>
         </section>
 
         <section class="game-card" style="border:1px solid var(--accent-purple, #7838f8);">
@@ -90,11 +90,11 @@
 
                 <label for="pay-plan">Plan paid for</label>
                 <select id="pay-plan">
-                    <option value="l1" selected>Level 1 plan — 5,000 premium points</option>
-                    <option value="l2">Level 2 plan — 10,000 premium points</option>
-                    <option value="l3">Level 3 plan — 15,000 premium points</option>
-                    <option value="b24">24h Unlimited Lives booster — 500 premium points</option>
-                    <option value="b72">72h Unlimited Lives booster — 1,500 premium points</option>
+                    <option value="l1" selected>Level 1 plan (30 days)</option>
+                    <option value="l2">Level 2 plan (30 days)</option>
+                    <option value="l3">Level 3 plan (30 days)</option>
+                    <option value="b24">24h Unlimited Lives booster</option>
+                    <option value="b72">72h Unlimited Lives booster</option>
                 </select>
                 <div class="receipt-hint" id="plan-hint">Pick what you paid for. This page handles every plan and booster pack.</div>
 
@@ -138,13 +138,13 @@
 
             var PLAN_AMOUNTS = { l1: 5, l2: 10, l3: 15, b24: 1, b72: 2 };
             var PLAN_NEXT = {
-                'l1': 'Our support team verifies the payment and credits your account. You get <b>5,000 premium points</b> and a Level 1 plan for 30 days.',
-                'l2': 'Our support team verifies the payment and credits your account. You get <b>10,000 premium points</b> and a Level 2 plan for 30 days.',
-                'l3': 'Our support team verifies the payment and credits your account. You get <b>15,000 premium points</b> and a Level 3 plan for 30 days.',
-                'b24': 'Our support team verifies the payment and credits your account with <b>500 premium points</b>. You then activate your <b>24-hour unlimited-lives booster</b> on your upgrade page.',
-                'b72': 'Our support team verifies the payment and credits your account with <b>1,500 premium points</b>. You then activate your <b>72-hour unlimited-lives booster</b> on your upgrade page.'
+                'l1': 'Our support team confirms the payment and activates your <b>Level 1 plan</b> for 30 days on-chain for you.',
+                'l2': 'Our support team confirms the payment and activates your <b>Level 2 plan</b> for 30 days on-chain for you.',
+                'l3': 'Our support team confirms the payment and activates your <b>Level 3 plan</b> for 30 days on-chain for you.',
+                'b24': 'Our support team confirms the payment and switches on your <b>24-hour unlimited-lives booster</b> on-chain for you.',
+                'b72': 'Our support team confirms the payment and switches on your <b>72-hour unlimited-lives booster</b> on-chain for you.'
             };
-            var PLAN_HINTS = { 'l1': 'Level 1: $5 paid (regular $10) for 5,000 premium points.', 'l2': 'Level 2: $10 paid (regular $20) for 10,000 premium points.', 'l3': 'Level 3: $15 paid (regular $30) for 15,000 premium points.', 'b24': '24h Unlimited Lives: $1 for 500 premium points.', 'b72': '72h Unlimited Lives: $2 (regular $3) for 1,500 premium points.' };
+            var PLAN_HINTS = { 'l1': 'Level 1: $5 paid (regular $10).', 'l2': 'Level 2: $10 paid (regular $20).', 'l3': 'Level 3: $15 paid (regular $30).', 'b24': '24h Unlimited Lives: $1.', 'b72': '72h Unlimited Lives: $2 (regular $3).' };
             planEl.addEventListener('change', function () {
                 if (PLAN_AMOUNTS[planEl.value]) {
                     amountEl.value = PLAN_AMOUNTS[planEl.value];
