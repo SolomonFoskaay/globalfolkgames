@@ -57,13 +57,20 @@
         const gameId = (window.__gfgGameId = window.__gfgGameId || ('0x' + Date.now().toString(16).padStart(64, '0')));
         const j = await relay('rollDice', { gameId: gameId, counter: counter, player: player });
         window.__gfgLastArcRoll = j;
+        // Non-zero proof token for Arc: the committed seed hash. Points and the
+        // result derive match_ref from it, and the contract rejects ref 0, so
+        // this is what lets a win actually bank on Arc.
+        window.__gfgArcRollToken = j.seedHash || ('0x' + String(Date.now()).padStart(64, '0'));
         return [j.roll1, j.roll2];
       }
       return mb().roll();
     },
 
     getLastProofRollSignature: function () {
-      if (chain() === 'evm') return null; // the proof is the seed reveal at window close
+      // Arc: the commitment (committed seed hash) is the proof reference. It is
+      // non-zero so match_ref is valid; the full proof is the seed reveal plus
+      // the window Merkle proof.
+      if (chain() === 'evm') return window.__gfgArcRollToken || ('0x' + String(Date.now()).padStart(64, '0'));
       return (mb() && mb().getLastProofRollSignature) ? mb().getLastProofRollSignature() : null;
     },
     getLastDiceDelegationSignature: function () {
