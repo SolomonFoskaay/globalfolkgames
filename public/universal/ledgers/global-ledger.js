@@ -219,7 +219,7 @@
     }
 
     function magicReady() {
-        return !!(window.magicblockDice && typeof window.magicblockDice.recordGlobalPoints === 'function');
+        return !!((window.gfgChain && typeof window.gfgChain.recordGlobal === 'function') || (window.magicblockDice && typeof window.magicblockDice.recordGlobalPoints === 'function'));
     }
 
     async function refreshLedger(force) {
@@ -378,7 +378,7 @@
                 // MULTIPLAYER: credit the seat's OWN wallet when the M3 award
                 // carries an identity (on-chain seat->wallet); solo = device wallet.
                 var gAuth = (award && award.identity) ? award.identity : null;
-                var sig = await window.magicblockDice.recordGlobalPoints(
+                var sig = await (window.gfgChain && window.gfgChain.recordGlobal ? window.gfgChain.recordGlobal : window.magicblockDice.recordGlobalPoints)(
                     0, sourceCode, award.points, award.reason, matchRef, gAuth,
                 );
                 processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
@@ -509,7 +509,7 @@
             var reason = opts.reason || 0;
             var matchRef = opts.matchRef || '0';
             try {
-                var sig = await window.magicblockDice.recordGlobalPoints(
+                var sig = await (window.gfgChain && window.gfgChain.recordGlobal ? window.gfgChain.recordGlobal : window.magicblockDice.recordGlobalPoints)(
                     kind, sourceCode, points, reason, matchRef,
                 );
                 await refreshLedger(true);

@@ -33,6 +33,7 @@ const DICE_SEED = process.env.GFG_Arc_Dice_Seed || '';
 const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
   'function recordPoints(address player, bytes32 tag, uint64 points, uint8 reason, uint64 matchRef)',
+  'function recordGlobal(address player, uint8 kind, uint64 points, uint64 matchRef)',
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
@@ -160,6 +161,13 @@ export default async function handler(req, res) {
         if (pts === null || pts <= 0n || pts > MAX_AWARD) throw new Error('points out of range');
         address = PLAYER_CORE; abi = coreAbi; fn = 'recordPoints';
         args = [getAddress(params.player), tag32(params.tag), pts, Number(params.reason || 1), num(params.matchRef)];
+        break;
+      }
+      case 'recordGlobal': {
+        const gp = num(params.points);
+        if (gp === null || gp <= 0n || gp > MAX_AWARD) throw new Error('points out of range');
+        address = PLAYER_CORE; abi = coreAbi; fn = 'recordGlobal';
+        args = [getAddress(params.player), Number(params.kind || 0), gp, num(params.matchRef)];
         break;
       }
       case 'creditPremium':

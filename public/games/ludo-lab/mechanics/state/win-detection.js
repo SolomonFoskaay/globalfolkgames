@@ -283,10 +283,12 @@
     // write is logged and surfaced in the ceremony as "pending/failed", never
     // blocking the match-ending UX. Returns the receipt Promise (or null).
     function commitGameResultOnchain(proofSig) {
-        if (!window.magicblockDice || typeof window.magicblockDice.recordResult !== 'function') return null;
+        var chain = window.gfgChain || window.magicblockDice;
+        if (!chain || typeof chain.recordResult !== 'function') return null;
         try {
-            const matchRef = (proofSig && typeof window.magicblockDice.matchRefFromSignature === 'function')
-                ? window.magicblockDice.matchRefFromSignature(proofSig) : 0;
+            const matchRef = (proofSig && chain.matchRefFromSignature)
+                ? chain.matchRefFromSignature(proofSig)
+                : ((window.gfgChain && window.gfgChain.isArc) ? Date.now() : 0);
             // Mirror the banked award in the on-chain result record: read M3's
             // award for this match (the landed one, or the in-flight one at
             // worst), so the result's points column matches what M3/M4 banked

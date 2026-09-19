@@ -274,6 +274,19 @@ function toggleArenaPauseState() {
 function lockSetupDropdowns() {
     if (setupConfigurationLocked) return;
     setupConfigurationLocked = true;
+
+    // Arc rail (arcv2m16): charge ONE life at match start through the self-hosted
+    // relayer. On Solana this is a no-op (the life is charged on-chain at
+    // begin/join), so the gateway returns null there.
+    try {
+        if (window.gfgChain && typeof window.gfgChain.isArc === 'function' && window.gfgChain.isArc()) {
+            const arcMatchRef = window.gfgGameMatchRef || Date.now();
+            window.gfgGameMatchRef = arcMatchRef;
+            if (window.gfgChain.chargeLife) {
+                window.gfgChain.chargeLife(arcMatchRef).catch(function (e) { console.warn('[gfgChain] chargeLife failed', e); });
+            }
+        }
+    } catch (e) { /* soft: never block the match start */ }
     matchOver = false;
 
     // New match: arm exactly one fresh provably-fair proof roll (first human turn).
