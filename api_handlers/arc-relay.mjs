@@ -16,15 +16,43 @@
 // can never be turned into a points faucet.
 import { createPublicClient, createWalletClient, defineChain, http, parseAbi, getAddress, formatEther } from 'viem';
 import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
+import { readSolanaCore, coreBalances, hasBalances } from '../scripts/solana-core-read.mjs';
+import { createHash } from 'crypto';
+import { leafOf, buildTree, verifyProof } from '../scripts/arc-merkle.mjs';
+import { enqueue, pending, due, markFlushed, lastFlush, proofFor } from '../scripts/arc-batch-store.mjs';
 import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
+// PUBLIC values (RPC + contract addresses) live in ONE repo file, /arc-config.json,
+// never in env. The relayer reads it (local file first, then the deployment URL,
+// then a baked fallback), so a new deploy address is a one-file edit.
+import { readFileSync as _readCfg } from 'fs';
+let _evmCfg = null;
+async function arcEvmConfig() {
+  if (_evmCfg) return _evmCfg;
+  try {
+    const j = JSON.parse(_readCfg(new URL('../public/arc-config.json', import.meta.url), 'utf8'));
+    _evmCfg = j.rails.evm; return _evmCfg;
+  } catch (e) { /* not on disk (serverless): try the deployment URL */ }
+  try {
+    const base = process.env.GFG_SITE_URL || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : '');
+    if (base) {
+      const r = await fetch(base + '/arc-config.json', { cache: 'no-store' });
+      if (r.ok) { _evmCfg = (await r.json()).rails.evm; return _evmCfg; }
+    }
+  } catch (e) { /* fall through to baked values */ }
+  _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
+    playerCore: '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7',
+    gameRegistry: '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb',
+    randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
+  return _evmCfg;
+}
 const RPC = process.env.GFG_Arc_RPC || 'https://rpc.testnet.arc.io';
 const SPONSOR_KEY = process.env.GFG_Arc_Gasless_Sponsor_Key || '';
-const PLAYER_CORE = process.env.GFG_Arc_PlayerCore || '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7';
-const GAME_REGISTRY = process.env.GFG_Arc_GameRegistry || '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb';
-const RANDOMNESS = process.env.GFG_Arc_Randomness || '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
+
+
+
 const MAX_AWARD = BigInt(process.env.GFG_Arc_MaxAward || '10000');
 const CHAIN_ID = Number(process.env.GFG_Arc_ChainId || 5042002);
 // Dice: one secret window seed, committed BEFORE play and revealed at window
@@ -35,7 +63,7 @@ const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
   'function recordPoints(address player, bytes32 tag, uint64 points, uint8 reason, uint64 matchRef)',
   'function recordGlobal(address player, uint8 kind, uint64 points, uint64 matchRef)',
-  'function migratePlayer(address player, (bytes32,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint8,uint64,uint64) m)',
+  'function migratePlayer(address player, (bytes32 tag, uint64 localPure, uint64 localSpendable, uint64 globalPure, uint64 globalLifetime, uint64 globalSpendable, uint64 premiumLifetime, uint64 premiumSpendable, uint8 level, uint64 activeUntil, uint64 migrationRef) m)',
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
@@ -101,10 +129,105 @@ export default async function handler(req, res) {
   }
 
   try {
-    const chain = defineChain({ id: CHAIN_ID, name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
-    const pub = createPublicClient({ chain, transport: http(RPC) });
+    // Addresses + RPC come from the public config (one repo file), never env.
+    const __evm = await arcEvmConfig();
+    const RPC_URL = __evm.rpc || RPC;
+    const PLAYER_CORE = __evm.contracts.playerCore;
+    const GAME_REGISTRY = __evm.contracts.gameRegistry;
+    const RANDOMNESS = __evm.contracts.randomness;
+    const chain = defineChain({ id: Number(__evm.chainId || CHAIN_ID), name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC_URL] } } });
+    const pub = createPublicClient({ chain, transport: http(RPC_URL) });
     const relayer = accountFor(SPONSOR_KEY);
-    const wallet = createWalletClient({ chain, transport: http(RPC), account: relayer });
+    const wallet = createWalletClient({ chain, transport: http(RPC_URL), account: relayer });
+
+    // LAZY MIGRATION (arcv2m16): a returning player who just got an EVM wallet.
+    // The relayer verifies with Dynamic which Solana wallet belongs to this EVM
+    // address, reads the Solana ledger itself, and migrates idempotently. The
+    // client never supplies amounts, so no one can mint points. Close it any time
+    // with GFG_Arc_Migration_Open=false (for example before/after mainnet).
+    if (action === 'migrateMe') {
+      const __evm2 = await arcEvmConfig();
+      if (String(process.env.GFG_Arc_Migration_Open || 'true') === 'false') {
+        res.status(403).json({ ok: false, error: 'migration is closed' });
+        return;
+      }
+      const evm = getAddress(params.evmAddress || params.player);
+      const dt = process.env.DYNAMIC_API_TOKEN || '';
+      const de = process.env.DYNAMIC_ENV_ID || process.env.DYNAMIC_ENVIRONMENT_ID || '';
+      if (!dt || !de) { res.status(500).json({ ok: false, error: 'Dynamic API not configured' }); return; }
+      const ur = await fetch(`https://app.dynamicauth.com/api/v0/environments/${de}/users?limit=100`, { headers: { Authorization: 'Bearer ' + dt } });
+      if (!ur.ok) throw new Error('Dynamic API ' + ur.status);
+      const uj = await ur.json();
+      let sol = null;
+      for (const u of (uj.users || [])) {
+        const creds = u.verifiedCredentials || [];
+        const ec = creds.find(c => c.chain === 'EVM');
+        const ew = (u.wallets || []).find(w => w.chain === 'EVM');
+        const evmAddr = (ec && ec.address) || (ew && (ew.publicKey || ew.address));
+        if (evmAddr && String(evmAddr).toLowerCase() !== evm.toLowerCase()) continue;
+        const sc = creds.find(c => c.chain === 'SOL');
+        const sw = (u.wallets || []).find(w => w.chain === 'SOL');
+        sol = (sc && sc.address) || (sw && (sw.publicKey || sw.address)) || null;
+        break;
+      }
+      if (!sol) { res.status(404).json({ ok: false, error: 'no Solana wallet found for this Arc address' }); return; }
+      const core = await readSolanaCore(sol).catch(() => null);
+      const b = coreBalances(core, 'ludo');
+      if (!hasBalances(b)) { res.status(200).json({ ok: true, migrated: false, reason: 'nothing to migrate' }); return; }
+      const migrationRef = parseInt(createHash('sha256').update('arc-migrate:' + sol).digest('hex').slice(0, 15), 16);
+      const chain2 = defineChain({ id: Number(__evm2.chainId || 5042002), name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [__evm2.rpc] } } });
+      const pub2 = createPublicClient({ chain: chain2, transport: http(__evm2.rpc) });
+      const relayer2 = accountFor(SPONSOR_KEY);
+      const wallet2 = createWalletClient({ chain: chain2, transport: http(__evm2.rpc), account: relayer2 });
+      const hash2 = await wallet2.writeContract({ address: __evm2.contracts.playerCore, abi: coreAbi, functionName: 'migratePlayer', args: [evm, { ...b, migrationRef }] });
+      const rc2 = await pub2.waitForTransactionReceipt({ hash: hash2 });
+      try { recordArcSpend({ action: 'migrateMe', gas: Number(rc2.gasUsed), usdc: Number(formatEther(rc2.gasUsed * rc2.effectiveGasPrice)), player: evm, gameId: null }); } catch (e) {}
+      res.status(200).json({ ok: true, migrated: true, txHash: hash2, points: b.localPure });
+      return;
+    }
+
+    // WINDOW AGGREGATOR (GFG-BS): collect game leaves and flush ONE transaction
+    // per window. Flush when the batch reaches N games OR the window reaches T.
+    async function flushBatchNow(kind) {
+      const p = pending(kind);
+      if (!p.leaves.length) return { flushed: false, reason: 'empty' };
+      const leaves = p.leaves.map(x => x.leaf);
+      const tree = buildTree(leaves);
+      const items = p.leaves.map(x => ({ gameId: x.gameId, leaf: x.leaf, proof: tree.proofs.get(x.leaf) || [] }));
+      const kindNum = kind === 'settle' ? 1 : 0;
+      const h = await wallet.writeContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'commitBatch', args: [kindNum, tree.root, BigInt(p.leaves.length)] });
+      const rc = await pub.waitForTransactionReceipt({ hash: h });
+      try { recordArcSpend({ action: 'commitBatch:' + kind, gas: Number(rc.gasUsed), usdc: Number(formatEther(rc.gasUsed * rc.effectiveGasPrice)), player: null, gameId: null }); } catch (e) {}
+      markFlushed(kind, tree.root, items);
+      return { flushed: true, root: tree.root, count: p.leaves.length, txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice) };
+    }
+
+    if (action === 'enqueueResult') {
+      const kind = params.kind === 'open' ? 'open' : 'settle';
+      const leaf = leafOf({ gameId: hex32(params.gameId), resultHash: hex32(params.resultHash), points: num(params.points) || 0n, player: getAddress(params.player) });
+      const st = enqueue(kind, leaf, { gameId: hex32(params.gameId), points: String(params.points || 0) });
+      let flushed = null;
+      if (due(kind, { windowMs: Number(params.windowMs || 0) || undefined, maxGames: Number(params.maxGames || 0) || undefined })) {
+        flushed = await flushBatchNow(kind);
+      }
+      res.status(200).json({ ok: true, pending: st.count, startedAt: st.startedAt, flushed });
+      return;
+    }
+    if (action === 'flushBatch') {
+      res.status(200).json({ ok: true, ...(await flushBatchNow(params.kind === 'open' ? 'open' : 'settle')) });
+      return;
+    }
+    if (action === 'batchStat') {
+      const k = params.kind === 'open' ? 'open' : 'settle';
+      const p = pending(k);
+      res.status(200).json({ ok: true, pending: p.leaves.length, startedAt: p.startedAt, last: lastFlush(k) });
+      return;
+    }
+    if (action === 'batchProof') {
+      const hit = proofFor(params.kind === 'open' ? 'open' : 'settle', hex32(params.gameId));
+      res.status(200).json(hit ? { ok: true, root: hit.root, proof: hit.proof, leaf: hit.leaf, flushedAt: hit.flushedAt, valid: verifyProof(hit.leaf, hit.proof, hit.root) } : { ok: false, error: 'no proof yet (still pending or unknown)' });
+      return;
+    }
 
     // Usage summary for the dashboard (raw project data).
     if (action === 'arcUsage') {
