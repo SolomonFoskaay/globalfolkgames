@@ -26,6 +26,9 @@ const GAME_REGISTRY = process.env.GFG_Arc_GameRegistry || '0xC0d3c82994e31d8C97A
 const RANDOMNESS = process.env.GFG_Arc_Randomness || '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
 const MAX_AWARD = BigInt(process.env.GFG_Arc_MaxAward || '10000');
 const CHAIN_ID = Number(process.env.GFG_Arc_ChainId || 5042002);
+// Dice: one secret window seed, committed BEFORE play and revealed at window
+// close. Rolls are derived from it, so they are free and verifiable later.
+const DICE_SEED = process.env.GFG_Arc_Dice_Seed || '';
 
 const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
@@ -44,6 +47,7 @@ const rndAbi = parseAbi([
   'function commitSeed(bytes32 batchId, bytes32 seedHash)',
   'function revealSeed(bytes32 batchId, bytes32 seed)',
 ]);
+const bytes32 = (hexStr) => hexStr;
 const readAbi = parseAbi([
   'function livesOf(address a) view returns (uint16 used, uint16 pool, uint64 boosterUntil, uint64 livesDay)',
   'function globalsOf(address a) view returns (uint64 purePts, uint64 lifetime, uint64 spendable)',
@@ -98,6 +102,30 @@ export default async function handler(req, res) {
     const pub = createPublicClient({ chain, transport: http(RPC) });
     const relayer = accountFor(SPONSOR_KEY);
     const wallet = createWalletClient({ chain, transport: http(RPC), account: relayer });
+
+    // DICE (GFG-BS commit-reveal): roll derived from the window seed, no gas.
+    if (action === 'rollDice') {
+      if (!/^0x[0-9a-fA-F]{64}$/.test(DICE_SEED)) {
+        res.status(500).json({ error: 'dice seed not configured (GFG_Arc_Dice_Seed)' });
+        return;
+      }
+      const gid = hex32(params.gameId);
+      const counter = Number(params.counter || 0);
+      const salt = '0x' + String(counter).padStart(8, '0').padStart(64, '0');
+      const { keccak256, encodePacked } = await import('viem');
+      const h = keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32'], [DICE_SEED, gid, salt]));
+      const b = Buffer.from(h.slice(2), 'hex');
+      const roll1 = (b[0] % 6) + 1;
+      const roll2 = (b[1] % 6) + 1;
+      res.status(200).json({ ok: true, roll1, roll2, counter, seedHash: keccak256(encodePacked(['bytes32'], [DICE_SEED])), chain: 'arc' });
+      return;
+    }
+    if (action === 'diceSeedHash') {
+      if (!/^0x[0-9a-fA-F]{64}$/.test(DICE_SEED)) { res.status(500).json({ error: 'dice seed not configured' }); return; }
+      const { keccak256, encodePacked } = await import('viem');
+      res.status(200).json({ ok: true, seedHash: keccak256(encodePacked(['bytes32'], [DICE_SEED])) });
+      return;
+    }
 
     // Read actions (no gas, no write): keep the browser thin by decoding here.
     if (action === 'readPlayer') {
@@ -169,6 +197,19 @@ export default async function handler(req, res) {
       case 'revealSeed':
         address = RANDOMNESS; abi = rndAbi; fn = 'revealSeed';
         args = [hex32(params.batchId), hex32(params.seed)];
+        break;
+      case 'commitDiceSeed':
+        if (!/^0x[0-9a-fA-F]{64}$/.test(DICE_SEED)) throw new Error('dice seed not configured');
+        {
+          const { keccak256, encodePacked } = await import('viem');
+          address = RANDOMNESS; abi = rndAbi; fn = 'commitSeed';
+          args = [hex32(params.batchId), keccak256(encodePacked(['bytes32'], [DICE_SEED]))];
+        }
+        break;
+      case 'revealDiceSeed':
+        if (!/^0x[0-9a-fA-F]{64}$/.test(DICE_SEED)) throw new Error('dice seed not configured');
+        address = RANDOMNESS; abi = rndAbi; fn = 'revealSeed';
+        args = [hex32(params.batchId), DICE_SEED];
         break;
       default:
         res.status(400).json({ error: 'unknown action: ' + action });
