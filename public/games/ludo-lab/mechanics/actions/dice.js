@@ -112,8 +112,8 @@ function hideChainDownBanner() {
 
 async function pingOnchainStack() {
     try {
-        if (window.magicblockDice && typeof window.magicblockDice.ping === 'function') {
-            return await window.magicblockDice.ping();
+        if (window.gfgChain && typeof window.gfgChain.ping === 'function') {
+            return await window.gfgChain.ping();
         }
     } catch (e) {
         console.warn('[ER VRF] chain ping failed:', e);
@@ -315,18 +315,18 @@ async function rollDiceEngine(source) {
     let rollValues = null;
     for (let attempt = 1; attempt <= MAX_ROLL_ATTEMPTS && !rollValues; attempt++) {
         if (attempt > 1) await sleepMs(ONCHAIN_RETRY_DELAY_MS);
-        if (isUserSeat && window.magicblockDice && window.magicblockDice.available()) {
+        if (isUserSeat && window.gfgChain && window.gfgChain.available()) {
             try {
                 if (totalDisplay) totalDisplay.innerText = 'VRF roll...';
-                displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair roll [MagicBlock ER VRF on Solana Blockchain]...`);
-                const v = await window.magicblockDice.roll();
+                displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair roll [${window.gfgChain.label()}]...`);
+                const v = await window.gfgChain.roll();
                 if (Array.isArray(v) && v.length === 2) {
                     rollValues = v;
                     activeDiceSource = 'onchain';
                     onchainProofRollUsedThisMatch = true;
-                    lastProofRollSignature = (window.magicblockDice && window.magicblockDice.getLastProofRollSignature)
-                        ? window.magicblockDice.getLastProofRollSignature() : null;
-                    console.log(`[MagicBlock ER VRF on Solana Blockchain] Your roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
+                    lastProofRollSignature = (window.gfgChain && window.gfgChain.getLastProofRollSignature)
+                        ? window.gfgChain.getLastProofRollSignature() : null;
+                    console.log(`[${window.gfgChain.label()}] Your roll resolved on-chain: ${rollValues[0]} + ${rollValues[1]}`);
                     console.log(`[Proof roll TX] ${lastProofRollSignature}`);
                     displayEducationalLog(`${currentTurn.toUpperCase()}: VRF roll ${rollValues[0]} + ${rollValues[1]} ${currentDiceSourceTag()}`);
                     // ER rollup tx signatures are NOT indexed by any public
@@ -337,8 +337,8 @@ async function rollDiceEngine(source) {
                     // created+delegated this player's dice account IS
                     // devnet-visible, so we link that as the real proof.
                     let userVerifyLine = `${currentTurn.toUpperCase()}: roll resolved on-chain (MagicBlock ER VRF)`;
-                    const diceDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastDiceDelegationSignature === 'function')
-                        ? window.magicblockDice.getLastDiceDelegationSignature() : null;
+                    const diceDelegateSig = (window.gfgChain && typeof window.gfgChain.getLastDiceDelegationSignature === 'function')
+                        ? window.gfgChain.getLastDiceDelegationSignature() : null;
                     if (diceDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
                         userVerifyLine += ` - dice account delegated on devnet: ${window.gfgExplorer.txLink(diceDelegateSig, 'view tx')}`;
                     }

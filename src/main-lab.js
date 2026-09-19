@@ -21,6 +21,13 @@ import './dynamic-auth.js';
 import './magicblock-er-vrf.js';
 import { initMagicBlockDice } from './magicblock-er-vrf.js';
 import { GFG_DICE } from './gfg-dice-config.js';
+import { loadAdapter, CHAIN } from './chain/adapter.js';
+
+// Chain switch (arcv2m16): svm = Solana as today, evm = the Arc rail. Default
+// is svm, so the live flow is untouched. Games read window.GFG_CHAIN through
+// chain-gateway.js.
+window.GFG_CHAIN = CHAIN || 'svm';
+loadAdapter().then(function (a) { window.gfgChainAdapter = a; }).catch(function (e) { console.warn('[chain] adapter load failed', e); });
 
 // Expose the dice module on window (requires the Dynamic client to be ready).
 initMagicBlockDice();
