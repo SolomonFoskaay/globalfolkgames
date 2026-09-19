@@ -93,6 +93,9 @@ export const arcAdapter = {
   async openGame(gameId, p2, ttl) { return relay('openGame', { gameId, p2, ttl: ttl || 1800 }); },
   async settleGame(gameId, resultHash) { return relay('settleGame', { gameId, resultHash }); },
   async expireGame(gameId) { return relay('expireGame', { gameId }); },
+  // Full finish order (1st..Nth seat indexes) recorded with the result.
+  async settleGameOrder(gameId, actor, resultHash, order) { return relay('settleGameOrder', { gameId, actor, resultHash, order }); },
+  async resultOrder(gameId) { return relay('resultOrder', { gameId }); },
   // On-chain turn clock (arcv2m1/2ii). The game reads the ABSOLUTE deadline from
   // the chain and counts down to it; a lapsed seat is advanced by anyone.
   async seatUp(gameId, host, seat, player) { return relay('seatUp', { gameId, host, seat, player }); },

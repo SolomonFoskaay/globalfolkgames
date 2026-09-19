@@ -37,10 +37,11 @@ table (Phase 3), and mainnet (Phase 5). No key material is ever stored here.
 - Chain 5042002, `https://rpc.testnet.arc.io`, gas 25 Gwei, USDC is gas.
 - Deploy cost for BOTH contracts: about 0.023 USDC.
 
-Updated 2026-09-19 (on-chain turn clock, arcv2m1/2ii): GameRegistry was
-redeployed with the turn clock + permissionless `expireTurn`
-(`0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068`). PlayerCore (points) is
-UNCHANGED, so no player balance moved. Live proof: `node scripts/arc-phase2-clocks.mjs`.
+Updated 2026-09-19 (on-chain turn clock + finish order, arcv2m1/2ii-2iii):
+GameRegistry was redeployed (`0x19BbC0C9e71318cDa9ca03994380a73B1280b38a`)
+with the turn clock, permissionless `expireTurn`, and `settleGameOrder`/
+`resultOrder` (full 1st..Nth finish order). PlayerCore (points) is UNCHANGED,
+so no player balance moved. Live proof: `node scripts/arc-phase2-clocks.mjs`.
 
 Measured gas and cost per action (one real session, `node scripts/arc-phase1.mjs`):
 

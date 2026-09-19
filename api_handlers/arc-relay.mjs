@@ -43,7 +43,7 @@ async function arcEvmConfig() {
   } catch (e) { /* fall through to baked values */ }
   _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
     playerCore: '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7',
-    gameRegistry: '0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068',
+    gameRegistry: '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a',
     randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
   return _evmCfg;
 }
@@ -87,6 +87,8 @@ const regAbi = parseAbi([
   'function commitMove(bytes32 gameId, address mover, uint8 seat, uint8 nextSeat, bytes32 moveCommit)',
   'function expireTurn(bytes32 gameId)',
   'function turnState(bytes32 gameId) view returns (uint8 seats, uint8 activeSeat, uint32 turnSecs, uint64 turnDeadline, uint32 moveCount, bool begun)',
+  'function settleGameOrder(bytes32 gameId, address actor, bytes32 resultHash, uint8[] finishOrder)',
+  'function resultOrder(bytes32 gameId) view returns (bytes32 resultHash, uint8[] order)',
 ]);
 const rndAbi = parseAbi([
   'function commitSeed(bytes32 batchId, bytes32 seedHash)',
@@ -362,6 +364,13 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Read a game's on-chain result + full finish order (empty until settled).
+    if (action === 'resultOrder') {
+      const r = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'resultOrder', args: [hex32(params.gameId)] });
+      res.status(200).json({ ok: true, gameId: hex32(params.gameId), resultHash: r[0], order: (r[1] || []).map(Number), chain: 'arc' });
+      return;
+    }
+
     let address, abi, fn, args;
     switch (action) {
       case 'chargeLife':
@@ -413,6 +422,13 @@ export default async function handler(req, res) {
         address = GAME_REGISTRY; abi = regAbi; fn = 'settleGame';
         args = [hex32(params.gameId), hex32(params.resultHash)];
         break;
+      case 'settleGameOrder': {
+        const order = Array.isArray(params.order) ? params.order.map((x) => Number(x)) : [];
+        if (!order.length || order.length > 8) throw new Error('finish order 1..8');
+        address = GAME_REGISTRY; abi = regAbi; fn = 'settleGameOrder';
+        args = [hex32(params.gameId), getAddress(params.actor), hex32(params.resultHash), order];
+        break;
+      }
       case 'expireGame':
         address = GAME_REGISTRY; abi = regAbi; fn = 'expireGame';
         args = [hex32(params.gameId)];

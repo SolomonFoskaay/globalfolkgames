@@ -141,6 +141,23 @@
       return null;
     },
 
+    // Game flow: open a match on Arc, then record the finish order with the
+    // result. Null on svm (the Solana path owns those writes there).
+    openGame: async function (gameId, p2, ttl) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.openGame) return a.openGame(gameId, p2, ttl); return null; }
+      return null;
+    },
+    settleGameOrder: async function (gameId, actor, resultHash, order) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.settleGameOrder) return a.settleGameOrder(gameId, actor, resultHash, order); return null; }
+      return null;
+    },
+    // Reads the on-chain result + finish order: { resultHash, order }.
+    resultOrder: async function (gameId) {
+      if (chain() !== 'evm') return null;
+      const a = adapter(); if (a && a.resultOrder) return a.resultOrder(gameId);
+      return null;
+    },
+
     // On-chain proof for a game in the last flushed window (verify card).
     batchProof: async function (matchRef) {
       if (chain() !== 'evm') return null;
