@@ -360,6 +360,21 @@ async function rollDiceEngine(source) {
         } else {
             // Non-user seat (computer, or an extra local human): house roll.
             try {
+                if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                    // Arc rail: the house/AI roll derives from the SAME committed
+                    // window seed as the player's roll, through the self-hosted
+                    // relayer (never the Solana /api/roll). Distinct counter, so
+                    // every seat's roll is a distinct gasless derivation.
+                    if (totalDisplay) totalDisplay.innerText = 'on-chain roll...';
+                    const hv = await window.gfgChain.roll();
+                    if (hv && hv.length === 2 && Number.isInteger(hv[0]) && Number.isInteger(hv[1])) {
+                        rollValues = [hv[0], hv[1]];
+                        activeDiceSource = 'onchain';
+                        console.log(`[${window.gfgChain.label()}] Computer roll resolved on-chain: ${hv[0]} + ${hv[1]}`);
+                        displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${hv[0]} + ${hv[1]} [${window.gfgChain.label()}]`);
+                        showVerifyLink(`${currentTurn.toUpperCase()}: house roll resolved on-chain (${window.gfgChain.shortLabel()})`);
+                    }
+                } else {
                 if (totalDisplay) totalDisplay.innerText = 'VRF roll...';
                 const res = await fetch('/api/roll', {
                     method: 'POST',
@@ -382,6 +397,7 @@ async function rollDiceEngine(source) {
                         showVerifyLink(`${currentTurn.toUpperCase()}: house roll resolved on-chain (MagicBlock ER VRF)`);
                     }
                 }
+                } // end Arc house-roll branch
             } catch (err) {
                 console.error(`[ER VRF] computer roll attempt ${attempt}/${MAX_ROLL_ATTEMPTS} failed (retrying):`, err);
                 rollValues = null;
