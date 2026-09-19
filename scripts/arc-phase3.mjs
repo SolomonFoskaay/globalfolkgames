@@ -21,7 +21,7 @@ import * as evmKeys from 'viem/accounts';
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
 const RPC = 'https://rpc.testnet.arc.io';
-const REGISTRY = '0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068';
+const REGISTRY = '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a';
 
 const info = JSON.parse(readFileSync(join(homedir(), '.config', 'gfg', 'arc-sponsor.json'), 'utf8'));
 const relayer = accountFor(info.key);

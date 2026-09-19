@@ -40,6 +40,8 @@ contract GameRegistry {
     mapping(bytes32 => mapping(uint8 => address)) public seatOwner;
     /// Last hashed move checkpoint (arc2m1 commitments; 0 = none).
     mapping(bytes32 => bytes32) public lastMoveCommit;
+    /// Full finish order (seat indexes, 1st..Nth) once a game is settled (arc2m1).
+    mapping(bytes32 => uint8[]) private _finishOrder;
 
     /// Latest batched roots (Phase 3 verifies a per-game Merkle proof against these).
     bytes32 public lastOpenRoot;
@@ -66,6 +68,7 @@ contract GameRegistry {
     event SeatTaken(bytes32 indexed gameId, uint8 indexed seat, address indexed player);
     event MoveCommitted(bytes32 indexed gameId, uint8 indexed seat, uint8 nextSeat, uint32 moveCount, uint64 turnDeadline);
     event TurnExpired(bytes32 indexed gameId, uint8 indexed fromSeat, uint8 toSeat, uint32 moveCount, uint64 turnDeadline);
+    event GameSettledOrder(bytes32 indexed gameId, bytes32 resultHash, uint8[] order);
 
     constructor(uint32 maxTtl_) {
         require(maxTtl_ > 0, "ttl");
@@ -226,6 +229,33 @@ contract GameRegistry {
         g.turnDeadline = uint64(block.timestamp) + g.turnSecs;
         g.moveCount += 1;
         emit TurnExpired(gameId, from, to, g.moveCount, g.turnDeadline);
+    }
+
+    /// Settle a game AND record the full finish order (1st..Nth seat indexes).
+    /// `actor` is a main player (relayer-attested on devnet, EIP-712 on mainnet),
+    /// matching the seat/authority model of the rest of the game core.
+    function settleGameOrder(bytes32 gameId, address actor, bytes32 resultHash, uint8[] calldata finishOrder) external {
+        Game storage g = _games[gameId];
+        require(g.p1 != address(0), "no game");
+        require(!g.expired, "expired");
+        require(g.resultHash == bytes32(0), "settled");
+        require(actor == g.p1 || actor == g.p2, "not player");
+        require(resultHash != bytes32(0), "result");
+        uint256 n = finishOrder.length;
+        require(n > 0 && n <= MAX_SEATS, "order");
+        uint8 seatCap = g.seats == 0 ? MAX_SEATS : g.seats;
+        for (uint256 i = 0; i < n; i++) {
+            require(finishOrder[i] < seatCap, "seat");
+        }
+        g.resultHash = resultHash;
+        _finishOrder[gameId] = finishOrder;
+        emit GameSettledOrder(gameId, resultHash, finishOrder);
+    }
+
+    /// Read a game's result hash and its full finish order (empty until settled).
+    function resultOrder(bytes32 gameId) external view returns (bytes32 resultHash, uint8[] memory order) {
+        Game storage g = _games[gameId];
+        return (g.resultHash, _finishOrder[gameId]);
     }
 
     /// The seat allowed to move for `seat`: an explicitly seated wallet if one

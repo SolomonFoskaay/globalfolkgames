@@ -207,4 +207,51 @@ contract GameRegistryTest {
         vm.expectRevert(); // settled
         reg.expireTurn(G);
     }
+
+    // ===== arcv2m1 finish order + result =====
+
+    function testSettleGameOrderStoresOrder() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        uint8[] memory order = new uint8[](4);
+        order[0] = 2; order[1] = 0; order[2] = 3; order[3] = 1;
+        bytes32 r = keccak256("final");
+        reg.settleGameOrder(G, address(this), r, order);
+        (bytes32 got, uint8[] memory stored) = reg.resultOrder(G);
+        require(got == r, "hash");
+        require(stored.length == 4, "len");
+        require(stored[0] == 2 && stored[1] == 0 && stored[2] == 3 && stored[3] == 1, "order");
+        vm.expectRevert(); // cannot settle twice
+        reg.settleGameOrder(G, address(this), keccak256("again"), order);
+    }
+
+    function testResultOrderEmptyBeforeSettle() public {
+        reg.openGame(G, P2, 30 minutes);
+        (bytes32 got, uint8[] memory stored) = reg.resultOrder(G);
+        require(got == bytes32(0) && stored.length == 0, "empty");
+    }
+
+    function testSettleGameOrderRejectsBadSeat() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 2, 45);
+        uint8[] memory order = new uint8[](2);
+        order[0] = 0; order[1] = 5; // seat 5 is outside the 2 seats
+        vm.expectRevert();
+        reg.settleGameOrder(G, address(this), keccak256("bad"), order);
+    }
+
+    function testSettleGameOrderRejectsNonPlayer() public {
+        reg.openGame(G, P2, 30 minutes);
+        uint8[] memory order = new uint8[](2);
+        order[0] = 0; order[1] = 1;
+        vm.expectRevert();
+        reg.settleGameOrder(G, address(0x1234), keccak256("bad"), order);
+    }
+
+    function testSettleGameOrderRejectsEmptyOrder() public {
+        reg.openGame(G, P2, 30 minutes);
+        uint8[] memory order = new uint8[](0);
+        vm.expectRevert();
+        reg.settleGameOrder(G, address(this), keccak256("bad"), order);
+    }
 }
