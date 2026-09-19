@@ -270,7 +270,7 @@
                     if (!addr) { lastError = 'no Arc wallet connected'; return null; }
                     var r = await a.activatePlan(addr, lvl, 30);
                     await refreshLedger(true);
-                    lastSpend = { amount: [0, 5000, 10000, 15000][lvl], reason: 'activate_subscription', ref: 'activate', sig: (r && (r.txHash || r)) || null, at: Date.now() };
+                    lastSpend = { amount: premiumCostForLevel(lvl), reason: 'activate_subscription', ref: 'activate', sig: (r && (r.txHash || r)) || null, at: Date.now() };
                     notify(cached);
                     return (r && (r.txHash || r)) || null;
                 } catch (e) {
@@ -283,7 +283,7 @@
             try {
                 var sig = await window.magicblockDice.activateSubscriptionLevel(lvl);
                 await refreshLedger(true);
-                lastSpend = { amount: [0, 5000, 10000, 15000][lvl], reason: 'activate_subscription', ref: 'activate', sig: sig, at: Date.now() };
+                lastSpend = { amount: premiumCostForLevel(lvl), reason: 'activate_subscription', ref: 'activate', sig: sig, at: Date.now() };
                 notify(cached);
                 return sig || null;
             } catch (e) {
@@ -434,11 +434,29 @@
     var BOOST_REASON = 5; // mirrors the program's u8 reason for tier boosts
 
     function multiplierForLevel(level) {
+        // Config-driven (arcv2m5): read the live plan ladder when present, so a
+        // new level or a changed multiplier is a config edit. Falls back to the
+        // owner-approved launch numbers if the module/config is unavailable.
+        try {
+            if (window.gfgPlanLadder && typeof window.gfgPlanLadder.multiplier === 'function') {
+                return Number(window.gfgPlanLadder.multiplier(level)) || 1;
+            }
+        } catch (e) { /* ignore */ }
         // Ladder L0-L3 (owner 2026-08-31): L0 free 1x, L1 1.5x, L2 2x, L3 3x.
         if (level <= 0) return 1;
         if (level === 1) return 1.5;
         if (level === 2) return 2;
         return 3;
+    }
+
+    // Premium cost of a plan level, config-driven when available.
+    function premiumCostForLevel(level) {
+        try {
+            if (window.gfgPlanLadder && typeof window.gfgPlanLadder.premiumCost === 'function') {
+                return Number(window.gfgPlanLadder.premiumCost(level)) || 0;
+            }
+        } catch (e) { /* ignore */ }
+        return [0, 5000, 10000, 15000][Number(level)] || 0;
     }
 
     function baseAwardForEnv(env, matchRef) {

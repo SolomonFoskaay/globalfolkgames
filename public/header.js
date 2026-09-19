@@ -548,6 +548,9 @@
         // globalLedger, so pages that don't explicitly load them would otherwise
         // sit on a permanent loading state / zero. Loading the module scripts
         // here when absent makes the pill always reflect the real balances.
+        // The plan ladder is a data config every subscription consumer reads;
+        // load it FIRST so lives/daily/premium never fall back to hardcoded numbers.
+        if (!window.gfgPlanLadder) ensureScript('/universal/subscription/plan-ladder.js');
         ['/chain-gateway.js', '/universal/identity/handle.js', '/universal/point-sources/referral.js', '/universal/points/local-points.js', '/universal/ledgers/global-ledger.js', '/universal/subscription/premium-ledger.js', '/universal/lives/lives.js', '/universal/lives/daily-reward.js'].forEach(function (src) {
             if (!window.deriveProfileHandle && src.indexOf('handle.js') >= 0) ensureScript(src);
             if (!window.gfgReferral && src.indexOf('referral.js') >= 0) ensureScript(src);
