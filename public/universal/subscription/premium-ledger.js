@@ -45,6 +45,8 @@
     // ---- identity + cache (mirror global-ledger.js) ----
 
     function readAddress() {
+        // Arc rail: the EVM address is the identity for the on-chain ledger.
+        try { if (isArc()) { var e = evmAddress(); if (e) return e; } } catch (err) { /* ignore */ }
         var addr = null;
         try {
             if (window.getDynamicSolanaWallet) {
@@ -62,6 +64,9 @@
     }
 
     function walletKey() {
+        try {
+            if (isArc()) { var e = evmAddress(); if (e) return e.toLowerCase(); }
+        } catch (err) { /* ignore */ }
         try {
             if (window.getDynamicSolanaWallet) {
                 var w = window.getDynamicSolanaWallet();
@@ -111,6 +116,42 @@
         return !!(window.magicblockDice && typeof window.magicblockDice.fetchPremiumPointsPdaFor === 'function');
     }
 
+    // ---- Arc rail (arcv2m16/arcv2m17) --------------------------------------
+    // On Arc the ledger lives in PlayerCore, read through the relayer. This is
+    // the SAME on-chain truth, just a different rail; the module is otherwise
+    // chain-agnostic. Returns the same ledger shape the Solana path produces.
+    function isArc() {
+        try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; }
+    }
+    function evmAddress() {
+        try {
+            var a = window.gfgChainAdapter;
+            var w = (a && a.walletAddress && a.walletAddress()) || null;
+            if (w) return String(w);
+        } catch (e) { /* ignore */ }
+        try { if (window.getDynamicEvmWallet) { var x = window.getDynamicEvmWallet(); if (x) return String(x); } } catch (e) { /* ignore */ }
+        return null;
+    }
+    async function arcReadLedger() {
+        var addr = evmAddress();
+        if (!addr) return null;
+        var a = window.gfgChainAdapter;
+        if (!a || typeof a.readPlayer !== 'function') return null;
+        var r = await a.readPlayer('ludo');
+        if (!r) return null;
+        var p = r.premium || {};
+        var lv = r.lives || {};
+        return {
+            premiumLifetime: Number(p.lifetime || 0),
+            premiumSpendable: Number(p.spendable || 0),
+            subscriptionLevel: Number(p.level || 0),
+            // relayer returns seconds; the view expects ms.
+            subscriptionActiveUntil: Number(p.activeUntil || 0) * 1000,
+            boosterActiveUntil: Number(lv.boosterUntil || 0) * 1000,
+            chain: 'arc',
+        };
+    }
+
     loadCache();
     syncCacheToWallet();
     loadMeta();
@@ -154,9 +195,13 @@
         refreshInFlight = (async function () {
             var ledger = null;
             try {
+                // Arc rail: read PlayerCore through the relayer (same on-chain truth).
+                if (isArc()) {
+                    ledger = await arcReadLedger();
+                }
                 var addr = readAddress();
                 var sdk = window.magicblockDice;
-                if (addr && sdk && typeof sdk.fetchPremiumPointsPdaFor === 'function') {
+                if (!ledger && addr && sdk && typeof sdk.fetchPremiumPointsPdaFor === 'function') {
                     ledger = await sdk.fetchPremiumPointsPdaFor(addr);
                 }
                 if (!ledger && sdk && typeof sdk.fetchPremiumPointsPda === 'function') {
@@ -287,7 +332,8 @@
         (function poll() {
             var sdk = window.magicblockDice;
             var addr = readAddress();
-            if (addr && sdk && typeof sdk.isConfigured === 'function' && sdk.isConfigured()) {
+            var ready = isArc() ? !!addr : !!(addr && sdk && typeof sdk.isConfigured === 'function' && sdk.isConfigured());
+            if (ready) {
                 if (addr !== lastReadWallet) {
                     lastReadWallet = addr;
                     syncCacheToWallet();
@@ -317,7 +363,8 @@
             try {
                 var sdk = window.magicblockDice;
                 var addr = readAddress();
-                if (addr && sdk && typeof sdk.isConfigured === 'function' && sdk.isConfigured()) {
+                var ready = isArc() ? !!addr : !!(addr && sdk && typeof sdk.isConfigured === 'function' && sdk.isConfigured());
+                if (ready) {
                     syncCacheToWallet();
                     renderCached();
                     // Seed on first appearance only when no snapshot exists yet.
