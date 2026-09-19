@@ -78,3 +78,23 @@ revealed seed.
 Cost falls sharply with batching: the open and the settle become one tx for many
 games (about 0.00002 USDC each per game), and the per-player writes cluster the
 same way, so a batched game is roughly 0.0001 USDC or less.
+
+## Phase 3 — batching at scale + TTL, measured 2026-09-18
+
+One transaction commits a Merkle root for N games, so the gas is O(1) and the
+per-game cost falls as 1/N (all at 25 Gwei):
+
+| N games in one tx | Gas | Batch USDC | Per-game USDC |
+| --- | --- | --- | --- |
+| 1 | 28,985 | 0.000724625 | 0.00072463 |
+| 20 | 28,985 | 0.000724625 | 0.00003623 |
+| 100 | 28,985 | 0.000724625 | 0.00000725 |
+| 1000 | 28,997 | 0.000724925 | 0.00000072 |
+
+TTL/expire proven live: a game opened with a 2s TTL was expired permissionlessly
+after the deadline (about 51,700 gas), and the settled `lastOpenRoot` was read
+back on-chain.
+
+Settlement policy: flush on N games OR T seconds, whichever first, and stay
+per-game while volume is low. At 1000 games per flush a game is about
+0.0000007 USDC, roughly 1.4 million games per USDC.

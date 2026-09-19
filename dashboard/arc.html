@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arc rail (EVM) | Dashboard | GlobalFolkGames</title>
+    <meta name="og:title" content="Arc rail (EVM) | Dashboard | GlobalFolkGames">
+    <meta property="og:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/dashboard/arc.html">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Arc rail (EVM) | Dashboard | GlobalFolkGames">
+    <meta name="twitter:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
+    <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .arc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+        .arc-card { background: #101014; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px 12px; }
+        .arc-card .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .arc-card .v { color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px; word-break: break-all; }
+        .arc-card .v.small { font-size: 0.8rem; }
+        .arc-card .v.ok { color: #2ecc71; }
+        .arc-card .v.warn { color: #f87818; }
+        .arc-card .v.bad { color: #e74c3c; }
+        .arc-addr { font-family: monospace; font-size: 0.8rem; color: #7838f8; word-break: break-all; }
+        .arc-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 8px; }
+        .arc-table th, .arc-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .arc-table th { color: #f87818; }
+        .arc-note { color: var(--muted); font-size: 0.8rem; line-height: 1.5; margin-top: 8px; }
+        .arc-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .arc-table { min-width: 420px; }
+        .refresh-btn { background: var(--accent, #f87818); color: #1a1a1a; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-top: 10px; }
+        .refresh-btn:disabled { opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <main class="mobile-container dash-rail-content" style="max-width:780px;">
+        <section class="onboarding-billboard" style="border-color:#7838f8;">
+            <h2>🔷 Arc rail (EVM)</h2>
+            <p class="auth-hint" style="margin-top:8px;">The Arc (Circle EVM) rail for arcv2m16: chain, RPC, the three contracts, the self-hosted relayer wallet, live chain data and the measured costs. Public addresses only, no secrets here.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Chain + live <span id="arc-checked" class="last-checked"></span></h3>
+            <div class="arc-grid" id="arc-chain"><p class="empty">Loading…</p></div>
+            <button class="refresh-btn" id="arc-refresh">↻ Refresh</button>
+        </section>
+
+        <section class="game-card" style="text-align:left; border:1px solid #7838f8;">
+            <h3>Contracts (Arc Testnet)</h3>
+            <div class="arc-grid" id="arc-contracts"><p class="empty">Loading…</p></div>
+            <p class="arc-note">PlayerCore is the single per-player account (lives, points, premium, per-game buckets). GameRegistry holds match starts/ends with a TTL. Randomness holds the committed and revealed dice seeds.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Self-hosted relayer (gasless)</h3>
+            <div class="arc-grid" id="arc-relayer"><p class="empty">Loading…</p></div>
+            <p class="arc-note">The app's own relayer submits every write and pays the tiny USDC gas. Players sign nothing and pay nothing. No paid sponsorship platform is used.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Measured cost (Phase 1 + 2)</h3>
+            <div class="arc-table-wrap">
+                <table class="arc-table">
+                    <thead><tr><th>Action</th><th>Gas</th><th>USDC</th></tr></thead>
+                    <tbody>
+                        <tr><td>openGame (match starts, TTL)</td><td>96,937</td><td>0.002423</td></tr>
+                        <tr><td>commitSeed (dice locked)</td><td>46,041</td><td>0.001151</td></tr>
+                        <tr><td>chargeLife (one life)</td><td>94,403</td><td>0.002360</td></tr>
+                        <tr><td>revealSeed (dice revealed)</td><td>48,554</td><td>0.001214</td></tr>
+                        <tr><td>recordPoints (bucket + global)</td><td>104,925</td><td>0.002623</td></tr>
+                        <tr><td>settleGame (match ends)</td><td>50,494</td><td>0.001262</td></tr>
+                        <tr><td><b>total per game (unbatched)</b></td><td></td><td><b>0.011034</b></td></tr>
+                        <tr><td>commitBatch (100 games in one tx)</td><td>28,985</td><td>0.000725</td></tr>
+                        <tr><td>batched root, N=20 (per game)</td><td>28,985</td><td>0.00003623</td></tr>
+                        <tr><td>batched root, N=100 (per game)</td><td>28,985</td><td>0.00000725</td></tr>
+                        <tr><td>batched root, N=1000 (per game)</td><td>28,997</td><td>0.00000072</td></tr>
+                        <tr><td>expireGame (permissionless TTL)</td><td>51,697</td><td>0.001292</td></tr>
+                        <tr><td>a dice roll (derived from seed)</td><td>0</td><td>0 (free read)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="arc-note">Batched, a game lands near 0.0001 USDC or less. At 20 games/day launch scale, about 0.22 USDC/day. Compare Solana: 10,000 players is about 10,400 USD of one-time rent.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left;">
+            <h3>Raw public config</h3>
+            <div class="arc-table-wrap"><pre id="arc-raw" style="font-size:0.76rem; white-space:pre-wrap; word-break:break-all;">Loading…</pre></div>
+        </section>
+    </main>
+
+    <script src="/global_header.js"></script>
+    <script src="/gfg-explorer.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-core.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const staff = await window.DashCore.gateStaff();
+            if (!staff) return;
+
+            window.GFG_DASH_NAV.render({
+                brand: '🛡 Dashboard',
+                active: 'arc',
+                sections: [
+                    { heading: 'Overview', items: [
+                        { key: 'home', label: '🏠 Dashboard home', href: '/dashboard/' },
+                    ]},
+                    { heading: 'Detail', items: [
+                        { key: 'arc', label: '🔷 Arc rail (EVM)', href: '/dashboard/arc.html' },
+                        { key: 'ops', label: '⚙️ Project ops', href: '/dashboard/ops.html' },
+                        { key: 'endpoints', label: '🩺 Endpoint watchlist', href: '/dashboard/endpoints.html' },
+                        { key: 'accounts', label: '🔑 Wallets & accounts', href: '/dashboard/accounts.html' },
+                    ]},
+                ]
+            });
+
+            const el = (id) => document.getElementById(id);
+            const esc = window.DashCore.esc;
+            const rpcUrl = () => (cfg && cfg.rails && cfg.rails.evm && cfg.rails.evm.rpc) || 'https://rpc.testnet.arc.io';
+            let cfg = null;
+
+            async function rpc(client_cfg, method, params) {
+                const res = await fetch(client_cfg.rpc, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: params || [] }),
+                });
+                const j = await res.json();
+                if (j.error) throw new Error(j.error.message || 'rpc error');
+                return j.result;
+            }
+            function usdc(hexWei) {
+                const v = BigInt(hexWei || '0x0');
+                const whole = v / 10n ** 18n;
+                const frac = (v % 10n ** 18n).toString().padStart(18, '0').slice(0, 6);
+                return whole.toString() + '.' + frac;
+            }
+            function short(a) { return a ? a.slice(0, 10) + '…' + a.slice(-6) : '—'; }
+            function addrCard(label, addr, explorer) {
+                const link = explorer && addr ? '<a class="arc-addr" href="' + explorer + '/address/' + addr + '" target="_blank" rel="noreferrer">' + esc(addr) + '</a>' : '<span class="arc-addr">' + esc(addr || '—') + '</span>';
+                return '<div class="arc-card"><div class="k">' + esc(label) + '</div><div class="v small">' + link + '</div></div>';
+            }
+            function card(label, value, cls) {
+                return '<div class="arc-card"><div class="k">' + esc(label) + '</div><div class="v ' + (cls || '') + '">' + esc(value) + '</div></div>';
+            }
+
+            async function load() {
+                const btn = el('arc-refresh'); if (btn) btn.disabled = true;
+                try {
+                    cfg = await (await fetch('/arc-config.json', { cache: 'no-store' })).json();
+                } catch (e) {
+                    el('arc-chain').innerHTML = '<p class="empty">Could not load /arc-config.json (' + esc(e.message) + ').</p>';
+                    return;
+                }
+                const evm = cfg.rails.evm;
+                el('arc-raw').textContent = JSON.stringify(cfg, null, 2);
+
+                el('arc-contracts').innerHTML =
+                    addrCard('PlayerCore (per-player)', evm.contracts.playerCore, evm.explorer) +
+                    addrCard('GameRegistry (matches)', evm.contracts.gameRegistry, evm.explorer) +
+                    addrCard('Randomness (dice seed)', evm.contracts.randomness, evm.explorer) +
+                    card('Chain id', String(evm.chainId)) +
+                    card('Gas token', 'USDC (' + evm.usdcDecimalsNative + ' decimals native)');
+
+                el('arc-relayer').innerHTML =
+                    addrCard('Relayer address (pays gas)', evm.sponsor, evm.explorer) +
+                    card('Relayer USDC balance', 'reading…', 'small') +
+                    card('Player gas cost', '0 (sponsored)', 'ok');
+
+                // live reads (graceful if the RPC blocks browser CORS)
+                try {
+                    const [gasHex, blockHex, balHex] = await Promise.all([
+                        rpc(evm, 'eth_gasPrice'),
+                        rpc(evm, 'eth_blockNumber'),
+                        evm.sponsor ? rpc(evm, 'eth_getBalance', [evm.sponsor, 'latest']) : Promise.resolve('0x0'),
+                    ]);
+                    const gwei = (Number(BigInt(gasHex)) / 1e9).toFixed(2);
+                    el('arc-chain').innerHTML =
+                        card('Network', evm.name + ' (live)', 'ok') +
+                        card('Gas price', gwei + ' Gwei') +
+                        card('Block', parseInt(blockHex, 16).toLocaleString()) +
+                        card('RPC', short(evm.rpc), 'small');
+                    const rel = el('arc-relayer');
+                    if (rel && evm.sponsor) {
+                        rel.innerHTML =
+                            addrCard('Relayer address (pays gas)', evm.sponsor, evm.explorer) +
+                            card('Relayer USDC balance', usdc(balHex) + ' USDC', 'ok') +
+                            card('Player gas cost', '0 (sponsored)', 'ok');
+                    }
+                    if (el('arc-checked')) el('arc-checked').textContent = '· refreshed ' + new Date().toLocaleTimeString();
+                } catch (e) {
+                    el('arc-chain').innerHTML =
+                        card('Network', evm.name) +
+                        card('Chain id', String(evm.chainId)) +
+                        card('RPC', short(evm.rpc), 'small') +
+                        '<p class="arc-note">Live read unavailable from the browser (' + esc(e.message) + '). Addresses and config above are still current.</p>';
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
+            }
+
+            el('arc-refresh').addEventListener('click', load);
+            load();
+        });
+    </script>
+</body>
+</html>
