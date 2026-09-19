@@ -22,7 +22,8 @@
     { key: 'arcv2m13', label: 'arcv2m13 · Academy' },
     { key: 'arcv2m14', label: 'arcv2m14 · AGM' },
     { key: 'arcv2m15', label: 'arcv2m15 · Revenue splitter' },
-    { key: 'arcv2m16', label: 'arcv2m16 · EVM rail (Arc)' }
+    { key: 'arcv2m16', label: 'arcv2m16 · EVM rail (Arc)' },
+    { key: 'arcv2m17', label: 'arcv2m17 · Batched Settlement (GFG-BS)' }
   ];
   var V1 = [];
   for (var i = 1; i <= 11; i++) V1.push({ key: 'arcv1m' + i, label: 'arcv1m' + i + ' · record' });

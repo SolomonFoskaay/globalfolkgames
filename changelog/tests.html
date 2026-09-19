@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Research | GlobalFolkGames</title>
-    <meta property="og:title" content="Research | GlobalFolkGames">
+    <title>Test results | GlobalFolkGames</title>
+    <meta property="og:title" content="Test results | GlobalFolkGames">
     <meta property="og:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
     <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
-    <meta property="og:url" content="https://globalfolkgames.fun/changelog/research.html">
+    <meta property="og:url" content="https://globalfolkgames.fun/changelog/tests.html">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Research | GlobalFolkGames">
+    <meta name="twitter:title" content="Test results | GlobalFolkGames">
     <meta name="twitter:description" content="Play classic folk games on-chain with a web2 feel: sign in with email, no wallet popups, no gas, provably fair. Live at globalfolkgames.fun.">
     <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
     <link rel="stylesheet" href="/style.css">
@@ -43,8 +43,8 @@
     <main class="mobile-container dash-rail-content changelog-page admin">
         <section class="changelog-head">
             <a href="/dashboard/" class="changelog-back">← Dashboard</a>
-            <h2>Research, staff workspace</h2>
-            <p class="changelog-sub">Pre-architecture research. These are things being explored BEFORE any module is added to the architecture, kept here so they can be re-read on mobile and used as guidance when a direction is adopted (for example the Arc migration). Adding an entry is a decision, so the agent always asks first.</p>
+            <h2>Test results, staff workspace</h2>
+            <p class="changelog-sub">Built and tested results. These are things that have been BUILT and TESTED, with real numbers from the chain. Read on mobile, re-check later, and use for financial planning. Adding an entry is a decision, so the agent always asks first.</p>
             <div class="changelog-meta">
                 <span id="changelog-role" class="changelog-role"></span>
                 <a href="/changelog/architecture-v2.html" class="changelog-admin-link">Architecture V2 →</a>
@@ -52,13 +52,12 @@
             </div>
         </section>
 
-        <div id="research-items" class="changelog-entries">
+        <div id="tests-items" class="changelog-entries">
             <p class="empty">Checking access…</p>
         </div>
 
         <p style="margin-top:16px; font-size:0.8rem; color:#888;">
-            <a href="/changelog/research.html" style="color:#f87818;">Research (this workspace)</a>
-            &nbsp;·&nbsp; <a href="/changelog/tests.html" style="color:#2ecc71;">Test results</a>
+            <a href="/changelog/tests.html" style="color:#f87818;">Test results (this workspace)</a>
             &nbsp;·&nbsp; <a href="/changelog/architecture-v2.html" style="color:#7838f8;">Architecture V2</a>
             &nbsp;·&nbsp; <a href="/changelog/economics.html" style="color:#2ecc71;">Game Economics</a>
         </p>
@@ -68,18 +67,18 @@
     <script src="/global_header.js"></script>
     <script src="/changelog/render.js"></script>
     <script src="/dash-nav.js"></script>
-    <script src="/changelog/research.js"></script>
-    <script src="/changelog/research-nav.js"></script>
+    <script src="/changelog/tests.js"></script>
+    <script src="/changelog/tests-nav.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             if (window.requireStaffAccess) {
                 const role = await window.requireStaffAccess();
-                if (role && window.renderResearch) window.renderResearch();
-            } else if (window.renderResearch) {
-                window.renderResearch();
+                if (role && window.renderTests) window.renderTests();
+            } else if (window.renderTests) {
+                window.renderTests();
             }
-            if (window.GFG_RESEARCH_NAV) window.GFG_RESEARCH_NAV.render();
+            if (window.GFG_TESTS_NAV) window.GFG_TESTS_NAV.render();
         });
     </script>
 </body>

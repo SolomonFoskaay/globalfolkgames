@@ -60,6 +60,11 @@
                 { key: 'arc-rail', label: '🔷 Arc rail (EVM)', href: '/dashboard/arc.html' }
             ] });
         }
+        if (!sections.some(sec => (sec.items || []).some(it => it.href === '/changelog/tests.html'))) {
+            sections.push({ heading: 'Test results', items: [
+                { key: 'tests', label: '🧪 Test results (built + measured)', href: '/changelog/tests.html' }
+            ] });
+        }
         if (!sections.some(sec => (sec.items || []).some(it => it.key === 'research'))) {
             sections.push({ heading: 'Research', items: [
                 { key: 'research', label: '🔬 Research (pre-architecture)', href: '/changelog/research.html' }
