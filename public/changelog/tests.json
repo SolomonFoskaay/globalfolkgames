@@ -1,0 +1,144 @@
+{
+  "updated": "2026-09-18",
+  "note": "Staff-only TEST RESULTS. Unlike the Research library (things being researched), these are things that have been BUILT and TESTED, with real numbers from the chain. Read on mobile, re-check later, and use for financial planning. Adding an entry is a decision: the agent asks first. This file is client-served, so it holds results and public addresses only, never secrets.",
+  "statusLegend": {
+    "verified": "Built, run on-chain, numbers measured",
+    "in-progress": "Part built or part measured",
+    "planned": "Not run yet"
+  },
+  "items": [
+    {
+      "id": "arc-phase1",
+      "title": "Arc rail Phase 1: contracts deployed + one real session (Arc Testnet)",
+      "status": "verified",
+      "updated": "2026-09-18",
+      "summary": "GameRegistry and Randomness deployed to Arc Testnet (chain 5042002, USDC gas at 25 Gwei). One real session ran end to end: a match opened with a TTL, a dice seed was committed then revealed, rolls were derived from the seed, and the match settled. Both deploys cost about 0.023 USDC.",
+      "decision": "Measurements only. No go-live decision here.",
+      "sections": [
+        {
+          "heading": "Deployed contracts (Arc Testnet)",
+          "table": {
+            "headers": ["Contract", "Address"],
+            "rows": [
+              ["GameRegistry", "0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb"],
+              ["Randomness", "0xb406295b4F7E5B513b656122AfFF29AF720E9E23"]
+            ]
+          }
+        },
+        {
+          "heading": "Measured cost per action",
+          "table": {
+            "headers": ["Action", "Gas", "USDC"],
+            "rows": [
+              ["commitBatch (opens 100 games in ONE tx)", "28,985", "0.000724625"],
+              ["openGame (single)", "97,153", "0.002428825"],
+              ["commitSeed", "46,041", "0.001151025"],
+              ["revealSeed", "48,554", "0.001213850"],
+              ["settleGame (single)", "50,506", "0.001262650"],
+              ["a dice roll (derived from the seed)", "0 (read)", "0"]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "arc-phase2",
+      "title": "Arc rail Phase 2: PlayerCore + self-hosted gasless relayer (Arc Testnet)",
+      "status": "verified",
+      "updated": "2026-09-18",
+      "summary": "PlayerCore deployed (the single per-player account: lives, points, premium, per-game buckets). The self-hosted relayer submitted every write and paid the gas; the player signed nothing and paid nothing. A full game cost 0.011034 USDC, all paid by the app. No paid sponsorship platform is used.",
+      "decision": "Gasless model proven. Player cost is zero by construction.",
+      "sections": [
+        {
+          "heading": "PlayerCore contract",
+          "paragraphs": ["0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc, admin set to the relayer address 0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4."]
+        },
+        {
+          "heading": "Full sponsored game (measured)",
+          "table": {
+            "headers": ["Action", "Gas", "USDC"],
+            "rows": [
+              ["openGame (match starts, TTL)", "96,937", "0.002423425"],
+              ["commitSeed (dice locked)", "46,041", "0.001151025"],
+              ["chargeLife (one life)", "94,403", "0.002360075"],
+              ["revealSeed (dice revealed)", "48,554", "0.001213850"],
+              ["recordPoints (bucket + global)", "104,925", "0.002623125"],
+              ["settleGame (match ends)", "50,494", "0.001262350"],
+              ["total per game (unbatched)", "", "0.011033850"]
+            ]
+          },
+          "bullets": [
+            "Player balance unchanged: the player paid 0.",
+            "On-chain result read back: life 1/5, bucket pure 100, global lifetime 100, roll derived from the revealed seed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arc-phase3",
+      "title": "Arc rail Phase 3: O(1) batching + TTL expiry (Arc Testnet)",
+      "status": "verified",
+      "updated": "2026-09-18",
+      "summary": "One transaction commits a Merkle root for N games, so the gas is flat (O(1)) and the per-game cost falls as 1/N. TTL was proven live: a game opened with a 2 second TTL was expired permissionlessly after the deadline.",
+      "decision": "Batching is the cost lever. The window policy is a config choice.",
+      "sections": [
+        {
+          "heading": "Batched root: one tx for N games",
+          "table": {
+            "headers": ["N games in one tx", "Gas", "Batch USDC", "Per-game USDC"],
+            "rows": [
+              ["1", "28,985", "0.000724625", "0.00072463"],
+              ["20", "28,985", "0.000724625", "0.00003623"],
+              ["100", "28,985", "0.000724625", "0.00000725"],
+              ["1000", "28,997", "0.000724925", "0.00000072"]
+            ]
+          }
+        },
+        {
+          "heading": "TTL / expire",
+          "bullets": [
+            "openGame with ttl=2s: deadline set, expiry false.",
+            "expireGame after the deadline: about 51,697 gas (0.001292 USDC), expired now true.",
+            "lastOpenRoot read back on-chain to confirm the batch root landed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arc-window",
+      "title": "Arc rail settlement window: launch economics",
+      "status": "in-progress",
+      "updated": "2026-09-18",
+      "summary": "The relayer flushes when the pending batch reaches N games OR the window reaches T seconds, whichever first, and always flushes at window close even with one game. This table shows what a window costs at very low launch volume (10 games a day).",
+      "decision": "Proposed launch setting: T=24h, N=100 (adjustable). No decision recorded yet.",
+      "sections": [
+        {
+          "heading": "Cost per window at 10 games a day",
+          "table": {
+            "headers": ["Window T", "Flushes a day", "Cost a day", "Cost per game", "1 USD buys"],
+            "rows": [
+              ["24 hours", "1", "0.0038 USDC", "0.000382", "about 2,600 games"],
+              ["6 hours", "4", "0.0082 USDC", "0.000817", "about 1,220 games"],
+              ["1 hour", "24", "0.037 USDC", "0.003717", "about 270 games"]
+            ]
+          }
+        },
+        {
+          "heading": "When volume grows (N flushes first)",
+          "table": {
+            "headers": ["Batched N", "Per-game USDC", "1 USD buys"],
+            "rows": [
+              ["20", "0.000036", "about 27,600 games"],
+              ["100", "0.0000073", "about 138,000 games"],
+              ["1000", "0.0000007", "about 1.4 million games"]
+            ]
+          },
+          "bullets": [
+            "Receipts while a batch is open: each game gets an instant app-signed receipt (including the dice-seed hash published before the game), labelled pending; at flush it upgrades to an on-chain receipt with that game's own Merkle proof and the batch transaction hash. No game waits on another.",
+            "To have an on-chain link the moment a game ends, a config knob anchors each start on-chain for about 0.00243 USDC (about 1 USD per 400 games at launch volume)."
+          ]
+        }
+      ]
+    }
+  ]
+}
