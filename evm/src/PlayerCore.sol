@@ -20,6 +20,16 @@ contract PlayerCore {
     uint64 public constant DAY = 86400;
     uint16 public constant DEFAULT_POOL = 5;
 
+    /// Lives pool for a plan level (owner-approved ladder 2026-09-19):
+    /// L0 free = 5, L1 = 10, L2 = 15, L3 = 20. One place, so migrate and
+    /// activate can never drift apart.
+    function _poolForLevel(uint8 level) internal pure returns (uint16) {
+        if (level >= 3) return 20;
+        if (level == 2) return 15;
+        if (level == 1) return 10;
+        return 5;
+    }
+
     struct Bucket {
         bytes32 tag;       // game tag, e.g. "ludo"
         uint64 purePts;     // unspendable lifetime
@@ -92,6 +102,8 @@ contract PlayerCore {
     event PlanActivated(address indexed player, uint8 level, uint64 until);
     event BoosterActivated(address indexed player, uint64 until);
     event Migrated(address indexed player, uint64 migrationRef);
+    event PlanExpired(address indexed player);
+    event PoolUpdated(address indexed player, uint16 pool);
 
     constructor(address admin) {
         require(admin != address(0), "admin");
@@ -188,7 +200,7 @@ contract PlayerCore {
         if (m.level > 0 && m.level <= MAX_PLAN_LEVEL) {
             p.subscriptionLevel = m.level;
             p.subscriptionActiveUntil = m.activeUntil;
-            p.livesPool = m.level >= 3 ? 15 : (m.level == 2 ? 10 : 5);
+            p.livesPool = _poolForLevel(m.level);
         }
         p.migrationRef = m.migrationRef;
         emit Migrated(player, m.migrationRef);
@@ -243,7 +255,7 @@ contract PlayerCore {
         uint64 until = uint64(block.timestamp) + uint64(planDays) * DAY;
         p.subscriptionLevel = level;
         p.subscriptionActiveUntil = until;
-        p.livesPool = level >= 3 ? 15 : (level == 2 ? 10 : 5);
+        p.livesPool = _poolForLevel(level);
         emit PlanActivated(player, level, until);
     }
 
@@ -252,6 +264,27 @@ contract PlayerCore {
         uint64 until = uint64(block.timestamp) + uint64(planHours) * 3600;
         if (until > p.boosterUntil) p.boosterUntil = until;
         emit BoosterActivated(player, until);
+    }
+
+    /// PERMISSIONLESS upkeep: bring a player's on-chain state in line with the
+    /// chain clock and the current plan ladder. Anyone may call it for any
+    /// player; it:
+    ///   - expires a plan whose 30-day window has passed (level -> 0), so the
+    ///     boost and the bigger lives pool stop automatically (no cron needed);
+    ///   - re-derives the lives pool from the (possibly just-expired) level.
+    /// Idempotent and safe to re-run. NEVER touches points or premium balances.
+    function upkeep(address player) external {
+        Player storage p = _p(player);
+        if (p.subscriptionLevel != 0 && p.subscriptionActiveUntil != 0 && p.subscriptionActiveUntil <= block.timestamp) {
+            p.subscriptionLevel = 0;
+            p.subscriptionActiveUntil = 0;
+            emit PlanExpired(player);
+        }
+        uint16 want = p.subscriptionLevel == 0 ? DEFAULT_POOL : _poolForLevel(p.subscriptionLevel);
+        if (p.livesPool != want) {
+            p.livesPool = want;
+            emit PoolUpdated(player, want);
+        }
     }
 
     // -------------------------------------------------------------------- reads

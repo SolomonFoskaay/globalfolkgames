@@ -107,6 +107,14 @@ export const arcAdapter = {
   async commitSeed(batchId, seedHash) { return relay('commitSeed', { batchId, seedHash }); },
   async revealSeed(batchId, seed) { return relay('revealSeed', { batchId, seed }); },
 
+  // Permissionless upkeep: expires a stale plan on-chain and heals the lives
+  // pool to the approved ladder (L0 5 / L1 10 / L2 15 / L3 20).
+  async upkeep(playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) return null;
+    return relay('upkeep', { player });
+  },
+
   // Money actions require the operator token (fail-closed on the server).
   async creditPremium(player, points, creditRef, token) { return relay('creditPremium', { player, points, creditRef }, token); },
   async activatePlan(player, level, planDays, token) { return relay('activatePlan', { player, level, planDays: planDays || 30 }, token); },
