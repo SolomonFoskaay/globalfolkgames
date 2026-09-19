@@ -116,6 +116,31 @@
       return (mb() && mb().recordResult) ? mb().recordResult(finishOrder, points, reason, matchRef) : null;
     },
 
+    // On-chain turn clock (arcv2m1/2ii). Mirrors the Solana game core: the
+    // deadline is an absolute chain timestamp, and expireTurn is permissionless.
+    seatUp: async function (gameId, host, seat, player) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.seatUp) return a.seatUp(gameId, host, seat, player); return null; }
+      return null;
+    },
+    beginGame: async function (gameId, host, seats, turnSecs) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.beginGame) return a.beginGame(gameId, host, seats, turnSecs); return null; }
+      return null;
+    },
+    commitMove: async function (gameId, mover, seat, nextSeat, moveCommit) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.commitMove) return a.commitMove(gameId, mover, seat, nextSeat, moveCommit); return null; }
+      return null;
+    },
+    expireTurn: async function (gameId) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.expireTurn) return a.expireTurn(gameId); return null; }
+      return null;
+    },
+    // Reads the chain clock: { seats, activeSeat, turnSecs, turnDeadline, moveCount, begun }.
+    turnState: async function (gameId) {
+      if (chain() !== 'evm') return null;
+      const a = adapter(); if (a && a.turnState) return a.turnState(gameId);
+      return null;
+    },
+
     // On-chain proof for a game in the last flushed window (verify card).
     batchProof: async function (matchRef) {
       if (chain() !== 'evm') return null;

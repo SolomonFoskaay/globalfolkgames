@@ -43,7 +43,7 @@ async function arcEvmConfig() {
   } catch (e) { /* fall through to baked values */ }
   _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
     playerCore: '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7',
-    gameRegistry: '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb',
+    gameRegistry: '0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068',
     randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
   return _evmCfg;
 }
@@ -82,6 +82,11 @@ const regAbi = parseAbi([
   'function windowCount(uint8) view returns (uint256)',
   'function windowFromBlock(uint8) view returns (uint256)',
   'function windowToBlock(uint8) view returns (uint256)',
+  'function seatUp(bytes32 gameId, address host, uint8 seat, address player)',
+  'function beginGame(bytes32 gameId, address host, uint8 seats, uint32 turnSecs)',
+  'function commitMove(bytes32 gameId, address mover, uint8 seat, uint8 nextSeat, bytes32 moveCommit)',
+  'function expireTurn(bytes32 gameId)',
+  'function turnState(bytes32 gameId) view returns (uint8 seats, uint8 activeSeat, uint32 turnSecs, uint64 turnDeadline, uint32 moveCount, bool begun)',
 ]);
 const rndAbi = parseAbi([
   'function commitSeed(bytes32 batchId, bytes32 seedHash)',
@@ -345,6 +350,18 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Read the on-chain turn clock (no gas): the browser counts down to the
+    // ABSOLUTE deadline stored on-chain, never a local timer.
+    if (action === 'turnState') {
+      const t = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'turnState', args: [hex32(params.gameId)] });
+      res.status(200).json({
+        ok: true, gameId: hex32(params.gameId),
+        seats: Number(t[0]), activeSeat: Number(t[1]), turnSecs: Number(t[2]),
+        turnDeadline: Number(t[3]), moveCount: Number(t[4]), begun: t[5], chain: 'arc',
+      });
+      return;
+    }
+
     let address, abi, fn, args;
     switch (action) {
       case 'chargeLife':
@@ -398,6 +415,22 @@ export default async function handler(req, res) {
         break;
       case 'expireGame':
         address = GAME_REGISTRY; abi = regAbi; fn = 'expireGame';
+        args = [hex32(params.gameId)];
+        break;
+      case 'seatUp':
+        address = GAME_REGISTRY; abi = regAbi; fn = 'seatUp';
+        args = [hex32(params.gameId), getAddress(params.host), Number(params.seat), getAddress(params.player)];
+        break;
+      case 'beginGame':
+        address = GAME_REGISTRY; abi = regAbi; fn = 'beginGame';
+        args = [hex32(params.gameId), getAddress(params.host), Number(params.seats), Number(params.turnSecs)];
+        break;
+      case 'commitMove':
+        address = GAME_REGISTRY; abi = regAbi; fn = 'commitMove';
+        args = [hex32(params.gameId), getAddress(params.mover), Number(params.seat), Number(params.nextSeat), hex32(params.moveCommit)];
+        break;
+      case 'expireTurn':
+        address = GAME_REGISTRY; abi = regAbi; fn = 'expireTurn';
         args = [hex32(params.gameId)];
         break;
       case 'commitBatch':

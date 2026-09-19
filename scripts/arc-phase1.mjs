@@ -17,7 +17,7 @@ import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
-const REGISTRY = process.argv[2] || '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb';
+const REGISTRY = process.argv[2] || '0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068';
 const RANDOMNESS = process.argv[3] || '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
 const RPC = 'https://rpc.testnet.arc.io';
 
