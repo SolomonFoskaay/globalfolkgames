@@ -70,6 +70,17 @@ const coreAbi = parseAbi([
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
+  // Custom errors, so viem can DECODE a rule rejection and surface its name
+  // (e.g. NoLives) instead of a generic "function reverted".
+  'error NotAdmin()',
+  'error NoLives()',
+  'error Insufficient()',
+  'error Overflow()',
+  'error BucketsFull()',
+  'error DuplicateRef()',
+  'error BadLevel()',
+  'error CreditTooLarge()',
+  'error BadPoints()',
 ]);
 const regAbi = parseAbi([
   'function openGame(bytes32 gameId, address p2, uint32 ttl)',
@@ -485,7 +496,21 @@ export default async function handler(req, res) {
     try { windowGasWei += (rc.gasUsed * rc.effectiveGasPrice); } catch (e) { /* accounting */ }
     res.status(200).json({ ok: true, action, txHash: hash, gas: String(rc.gasUsed), usdc: costUsdc, relayer: relayer.address });
   } catch (e) {
-    console.error('arc-relay error:', e.shortMessage || e.message);
-    res.status(400).json({ ok: false, error: (e.shortMessage || e.message || String(e)) });
+    // Surface the DECODED contract error name (e.g. NoLives) when present, so
+    // the client can tell a real game rule rejection from a network error.
+    let name = '';
+    try {
+      const walk = (err) => {
+        if (!err || typeof err !== 'object') return '';
+        if (err.errorName) return err.errorName;
+        if (err.data && err.data.errorName) return err.data.errorName;
+        return walk(err.cause);
+      };
+      name = walk(e) || '';
+    } catch (er) { /* ignore */ }
+    const detail = (e.shortMessage || e.message || String(e));
+    const msg = name ? (name + ': ' + detail) : detail;
+    console.error('arc-relay error:', msg);
+    res.status(400).json({ ok: false, error: msg, errorName: name || undefined });
   }
 }
