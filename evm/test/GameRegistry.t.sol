@@ -8,6 +8,7 @@ import {GameRegistry} from "../src/GameRegistry.sol";
 interface Vm {
     function warp(uint256 newTimestamp) external;
     function expectRevert() external;
+    function prank(address) external;
 }
 
 contract GameRegistryTest {
@@ -94,5 +95,116 @@ contract GameRegistryTest {
         require(reg.lastSettleRoot() == settleRoot, "settle root");
         vm.expectRevert();
         reg.commitBatch(2, settleRoot, 1); // bad kind
+    }
+
+    // ===== arcv2m1 on-chain turn clock =====
+
+    function testBeginStampsSeatZeroDeadline() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        (uint8 seats, uint8 activeSeat, uint32 turnSecs, uint64 turnDeadline, uint32 moves, bool begun) = reg.turnState(G);
+        require(seats == 4 && activeSeat == 0 && turnSecs == 45 && begun, "began");
+        require(moves == 0, "moves");
+        require(turnDeadline == block.timestamp + 45, "deadline");
+    }
+
+    function testBeginRejectsBadSeatsAndTurn() public {
+        reg.openGame(G, P2, 30 minutes);
+        vm.expectRevert();
+        reg.beginGame(G, address(this), 1, 45); // seats < 2
+        vm.expectRevert();
+        reg.beginGame(G, address(this), 9, 45); // seats > MAX_SEATS
+        vm.expectRevert();
+        reg.beginGame(G, address(this), 4, 0); // zero turn
+    }
+
+    function testBeginRejectsNonHost() public {
+        reg.openGame(G, P2, 30 minutes);
+        vm.expectRevert(); // a stranger is not p1/p2
+        reg.beginGame(G, address(0x1234), 4, 45);
+    }
+
+    function testCommitMoveAdvancesActiveSeat() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        vm.warp(block.timestamp + 10);
+        reg.commitMove(G, address(this), 0, 1, keccak256("m1"));
+        (,,, uint64 dl, uint32 moves, ) = reg.turnState(G);
+        require(moves == 1, "moves");
+        require(dl == block.timestamp + 45, "restamped");
+        require(reg.lastMoveCommit(G) == keccak256("m1"), "commit");
+        // Only the active seat (1, held by P2) may move next.
+        reg.commitMove(G, P2, 1, 2, keccak256("m2"));
+        (, uint8 activeSeat, , , uint32 m2, ) = reg.turnState(G);
+        require(activeSeat == 2 && m2 == 2, "advanced");
+    }
+
+    function testCommitByNonActiveSeatReverts() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        vm.expectRevert(); // seat 1 is not the active seat
+        reg.commitMove(G, P2, 1, 2, keccak256("bad"));
+    }
+
+    function testCommitByWrongWalletReverts() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        vm.expectRevert(); // P2 holds seat 1, seat 0 is the active seat
+        reg.commitMove(G, P2, 0, 1, keccak256("bad"));
+    }
+
+    function testSeatUpThenThatWalletMayMove() public {
+        address seat2 = address(0xCAFE);
+        reg.openGame(G, P2, 30 minutes);
+        reg.seatUp(G, address(this), 2, seat2);
+        require(reg.seatOwner(G, 2) == seat2, "owner");
+        reg.beginGame(G, address(this), 4, 45);
+        reg.commitMove(G, address(this), 0, 1, keccak256("m1"));
+        reg.commitMove(G, P2, 1, 2, keccak256("m2"));
+        reg.commitMove(G, seat2, 2, 3, keccak256("m3"));
+        (, uint8 activeSeat, , , uint32 moves, ) = reg.turnState(G);
+        require(activeSeat == 3 && moves == 3, "seat wallet moved");
+        // A seat already taken cannot be re-assigned.
+        vm.expectRevert();
+        reg.seatUp(G, address(this), 2, address(0xDEAD));
+    }
+
+    function testSeatUpAfterBeginReverts() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 4, 45);
+        vm.expectRevert();
+        reg.seatUp(G, address(this), 2, address(0xCAFE));
+    }
+
+    function testExpireOnlyAfterDeadlineAndIsPermissionless() public {
+        reg.openGame(G, P2, 30 minutes);
+        reg.beginGame(G, address(this), 3, 45);
+        vm.expectRevert(); // still running
+        reg.expireTurn(G);
+        vm.warp(block.timestamp + 46);
+        // A random third party (not a player) may advance the stalled turn.
+        vm.prank(address(0x1234));
+        reg.expireTurn(G);
+        (, uint8 activeSeat, , uint64 dl, uint32 moves, ) = reg.turnState(G);
+        require(activeSeat == 1 && moves == 1, "force-passed");
+        require(dl == block.timestamp + 45, "fresh window");
+        // Wraps around the seat count.
+        vm.warp(block.timestamp + 46);
+        reg.expireTurn(G);
+        vm.warp(block.timestamp + 46);
+        reg.expireTurn(G);
+        (, uint8 wrapped, , , , ) = reg.turnState(G);
+        require(wrapped == 0, "wrap");
+    }
+
+    function testExpireTurnOnUnbegunOrSettledReverts() public {
+        reg.openGame(G, P2, 30 minutes);
+        vm.expectRevert(); // not begun
+        reg.expireTurn(G);
+        reg.beginGame(G, address(this), 2, 45);
+        reg.settleGame(G, keccak256("done"));
+        vm.warp(block.timestamp + 46);
+        vm.expectRevert(); // settled
+        reg.expireTurn(G);
     }
 }

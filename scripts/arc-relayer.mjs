@@ -20,7 +20,7 @@ const accountFor = evmKeys['private' + 'KeyToAccount'];
 
 const RPC = 'https://rpc.testnet.arc.io';
 const CORE = '0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc';
-const REGISTRY = '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb';
+const REGISTRY = '0xeECD9e3be86F4bABB0058356d729c5fF8DC6A068';
 const RANDOMNESS = '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
 
 const info = JSON.parse(readFileSync(join(homedir(), '.config', 'gfg', 'arc-sponsor.json'), 'utf8'));
