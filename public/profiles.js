@@ -170,8 +170,12 @@
             try { handle = (window.gfgReferral && typeof window.gfgReferral.handle === 'function') ? window.gfgReferral.handle() : null; } catch (e) {}
             const name = (handle || profile?.display_name || 'Player').slice(0, 12);
             const premium = (window.activeTier && typeof window.activeTier.get === 'function') ? window.activeTier.get() : null;
+            const lvlMult = (lv) => {
+                try { if (window.gfgPlanLadder && typeof window.gfgPlanLadder.multiplier === 'function') return window.gfgPlanLadder.multiplier(lv); } catch (e) {}
+                return [1, 1.5, 2, 3][lv] || 1;
+            };
             const tier = premium && premium.active
-                ? { tier: premium.level, mult: [1, 1.5, 2, 3][premium.level] || 1, label: 'Level ' + premium.level }
+                ? { tier: premium.level, mult: lvlMult(premium.level), label: 'Level ' + premium.level }
                 : ((typeof window.getActiveTier === 'function')
                     ? window.getActiveTier()
                     : { tier: 0, mult: 1, label: 'Level 0' });

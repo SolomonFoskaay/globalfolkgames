@@ -107,8 +107,14 @@
     }
 
     function amount() {
-        // Plan-ladder (M5, config-driven): L0 25 / L1 50 / L2 100 / L3 200.
+        // Config-driven (arcv2m5): the daily reward comes from the plan ladder
+        // (/plan-ladder.json) when loaded. Fallback = L0 25 / L1 50 / L2 100 / L3 200.
         var l = tierLevel();
+        try {
+            if (window.gfgPlanLadder && typeof window.gfgPlanLadder.dailyReward === 'function') {
+                return Number(window.gfgPlanLadder.dailyReward(l)) || FREE_REWARD;
+            }
+        } catch (e) { /* ignore */ }
         if (l >= 3) return LEVEL4_REWARD;
         if (l >= 2) return LEVEL3_REWARD;
         if (l >= 1) return PREMIUM_REWARD;

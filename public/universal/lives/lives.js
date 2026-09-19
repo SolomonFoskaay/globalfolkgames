@@ -115,9 +115,16 @@
     }
 
     function totalForLevel() {
-        // Plan-ladder (M5, config-driven): L0 5 / L1 10 / L2 15 / L3 20.
+        // Config-driven (arcv2m5): the lives pool comes from the plan ladder
+        // (/plan-ladder.json) when loaded, so a new level is a config edit.
+        // Fallback = owner-approved ladder L0 5 / L1 10 / L2 15 / L3 20.
         var v = activeView();
         var lvl = v ? (v.level || 0) : 0;
+        try {
+            if (window.gfgPlanLadder && typeof window.gfgPlanLadder.livesPool === 'function') {
+                return Number(window.gfgPlanLadder.livesPool(lvl)) || FREE_LIVES;
+            }
+        } catch (e) { /* ignore */ }
         if (lvl >= 3) return LEVEL4_LIVES;
         if (lvl >= 2) return LEVEL3_LIVES;
         if (lvl >= 1) return PREMIUM_LIVES;
