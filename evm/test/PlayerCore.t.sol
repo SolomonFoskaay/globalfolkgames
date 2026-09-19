@@ -100,13 +100,40 @@ contract PlayerCoreTest {
     }
 
     function testActivatePlanSetsPool() public {
+        // Owner-approved ladder 2026-09-19: L0 5 / L1 10 / L2 15 / L3 20.
         core.activatePlan(P, 2, 30);
         (uint16 used, uint16 pool,,) = core.livesOf(P);
         (,, uint8 level, uint64 until) = core.premiumOf(P);
-        require(level == 2 && pool == 10 && until > block.timestamp, "plan");
+        require(level == 2 && pool == 15 && until > block.timestamp, "plan");
         require(used == 0, "fresh");
+        core.activatePlan(P, 3, 30);
+        require(_poolOf(P) == 20, "l3 pool");
         vm.expectRevert();
         core.activatePlan(P, 9, 30);
+    }
+
+    function _lives(address a) internal view returns (uint16 used, uint16 pool, uint64 booster, uint64 day) {
+        return core.livesOf(a);
+    }
+
+    function testUpkeepExpiresPlanAndHealsPool() public {
+        core.activatePlan(P, 2, 1); // 1-day plan -> pool 15
+        require(_poolOf(P) == 15, "before");
+        vm.warp(block.timestamp + 2 days);
+        core.upkeep(P);
+        (,, uint8 level, uint64 until) = core.premiumOf(P);
+        uint16 poolAfter = _poolOf(P);
+        require(level == 0 && until == 0, "expired");
+        require(poolAfter == 5, "pool back to free");
+        // Idempotent: a second run changes nothing.
+        core.upkeep(P);
+        require(_poolOf(P) == 5, "idempotent");
+    }
+
+    function _poolOf(address a) internal view returns (uint16 pool) {
+        (uint16 used, uint16 p, uint64 booster, uint64 day) = core.livesOf(a);
+        used; booster; day;
+        return p;
     }
 
     function testOnlyAdminCanWrite() public {

@@ -42,7 +42,7 @@ async function arcEvmConfig() {
     }
   } catch (e) { /* fall through to baked values */ }
   _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
-    playerCore: '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7',
+    playerCore: '0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730',
     gameRegistry: '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a',
     randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
   return _evmCfg;
@@ -70,6 +70,7 @@ const coreAbi = parseAbi([
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
+  'function upkeep(address player)',
   // Custom errors, so viem can DECODE a rule rejection and surface its name
   // (e.g. NoLives) instead of a generic "function reverted".
   'error NotAdmin()',
@@ -424,6 +425,11 @@ export default async function handler(req, res) {
       case 'activateBooster':
         address = PLAYER_CORE; abi = coreAbi; fn = 'activateBooster';
         args = [getAddress(params.player), Number(params.planHours || 72)];
+        break;
+      case 'upkeep':
+        // Permissionless: expire a stale plan + heal the lives pool. No money.
+        address = PLAYER_CORE; abi = coreAbi; fn = 'upkeep';
+        args = [getAddress(params.player)];
         break;
       case 'openGame':
         address = GAME_REGISTRY; abi = regAbi; fn = 'openGame';
