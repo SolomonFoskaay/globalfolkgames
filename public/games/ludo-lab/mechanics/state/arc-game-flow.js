@@ -19,6 +19,7 @@
 
     var cfg = null;
     var st = { gameId: null, seatColors: [], started: false, settled: false, lastTurn: null, expiring: false };
+    var gateInFlight = false; // re-entrancy guard for the async lives gate
 
     function isArc() { try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; } }
     function wallet() { try { return (window.gfgChainAdapter && window.gfgChainAdapter.walletAddress && window.gfgChainAdapter.walletAddress()) || null; } catch (e) { return null; } }
@@ -129,6 +130,70 @@
 
     function reset() { st = { gameId: null, seatColors: [], started: false, settled: false, lastTurn: null, expiring: false }; }
 
+    // 5) LIVES GATE: the CHAIN is the authority. Before the local board starts,
+    // await chargeLife. If the contract reverts (NoLives) the match is blocked
+    // with the lives overlay; a modified client cannot skip it, because the
+    // charge is what lets the game proceed. A transient network error does NOT
+    // hard-block play (the local meter still gates), matching the soft-fail
+    // contract everywhere else in the Arc rail.
+    function blockNoLives() {
+        try {
+            if (typeof window.showLivesBlocked === 'function') window.showLivesBlocked(true);
+            else if (typeof window.showAuthBanner === 'function') {
+                window.showAuthBanner('No lives left today. Your meter refills at midnight (GMT).\n\nGo Premium for more lives.', true);
+            }
+        } catch (e) { /* soft */ }
+    }
+    function gateThenStart(orig, args) {
+        // Re-entrancy guard: the gate is async, so a rapid double-tap before
+        // setupConfigurationLocked is set must NOT charge twice.
+        if (gateInFlight) return null;
+        // Multiplayer exemption: an invited device (not the host seat 0) starts
+        // its board to mirror the shared game; the HOST already consumed the
+        // entry life on-chain, so the joiner must never be charged or blocked.
+        try {
+            var a = window.gfgLudoAdapter;
+            var isMp = !!(a && typeof a.isActive === 'function' && a.isActive());
+            var isHost = !!(a && typeof a.seat === 'function' && a.seat() === 0);
+            if (isMp && !isHost) return orig.apply(window, args);
+        } catch (e) { /* soft: fall through to the gate */ }
+        var ref = window.gfgGameMatchRef || Date.now();
+        window.gfgGameMatchRef = ref;
+        gateInFlight = true;
+        return Promise.resolve()
+            .then(function () { return window.gfgChain.chargeLife(ref); })
+            .then(function () {
+                // Charged (or unlimited): let the normal start proceed, and tell
+                // the game core the gate already charged so it never double-charges.
+                window.__gfgArcLifeGateHandled = ref;
+                gateInFlight = false;
+                return orig.apply(window, args);
+            })
+            .catch(function (e) {
+                gateInFlight = false;
+                var msg = (e && (e.message || e.shortMessage)) || String(e);
+                if (/nolives|no lives|lives/i.test(msg)) {
+                    console.warn('[arc-flow] lives gate blocked the match:', msg);
+                    blockNoLives();
+                    return null;
+                }
+                // Network/transient: do not break play; the local meter still gates.
+                console.warn('[arc-flow] lives gate soft-fail (proceeding):', msg);
+                return orig.apply(window, args);
+            });
+    }
+    var startWrapped = false;
+    function wrapStart() {
+        if (startWrapped) return;
+        var orig = window.initiateArenaMatch;
+        if (typeof orig !== 'function') return; // not defined yet; retry later
+        window.initiateArenaMatch = function () {
+            if (!isArc()) return orig.apply(this, arguments);
+            return gateThenStart(orig, arguments);
+        };
+        startWrapped = true;
+    }
+
     function tick() {
         if (!isArc()) return;
         try { ensureStarted().then(syncTurn).then(watchDeadline); } catch (e) {}
@@ -144,6 +209,10 @@
     } catch (e) { /* soft */ }
 
     try { wrapCeremony(); } catch (e) {}
+    try { wrapStart(); } catch (e) {}
+    // The page may define initiateArenaMatch after this file loads; re-wrap
+    // until it is present and still unguarded.
+    try { setInterval(function () { if (!window.initiateArenaMatch || !window.initiateArenaMatch.__arcGated) wrapStart(); }, 2000); } catch (e) {}
     try { setInterval(function () { if (window.playAgainAfterCeremony !== undefined) wrapCeremony(); }, 2000); } catch (e) {}
     try { setInterval(tick, POLL_MS); } catch (e) {}
 })();

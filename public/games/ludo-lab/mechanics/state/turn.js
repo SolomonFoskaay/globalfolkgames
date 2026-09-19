@@ -282,7 +282,11 @@ function lockSetupDropdowns() {
         if (window.gfgChain && typeof window.gfgChain.isArc === 'function' && window.gfgChain.isArc()) {
             const arcMatchRef = window.gfgGameMatchRef || Date.now();
             window.gfgGameMatchRef = arcMatchRef;
-            if (window.gfgChain.chargeLife) {
+            // The Arc game-flow bridge already charged this life at the gate
+            // (chain-enforced, awaited). Never charge twice for the same match.
+            if (window.__gfgArcLifeGateHandled === arcMatchRef) {
+                window.__gfgArcLifeGateHandled = null;
+            } else if (window.gfgChain.chargeLife) {
                 window.gfgChain.chargeLife(arcMatchRef).catch(function (e) { console.warn('[gfgChain] chargeLife failed', e); });
             }
         }
