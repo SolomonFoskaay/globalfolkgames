@@ -254,6 +254,11 @@ function applyMove(move) {
         // getDynamicSolanaWallet() returns the wallet ADDRESS as a plain string
         // (src/dynamic-auth.js), so accept string/object + profile fallbacks.
         try {
+            if (window.gfgChain && typeof window.gfgChain.isArc === 'function' && window.gfgChain.isArc()) {
+                // Arc rail: ONLY the EVM wallet is valid here. No Solana fallback.
+                var wa = (typeof window.gfgChain.walletAddress === 'function') ? window.gfgChain.walletAddress() : null;
+                return (typeof wa === 'string' && wa) ? wa : null;
+            }
             if (window.getDynamicSolanaWallet && typeof window.getDynamicSolanaWallet === 'function') {
                 var w = window.getDynamicSolanaWallet();
                 if (typeof w === 'string' && w) return w;

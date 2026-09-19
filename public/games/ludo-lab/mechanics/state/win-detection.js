@@ -248,7 +248,7 @@
             proof: proofSig
                 ? {
                     method: 'magicblock-vrf',
-                    chain: 'solana-devnet',
+                    chain: (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) ? 'arc' : 'solana-devnet',
                     signature: proofSig,
                 }
                 : null,

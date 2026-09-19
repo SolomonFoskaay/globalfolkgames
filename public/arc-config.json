@@ -11,7 +11,7 @@
       "contracts": {
         "gameRegistry": "0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb",
         "randomness": "0xb406295b4F7E5B513b656122AfFF29AF720E9E23",
-        "playerCore": "0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc"
+        "playerCore": "0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7"
       },
       "sponsor": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
       "sponsorNote": "Public address of the self-hosted relayer that pays the tiny USDC gas. The key is NEVER here (it lives only in the server env)."

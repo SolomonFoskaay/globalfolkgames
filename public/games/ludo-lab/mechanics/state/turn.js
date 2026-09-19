@@ -594,7 +594,7 @@ window.showResultCeremony = function () {
             if (!proofEl) return;
             if (sig) {
                 const receipt = typeof sig === 'string' ? sig : '';
-                proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain game record (MagicBlock ER VRF).</span>'
+                proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain record (' + (window.gfgChain ? window.gfgChain.shortLabel() : 'on-chain') + ').</span>'
                     + (receipt ? '<span class="ceremony-proof-receipt">Receipt: <code class="ceremony-proof-sig" title="Click to copy">' + receipt + '</code></span>' : '')
                     + (receipt ? ' <span class="ceremony-proof-status"><a href="/verify/?tx=' + encodeURIComponent(receipt) + '" target="_blank" rel="noopener noreferrer" style="color:#f87818;text-decoration:underline;">See on-chain receipt</a></span>' : '');
                 const sigCode = proofEl.querySelector('.ceremony-proof-sig');
@@ -609,20 +609,16 @@ window.showResultCeremony = function () {
             } else {
                 proofEl.innerHTML = '<span class="ceremony-proof-status">Match result recorded. On-chain commit pending (receipt unavailable this session).</span>';
             }
-            const resultDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastResultDelegationSignature === 'function')
+            // Solana-only onboarding/record links. On Arc none of this applies
+            // (Arc has real explorer links per transaction instead), so the game
+            // never shows a Solana/devnet reference while running on Arc.
+            const isArc = !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc());
+            const resultDelegateSig = (!isArc && window.magicblockDice && typeof window.magicblockDice.getLastResultDelegationSignature === 'function')
                 ? window.magicblockDice.getLastResultDelegationSignature() : null;
             if (resultDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
                 proofEl.innerHTML += ' <span class="ceremony-proof-status">Game record account created on devnet: ' + window.gfgExplorer.txLink(resultDelegateSig, 'view tx') + '.</span>';
             }
-            // Initial ER onboarding/delegation tx (below the receipt): the ONE
-            // base-layer tx the sponsor relay ran for this player's dice account
-            // ("Delegating player dice account (sponsored by GlobalFolkGames)").
-            // It is devnet-visible (unlike the gasless ER roll/commit receipts),
-            // so it is the clickable proof that the dice account exists on-chain.
-            // Only present when THIS page session actually ran the sponsored
-            // onboarding; otherwise the roll-verification line during play is
-            // the only proof shown, and that stays honest.
-            const diceDelegateSig = (window.magicblockDice && typeof window.magicblockDice.getLastDiceDelegationSignature === 'function')
+            const diceDelegateSig = (!isArc && window.magicblockDice && typeof window.magicblockDice.getLastDiceDelegationSignature === 'function')
                 ? window.magicblockDice.getLastDiceDelegationSignature() : null;
             if (diceDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
                 proofEl.innerHTML += ' <span class="ceremony-proof-status">Dice account created and delegated on devnet (sponsored once by GlobalFolkGames, every roll afterwards ran free on the ER): ' + window.gfgExplorer.txLink(diceDelegateSig, 'view onboarding tx') + '.</span>';

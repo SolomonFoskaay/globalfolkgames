@@ -120,4 +120,28 @@ contract PlayerCoreTest {
         vm.expectRevert();
         core.activatePlan(P, 2, 30);
     }
+
+    function testMigratePlayerSetsBalancesAndIsIdempotent() public {
+        PlayerCore.MigrationData memory m = PlayerCore.MigrationData({
+            tag: LUDO, localPure: 1810, localSpendable: 1810,
+            globalPure: 1810, globalLifetime: 6235, globalSpendable: 5235,
+            premiumLifetime: 12500, premiumSpendable: 6500,
+            level: 2, activeUntil: uint64(block.timestamp + 30 days), migrationRef: 999
+        });
+        core.migratePlayer(P, m);
+        (uint64 bp, uint64 bs) = core.bucketOf(P, LUDO);
+        (uint64 gp, uint64 gl, uint64 gs) = core.globalsOf(P);
+        (uint64 pl, uint64 ps, uint8 lvl,) = core.premiumOf(P);
+        require(bp == 1810 && bs == 1810, "bucket");
+        require(gp == 1810 && gl == 6235 && gs == 5235, "global");
+        require(pl == 12500 && ps == 6500 && lvl == 2, "premium");
+
+        core.migratePlayer(P, m); // re-run must be a no-op
+        (gp, gl, gs) = core.globalsOf(P);
+        require(gp == 1810 && gl == 6235 && gs == 5235, "idempotent");
+
+        vm.expectRevert();
+        PlayerCore.MigrationData memory z = m; z.migrationRef = 0;
+        core.migratePlayer(P, z); // ref required
+    }
 }

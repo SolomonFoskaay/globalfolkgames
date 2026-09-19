@@ -29,8 +29,9 @@ function resetOnchainProofRollUsed() {
 // Bracket tag shown in the Ludo log + console so players know where the
 // CURRENT dice click was resolved: on-chain (MagicBlock ER VRF on Solana) or not.
 function currentDiceSourceTag() {
+    // Chain-correct label: on Arc it must say Arc, never Solana.
     return activeDiceSource === 'onchain'
-        ? '[MagicBlock ER VRF on Solana Blockchain]'
+        ? '[' + (window.gfgChain ? window.gfgChain.label() : 'On-Chain') + ']'
         : '[Off-Chain Local Randomness]';
 }
 
@@ -116,7 +117,7 @@ async function pingOnchainStack() {
             return await window.gfgChain.ping();
         }
     } catch (e) {
-        console.warn('[ER VRF] chain ping failed:', e);
+        console.warn('[chain] ping failed:', e);
     }
     // Fallback: if the VRF ping helper is not ready yet, probe the relay's
     // passive health route (never triggers a roll).
@@ -336,10 +337,10 @@ async function rollDiceEngine(source) {
                     // on-chain via the ER VRF, and the base-layer tx that
                     // created+delegated this player's dice account IS
                     // devnet-visible, so we link that as the real proof.
-                    let userVerifyLine = `${currentTurn.toUpperCase()}: roll resolved on-chain (MagicBlock ER VRF)`;
+                    let userVerifyLine = `${currentTurn.toUpperCase()}: roll resolved on-chain (${window.gfgChain ? window.gfgChain.shortLabel() : 'on-chain'})`;
                     const diceDelegateSig = (window.gfgChain && typeof window.gfgChain.getLastDiceDelegationSignature === 'function')
                         ? window.gfgChain.getLastDiceDelegationSignature() : null;
-                    if (diceDelegateSig && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
+                    if (diceDelegateSig && !(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) && window.gfgExplorer && typeof window.gfgExplorer.txLink === 'function') {
                         userVerifyLine += ` - dice account delegated on devnet: ${window.gfgExplorer.txLink(diceDelegateSig, 'view tx')}`;
                     }
                     showVerifyLink(userVerifyLine);
@@ -370,9 +371,9 @@ async function rollDiceEngine(source) {
                     if (data && Number.isInteger(data.roll1) && Number.isInteger(data.roll2)) {
                         rollValues = [data.roll1, data.roll2];
                         activeDiceSource = 'onchain';
-                        console.log(`[MagicBlock ER VRF on Solana Blockchain] Computer roll resolved on-chain: ${data.roll1} + ${data.roll2} (seed ${data.seed})`);
+                        console.log(`[${window.gfgChain ? window.gfgChain.label() : 'On-Chain'}] Computer roll resolved on-chain: ${data.roll1} + ${data.roll2} (seed ${data.seed})`);
                         console.log(`[Computer roll TX] ${data.signature}`);
-                        displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${data.roll1} + ${data.roll2} [MagicBlock ER VRF on Solana Blockchain]`);
+                        displayEducationalLog(`${currentTurn.toUpperCase()}: VRF computer roll ${data.roll1} + ${data.roll2} [${window.gfgChain ? window.gfgChain.label() : 'On-Chain'}]`);
                         // Same honest verification as the user seat: the ER
                         // rollup's tx sigs 404 on every public explorer, so no
                         // fake per-roll link. The house dice account is

@@ -47,10 +47,27 @@ contract PlayerCore {
         uint64 lastGlobalRef;
         // idempotency for the last award
         uint64 lastMatchRef;
+        // migration idempotency (Solana -> Arc)
+        uint64 migrationRef;
         // per-game buckets
         uint8 bucketCount;
         Bucket[MAX_BUCKETS] buckets;
         bool exists;
+    }
+
+    /// One-shot migration payload for moving a player's Solana balances to Arc.
+    struct MigrationData {
+        bytes32 tag;
+        uint64 localPure;
+        uint64 localSpendable;
+        uint64 globalPure;
+        uint64 globalLifetime;
+        uint64 globalSpendable;
+        uint64 premiumLifetime;
+        uint64 premiumSpendable;
+        uint8 level;
+        uint64 activeUntil;
+        uint64 migrationRef;
     }
 
     address public adminAuthority; // the self-hosted relayer
@@ -74,6 +91,7 @@ contract PlayerCore {
     event PremiumCredited(address indexed player, uint64 points, uint64 creditRef);
     event PlanActivated(address indexed player, uint8 level, uint64 until);
     event BoosterActivated(address indexed player, uint64 until);
+    event Migrated(address indexed player, uint64 migrationRef);
 
     constructor(address admin) {
         require(admin != address(0), "admin");
@@ -150,6 +168,30 @@ contract PlayerCore {
         p.globalSpendable = _add(p.globalSpendable, points);
         p.lastMatchRef = matchRef;
         emit PointsRecorded(player, tag, points, reason, matchRef);
+    }
+
+    /// Migration (Solana -> Arc): SET this player's balances from the source
+    /// chain in one call. Admin-gated and idempotent by migrationRef, so a
+    /// re-run for the same player is a clean no-op. Never adds to global twice.
+    function migratePlayer(address player, MigrationData calldata m) external onlyAdmin {
+        Player storage p = _p(player);
+        require(m.migrationRef != 0, "ref");
+        if (p.migrationRef == m.migrationRef) return; // already migrated: clean no-op
+        uint256 i = _ensure(p, m.tag);
+        p.buckets[i].purePts = m.localPure;
+        p.buckets[i].spendable = m.localSpendable;
+        p.globalPure = m.globalPure;
+        p.globalLifetime = m.globalLifetime;
+        p.globalSpendable = m.globalSpendable;
+        p.premiumLifetime = m.premiumLifetime;
+        p.premiumSpendable = m.premiumSpendable;
+        if (m.level > 0 && m.level <= MAX_PLAN_LEVEL) {
+            p.subscriptionLevel = m.level;
+            p.subscriptionActiveUntil = m.activeUntil;
+            p.livesPool = m.level >= 3 ? 15 : (m.level == 2 ? 10 : 5);
+        }
+        p.migrationRef = m.migrationRef;
+        emit Migrated(player, m.migrationRef);
     }
 
     /// kind 0 = game win (all three tracks); kind 1 = other sources (lifetime +
