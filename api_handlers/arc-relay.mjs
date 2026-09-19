@@ -18,8 +18,8 @@ import { createPublicClient, createWalletClient, defineChain, http, parseAbi, ge
 import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
 import { readSolanaCore, coreBalances, hasBalances } from '../scripts/solana-core-read.mjs';
 import { createHash } from 'crypto';
-import { leafOf, buildTree, verifyProof } from '../scripts/arc-merkle.mjs';
-import { enqueue, pending, due, markFlushed, lastFlush, proofFor } from '../scripts/arc-batch-store.mjs';
+import { buildTree, verifyProof } from '../scripts/arc-merkle.mjs';
+import { keccak256, encodePacked } from 'viem';
 import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
@@ -73,6 +73,11 @@ const regAbi = parseAbi([
   'function settleGame(bytes32 gameId, bytes32 resultHash)',
   'function expireGame(bytes32 gameId)',
   'function commitBatch(uint8 kind, bytes32 root, uint256 count)',
+  'function finalizeWindow(uint8 kind, bytes32 root, uint256 count, uint256 fromBlock, uint256 toBlock)',
+  'function windowRoot(uint8) view returns (bytes32)',
+  'function windowCount(uint8) view returns (uint256)',
+  'function windowFromBlock(uint8) view returns (uint256)',
+  'function windowToBlock(uint8) view returns (uint256)',
 ]);
 const rndAbi = parseAbi([
   'function commitSeed(bytes32 batchId, bytes32 seedHash)',
@@ -186,46 +191,82 @@ export default async function handler(req, res) {
       return;
     }
 
-    // WINDOW AGGREGATOR (GFG-BS): collect game leaves and flush ONE transaction
-    // per window. Flush when the batch reaches N games OR the window reaches T.
-    async function flushBatchNow(kind) {
-      const p = pending(kind);
-      if (!p.leaves.length) return { flushed: false, reason: 'empty' };
-      const leaves = p.leaves.map(x => x.leaf);
-      const tree = buildTree(leaves);
-      const items = p.leaves.map(x => ({ gameId: x.gameId, leaf: x.leaf, proof: tree.proofs.get(x.leaf) || [] }));
-      const kindNum = kind === 'settle' ? 1 : 0;
-      const h = await wallet.writeContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'commitBatch', args: [kindNum, tree.root, BigInt(p.leaves.length)] });
-      const rc = await pub.waitForTransactionReceipt({ hash: h });
-      try { recordArcSpend({ action: 'commitBatch:' + kind, gas: Number(rc.gasUsed), usdc: Number(formatEther(rc.gasUsed * rc.effectiveGasPrice)), player: null, gameId: null }); } catch (e) {}
-      markFlushed(kind, tree.root, items);
-      return { flushed: true, root: tree.root, count: p.leaves.length, txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice) };
+    // WINDOW AGGREGATOR (GFB-BS), CHAIN-DERIVED: the LEAVES are the chain's own
+    // PointsRecorded events. The relayer reads them with getLogs since the last
+    // finalized block, builds the Merkle root, and finalizes the window on-chain.
+    // There is NO off-chain store: a restart simply re-reads the chain.
+    const POINTS_TOPIC = keccak256(Buffer.from('PointsRecorded(address,bytes32,uint64,uint8,uint64)'));
+
+    async function windowLogs(fromBlock, toBlock) {
+      const logs = await pub.getLogs({ address: PLAYER_CORE, fromBlock, toBlock, topics: [POINTS_TOPIC] });
+      return logs.map((l) => {
+        const player = getAddress('0x' + l.topics[1].slice(26));
+        const tag = l.topics[2];
+        const d = l.data.slice(2);
+        const u64 = (i) => BigInt('0x' + d.slice(i * 64, i * 64 + 64));
+        return { player, tag, points: u64(0), reason: Number(u64(1) & 0xffn), matchRef: u64(2), blockNumber: l.blockNumber };
+      });
+    }
+    async function leafFromEvent(e) {
+      return keccak256(encodePacked(['address', 'bytes32', 'uint64', 'uint8', 'uint64'], [e.player, e.tag, e.points, e.reason, e.matchRef]));
     }
 
-    if (action === 'enqueueResult') {
-      const kind = params.kind === 'open' ? 'open' : 'settle';
-      const leaf = leafOf({ gameId: hex32(params.gameId), resultHash: hex32(params.resultHash), points: num(params.points) || 0n, player: getAddress(params.player) });
-      const st = enqueue(kind, leaf, { gameId: hex32(params.gameId), points: String(params.points || 0) });
-      let flushed = null;
-      if (due(kind, { windowMs: Number(params.windowMs || 0) || undefined, maxGames: Number(params.maxGames || 0) || undefined })) {
-        flushed = await flushBatchNow(kind);
-      }
-      res.status(200).json({ ok: true, pending: st.count, startedAt: st.startedAt, flushed });
-      return;
+    async function flushBatchNow(kind) {
+      const kindNum = kind === 'settle' ? 1 : 0;
+      const last = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [kindNum] });
+      const latest = await pub.getBlockNumber();
+      // First flush: bound the scan to a recent range the RPC accepts.
+      const fromBlock = last === 0n ? (latest > 9999n ? latest - 9999n : 0n) : last + 1n;
+      if (latest < fromBlock) return { flushed: false, reason: 'empty' };
+      const events = await windowLogs(fromBlock, latest);
+      if (!events.length) return { flushed: false, reason: 'no leaves in range' };
+      const leaves = [];
+      for (const e of events) leaves.push(await leafFromEvent(e));
+      const tree = buildTree(leaves);
+      const h = await wallet.writeContract({
+        address: GAME_REGISTRY, abi: regAbi, functionName: 'finalizeWindow',
+        args: [kindNum, tree.root, BigInt(leaves.length), fromBlock, BigInt(latest)],
+      });
+      const rc = await pub.waitForTransactionReceipt({ hash: h });
+      try { recordArcSpend({ action: 'finalizeWindow:' + kind, gas: Number(rc.gasUsed), usdc: Number(formatEther(rc.gasUsed * rc.effectiveGasPrice)), player: null, gameId: null }); } catch (e) {}
+      return { flushed: true, root: tree.root, count: leaves.length, fromBlock: String(fromBlock), toBlock: String(latest), txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice) };
     }
+
     if (action === 'flushBatch') {
       res.status(200).json({ ok: true, ...(await flushBatchNow(params.kind === 'open' ? 'open' : 'settle')) });
       return;
     }
     if (action === 'batchStat') {
       const k = params.kind === 'open' ? 'open' : 'settle';
-      const p = pending(k);
-      res.status(200).json({ ok: true, pending: p.leaves.length, startedAt: p.startedAt, last: lastFlush(k) });
+      const kNum = k === 'settle' ? 1 : 0;
+      const [root, count, fromB, toB, latest] = await Promise.all([
+        pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowRoot', args: [kNum] }),
+        pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowCount', args: [kNum] }),
+        pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowFromBlock', args: [kNum] }),
+        pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [kNum] }),
+        pub.getBlockNumber(),
+      ]);
+      const pendFrom = toB === 0n ? (latest > 9999n ? latest - 9999n : 0n) : toB + 1n;
+      const pendingLeaves = await windowLogs(pendFrom, latest).catch(() => []);
+      res.status(200).json({ ok: true, chain: true, pending: pendingLeaves.length, last: { root: root === '0x' + '0'.repeat(64) ? null : root, count: Number(count), fromBlock: String(fromB), toBlock: String(toB), at: null } });
       return;
     }
     if (action === 'batchProof') {
-      const hit = proofFor(params.kind === 'open' ? 'open' : 'settle', hex32(params.gameId));
-      res.status(200).json(hit ? { ok: true, root: hit.root, proof: hit.proof, leaf: hit.leaf, flushedAt: hit.flushedAt, valid: verifyProof(hit.leaf, hit.proof, hit.root) } : { ok: false, error: 'no proof yet (still pending or unknown)' });
+      const kNum = params.kind === 'open' ? 0 : 1;
+      const toB = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [kNum] });
+      const root = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowRoot', args: [kNum] });
+      const gameId = hex32(params.gameId);
+      if (toB === 0n) { res.status(200).json({ ok: false, error: 'no window finalized yet' }); return; }
+      let fromB = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowFromBlock', args: [kNum] });
+      if (fromB === 0n) fromB = toB > 9999n ? toB - 9999n : 0n;
+      const events = await windowLogs(fromB, toB);
+      const leaves = [];
+      for (const e of events) leaves.push({ leaf: await leafFromEvent(e), e });
+      const tree = buildTree(leaves.map(x => x.leaf));
+      const hit = leaves.find(x => ('0x' + x.e.matchRef.toString(16).padStart(64, '0')) === gameId);
+      if (!hit) { res.status(200).json({ ok: false, error: 'game not in the last window' }); return; }
+      const proof = tree.proofs.get(hit.leaf) || [];
+      res.status(200).json({ ok: true, root, proof, leaf: hit.leaf, valid: verifyProof(hit.leaf, proof, root), fromBlock: String(fromB), toBlock: String(toB) });
       return;
     }
 

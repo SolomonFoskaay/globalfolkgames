@@ -108,19 +108,10 @@
     },
     recordResult: async function (finishOrder, points, reason, matchRef) {
       if (chain() === 'evm') {
-        // BATCHED: add this game as a leaf to the settle window instead of its
-        // own transaction. One wallet address per game, verified by Merkle proof
-        // when the window flushes (on N games or T time).
-        const a = adapter();
-        const player = (a && a.walletAddress && a.walletAddress()) || null;
-        const gameId = '0x' + String(matchRef).padStart(64, '0');
-        const resultHash = '0x' + String(points).padStart(64, '0');
-        if (!player) return null;
-        try {
-          const r = await relay('enqueueResult', { kind: 'settle', gameId, resultHash, points: points || 0, player, windowMs: 24 * 3600 * 1000, maxGames: 100 });
-          window.__gfgLastBatch = r;
-          return r;
-        } catch (e) { console.warn('[gfgChain] enqueueResult failed (soft):', e && e.message); return null; }
+        // The on-chain points write already emitted the leaf (PointsRecorded).
+        // The window is DERIVED from the chain, so there is nothing to enqueue
+        // and no off-chain store. The proof is available after a window flush.
+        return { ok: true, batched: true };
       }
       return (mb() && mb().recordResult) ? mb().recordResult(finishOrder, points, reason, matchRef) : null;
     },
