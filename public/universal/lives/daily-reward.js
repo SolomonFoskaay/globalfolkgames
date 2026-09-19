@@ -31,7 +31,20 @@
     var claiming = false;
 
     // ---- identity --------------------------------------------------------
+    function isArc() {
+        try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; }
+    }
+    function evmAddress() {
+        try {
+            var a = window.gfgChainAdapter;
+            var w = (a && a.walletAddress && a.walletAddress()) || null;
+            if (w) return String(w);
+        } catch (e) { /* ignore */ }
+        try { if (window.getDynamicEvmWallet) { var x = window.getDynamicEvmWallet(); if (x) return String(x); } } catch (e) { /* ignore */ }
+        return null;
+    }
     function readAddress() {
+        try { if (isArc()) { var e = evmAddress(); if (e) return e; } } catch (err) { /* ignore */ }
         var addr = null;
         try {
             if (window.getDynamicSolanaWallet) {
@@ -49,6 +62,9 @@
     }
 
     function walletKey() {
+        try {
+            if (isArc()) { var e = evmAddress(); if (e) return e.toLowerCase(); }
+        } catch (err) { /* ignore */ }
         try {
             if (window.getDynamicSolanaWallet) {
                 var w = window.getDynamicSolanaWallet();

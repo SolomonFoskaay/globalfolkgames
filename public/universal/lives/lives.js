@@ -36,7 +36,21 @@
     var lastHandled = null; // dedupe seam handlers vs the DOM event (same finish)
 
     // ---- identity --------------------------------------------------------
+    function isArc() {
+        try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; }
+    }
+    function evmAddress() {
+        try {
+            var a = window.gfgChainAdapter;
+            var w = (a && a.walletAddress && a.walletAddress()) || null;
+            if (w) return String(w);
+        } catch (e) { /* ignore */ }
+        try { if (window.getDynamicEvmWallet) { var x = window.getDynamicEvmWallet(); if (x) return String(x); } } catch (e) { /* ignore */ }
+        return null;
+    }
     function readAddress() {
+        // Arc rail: the EVM address is the identity for the on-chain lives ledger.
+        try { if (isArc()) { var e = evmAddress(); if (e) return e; } } catch (err) { /* ignore */ }
         var addr = null;
         try {
             if (window.getDynamicSolanaWallet) {
@@ -54,6 +68,9 @@
     }
 
     function walletKey() {
+        try {
+            if (isArc()) { var e = evmAddress(); if (e) return e.toLowerCase(); }
+        } catch (err) { /* ignore */ }
         try {
             if (window.getDynamicSolanaWallet) {
                 var w = window.getDynamicSolanaWallet();
@@ -248,6 +265,26 @@
     // truth for lives, exactly like the turn timer).
     function syncFromChain() {
         try {
+            // Arc rail: read lives from PlayerCore through the relayer. The
+            // on-chain day (block time / 86400) and used count are the truth,
+            // so the local meter always mirrors the chain.
+            if (isArc()) {
+                var a = window.gfgChainAdapter;
+                if (!a || typeof a.readPlayer !== 'function') return;
+                if (!readAddress()) return;
+                a.readPlayer('ludo').then(function (r) {
+                    if (!r || !r.lives) return;
+                    var s = slice();
+                    // Local day keys are UTC YYYY-MM-DD; the chain day is an
+                    // absolute day number. Mirror the chain's used count and
+                    // keep the local day key fresh so the meter renders right.
+                    s.day = utcDayKey();
+                    s.used = Math.min(Number(r.lives.used || 0), Number(r.lives.pool || 0));
+                    persist();
+                    render();
+                }).catch(function () { /* soft */ });
+                return;
+            }
             var md = window.magicblockDice;
             var addr = readAddress();
             if (!addr || !md || typeof md.readLivesFor !== 'function') return;
