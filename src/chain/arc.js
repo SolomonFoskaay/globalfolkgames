@@ -90,6 +90,19 @@ export const arcAdapter = {
     return relay('chargeLife', { player, matchRef });
   },
 
+  // Spendable draw-downs (gasless; the relayer signs). The contract's own
+  // Insufficient check is the guard, so a spend can never overdraw.
+  async spendLocal(gameTag, amount, playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) throw new Error('no Arc wallet connected');
+    return relay('spendLocal', { player, tag: gameTag || 'ludo', amount });
+  },
+  async spendGlobal(amount, playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) throw new Error('no Arc wallet connected');
+    return relay('spendGlobal', { player, amount });
+  },
+
   async openGame(gameId, p2, ttl) { return relay('openGame', { gameId, p2, ttl: ttl || 1800 }); },
   async settleGame(gameId, resultHash) { return relay('settleGame', { gameId, resultHash }); },
   async expireGame(gameId) { return relay('expireGame', { gameId }); },

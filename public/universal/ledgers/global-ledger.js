@@ -519,11 +519,17 @@
                 return null;
             }
         },
-        // Global spendable draw-down. Soft-fail.
+        // Global spendable draw-down. Soft-fail. On Arc the relayer signs and the
+        // contract's Insufficient check guards the balance.
         spend: async function (amount, reason, ref) {
             if (!magicReady()) return null;
             try {
-                var sig = await window.magicblockDice.spendGlobal(amount, reason, ref);
+                var sig;
+                if (window.gfgChain && typeof window.gfgChain.spendGlobal === 'function') {
+                    sig = await window.gfgChain.spendGlobal(amount, reason, ref);
+                } else {
+                    sig = await window.magicblockDice.spendGlobal(amount, reason, ref);
+                }
                 await refreshLedger(true);
                 return sig || null;
             } catch (e) {

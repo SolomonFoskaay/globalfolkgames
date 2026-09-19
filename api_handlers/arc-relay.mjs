@@ -68,6 +68,8 @@ const coreAbi = parseAbi([
   'function recordGlobal(address player, uint8 kind, uint64 points, uint64 matchRef)',
   'function migratePlayer(address player, (bytes32 tag, uint64 localPure, uint64 localSpendable, uint64 globalPure, uint64 globalLifetime, uint64 globalSpendable, uint64 premiumLifetime, uint64 premiumSpendable, uint8 level, uint64 activeUntil, uint64 migrationRef) m)',
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
+  'function spendLocal(address player, bytes32 tag, uint64 amount)',
+  'function spendGlobal(address player, uint64 amount)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
   'function upkeep(address player)',
@@ -417,6 +419,14 @@ export default async function handler(req, res) {
       case 'creditPremium':
         address = PLAYER_CORE; abi = coreAbi; fn = 'creditPremium';
         args = [getAddress(params.player), num(params.points), num(params.creditRef)];
+        break;
+      case 'spendLocal':
+        address = PLAYER_CORE; abi = coreAbi; fn = 'spendLocal';
+        args = [getAddress(params.player), tag32(params.tag), num(params.amount)];
+        break;
+      case 'spendGlobal':
+        address = PLAYER_CORE; abi = coreAbi; fn = 'spendGlobal';
+        args = [getAddress(params.player), num(params.amount)];
         break;
       case 'activatePlan':
         address = PLAYER_CORE; abi = coreAbi; fn = 'activatePlan';

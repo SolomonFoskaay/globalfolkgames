@@ -158,6 +158,17 @@
       return null;
     },
 
+    // Spendable draw-downs. On Arc these go through the relayer (contract
+    // enforces Insufficient); Solana keeps the session-key path.
+    spendGlobal: async function (amount, reason, ref) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.spendGlobal) return a.spendGlobal(amount); return null; }
+      return (mb() && mb().spendGlobal) ? mb().spendGlobal(amount, reason, ref) : null;
+    },
+    spendLocal: async function (gameTag, amount, reason, ref) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.spendLocal) return a.spendLocal(gameTag, amount); return null; }
+      return (mb() && mb().spendLocal) ? mb().spendLocal(gameTag, amount, reason, ref) : null;
+    },
+
     // On-chain proof for a game in the last flushed window (verify card).
     batchProof: async function (matchRef) {
       if (chain() !== 'evm') return null;
