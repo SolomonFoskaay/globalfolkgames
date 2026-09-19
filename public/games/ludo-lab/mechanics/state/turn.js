@@ -594,7 +594,21 @@ window.showResultCeremony = function () {
             if (!proofEl) return;
             if (sig) {
                 const receipt = typeof sig === 'string' ? sig : '';
-                proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain record (' + (window.gfgChain ? window.gfgChain.shortLabel() : 'on-chain') + ').</span>'
+                            // Arc: the match is a leaf in the batched settlement window. Show the
+            // honest pending state, then the on-chain proof once the window flushes.
+            if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                proofEl.innerHTML = '<span class="ceremony-proof-status">Match queued for the Arc settlement window. It becomes verifiable on-chain when the window flushes (100 games or 24h, and the dashboard can flush it sooner).</span>';
+                try {
+                    var __mr = (typeof window.gfgGameMatchRef !== 'undefined' && window.gfgGameMatchRef) ? window.gfgGameMatchRef : Date.now();
+                    window.gfgChain.batchProof(__mr).then(function (bp) {
+                        if (bp && bp.ok && bp.valid) {
+                            proofEl.innerHTML = '<span class="ceremony-proof-status">Verified on-chain in the Arc settlement window (Merkle root ' + String(bp.root).slice(0, 14) + '…, proof valid).</span>';
+                        }
+                    }).catch(function () { /* stays pending */ });
+                } catch (e) { /* stays pending */ }
+                return;
+            }
+proofEl.innerHTML = '<span class="ceremony-proof-status">Whole match committed to the on-chain record (' + (window.gfgChain ? window.gfgChain.shortLabel() : 'on-chain') + ').</span>'
                     + (receipt ? '<span class="ceremony-proof-receipt">Receipt: <code class="ceremony-proof-sig" title="Click to copy">' + receipt + '</code></span>' : '')
                     + (receipt ? ' <span class="ceremony-proof-status"><a href="/verify/?tx=' + encodeURIComponent(receipt) + '" target="_blank" rel="noopener noreferrer" style="color:#f87818;text-decoration:underline;">See on-chain receipt</a></span>' : '');
                 const sigCode = proofEl.querySelector('.ceremony-proof-sig');

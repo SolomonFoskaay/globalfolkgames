@@ -84,6 +84,19 @@
             <p class="arc-note">Batched, a game lands near 0.0001 USDC or less. At 20 games/day launch scale, about 0.22 USDC/day. Compare Solana: 10,000 players is about 10,400 USD of one-time rent.</p>
         </section>
 
+        <section class="game-card" style="text-align:left; border:1px solid #f87818;">
+            <h3>Settlement window (batched)</h3>
+            <p class="arc-note">Games are collected as leaves and flushed in ONE transaction when the window reaches 100 games or 24 hours. Flush an idle window here (no cron; this button is the manual trigger).</p>
+            <div class="arc-table-wrap">
+                <table class="arc-table" id="arc-window-table">
+                    <thead><tr><th>Pending games</th><th>Window started</th><th>Last flush</th><th>Last count</th><th>Last root</th></tr></thead>
+                    <tbody><tr><td colspan="5">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <button class="refresh-btn" id="arc-flush-btn" style="border:1px solid #f87818;">Flush window now</button>
+            <p class="arc-note" id="arc-flush-note"></p>
+        </section>
+
         <section class="game-card" style="text-align:left; border:1px solid #2ecc71;">
             <h3>Gas usage (live, USDC)</h3>
             <p class="arc-note">Raw project data from the self-hosted relayer: transactions, games and spend over the last 24h, 7d, 14d, 30d and 90d. This is measured spend, not an estimate, for mainnet financial planning.</p>
@@ -234,9 +247,49 @@
                 }
             }
 
-            el('arc-refresh').addEventListener('click', function () { load(); loadUsage(); });
+            async function arcCall(action, params) {
+                const res = await fetch('/api/arc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params: params || {} }) });
+                const j = await res.json().catch(function () { return { ok: false, error: 'bad response' }; });
+                if (!res.ok || !j.ok) throw new Error(j.error || ('relay ' + res.status));
+                return j;
+            }
+            function shortHash(h) { return h ? (String(h).slice(0, 12) + '…' + String(h).slice(-6)) : '—'; }
+            async function loadWindow() {
+                const tbody = document.querySelector('#arc-window-table tbody');
+                if (!tbody) return;
+                try {
+                    const j = await arcCall('batchStat', { kind: 'settle' });
+                    const last = j.last || {};
+                    tbody.innerHTML = '<tr><td>' + j.pending + '</td><td>' + (j.startedAt ? new Date(j.startedAt).toLocaleString() : '—') +
+                        '</td><td>' + (last.at ? new Date(last.at).toLocaleString() : '—') + '</td><td>' + (last.count || 0) +
+                        '</td><td>' + shortHash(last.root) + '</td></tr>';
+                } catch (e) {
+                    tbody.innerHTML = '<tr><td colspan="5">Window unavailable (' + esc(e.message) + ').</td></tr>';
+                }
+            }
+            async function flushWindow() {
+                const note = el('arc-flush-note'); const btn = el('arc-flush-btn');
+                if (btn) btn.disabled = true;
+                if (note) note.textContent = 'Flushing the settlement window on-chain...';
+                try {
+                    const j = await arcCall('flushBatch', { kind: 'settle' });
+                    if (note) {
+                        note.textContent = j.flushed
+                            ? ('Flushed ' + j.count + ' game(s) in one tx. root ' + shortHash(j.root) + ', gas ' + j.gas + ', ' + j.usdc + ' USDC, tx ' + shortHash(j.txHash))
+                            : ('Nothing to flush (' + (j.reason || 'empty') + ').');
+                    }
+                } catch (e) {
+                    if (note) note.textContent = 'Flush failed: ' + esc(e.message);
+                } finally {
+                    if (btn) btn.disabled = false;
+                    loadWindow(); loadUsage();
+                }
+            }
+            if (el('arc-flush-btn')) el('arc-flush-btn').addEventListener('click', flushWindow);
+            el('arc-refresh').addEventListener('click', function () { load(); loadUsage(); loadWindow(); });
             load();
             loadUsage();
+            loadWindow();
         });
     </script>
 </body>
