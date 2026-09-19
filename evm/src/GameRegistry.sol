@@ -26,6 +26,15 @@ contract GameRegistry {
     /// Latest batched roots (Phase 3 verifies a per-game Merkle proof against these).
     bytes32 public lastOpenRoot;
     bytes32 public lastSettleRoot;
+    // Window state per kind (0 = open, 1 = settle). The LEAVES are the chain's
+    // own events (derived with getLogs); these fields record the finalized root,
+    // how many leaves it covers, and the block range, so the window is
+    // restart-safe and fully verifiable from the chain alone. No off-chain store.
+    mapping(uint8 => bytes32) public windowRoot;
+    mapping(uint8 => uint256) public windowCount;
+    mapping(uint8 => uint256) public windowFromBlock;
+    mapping(uint8 => uint256) public windowToBlock;
+    event WindowFinalized(uint8 indexed kind, bytes32 root, uint256 count, uint256 fromBlock, uint256 toBlock);
 
     event GameOpened(bytes32 indexed gameId, address indexed p1, address indexed p2, uint64 startAt, uint64 deadline);
     event GameSettled(bytes32 indexed gameId, bytes32 resultHash);
@@ -79,6 +88,24 @@ contract GameRegistry {
         if (kind == 0) lastOpenRoot = root;
         else lastSettleRoot = root;
         emit BatchCommitted(kind, root, count);
+    }
+
+    /// Finalize a settlement window: one transaction records the Merkle root of
+    /// every leaf in [fromBlock, toBlock]. Anyone can recompute the leaves from
+    /// the chain's events and check the root, so no off-chain state is trusted.
+    /// Idempotent-by-range: a range already covered cannot be finalized twice.
+    function finalizeWindow(uint8 kind, bytes32 root, uint256 count, uint256 fromBlock, uint256 toBlock) external {
+        require(kind <= 1, "kind");
+        require(root != bytes32(0), "root");
+        require(count > 0, "count");
+        require(toBlock >= fromBlock, "range");
+        require(fromBlock > windowToBlock[kind] || windowToBlock[kind] == 0, "already finalized");
+        windowRoot[kind] = root;
+        windowCount[kind] = count;
+        windowFromBlock[kind] = fromBlock;
+        windowToBlock[kind] = toBlock;
+        if (kind == 0) lastOpenRoot = root; else lastSettleRoot = root;
+        emit WindowFinalized(kind, root, count, fromBlock, toBlock);
     }
 
     function gameState(bytes32 gameId)
