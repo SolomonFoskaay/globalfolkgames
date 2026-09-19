@@ -93,6 +93,13 @@ export const arcAdapter = {
   async openGame(gameId, p2, ttl) { return relay('openGame', { gameId, p2, ttl: ttl || 1800 }); },
   async settleGame(gameId, resultHash) { return relay('settleGame', { gameId, resultHash }); },
   async expireGame(gameId) { return relay('expireGame', { gameId }); },
+  // On-chain turn clock (arcv2m1/2ii). The game reads the ABSOLUTE deadline from
+  // the chain and counts down to it; a lapsed seat is advanced by anyone.
+  async seatUp(gameId, host, seat, player) { return relay('seatUp', { gameId, host, seat, player }); },
+  async beginGame(gameId, host, seats, turnSecs) { return relay('beginGame', { gameId, host, seats, turnSecs }); },
+  async commitMove(gameId, mover, seat, nextSeat, moveCommit) { return relay('commitMove', { gameId, mover, seat, nextSeat, moveCommit }); },
+  async expireTurn(gameId) { return relay('expireTurn', { gameId }); },
+  async turnState(gameId) { return relay('turnState', { gameId }); },
   async commitBatch(kind, root, count) { return relay('commitBatch', { kind: kind || 0, root, count }); },
   async commitSeed(batchId, seedHash) { return relay('commitSeed', { batchId, seedHash }); },
   async revealSeed(batchId, seed) { return relay('revealSeed', { batchId, seed }); },
