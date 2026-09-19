@@ -100,8 +100,29 @@
       return (mb() && mb().matchRefFromSignature) ? mb().matchRefFromSignature(sig) : 0;
     },
     recordResult: async function (finishOrder, points, reason, matchRef) {
-      if (chain() === 'evm') { const a = adapter(); if (a) return a.settleGame('0x' + String(matchRef).padStart(64, '0'), '0x' + String(points).padStart(64, '0')); return null; }
+      if (chain() === 'evm') {
+        // BATCHED: add this game as a leaf to the settle window instead of its
+        // own transaction. One wallet address per game, verified by Merkle proof
+        // when the window flushes (on N games or T time).
+        const a = adapter();
+        const player = (a && a.walletAddress && a.walletAddress()) || null;
+        const gameId = '0x' + String(matchRef).padStart(64, '0');
+        const resultHash = '0x' + String(points).padStart(64, '0');
+        if (!player) return null;
+        try {
+          const r = await relay('enqueueResult', { kind: 'settle', gameId, resultHash, points: points || 0, player, windowMs: 24 * 3600 * 1000, maxGames: 100 });
+          window.__gfgLastBatch = r;
+          return r;
+        } catch (e) { console.warn('[gfgChain] enqueueResult failed (soft):', e && e.message); return null; }
+      }
       return (mb() && mb().recordResult) ? mb().recordResult(finishOrder, points, reason, matchRef) : null;
+    },
+
+    // On-chain proof for a game in the last flushed window (verify card).
+    batchProof: async function (matchRef) {
+      if (chain() !== 'evm') return null;
+      const gameId = '0x' + String(matchRef).padStart(64, '0');
+      try { return await relay('batchProof', { kind: 'settle', gameId }); } catch (e) { return null; }
     },
   };
   // Fire the lazy migration once per session when on Arc and a wallet exists.

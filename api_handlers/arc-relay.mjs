@@ -18,6 +18,8 @@ import { createPublicClient, createWalletClient, defineChain, http, parseAbi, ge
 import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
 import { readSolanaCore, coreBalances, hasBalances } from '../scripts/solana-core-read.mjs';
 import { createHash } from 'crypto';
+import { leafOf, buildTree, verifyProof } from '../scripts/arc-merkle.mjs';
+import { enqueue, pending, due, markFlushed, lastFlush, proofFor } from '../scripts/arc-batch-store.mjs';
 import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
@@ -181,6 +183,49 @@ export default async function handler(req, res) {
       const rc2 = await pub2.waitForTransactionReceipt({ hash: hash2 });
       try { recordArcSpend({ action: 'migrateMe', gas: Number(rc2.gasUsed), usdc: Number(formatEther(rc2.gasUsed * rc2.effectiveGasPrice)), player: evm, gameId: null }); } catch (e) {}
       res.status(200).json({ ok: true, migrated: true, txHash: hash2, points: b.localPure });
+      return;
+    }
+
+    // WINDOW AGGREGATOR (GFG-BS): collect game leaves and flush ONE transaction
+    // per window. Flush when the batch reaches N games OR the window reaches T.
+    async function flushBatchNow(kind) {
+      const p = pending(kind);
+      if (!p.leaves.length) return { flushed: false, reason: 'empty' };
+      const leaves = p.leaves.map(x => x.leaf);
+      const tree = buildTree(leaves);
+      const items = p.leaves.map(x => ({ gameId: x.gameId, leaf: x.leaf, proof: tree.proofs.get(x.leaf) || [] }));
+      const kindNum = kind === 'settle' ? 1 : 0;
+      const h = await wallet.writeContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'commitBatch', args: [kindNum, tree.root, BigInt(p.leaves.length)] });
+      const rc = await pub.waitForTransactionReceipt({ hash: h });
+      try { recordArcSpend({ action: 'commitBatch:' + kind, gas: Number(rc.gasUsed), usdc: Number(formatEther(rc.gasUsed * rc.effectiveGasPrice)), player: null, gameId: null }); } catch (e) {}
+      markFlushed(kind, tree.root, items);
+      return { flushed: true, root: tree.root, count: p.leaves.length, txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice) };
+    }
+
+    if (action === 'enqueueResult') {
+      const kind = params.kind === 'open' ? 'open' : 'settle';
+      const leaf = leafOf({ gameId: hex32(params.gameId), resultHash: hex32(params.resultHash), points: num(params.points) || 0n, player: getAddress(params.player) });
+      const st = enqueue(kind, leaf, { gameId: hex32(params.gameId), points: String(params.points || 0) });
+      let flushed = null;
+      if (due(kind, { windowMs: Number(params.windowMs || 0) || undefined, maxGames: Number(params.maxGames || 0) || undefined })) {
+        flushed = await flushBatchNow(kind);
+      }
+      res.status(200).json({ ok: true, pending: st.count, startedAt: st.startedAt, flushed });
+      return;
+    }
+    if (action === 'flushBatch') {
+      res.status(200).json({ ok: true, ...(await flushBatchNow(params.kind === 'open' ? 'open' : 'settle')) });
+      return;
+    }
+    if (action === 'batchStat') {
+      const k = params.kind === 'open' ? 'open' : 'settle';
+      const p = pending(k);
+      res.status(200).json({ ok: true, pending: p.leaves.length, startedAt: p.startedAt, last: lastFlush(k) });
+      return;
+    }
+    if (action === 'batchProof') {
+      const hit = proofFor(params.kind === 'open' ? 'open' : 'settle', hex32(params.gameId));
+      res.status(200).json(hit ? { ok: true, root: hit.root, proof: hit.proof, leaf: hit.leaf, flushedAt: hit.flushedAt, valid: verifyProof(hit.leaf, hit.proof, hit.root) } : { ok: false, error: 'no proof yet (still pending or unknown)' });
       return;
     }
 
