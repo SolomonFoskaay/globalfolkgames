@@ -55,6 +55,11 @@
                 { key: 'arch-v2', label: '🚀 Architecture V2', href: '/changelog/architecture-v2.html' }
             ] });
         }
+        if (!sections.some(sec => (sec.items || []).some(it => it.href === '/dashboard/arc.html'))) {
+            sections.push({ heading: 'On-chain rails', items: [
+                { key: 'arc-rail', label: '🔷 Arc rail (EVM)', href: '/dashboard/arc.html' }
+            ] });
+        }
         if (!sections.some(sec => (sec.items || []).some(it => it.key === 'research'))) {
             sections.push({ heading: 'Research', items: [
                 { key: 'research', label: '🔬 Research (pre-architecture)', href: '/changelog/research.html' }

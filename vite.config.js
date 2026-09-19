@@ -84,6 +84,7 @@ export default defineConfig({
         payment: './payment/index.html',
         dashboard: './dashboard/index.html',
         backers: './backers/index.html',
+        'dashboard-arc': './dashboard/arc.html',
         'dashboard-ops': './dashboard/ops.html',
         'dashboard-endpoints': './dashboard/endpoints.html',
         'dashboard-activity': './dashboard/activity.html',
