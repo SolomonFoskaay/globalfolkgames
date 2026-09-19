@@ -71,6 +71,18 @@
       return (mb() && mb().getLastDiceDelegationSignature) ? mb().getLastDiceDelegationSignature() : null;
     },
 
+    // Lazy migration: when a player who was on Solana logs in and gets an EVM
+    // wallet, ask the relayer to copy their Solana points to Arc. The relayer
+    // verifies the wallet mapping itself; the client sends only the address.
+    migrateMe: async function () {
+      if (chain() !== 'evm') return { ok: false, reason: 'not arc' };
+      var a = adapter();
+      var addr = (a && a.walletAddress && a.walletAddress()) || null;
+      if (!addr) return { ok: false, reason: 'no evm wallet' };
+      try { return await relay('migrateMe', { evmAddress: addr }); }
+      catch (e) { console.warn('[gfgChain] migrateMe failed (soft):', e && e.message); return { ok: false, error: String(e && e.message) }; }
+    },
+
     chargeLife: async function (matchRef) {
       if (chain() === 'evm') { const a = adapter(); if (a) return a.chargeLife(matchRef); return null; }
       return null; // Solana charges the life on-chain at begin/join
@@ -92,4 +104,18 @@
       return (mb() && mb().recordResult) ? mb().recordResult(finishOrder, points, reason, matchRef) : null;
     },
   };
+  // Fire the lazy migration once per session when on Arc and a wallet exists.
+  try {
+    var ran = false;
+    function maybeMigrate() {
+      if (ran) return;
+      if (!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc())) return;
+      var a = window.gfgChainAdapter;
+      if (!a || !a.walletAddress || !a.walletAddress()) return;
+      ran = true;
+      window.gfgChain.migrateMe().then(function (r) { if (r && r.migrated) console.log('[gfgChain] points migrated to Arc:', r.points); });
+    }
+    window.addEventListener('load', function () { setTimeout(maybeMigrate, 1500); });
+    window.addEventListener('gfg:auth-changed', function () { setTimeout(maybeMigrate, 1200); });
+  } catch (e) { /* soft */ }
 })();

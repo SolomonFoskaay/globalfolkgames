@@ -16,6 +16,8 @@
 // can never be turned into a points faucet.
 import { createPublicClient, createWalletClient, defineChain, http, parseAbi, getAddress, formatEther } from 'viem';
 import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
+import { readSolanaCore, coreBalances, hasBalances } from '../scripts/solana-core-read.mjs';
+import { createHash } from 'crypto';
 import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
@@ -59,7 +61,7 @@ const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
   'function recordPoints(address player, bytes32 tag, uint64 points, uint8 reason, uint64 matchRef)',
   'function recordGlobal(address player, uint8 kind, uint64 points, uint64 matchRef)',
-  'function migratePlayer(address player, (bytes32,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint8,uint64,uint64) m)',
+  'function migratePlayer(address player, (bytes32 tag, uint64 localPure, uint64 localSpendable, uint64 globalPure, uint64 globalLifetime, uint64 globalSpendable, uint64 premiumLifetime, uint64 premiumSpendable, uint8 level, uint64 activeUntil, uint64 migrationRef) m)',
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
@@ -135,6 +137,52 @@ export default async function handler(req, res) {
     const pub = createPublicClient({ chain, transport: http(RPC_URL) });
     const relayer = accountFor(SPONSOR_KEY);
     const wallet = createWalletClient({ chain, transport: http(RPC_URL), account: relayer });
+
+    // LAZY MIGRATION (arcv2m16): a returning player who just got an EVM wallet.
+    // The relayer verifies with Dynamic which Solana wallet belongs to this EVM
+    // address, reads the Solana ledger itself, and migrates idempotently. The
+    // client never supplies amounts, so no one can mint points. Close it any time
+    // with GFG_Arc_Migration_Open=false (for example before/after mainnet).
+    if (action === 'migrateMe') {
+      const __evm2 = await arcEvmConfig();
+      if (String(process.env.GFG_Arc_Migration_Open || 'true') === 'false') {
+        res.status(403).json({ ok: false, error: 'migration is closed' });
+        return;
+      }
+      const evm = getAddress(params.evmAddress || params.player);
+      const dt = process.env.DYNAMIC_API_TOKEN || '';
+      const de = process.env.DYNAMIC_ENV_ID || process.env.DYNAMIC_ENVIRONMENT_ID || '';
+      if (!dt || !de) { res.status(500).json({ ok: false, error: 'Dynamic API not configured' }); return; }
+      const ur = await fetch(`https://app.dynamicauth.com/api/v0/environments/${de}/users?limit=100`, { headers: { Authorization: 'Bearer ' + dt } });
+      if (!ur.ok) throw new Error('Dynamic API ' + ur.status);
+      const uj = await ur.json();
+      let sol = null;
+      for (const u of (uj.users || [])) {
+        const creds = u.verifiedCredentials || [];
+        const ec = creds.find(c => c.chain === 'EVM');
+        const ew = (u.wallets || []).find(w => w.chain === 'EVM');
+        const evmAddr = (ec && ec.address) || (ew && (ew.publicKey || ew.address));
+        if (evmAddr && String(evmAddr).toLowerCase() !== evm.toLowerCase()) continue;
+        const sc = creds.find(c => c.chain === 'SOL');
+        const sw = (u.wallets || []).find(w => w.chain === 'SOL');
+        sol = (sc && sc.address) || (sw && (sw.publicKey || sw.address)) || null;
+        break;
+      }
+      if (!sol) { res.status(404).json({ ok: false, error: 'no Solana wallet found for this Arc address' }); return; }
+      const core = await readSolanaCore(sol).catch(() => null);
+      const b = coreBalances(core, 'ludo');
+      if (!hasBalances(b)) { res.status(200).json({ ok: true, migrated: false, reason: 'nothing to migrate' }); return; }
+      const migrationRef = parseInt(createHash('sha256').update('arc-migrate:' + sol).digest('hex').slice(0, 15), 16);
+      const chain2 = defineChain({ id: Number(__evm2.chainId || 5042002), name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [__evm2.rpc] } } });
+      const pub2 = createPublicClient({ chain: chain2, transport: http(__evm2.rpc) });
+      const relayer2 = accountFor(SPONSOR_KEY);
+      const wallet2 = createWalletClient({ chain: chain2, transport: http(__evm2.rpc), account: relayer2 });
+      const hash2 = await wallet2.writeContract({ address: __evm2.contracts.playerCore, abi: coreAbi, functionName: 'migratePlayer', args: [evm, { ...b, migrationRef }] });
+      const rc2 = await pub2.waitForTransactionReceipt({ hash: hash2 });
+      try { recordArcSpend({ action: 'migrateMe', gas: Number(rc2.gasUsed), usdc: Number(formatEther(rc2.gasUsed * rc2.effectiveGasPrice)), player: evm, gameId: null }); } catch (e) {}
+      res.status(200).json({ ok: true, migrated: true, txHash: hash2, points: b.localPure });
+      return;
+    }
 
     // Usage summary for the dashboard (raw project data).
     if (action === 'arcUsage') {
