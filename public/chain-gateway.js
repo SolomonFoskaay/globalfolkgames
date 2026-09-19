@@ -79,6 +79,14 @@
       if (chain() === 'evm') { const a = adapter(); if (a) return a.recordPoints(gameTag, points, reason, matchRef, playerPubkey); return null; }
       return (mb() && mb().recordPoints) ? mb().recordPoints(gameTag, points, reason, matchRef, playerPubkey) : null;
     },
+    recordGlobal: async function (kind, sourceCode, points, reason, matchRef, playerPubkey) {
+      if (chain() === 'evm') { const a = adapter(); if (a) return a.recordGlobal(kind, points, matchRef, playerPubkey); return null; }
+      return (mb() && mb().recordGlobalPoints) ? mb().recordGlobalPoints(kind, sourceCode, points, reason, matchRef, playerPubkey) : null;
+    },
+    matchRefFromSignature: function (sig) {
+      if (chain() === 'evm') return Date.now();
+      return (mb() && mb().matchRefFromSignature) ? mb().matchRefFromSignature(sig) : 0;
+    },
     recordResult: async function (finishOrder, points, reason, matchRef) {
       if (chain() === 'evm') { const a = adapter(); if (a) return a.settleGame('0x' + String(matchRef).padStart(64, '0'), '0x' + String(points).padStart(64, '0')); return null; }
       return (mb() && mb().recordResult) ? mb().recordResult(finishOrder, points, reason, matchRef) : null;

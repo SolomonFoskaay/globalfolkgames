@@ -315,7 +315,7 @@
     }
 
     function magicReady() {
-        return !!(window.magicblockDice && typeof window.magicblockDice.recordPoints === 'function');
+        return !!((window.gfgChain && typeof window.gfgChain.recordPoints === 'function') || (window.magicblockDice && typeof window.magicblockDice.recordPoints === 'function'));
     }
 
     async function refreshLedger(gameTag, force) {
@@ -432,7 +432,7 @@
         while (attempts < 3) {
             attempts++;
             try {
-                var sig = await window.magicblockDice.recordPoints(
+                var sig = await (window.gfgChain || window.magicblockDice).recordPoints(
                     award.gameTag, award.points, award.reason, matchRef, authority,
                 );
                 processed[matchRef] = { gameId: env.gameId, points: award.points, at: Date.now() };
@@ -454,7 +454,7 @@
                 for (var k = 1; k < awards.length; k++) {
                     try {
                         var aw = awards[k];
-                        await window.magicblockDice.recordPoints(
+                        await (window.gfgChain || window.magicblockDice).recordPoints(
                             aw.gameTag, aw.points, aw.reason, matchRef + k,
                             (aw && aw.identity) ? aw.identity : null,
                         );

@@ -78,6 +78,12 @@ export const arcAdapter = {
     return relay('recordPoints', { player, tag: gameTag || 'ludo', points, reason: reason || 1, matchRef });
   },
 
+  async recordGlobal(kind, points, matchRef, playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) throw new Error('no Arc wallet connected');
+    return relay('recordGlobal', { player, kind: kind || 0, points, matchRef });
+  },
+
   async chargeLife(matchRef, playerPubkey) {
     const player = playerPubkey || evmAddress();
     if (!player) throw new Error('no Arc wallet connected');
