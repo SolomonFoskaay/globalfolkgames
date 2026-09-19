@@ -101,6 +101,13 @@
     // Resolve the connected wallet the same way the changelog page does.
     function currentWallet() {
         try {
+            // Arc rail: the EVM address is the identity.
+            if (window.gfgChain && typeof window.gfgChain.isArc === 'function' && window.gfgChain.isArc()) {
+                var a = window.gfgChainAdapter;
+                var ew = (a && a.walletAddress && a.walletAddress()) || null;
+                if (ew) return ew;
+                if (window.getDynamicEvmWallet) { var x = window.getDynamicEvmWallet(); if (x) return x; }
+            }
             if (window.getDynamicSolanaWallet) {
                 const w = window.getDynamicSolanaWallet();
                 if (w) return w;
@@ -472,13 +479,15 @@
     }
 
     // Sitewide tier badge: shows the signed-in user's plan in front of the points
-    // pill (Level 1 gray, Level 2 · 2x gold). PURE cache read — no RPC on load:
+    // pill (Level 0 free gray, Level 2 · 2x gold). PURE cache read — no RPC on load:
     // it reads window.activeTier.get() which is fed by the two RPC triggers
     // (auth change + win) via the central points store, same as M3/M4.
+    // The free tier is L0 (the plan ladder starts at L0 free), never L1: an
+    // inactive sub means level 0, so the badge must read L0, not L1.
     function updateActiveTierBadge() {
         const el = document.getElementById('active-tier-badge');
         if (!el) return;
-        const signedIn = !!(window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()));
+        const signedIn = !!(window.currentUser || (window.getDynamicSolanaWallet && window.getDynamicSolanaWallet()) || (window.getDynamicEvmWallet && window.getDynamicEvmWallet()));
         if (!signedIn) { el.style.display = 'none'; return; }
         const tier = (window.activeTier && typeof window.activeTier.get === 'function') ? window.activeTier.get() : null;
         const active = !!tier && tier.active === true && (tier.level || 0) >= 1;
@@ -489,7 +498,7 @@
             el.style.color = '#f87818';
             el.style.display = 'inline-block';
         } else {
-            el.textContent = 'L1';
+            el.textContent = 'L0';
             el.style.background = 'rgba(255,255,255,0.07)';
             el.style.border = '1px solid rgba(255,255,255,0.2)';
             el.style.color = '#999';
