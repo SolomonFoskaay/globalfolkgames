@@ -22,7 +22,7 @@ const accountFor = evmKeys['private' + 'KeyToAccount'];
 
 const RPC = process.env.GFG_Arc_RPC || 'https://rpc.testnet.arc.io';
 const SPONSOR_KEY = process.env.GFG_Arc_Gasless_Sponsor_Key || '';
-const PLAYER_CORE = process.env.GFG_Arc_PlayerCore || '0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc';
+const PLAYER_CORE = process.env.GFG_Arc_PlayerCore || '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7';
 const GAME_REGISTRY = process.env.GFG_Arc_GameRegistry || '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb';
 const RANDOMNESS = process.env.GFG_Arc_Randomness || '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
 const MAX_AWARD = BigInt(process.env.GFG_Arc_MaxAward || '10000');
@@ -35,6 +35,7 @@ const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
   'function recordPoints(address player, bytes32 tag, uint64 points, uint8 reason, uint64 matchRef)',
   'function recordGlobal(address player, uint8 kind, uint64 points, uint64 matchRef)',
+  'function migratePlayer(address player, (bytes32,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint8,uint64,uint64) m)',
   'function creditPremium(address player, uint64 points, uint64 creditRef)',
   'function activatePlan(address player, uint8 level, uint16 planDays)',
   'function activateBooster(address player, uint16 planHours)',
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
 
   const action = String(body.action || '');
   const params = body.params || {};
-  const MONEY = new Set(['creditPremium', 'activatePlan', 'activateBooster']);
+  const MONEY = new Set(['creditPremium', 'activatePlan', 'activateBooster', 'migratePlayer']);
   if (MONEY.has(action)) {
     const expected = process.env.GFG_OPERATOR_TOKEN;
     const token = body.token || (req.headers && req.headers['x-gfg-token']);
@@ -175,6 +176,17 @@ export default async function handler(req, res) {
         if (gp === null || gp <= 0n || gp > MAX_AWARD) throw new Error('points out of range');
         address = PLAYER_CORE; abi = coreAbi; fn = 'recordGlobal';
         args = [getAddress(params.player), Number(params.kind || 0), gp, num(params.matchRef)];
+        break;
+      }
+      case 'migratePlayer': {
+        const d = params.data || {};
+        address = PLAYER_CORE; abi = coreAbi; fn = 'migratePlayer';
+        args = [getAddress(params.player), {
+          tag: tag32(d.tag), localPure: num(d.localPure) || 0n, localSpendable: num(d.localSpendable) || 0n,
+          globalPure: num(d.globalPure) || 0n, globalLifetime: num(d.globalLifetime) || 0n, globalSpendable: num(d.globalSpendable) || 0n,
+          premiumLifetime: num(d.premiumLifetime) || 0n, premiumSpendable: num(d.premiumSpendable) || 0n,
+          level: Number(d.level || 0), activeUntil: num(d.activeUntil) || 0n, migrationRef: num(d.migrationRef) || 0n,
+        }];
         break;
       }
       case 'creditPremium':
