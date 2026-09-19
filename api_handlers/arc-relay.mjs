@@ -14,7 +14,8 @@
 // MAINNET HARDENING (documented, not built): replace the open game writes with
 // an EIP-712 player signature or a server-verified game result, so the relayer
 // can never be turned into a points faucet.
-import { createPublicClient, createWalletClient, defineChain, http, parseAbi, getAddress } from 'viem';
+import { createPublicClient, createWalletClient, defineChain, http, parseAbi, getAddress, formatEther } from 'viem';
+import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
 import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
@@ -103,6 +104,12 @@ export default async function handler(req, res) {
     const pub = createPublicClient({ chain, transport: http(RPC) });
     const relayer = accountFor(SPONSOR_KEY);
     const wallet = createWalletClient({ chain, transport: http(RPC), account: relayer });
+
+    // Usage summary for the dashboard (raw project data).
+    if (action === 'arcUsage') {
+      res.status(200).json({ ok: true, usage: arcUsageSummary() });
+      return;
+    }
 
     // DICE (GFG-BS commit-reveal): roll derived from the window seed, no gas.
     if (action === 'rollDice') {
@@ -226,7 +233,17 @@ export default async function handler(req, res) {
 
     const hash = await wallet.writeContract({ address, abi, functionName: fn, args });
     const rc = await pub.waitForTransactionReceipt({ hash });
-    res.status(200).json({ ok: true, action, txHash: hash, gas: String(rc.gasUsed), relayer: relayer.address });
+    const costUsdc = formatEther(rc.gasUsed * rc.effectiveGasPrice);
+    try {
+      recordArcSpend({
+        action,
+        gas: Number(rc.gasUsed),
+        usdc: Number(costUsdc),
+        player: params.player || params.p2 || null,
+        gameId: params.gameId || params.batchId || null,
+      });
+    } catch (e) { /* logging must never break a write */ }
+    res.status(200).json({ ok: true, action, txHash: hash, gas: String(rc.gasUsed), usdc: costUsdc, relayer: relayer.address });
   } catch (e) {
     console.error('arc-relay error:', e.shortMessage || e.message);
     res.status(400).json({ ok: false, error: (e.shortMessage || e.message || String(e)) });
