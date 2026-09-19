@@ -9,7 +9,7 @@
       "usdcDecimalsNative": 18,
       "usdcDecimalsErc20": 6,
       "contracts": {
-        "gameRegistry": "0x8a56aBe78b280375283DEE69083C0F90a2BF7591",
+        "gameRegistry": "0x295bb1F7110Ee685c77771c29eb0b596A96dE590",
         "randomness": "0xb406295b4F7E5B513b656122AfFF29AF720E9E23",
         "playerCore": "0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7"
       },
