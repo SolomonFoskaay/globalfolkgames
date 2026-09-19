@@ -84,6 +84,18 @@
             <p class="arc-note">Batched, a game lands near 0.0001 USDC or less. At 20 games/day launch scale, about 0.22 USDC/day. Compare Solana: 10,000 players is about 10,400 USD of one-time rent.</p>
         </section>
 
+        <section class="game-card" style="text-align:left; border:1px solid #2ecc71;">
+            <h3>Gas usage (live, USDC)</h3>
+            <p class="arc-note">Raw project data from the self-hosted relayer: transactions, games and spend over the last 24h, 7d, 14d, 30d and 90d. This is measured spend, not an estimate, for mainnet financial planning.</p>
+            <div class="arc-table-wrap">
+                <table class="arc-table" id="arc-usage-table">
+                    <thead><tr><th>Window</th><th>Txs</th><th>Games</th><th>USDC</th><th>USDC/day</th><th>Games/day</th><th>USDC/game</th></tr></thead>
+                    <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <p class="arc-note" id="arc-usage-note"></p>
+        </section>
+
         <section class="game-card" style="text-align:left;">
             <h3>Raw public config</h3>
             <div class="arc-table-wrap"><pre id="arc-raw" style="font-size:0.76rem; white-space:pre-wrap; word-break:break-all;">Loading…</pre></div>
@@ -200,8 +212,31 @@
                 }
             }
 
-            el('arc-refresh').addEventListener('click', load);
+            async function loadUsage() {
+                const tbody = document.querySelector('#arc-usage-table tbody');
+                const note = el('arc-usage-note');
+                if (!tbody) return;
+                tbody.innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
+                try {
+                    const res = await fetch('/api/arc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'arcUsage' }) });
+                    const j = await res.json();
+                    if (!res.ok || !j.ok) throw new Error(j.error || ('relay ' + res.status));
+                    const rows = (j.usage && j.usage.periods) || [];
+                    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7">No Arc writes recorded yet.</td></tr>'; }
+                    else {
+                        tbody.innerHTML = rows.map(function (r) {
+                            return '<tr><td>' + esc(r.window) + '</td><td>' + r.txs + '</td><td>' + r.games + '</td><td>' + r.usdc.toFixed(6) + '</td><td>' + r.usdcPerDay.toFixed(6) + '</td><td>' + r.gamesPerDay + '</td><td>' + (r.usdcPerGame == null ? '-' : r.usdcPerGame.toFixed(8)) + '</td></tr>';
+                        }).join('');
+                    }
+                    if (note) note.textContent = 'Recorded ' + new Date(j.usage.generatedAt).toLocaleString() + '. The relayer logs every sponsored write (durable locally, per-instance on Vercel until a durable store is added for mainnet).';
+                } catch (e) {
+                    tbody.innerHTML = '<tr><td colspan="7">Usage unavailable (' + esc(e.message) + ').</td></tr>';
+                }
+            }
+
+            el('arc-refresh').addEventListener('click', function () { load(); loadUsage(); });
             load();
+            loadUsage();
         });
     </script>
 </body>
