@@ -30,6 +30,7 @@ import { ensureTally, createCompetition, closeCompetition, cancelCompetition, se
 import { addWin, addEntry, hasEntry } from './competitions-wins.mjs';
 import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
 import { verifyAndCredit as verifyAndCreditVerifier } from '../api_handlers/verify-and-credit.mjs';
+import arcRelay from '../api_handlers/arc-relay.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -301,6 +302,23 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('verify-and-credit error:', e.message);
+      res.writeHead(400, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/arc') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const reqShim = { method: 'POST', body, headers: req.headers || {} };
+    let statusCode = 200, sent = false;
+    const resShim = {
+      setHeader() {},
+      status(c) { statusCode = c; return this; },
+      json(obj) { sent = true; res.writeHead(statusCode, { 'Content-Type': 'application/json', ...cors }); res.end(JSON.stringify(obj)); },
+      end() { if (!sent) { res.writeHead(statusCode, cors); res.end(); } },
+    };
+    try { await arcRelay(reqShim, resShim); } catch (e) {
       res.writeHead(400, { 'Content-Type': 'application/json', ...cors });
       res.end(JSON.stringify({ ok: false, error: e.message }));
     }

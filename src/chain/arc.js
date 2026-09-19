@@ -1,25 +1,98 @@
-// src/chain/arc.js — the Arc rail (arcv2m16). Phase 0 STUB.
+// src/chain/arc.js — the Arc rail adapter (arcv2m16).
 //
-// Nothing is wired yet, so every call throws a clear error instead of silently
-// doing the wrong thing. Phase 1 replaces these stubs with the real Arc
-// implementation (relayer, contracts in evm/, batched randomness).
-const NOT_YET = 'Arc rail is not wired yet (arcv2m16 Phase 2)';
+// The browser never holds a key and never pays gas. Writes and reads go to the
+// self-hosted relayer endpoint (/api/arc), which signs with the app sponsor key
+// and pays the tiny USDC gas. Reads are decoded server-side so the browser stays
+// thin (no viem in the client bundle).
+//
+// Naming note (owner 2026-09-18): the settlement layer is GlobalFolkGames
+// Batched Settlement (GFG-BS): Merkle-root batch settlement plus commit-reveal
+// randomness. It is NOT a rollup, and it settles more than gameplay.
+//
+// Everything here is behind VITE_GFG_CHAIN=evm. The default is svm, so the live
+// Solana flow is untouched while we build and test the Arc path.
 
-// PUBLIC config (addresses + endpoints only, never secrets). The addresses live
-// in /arc-config.json so they can be read by any browser without touching the
-// server env, which is reserved for secrets.
+let _cfg = null;
+
 export async function arcPublicConfig() {
+  if (_cfg) return _cfg;
   const res = await fetch('/arc-config.json', { cache: 'no-store' });
   if (!res.ok) throw new Error('arc-config.json ' + res.status);
-  return res.json();
+  _cfg = await res.json();
+  return _cfg;
+}
+
+async function relay(action, params, token) {
+  const res = await fetch('/api/arc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params: params || {}, token }),
+  });
+  let j = null;
+  try { j = await res.json(); } catch (e) { j = { ok: false, error: 'bad response' }; }
+  if (!res.ok || !j.ok) throw new Error(j.error || ('relay ' + res.status));
+  return j;
+}
+
+function evmAddress() {
+  try { return (window.getDynamicEvmWallet && window.getDynamicEvmWallet()) || null; } catch (e) { return null; }
 }
 
 export const arcAdapter = {
   name: 'arc',
-  isReady() { return false; },
-  walletAddress() {
-    try { return (window.getDynamicEvmWallet && window.getDynamicEvmWallet()) || null; } catch (e) { return null; }
+
+  async isReady() {
+    try { await arcPublicConfig(); return true; } catch (e) { return false; }
   },
-  fetchLedger() { throw new Error(NOT_YET); },
-  recordPoints() { throw new Error(NOT_YET); },
+
+  walletAddress() { return evmAddress(); },
+
+  // Full player snapshot (lives, globals, premium, one game bucket).
+  async readPlayer(gameTag = 'ludo') {
+    const player = evmAddress();
+    if (!player) return null;
+    return relay('readPlayer', { player, tag: gameTag });
+  },
+
+  // Ledger shape the modules expect (same fields as the Solana path).
+  async fetchLedger(gameTag = 'ludo') {
+    const r = await this.readPlayer(gameTag);
+    if (!r) return null;
+    const b = r.bucket || {};
+    const g = r.globals || {};
+    return {
+      pureLifetime: Number(b.pure || 0),
+      spendableBalance: Number(b.spendable || 0),
+      globalPure: Number(g.pure || 0),
+      globalLifetime: Number(g.lifetime || 0),
+      globalSpendable: Number(g.spendable || 0),
+      lives: r.lives || null,
+      premium: r.premium || null,
+      raw: r,
+    };
+  },
+
+  async recordPoints(gameTag, points, reason, matchRef, playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) throw new Error('no Arc wallet connected');
+    return relay('recordPoints', { player, tag: gameTag || 'ludo', points, reason: reason || 1, matchRef });
+  },
+
+  async chargeLife(matchRef, playerPubkey) {
+    const player = playerPubkey || evmAddress();
+    if (!player) throw new Error('no Arc wallet connected');
+    return relay('chargeLife', { player, matchRef });
+  },
+
+  async openGame(gameId, p2, ttl) { return relay('openGame', { gameId, p2, ttl: ttl || 1800 }); },
+  async settleGame(gameId, resultHash) { return relay('settleGame', { gameId, resultHash }); },
+  async expireGame(gameId) { return relay('expireGame', { gameId }); },
+  async commitBatch(kind, root, count) { return relay('commitBatch', { kind: kind || 0, root, count }); },
+  async commitSeed(batchId, seedHash) { return relay('commitSeed', { batchId, seedHash }); },
+  async revealSeed(batchId, seed) { return relay('revealSeed', { batchId, seed }); },
+
+  // Money actions require the operator token (fail-closed on the server).
+  async creditPremium(player, points, creditRef, token) { return relay('creditPremium', { player, points, creditRef }, token); },
+  async activatePlan(player, level, planDays, token) { return relay('activatePlan', { player, level, planDays: planDays || 30 }, token); },
+  async activateBooster(player, planHours, token) { return relay('activateBooster', { player, planHours: planHours || 72 }, token); },
 };

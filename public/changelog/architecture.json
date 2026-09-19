@@ -782,9 +782,9 @@
     },
     {
       "id": "arcv2m17",
-      "title": "GlobalFolkGames ER (GFG-ER): the reusable game session rollup",
+      "title": "GlobalFolkGames Batched Settlement (GFG-BS): Merkle roots + commit-reveal randomness",
       "status": "in-progress",
-      "summary": "The platform's OWN game session rollup, built from scratch so no hosted service is required. It bundles dice, moves, points, lives and timers for a whole match into ONE paid action per settlement window: the chain sees only the match start and the match end, everything inside is free. Named GFG-ER (also describable as MR, the Merkle-tree rollup, because results are committed as Merkle roots). Arc is finance-focused and does not serve games, so GFG-ER is deliberately standalone: any game project can reuse it the way this platform uses it, on any EVM chain. It replaces the Solana MagicBlock ER path for the Arc rail without deleting it.",
+      "summary": "The platform's OWN settlement layer, built from scratch so no hosted service is required. Many off-chain signed events (match results, dice, points, lives, timers, and later competitions, trades or posts) are committed as ONE Merkle root per window, so the chain sees very little and everything inside the window costs almost nothing. Naming is deliberately precise: this is NOT a rollup (there is no off-chain VM and no state-transition proof); the established terms are batched settlement (Merkle-root commitment) plus commit-reveal randomness, with a session registry and a sponsored relayer. Shown in games as the full project name, shortened to GFG-BS in docs. Standalone on purpose: Arc serves finance, not games, so other game projects can reuse it.",
       "expectedInput": {
         "summary": "What GFG-ER receives.",
         "items": [
@@ -804,14 +804,15 @@
         ]
       },
       "details": [
-        "NAME + SCOPE: GlobalFolkGames ER (GFG-ER), module arcv2m17. Standalone on purpose, so it can be extracted for other game builders later (Arc targets finance, not games). arcv2m16 is the Arc-specific wiring; arcv2m17 is the reusable rollup core.",
+        "NAME + SCOPE: GlobalFolkGames Batched Settlement (GFG-BS), module arcv2m17. In games the full project name is shown; docs may shorten it to GFG-BS. It is NOT a rollup: there is no off-chain VM and no state-transition proof. The accurate, existing technical terms are: MERKLE-ROOT BATCH SETTLEMENT (many signed events committed as one root, each verifiable by a Merkle proof), COMMIT-REVEAL RANDOMNESS (seed committed before play, revealed at close), a SESSION REGISTRY with TTL, and a SPONSORED RELAYER for gasless writes. Standalone on purpose so it can be reused by other game projects; arcv2m16 is the Arc-specific wiring.",
         "MECHANISM: the relayer flushes when the pending batch reaches N games OR the window reaches T seconds, whichever comes first, and always flushes at window close even with one game. Nothing is watched manually and an empty window costs nothing.",
         "COST SHAPE: one commitBatch transaction is O(1) gas (about 29,000) whether it carries 1 or 1000 games, so per game is 0.00072 (N=1), 0.000036 (N=20), 0.0000073 (N=100) and 0.0000007 (N=1000) USDC at 25 Gwei. Gameplay writes (life, points, settle) ride inside the same window, so adding features does not add per-action cost.",
         "BUILT + MEASURED (Arc Testnet, 2026-09-18): contracts GameRegistry 0xC0d3c8...11eb, Randomness 0xb40629...9E23, PlayerCore 0xcebA2d...56cc. Full sponsored game 0.011034 USDC unbatched; 25 forge tests pass. See the Test results workspace (/changelog/tests.html).",
         "RECEIPTS: instant app-signed receipt at game end (with the pre-committed dice-seed hash), then an on-chain receipt at flush with the batch transaction hash and the game's Merkle proof. A config knob can anchor each start on-chain for an instant explorer link at about 0.00243 USDC per game.",
-        "WHY IT DOES NOT GROW WITH FEATURES: new games, timers, competitions, card trading, forum posts and AGM all become LEAVES or event payloads inside the same windows, so they do not create new per-player accounts and do not add per-action cost. Only a program upgrade (a deploy) costs, which is a one-time cheap transaction.",
+        "SCOPE IS NOT ONLY GAMEPLAY: it settles any signed event, not just match records, so competitions, trades, posts and future features all use the same roots. WHY IT DOES NOT GROW WITH FEATURES: new games, timers, competitions, card trading, forum posts and AGM all become LEAVES or event payloads inside the same windows, so they do not create new per-player accounts and do not add per-action cost. Only a program upgrade (a deploy) costs, which is a one-time cheap transaction.",
         "MAINNET: stay on Arc Testnet until the existing games run on Arc with points, single-player, multiplayer, live and pro subscriptions all working. Then deploy to mainnet (gas only, no rent, no per-player account).",
-        "RESEARCH + RESULTS: fee findings live in the Research library; the measured build evidence lives in the Test results workspace."
+        "RESEARCH + RESULTS: fee findings live in the Research library; the measured build evidence lives in the Test results workspace.",
+        "TERMINOLOGY LOCK (owner 2026-09-18): never call this a rollup. Use \"batched settlement\" for the Merkle-root commitment mechanism, \"commit-reveal randomness\" for the dice, \"session registry (TTL)\" for match start/end, and \"sponsored relayer\" for gasless writes. Full project name in games; GFG-BS allowed in docs."
       ]
     }
   ],
