@@ -20,11 +20,35 @@ import * as evmKeys from 'viem/accounts';
 // Assembled at runtime so the strict leak scan stays meaningful; behavior identical.
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
+// PUBLIC values (RPC + contract addresses) live in ONE repo file, /arc-config.json,
+// never in env. The relayer reads it (local file first, then the deployment URL,
+// then a baked fallback), so a new deploy address is a one-file edit.
+import { readFileSync as _readCfg } from 'fs';
+let _evmCfg = null;
+async function arcEvmConfig() {
+  if (_evmCfg) return _evmCfg;
+  try {
+    const j = JSON.parse(_readCfg(new URL('../public/arc-config.json', import.meta.url), 'utf8'));
+    _evmCfg = j.rails.evm; return _evmCfg;
+  } catch (e) { /* not on disk (serverless): try the deployment URL */ }
+  try {
+    const base = process.env.GFG_SITE_URL || (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : '');
+    if (base) {
+      const r = await fetch(base + '/arc-config.json', { cache: 'no-store' });
+      if (r.ok) { _evmCfg = (await r.json()).rails.evm; return _evmCfg; }
+    }
+  } catch (e) { /* fall through to baked values */ }
+  _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
+    playerCore: '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7',
+    gameRegistry: '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb',
+    randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
+  return _evmCfg;
+}
 const RPC = process.env.GFG_Arc_RPC || 'https://rpc.testnet.arc.io';
 const SPONSOR_KEY = process.env.GFG_Arc_Gasless_Sponsor_Key || '';
-const PLAYER_CORE = process.env.GFG_Arc_PlayerCore || '0xc443f859ACEE3A2263B902B59ca3Bb8a2DcA12C7';
-const GAME_REGISTRY = process.env.GFG_Arc_GameRegistry || '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb';
-const RANDOMNESS = process.env.GFG_Arc_Randomness || '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
+
+
+
 const MAX_AWARD = BigInt(process.env.GFG_Arc_MaxAward || '10000');
 const CHAIN_ID = Number(process.env.GFG_Arc_ChainId || 5042002);
 // Dice: one secret window seed, committed BEFORE play and revealed at window
@@ -101,10 +125,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const chain = defineChain({ id: CHAIN_ID, name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
-    const pub = createPublicClient({ chain, transport: http(RPC) });
+    // Addresses + RPC come from the public config (one repo file), never env.
+    const __evm = await arcEvmConfig();
+    const RPC_URL = __evm.rpc || RPC;
+    const PLAYER_CORE = __evm.contracts.playerCore;
+    const GAME_REGISTRY = __evm.contracts.gameRegistry;
+    const RANDOMNESS = __evm.contracts.randomness;
+    const chain = defineChain({ id: Number(__evm.chainId || CHAIN_ID), name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC_URL] } } });
+    const pub = createPublicClient({ chain, transport: http(RPC_URL) });
     const relayer = accountFor(SPONSOR_KEY);
-    const wallet = createWalletClient({ chain, transport: http(RPC), account: relayer });
+    const wallet = createWalletClient({ chain, transport: http(RPC_URL), account: relayer });
 
     // Usage summary for the dashboard (raw project data).
     if (action === 'arcUsage') {
