@@ -15,7 +15,6 @@
 // an EIP-712 player signature or a server-verified game result, so the relayer
 // can never be turned into a points faucet.
 import { createPublicClient, createWalletClient, defineChain, http, parseAbi, getAddress, formatEther } from 'viem';
-import { recordArcSpend, arcUsageSummary } from '../scripts/arc-spend-ledger.mjs';
 import { readSolanaCore, coreBalances, hasBalances } from '../scripts/solana-core-read.mjs';
 import { createHash } from 'crypto';
 import { buildTree, verifyProof } from '../scripts/arc-merkle.mjs';
@@ -58,6 +57,10 @@ const CHAIN_ID = Number(process.env.GFG_Arc_ChainId || 5042002);
 // Dice: one secret window seed, committed BEFORE play and revealed at window
 // close. Rolls are derived from it, so they are free and verifiable later.
 const DICE_SEED = process.env.GFG_Arc_Dice_Seed || '';
+// Sponsor gas paid for the CURRENT window (wei). Accumulated in-process from the
+// receipts of the writes we sponsor, then written on-chain at finalize. The
+// chain is the accounting source of truth; nothing is kept in a file.
+let windowGasWei = 0n;
 
 const coreAbi = parseAbi([
   'function chargeLife(address player, uint64 matchRef)',
@@ -74,6 +77,7 @@ const regAbi = parseAbi([
   'function expireGame(bytes32 gameId)',
   'function commitBatch(uint8 kind, bytes32 root, uint256 count)',
   'function finalizeWindow(uint8 kind, bytes32 root, uint256 count, uint256 fromBlock, uint256 toBlock)',
+  'function finalizeWindowGas(uint8 kind, bytes32 root, uint256 count, uint256 fromBlock, uint256 toBlock, uint256 sponsorGasWei)',
   'function windowRoot(uint8) view returns (bytes32)',
   'function windowCount(uint8) view returns (uint256)',
   'function windowFromBlock(uint8) view returns (uint256)',
@@ -186,7 +190,6 @@ export default async function handler(req, res) {
       const wallet2 = createWalletClient({ chain: chain2, transport: http(__evm2.rpc), account: relayer2 });
       const hash2 = await wallet2.writeContract({ address: __evm2.contracts.playerCore, abi: coreAbi, functionName: 'migratePlayer', args: [evm, { ...b, migrationRef }] });
       const rc2 = await pub2.waitForTransactionReceipt({ hash: hash2 });
-      try { recordArcSpend({ action: 'migrateMe', gas: Number(rc2.gasUsed), usdc: Number(formatEther(rc2.gasUsed * rc2.effectiveGasPrice)), player: evm, gameId: null }); } catch (e) {}
       res.status(200).json({ ok: true, migrated: true, txHash: hash2, points: b.localPure });
       return;
     }
@@ -224,12 +227,14 @@ export default async function handler(req, res) {
       for (const e of events) leaves.push(await leafFromEvent(e));
       const tree = buildTree(leaves);
       const h = await wallet.writeContract({
-        address: GAME_REGISTRY, abi: regAbi, functionName: 'finalizeWindow',
-        args: [kindNum, tree.root, BigInt(leaves.length), fromBlock, BigInt(latest)],
+        address: GAME_REGISTRY, abi: regAbi, functionName: 'finalizeWindowGas',
+        args: [kindNum, tree.root, BigInt(leaves.length), fromBlock, BigInt(latest), windowGasWei],
       });
       const rc = await pub.waitForTransactionReceipt({ hash: h });
-      try { recordArcSpend({ action: 'finalizeWindow:' + kind, gas: Number(rc.gasUsed), usdc: Number(formatEther(rc.gasUsed * rc.effectiveGasPrice)), player: null, gameId: null }); } catch (e) {}
-      return { flushed: true, root: tree.root, count: leaves.length, fromBlock: String(fromBlock), toBlock: String(latest), txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice) };
+      const gasRecordedWei = windowGasWei;
+      windowGasWei = 0n;
+      try {  } catch (e) {}
+      return { flushed: true, root: tree.root, count: leaves.length, fromBlock: String(fromBlock), toBlock: String(latest), txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice), sponsorGasWei: String(gasRecordedWei) };
     }
 
     if (action === 'flushBatch') {
@@ -270,9 +275,27 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Usage summary for the dashboard (raw project data).
+    // Usage summary for the dashboard: summed from the chain's own events.
     if (action === 'arcUsage') {
-      res.status(200).json({ ok: true, usage: arcUsageSummary() });
+      const topic = keccak256(Buffer.from('WindowFinalizedGas(uint8,bytes32,uint256,uint256,uint256,uint256,uint256)'));
+      const latest = await pub.getBlockNumber();
+      const fromB = latest > 9999n ? latest - 9999n : 0n;
+      const logs = await pub.getLogs({ address: GAME_REGISTRY, fromBlock: fromB, toBlock: latest, topics: [topic] }).catch(() => []);
+      const now = Math.floor(Date.now() / 1000);
+      const periods = [24, 24 * 7, 24 * 14, 24 * 30, 24 * 90].map((hours) => {
+        const since = now - hours * 3600;
+        let gas = 0n, games = 0n, windows = 0;
+        for (const l of logs) {
+          const d = l.data.slice(2);
+          const u = (i) => BigInt('0x' + d.slice(i * 64, i * 64 + 64));
+          const count = u(1), gasWei = u(4), ts = u(5);
+          if (Number(ts) >= since) { gas += gasWei; games += count; windows += 1; }
+        }
+        const usdc = Number(formatEther(gas));
+        const days = hours / 24;
+        return { window: hours === 24 ? '24h' : (hours / 24) + 'd', txs: windows, gas: Number(gas), usdc: Number(usdc.toFixed(8)), games: Number(games), usdcPerDay: Number((usdc / days).toFixed(8)), gamesPerDay: Number((Number(games) / days).toFixed(2)), usdcPerGame: Number(games) > 0 ? Number((usdc / Number(games)).toFixed(8)) : null };
+      });
+      res.status(200).json({ ok: true, usage: { generatedAt: Date.now(), chain: true, periods } });
       return;
     }
 
@@ -410,15 +433,7 @@ export default async function handler(req, res) {
     const hash = await wallet.writeContract({ address, abi, functionName: fn, args });
     const rc = await pub.waitForTransactionReceipt({ hash });
     const costUsdc = formatEther(rc.gasUsed * rc.effectiveGasPrice);
-    try {
-      recordArcSpend({
-        action,
-        gas: Number(rc.gasUsed),
-        usdc: Number(costUsdc),
-        player: params.player || params.p2 || null,
-        gameId: params.gameId || params.batchId || null,
-      });
-    } catch (e) { /* logging must never break a write */ }
+    try { windowGasWei += (rc.gasUsed * rc.effectiveGasPrice); } catch (e) { /* accounting */ }
     res.status(200).json({ ok: true, action, txHash: hash, gas: String(rc.gasUsed), usdc: costUsdc, relayer: relayer.address });
   } catch (e) {
     console.error('arc-relay error:', e.shortMessage || e.message);
