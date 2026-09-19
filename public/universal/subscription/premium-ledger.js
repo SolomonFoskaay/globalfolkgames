@@ -258,9 +258,29 @@
         // 30-day window, NO auto-renew). Gasless ER write. Soft-fail. Returns
         // the receipt sig on success.
         activate: async function (level) {
+            var lvl = Math.min(3, Math.max(1, Number(level) || 1));
+            // Arc rail: activation is an ADMIN-GATED on-chain write (the relayer
+            // holds the operator role), so the browser asks the relayer and the
+            // contract sets the 30-day window from block time. No signing needed.
+            if (isArc()) {
+                var a = window.gfgChainAdapter;
+                if (!a || typeof a.activatePlan !== 'function') { lastError = 'arc activate unavailable'; return null; }
+                try {
+                    var addr = evmAddress();
+                    if (!addr) { lastError = 'no Arc wallet connected'; return null; }
+                    var r = await a.activatePlan(addr, lvl, 30);
+                    await refreshLedger(true);
+                    lastSpend = { amount: [0, 5000, 10000, 15000][lvl], reason: 'activate_subscription', ref: 'activate', sig: (r && (r.txHash || r)) || null, at: Date.now() };
+                    notify(cached);
+                    return (r && (r.txHash || r)) || null;
+                } catch (e) {
+                    lastError = (e && (e.message || e)) || String(e);
+                    console.warn('[premium-ledger] arc activate failed:', lastError);
+                    return null;
+                }
+            }
             if (!magicReady()) return null;
             try {
-                var lvl = Math.min(3, Math.max(1, Number(level) || 1));
                 var sig = await window.magicblockDice.activateSubscriptionLevel(lvl);
                 await refreshLedger(true);
                 lastSpend = { amount: [0, 5000, 10000, 15000][lvl], reason: 'activate_subscription', ref: 'activate', sig: sig, at: Date.now() };
