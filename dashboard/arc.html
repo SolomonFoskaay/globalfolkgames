@@ -53,6 +53,12 @@
             <p class="arc-note">PlayerCore is the single per-player account (lives, points, premium, per-game buckets). GameRegistry holds match starts/ends with a TTL. Randomness holds the committed and revealed dice seeds.</p>
         </section>
 
+        <section class="game-card" style="text-align:left; border:1px solid #2ecc71;">
+            <h3>GFG-BS batch window <span id="arc-flush-checked" class="last-checked"></span></h3>
+            <div class="arc-grid" id="arc-flush"><p class="empty">Loading…</p></div>
+            <p class="arc-note">The settlement window flushes when 100 matches are pending OR the oldest pending match is 1 hour old, and an EMPTY window never flushes (no pending = no transaction = no cost). Read-only, free.</p>
+        </section>
+
         <section class="game-card" style="text-align:left;">
             <h3>Self-hosted relayer (gasless)</h3>
             <div class="arc-grid" id="arc-relayer"><p class="empty">Loading…</p></div>
@@ -60,33 +66,30 @@
         </section>
 
         <section class="game-card" style="text-align:left;">
-            <h3>Measured cost (Phase 1 + 2)</h3>
+            <h3>Measured cost (GFG-BS, batched)</h3>
             <div class="arc-table-wrap">
                 <table class="arc-table">
                     <thead><tr><th>Action</th><th>Gas</th><th>USDC</th></tr></thead>
                     <tbody>
-                        <tr><td>openGame (match starts, TTL)</td><td>96,937</td><td>0.002423</td></tr>
-                        <tr><td>commitSeed (dice locked)</td><td>46,041</td><td>0.001151</td></tr>
-                        <tr><td>chargeLife (one life)</td><td>94,403</td><td>0.002360</td></tr>
-                        <tr><td>revealSeed (dice revealed)</td><td>48,554</td><td>0.001214</td></tr>
-                        <tr><td>recordPoints (bucket + global)</td><td>104,925</td><td>0.002623</td></tr>
-                        <tr><td>settleGame (match ends)</td><td>50,494</td><td>0.001262</td></tr>
-                        <tr><td><b>total per game (unbatched)</b></td><td></td><td><b>0.011034</b></td></tr>
-                        <tr><td>commitBatch (100 games in one tx)</td><td>28,985</td><td>0.000725</td></tr>
-                        <tr><td>batched root, N=20 (per game)</td><td>28,985</td><td>0.00003623</td></tr>
-                        <tr><td>batched root, N=100 (per game)</td><td>28,985</td><td>0.00000725</td></tr>
-                        <tr><td>batched root, N=1000 (per game)</td><td>28,997</td><td>0.00000072</td></tr>
-                        <tr><td>expireGame (permissionless TTL)</td><td>51,697</td><td>0.001292</td></tr>
-                        <tr><td>a dice roll (derived from seed)</td><td>0</td><td>0 (free read)</td></tr>
+                        <tr><td>commitStart (match begins, per-match mode)</td><td>147,630</td><td>0.002953</td></tr>
+                        <tr><td>settle (match ends, co-signed, per-match mode)</td><td>90,344</td><td>0.001807</td></tr>
+                        <tr><td><b>per match, unbatched (2 txs)</b></td><td></td><td><b>0.004760</b></td></tr>
+                        <tr><td><b>per MATCH, batched (1 leaf in the window)</b></td><td colspan="2"><b>its share of the flush, not a tx</b></td></tr>
+                        <tr><td>flush (ONE tx for the whole window)</td><td>~136,598</td><td>0.002732 (flat)</td></tr>
+                        <tr><td>batched, N=20 sharing a flush</td><td colspan="2">0.000137 per match (about $0.14 / 1,000)</td></tr>
+                        <tr><td>batched, N=100 sharing a flush</td><td colspan="2">0.000027 per match (about $0.027 / 1,000)</td></tr>
+                        <tr><td>batched, N=1000 sharing a flush</td><td colspan="2">0.0000027 per match (about $0.003 / 1,000)</td></tr>
+                        <tr><td>moves, dice rolls, turn clock, dice seed</td><td>0</td><td>0 (off-chain / free reads)</td></tr>
+                        <tr><td>chargeLife (one life, at match start)</td><td>94,403</td><td>0.002360</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="arc-note">Batched, a game lands near 0.0001 USDC or less. At 20 games/day launch scale, about 0.22 USDC/day. Compare Solana: 10,000 players is about 10,400 USD of one-time rent.</p>
+            <p class="arc-note">A match is played OFF the chain (moves, dice, timers all free). ONE start commit and ONE co-signed settlement per match; many matches then share ONE window flush. Cost is per FLUSH, never per match or per move, and an empty window never flushes. See the Test results workspace for the locked setting and the daily-cost table.</p>
         </section>
 
         <section class="game-card" style="text-align:left; border:1px solid #f87818;">
             <h3>Settlement window (batched)</h3>
-            <p class="arc-note">Games are collected as leaves and flushed in ONE transaction when the window reaches 100 games or 24 hours. Flush an idle window here (no cron; this button is the manual trigger).</p>
+            <p class="arc-note">Matches are collected as leaves and flushed in ONE transaction when the window reaches 100 matches or the oldest pending match is 1 hour old. An EMPTY window is never flushed, so idle time costs nothing (no cron; this button is a manual trigger).</p>
             <div class="arc-table-wrap">
                 <table class="arc-table" id="arc-window-table">
                     <thead><tr><th>Pending games</th><th>Window started</th><th>Last flush</th><th>Last count</th><th>Last root</th></tr></thead>
@@ -285,11 +288,33 @@
                     loadWindow(); loadUsage();
                 }
             }
+            async function loadFlushState() {
+                const host = document.getElementById('arc-flush');
+                const checked = document.getElementById('arc-flush-checked');
+                if (!host) return;
+                try {
+                    const j = await arcCall('flushState', {});
+                    const mins = (j.nextFlushInMs == null) ? null : Math.ceil(j.nextFlushInMs / 60000);
+                    const trigger = j.pending === 0 ? 'none' : (j.nextTrigger === 'full' ? 'full (100 matches)' : 'age (1h)');
+                    const next = j.pending === 0 ? 'nothing pending' : (mins <= 0 ? 'flushing now' : 'in about ' + mins + ' min');
+                    host.innerHTML =
+                        '<div class="arc-card"><div class="k">Pending matches</div><div class="v">' + j.pending + '</div></div>' +
+                        '<div class="arc-card"><div class="k">Next flush</div><div class="v small ' + (j.pending === 0 ? '' : 'ok') + '">' + next + '</div></div>' +
+                        '<div class="arc-card"><div class="k">Trigger</div><div class="v small">' + trigger + '</div></div>' +
+                        '<div class="arc-card"><div class="k">Window rule</div><div class="v small">' + j.config.max + ' matches or ' + (j.config.ageMs / 60000) + ' min</div></div>' +
+                        '<div class="arc-card"><div class="k">Last flushed to block</div><div class="v small">' + j.lastFlushedRange.toBlock + '</div></div>';
+                    if (checked) checked.textContent = 'checked ' + new Date().toLocaleTimeString();
+                } catch (e) {
+                    host.innerHTML = '<p class="empty">Flush state unavailable (' + esc(e.message) + ').</p>';
+                }
+            }
             if (el('arc-flush-btn')) el('arc-flush-btn').addEventListener('click', flushWindow);
-            el('arc-refresh').addEventListener('click', function () { load(); loadUsage(); loadWindow(); });
+            el('arc-refresh').addEventListener('click', function () { load(); loadUsage(); loadWindow(); loadFlushState(); });
             load();
             loadUsage();
             loadWindow();
+            loadFlushState();
+            setInterval(loadFlushState, 20000);
         });
     </script>
 </body>

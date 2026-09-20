@@ -361,6 +361,15 @@
             render();
         });
     }
+    // FIX (3v, game-agnostic): a life is charged at game START, so when any game
+    // reports the charge, re-read the on-chain meter immediately. Without this
+    // the display only caught up on a later match completion (late/double look).
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('gfg:life-charged', function () {
+            try { syncFromChain(); } catch (e) { /* soft */ }
+            try { render(); } catch (e) { /* soft */ }
+        });
+    }
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('storage', function (e) {
             if (e.key !== CACHE_KEY) return;
