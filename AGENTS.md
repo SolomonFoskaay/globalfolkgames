@@ -112,10 +112,12 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   Consumes the seam (arcv2m2). In-progress.
 - **arcv2m8 — Sponsor escrow:** on-chain brand event rake (30/70, prizes escrowed).
   The escrow proof-of-life; product build waits behind arcv2m1-arcv2m4.
-- **arcv2m10 — Lives + daily rewards:** the free-play gate (free 5 lives/day, Level-2
-  10/day, Level-3 15/day, GMT+00 reset, consumed ONLY on match completion, never on abandon/reset/
-  disconnect) + daily earn (free 25P/day, Level-2 200P/day, Level-3 300P/day, kind=1 credit into arcv2m4,
-  new source_code 14). Ships inside the arcv2m5 build window. In-progress.
+- **arcv2m10 — Lives + daily rewards:** the free-play gate (owner-approved ladder
+  2026-09-19: L0 5 / L1 10 / L2 15 / L3 20 lives/day, GMT+00 reset, **CHARGED AT
+  GAME START and NON-REFUNDABLE** — win, lose, draw or abandon all spend it, which
+  ends the abandon exploit) + daily earn (free 25P/day, L2 100P/day, L3 200P/day,
+  kind=1 credit into arcv2m4, new source_code 14). Ships inside the arcv2m5 build
+  window. In-progress.
 
 **HARD RULES (do not regress):**
 0. **Surgical edits only, never rewrite.** When updating any code (adding a
@@ -327,7 +329,7 @@ truth is `public/changelog/architecture.json` (rendered on the staff page
   Multi-sponsor platform + arcv2m8 escrow product deferred.
 - arcv2m8: planned (deferred) — sponsor escrow.
 - arcv2m10: in-progress — lives + daily rewards gate (ships with arcv2m5; ladder by plan:
-  5/10/15 lives, 25/200/300P daily).
+  5/10/15/20 lives, 25/100/200P daily; **lives charged at game start, non-refundable**).
 
 - **arcv2m11 — Community (on-chain UGC forum, arcv2m11):** gasless ER forum, text-only posts with link/embed rendering, per-game + how-to/bugs/suggestions categories, author identity = the GFG-XXXXXX handle only, server search index, posts live forever on-chain (R19). Planned (builds after launch).
 

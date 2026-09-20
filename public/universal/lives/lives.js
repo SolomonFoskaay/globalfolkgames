@@ -1,15 +1,17 @@
 // public/universal/lives/lives.js
 // M10 — LIVES MODULE (universal, game-agnostic half of M10).
 //
-// The free-play meter. Consumes the universal result seam (M2):
-// subscribes to window.onGameResult ONCE and consumes exactly one life when a
-// match COMPLETES (a finished game). Abandon, reset, and mid-game network
-// disconnect never emit a completed result, so they never cost a life.
+// The free-play meter. HARD RULE (owner 2026-09-19): a life is CHARGED AT GAME
+// START and is NON-REFUNDABLE. Win, lose, draw, ABANDON, reset or disconnect
+// all spend the life; nothing refunds it. This is deliberate anti-exploit: if a
+// life were only spent on completion, a player could abandon endless losing
+// games for free. One game start = one life, always. The on-chain chargeLife is
+// the real gate (it reverts NoLives); this module is the display + local mirror.
 // A game never ships a lives plug — ANY M1 game (Ludo, Ayo Olopon, ...) gates
 // its start against window.gfgLives.get() and this module does the rest.
 //
-// Boosts with an active subscription: free = 5 lives/day, Level-2 subscriber =
-// 10 lives/day (5 base + 5 premium). Daily reset at GMT+00 (midnight UTC).
+// Boosts with an active subscription: L0 5 / L1 10 / L2 15 / L3 20 lives/day
+// (config-driven ladder in /plan-ladder.json). Daily reset at GMT+00.
 //
 // Consumes: M2 seam (match completion), M5 window.activeTier.get() (pool size).
 // Emits: window.gfgLives = { get(), consume(), subscribe(cb) }.
@@ -194,8 +196,10 @@
         };
     }
 
-    // Consume one life (called on a completed match — the module wires this to
-    // the seam below). Returns true if a life was actually consumed.
+    // Consume one life AT GAME START (owner 2026-09-19: charge at start, never
+    // on completion, never refunded). Returns true if a life was actually
+    // consumed. The on-chain chargeLife is the real gate; this local mirror
+    // keeps the meter honest for the same device.
     function consume() {
         // M5 v3: a booster makes lives unlimited, so a completed match never
         // draws the meter while the booster runs.
@@ -382,9 +386,10 @@
     window.gfgLives = {
         // PURE cache read of the lives pool for the current UTC day.
         get: get,
-        // Manually consume a life. The module auto-consumes on completed matches
-        // via the seam; a game can call this directly only for a match it knows
-        // finished (it is idempotent per UTC day by the used counter).
+        // Consume a life AT GAME START (owner 2026-09-19: charged at start,
+        // non-refundable). The on-chain chargeLife is the real gate; a game
+        // calls this so the same device's meter updates immediately. It is
+        // counted per UTC day by the used counter.
         consume: consume,
         subscribe: subscribe,
         // Milliseconds until the next lives reset (GMT+00 midnight). Lets any
