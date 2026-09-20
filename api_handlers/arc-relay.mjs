@@ -514,11 +514,12 @@ export default async function handler(req, res) {
         for (const l of logs) {
           const t0 = l.topics && l.topics[0];
           if (t0 === startTopic) {
-            const p1 = '0x' + l.topics[1].slice(26), p2 = '0x' + l.topics[2].slice(26);
+            const p1 = '0x' + l.topics[2].slice(26), p2 = '0x' + l.topics[3].slice(26);
             if (p1.toLowerCase() !== player.toLowerCase() && p2.toLowerCase() !== player.toLowerCase()) continue;
-            started.push({ gameId: l.topics[1] && l.data, block: Number(l.blockNumber), tx: l.transactionHash, raw: l });
+            // gameId is the INDEXED topic1; topics[2]/[3] are the two players.
+            started.push({ gameId: l.topics[1], block: Number(l.blockNumber), tx: l.transactionHash });
           } else if (t0 === settledTopic) {
-            settledMap.set((l.topics[1] || '').toLowerCase(), { tx: l.transactionHash });
+            settledMap.set((l.topics[1] || '').toLowerCase(), { tx: l.transactionHash, block: Number(l.blockNumber) });
           }
         }
         if (from === 0n) break;
@@ -542,11 +543,22 @@ export default async function handler(req, res) {
         });
       }
       rows.sort((a, b) => b.startedAt - a.startedAt);
-      res.status(200).json({ ok: true, player, count: rows.length, matches: rows.slice(0, limit), free: true, chain: 'arc' });
+      // Batch-window context: a settled match is not "on-chain final" until the
+      // window flushes, so the UI can show 'pending flush' vs the batch tx.
+      let windowTo = 0n;
+      try { windowTo = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [1] }); } catch (e) { /* soft */ }
+      for (const r of rows) {
+        const settledAtBlock = (settledMap.get(String(r.gameId).toLowerCase()) || {}).block || 0;
+        r.inWindow = settledAtBlock > 0 && windowTo > 0n && BigInt(settledAtBlock) <= windowTo;
+        if (!r.inWindow) r.flushState = 'pending flush';
+        else r.flushState = 'flushed';
+      }
+      res.status(200).json({ ok: true, player, count: rows.length, matches: rows.slice(0, limit), free: true, chain: 'arc', windowToBlock: String(windowTo) });
       return;
     }
 
     if (action === 'turnState') {
+      const t = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'turnState', args: [hex32(params.gameId)] });
       res.status(200).json({
         ok: true, gameId: hex32(params.gameId),
         seats: Number(t[0]), activeSeat: Number(t[1]), turnSecs: Number(t[2]),

@@ -59,25 +59,32 @@
     function render(rows, host, player) {
         if (!host) return;
         if (!rows.length) {
-            host.innerHTML = '<div class="gfg-mh-empty">No on-chain matches yet. Play a game and it will appear here with a link you can check anytime.</div>';
+            host.innerHTML = '<div class="gfg-mh-empty">No matches yet. Play a game and it will appear here with a start link, and a chain link once the batch window flushes.</div>';
             return;
         }
         var html = '<div class="gfg-mh-title">Your on-chain matches (newest first)</div><div class="gfg-mh-list">';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             var startTx = r.startTx ? '<a class="gfg-mh-link" target="_blank" rel="noopener" href="' + explorer() + '/tx/' + r.startTx + '">start tx</a>' : '';
+            // A settled match is final on-chain only when the window flushes. Before
+            // that we show an honest "pending flush" (app receipt is instant, the
+            // chain stamp lands at window close). The end link appears once flushed.
             var endTx = r.settleTx ? '<a class="gfg-mh-link" target="_blank" rel="noopener" href="' + explorer() + '/tx/' + r.settleTx + '">end tx</a>' : '';
-            var status = r.settled ? (r.disputed ? 'disputed' : 'settled') : 'open';
+            var status, statusClass;
+            if (!r.settled) { status = 'playing'; statusClass = 'open'; }
+            else if (r.disputed) { status = 'disputed'; statusClass = 'disputed'; }
+            else if (r.flushState === 'pending flush') { status = 'pending flush'; statusClass = 'open'; }
+            else { status = 'settled'; statusClass = 'settled'; }
             html += '<div class="gfg-mh-row">'
                 + '<span class="gfg-mh-game">' + (r.gameTag != null ? '(game ' + r.gameTag + ')' : '') + '</span>'
-                + '<span class="gfg-mh-status gfg-mh-' + status + '">' + status + '</span>'
+                + '<span class="gfg-mh-status gfg-mh-' + statusClass + '">' + status + '</span>'
                 + '<span class="gfg-mh-time">' + when(r.startedAt) + '</span>'
                 + '<span class="gfg-mh-moves">' + (r.moveCount || 0) + ' moves</span>'
                 + '<span class="gfg-mh-links">' + startTx + endTx + '</span>'
                 + '</div>';
         }
         html += '</div>';
-        html += '<div class="gfg-mh-note">Every match has an on-chain beginning and end. Reads are free, so this list costs nothing.</div>';
+        html += '<div class="gfg-mh-note">Every match has an on-chain beginning (start tx) and is written to the chain at window close (end tx). Matches batched together share one flush transaction, so your end tx may be the same block as other players. Reads are free, so this list costs nothing.</div>';
         host.innerHTML = html;
     }
 
