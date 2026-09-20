@@ -120,6 +120,22 @@ export const arcAdapter = {
   async commitSeed(batchId, seedHash) { return relay('commitSeed', { batchId, seedHash }); },
   async revealSeed(batchId, seed) { return relay('revealSeed', { batchId, seed }); },
 
+  // GFG-BS per-match settlement (arcv2m17, the gasless core): TWO txs per match
+  // total, no matter how many moves. The player pays nothing; the relayer pays.
+  async commitMatchStart(gameId, p1, p2, gameTag, seats, commitHash, ttlSecs) {
+    return relay('commitMatchStart', { gameId, p1, p2, gameTag, seats, commitHash, ttlSecs: ttlSecs || 3600 });
+  },
+  async settleMatch(gameId, moveDigest, resultHash, moveCount, sig1, sig2) {
+    return relay('settleMatch', {
+      gameId, moveDigest, resultHash, moveCount,
+      v1: sig1.v, r1: sig1.r, s1: sig1.s,
+      v2: sig2.v, r2: sig2.r, s2: sig2.s,
+    });
+  },
+  async matchDispute(gameId, revealedDigest) { return relay('matchDispute', { gameId, revealedDigest }); },
+  async matchTimeout(gameId) { return relay('matchTimeout', { gameId }); },
+  async matchState(gameId) { return relay('matchState', { gameId }); },
+
   // Permissionless upkeep: expires a stale plan on-chain and heals the lives
   // pool to the approved ladder (L0 5 / L1 10 / L2 15 / L3 20).
   async upkeep(playerPubkey) {
