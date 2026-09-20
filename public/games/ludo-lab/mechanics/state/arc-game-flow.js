@@ -46,7 +46,11 @@
     async function ensureStarted() {
         if (st.started || !matchActive()) return;
         var w = wallet(); if (!w) return;
-        if (!window.gfgSettlement || !window.gfgMatchEngine) return;
+        if (!window.gfgSettlement || !window.gfgMatchEngine) {
+            // Do NOT fail silently: if the rail is missing, retry on the next tick
+            // (the scripts may still be loading). Never write a half-start.
+            return;
+        }
         await loadCfg();
         var colors = seatColors();
         var ref = window.gfgGameMatchRef || Date.now();
@@ -172,6 +176,14 @@
                 // the game core the gate already charged so it never double-charges.
                 window.__gfgArcLifeGateHandled = ref;
                 gateInFlight = false;
+                // FIX (3v): the chain HAS charged the life now, so refresh the
+                // lives meter IMMEDIATELY. Without this it only updated on a
+                // later match completion, so lives looked late or doubled. This
+                // is game-agnostic: any game using this rail gets the same fix.
+                try {
+                    if (window.__gfgLivesSyncFromChain) window.__gfgLivesSyncFromChain();
+                    window.dispatchEvent(new CustomEvent('gfg:life-charged', { detail: { matchRef: ref } }));
+                } catch (e) { /* soft */ }
                 return orig.apply(window, args);
             })
             .catch(function (e) {

@@ -342,6 +342,39 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, flushed: true, trigger: full ? 'full' : 'age', pending, root: tree.root, txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice), config: { max: BATCH_MAX, ageMs: BATCH_MAX_AGE_MS } });
       return;
     }
+    // GFG-BS FLUSH TIMER (read-only, FREE): reports the batch window state so the
+    // dashboard can prove the timer works. No gas, no USDC.
+    if (action === 'flushState') {
+      const latest = await pub.getBlockNumber();
+      const lastTo = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [1] });
+      // Bound the scan to a range the RPC accepts (it caps eth_getLogs ranges).
+      let fromBlock = lastTo === 0n ? (latest > 9000n ? latest - 9000n : 0n) : lastTo + 1n;
+      if (latest - fromBlock > 9000n) fromBlock = latest - 9000n;
+      let pending = 0;
+      let scanError = null;
+      try {
+        const ml = latest >= fromBlock ? await matchLogs(fromBlock, latest) : { settled: [] };
+        pending = ml.settled.length;
+      } catch (e) { scanError = (e.shortMessage || e.message || String(e)); }
+      let nextInMs = null;
+      let trigger = 'none';
+      if (pending > 0) {
+        if (firstPendingAt === 0) firstPendingAt = Date.now(); // account for a cold start
+        const age = Date.now() - firstPendingAt;
+        nextInMs = Math.max(0, BATCH_MAX_AGE_MS - age);
+        trigger = pending >= BATCH_MAX ? 'full' : 'age';
+      }
+      res.status(200).json({
+        ok: true, chain: 'arc', free: true,
+        pending, config: { max: BATCH_MAX, ageMs: BATCH_MAX_AGE_MS },
+        nextFlushInMs: nextInMs, nextTrigger: trigger,
+        lastFlushedRange: { toBlock: String(lastTo) },
+        scanError: scanError || undefined,
+        note: 'Pending is read from chain events; the age timer starts when the first pending match is seen by the relayer. Empty windows never flush.',
+      });
+      return;
+    }
+
     if (action === 'batchStat') {
       const k = params.kind === 'open' ? 'open' : 'settle';
       const kNum = k === 'settle' ? 1 : 0;
