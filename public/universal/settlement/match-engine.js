@@ -106,6 +106,48 @@
         return m.digest;
     }
 
+    // ---- FREE DISPUTE (arcv2m17, owner-locked 2026-09-19) --------------------
+    // A dispute costs the player NOTHING: it is a signed event appended to the
+    // same off-chain log, exactly like a move. It rides the same batch flush, so
+    // there is no bond, no fee and no extra transaction. The verifier replay also
+    // runs off-chain for free. A dispute is only meaningful when the two devices
+    // disagree, i.e. when the digests differ.
+    function dispute(reason) {
+        if (!m) return null;
+        m.dispute = { at: nowMs(), reason: String(reason || 'disagreement'), digestAtDispute: m.digest };
+        m.digest = rollingHash(m.digest, 'dispute:' + m.dispute.reason);
+        return m.summary ? summary() : null;
+    }
+    function isDisputed() { return !!(m && m.dispute); }
+    function disputeInfo() { return m ? (m.dispute || null) : null; }
+
+    // Replay helper (game-agnostic): re-apply the given move list and result from
+    // empty and return the resulting digest. `entries` is the recorded log:
+    //   [{ seat: <index>, move: <object> }, ...]
+    // (the SEAT INDEX is what the engine hashed, never a field inside the move).
+    function replayDigest(entries, meta, result) {
+        var d = rollingHash('0', 'open:' + String((meta && meta.matchRef) || 0));
+        for (var i = 0; i < (entries || []).length; i++) {
+            var e = entries[i] || {};
+            var mv = (e.move !== undefined) ? e.move : e;
+            var seat = (e.seat != null) ? e.seat : 0;
+            var canonical = JSON.stringify(mv == null ? null : mv, Object.keys(mv || {}).sort());
+            d = rollingHash(d, 'move:' + seat + ':' + canonical);
+        }
+        if (result !== undefined && result !== null) {
+            var rc = JSON.stringify(result, Object.keys(result || {}).sort());
+            d = rollingHash(d, 'result:' + rc);
+        }
+        return d;
+    }
+    // Full verification of a reveal: the revealed log (+ result) must reproduce
+    // the digest BOTH players signed. Returns { ok, reason }.
+    function verifyReveal(moves, meta, expectedDigest, result) {
+        var got = replayDigest(moves, meta, result);
+        if (String(got) === String(expectedDigest)) return { ok: true, digest: got };
+        return { ok: false, digest: got, reason: 'revealed move log does not match the co-signed digest' };
+    }
+
     // The exact payload the two devices co-sign and the chain stores.
     function summary() {
         if (!m) return null;
@@ -120,6 +162,8 @@
             startedAt: m.startedAt,
             finishedAt: m.finishedAt || nowMs(),
             result: m.result,
+            disputed: !!m.dispute,
+            dispute: m.dispute || null,
         };
     }
 
@@ -169,6 +213,11 @@
         turnDeadlineMs: turnDeadlineMs,
         elapsedMs: elapsedMs,
         close: close,
+        dispute: dispute,
+        isDisputed: isDisputed,
+        disputeInfo: disputeInfo,
+        replayDigest: replayDigest,
+        verifyReveal: verifyReveal,
         summary: summary,
         summaryString: summaryString,
         signSummary: signSummary,
