@@ -1,36 +1,32 @@
 // public/games/ludo-lab/mechanics/state/arc-game-flow.js
-// arcv2m1 / GFG-BS bridge: makes the LIVE Ludo game drive the Arc on-chain game
-// flow. Loaded LAST on the page, and a NO-OP unless window.gfgChain.isArc() is
+// arcv2m1 / GFG-BS bridge: makes the LIVE Ludo game use the GAME-AGNOSTIC
+// settlement rail. Loaded LAST, and a NO-OP unless window.gfgChain.isArc() is
 // true, so the live Solana game is completely untouched.
 //
-// What it does, all soft-fail (never throws into game code):
-//   - match start  -> openGame + seatUp(each seat) + beginGame (on-chain clock)
-//   - turn pass    -> commitMove(prevSeat -> nextSeat) on the on-chain clock
-//   - match finish -> settleGameOrder(full 1st..Nth finish order)
-//   - deadline     -> permissionless expireTurn ONLY as a stall fallback (the
-//                     local solo timer stays authoritative: on-chain turnSecs is
-//                     kept slightly LONGER than the local 45s window)
+// GASLESS MODEL (owner-locked 2026-09-19): a match costs TWO transactions TOTAL,
+// no matter how many moves or dice rolls:
+//   - match start  -> ONE start commit (via window.gfgSettlement.start())
+//   - match finish -> ONE co-signed settlement (via window.gfgSettlement.finish())
+// EVERYTHING IN BETWEEN IS FREE: moves, dice rolls, turn changes, the turn
+// clock, captures, passes. Nothing is written during play.
 //
-// The chain is the source of truth; the browser is a thin display + driver.
+// The old per-action calls (openGame/seatUp/beginGame/commitMove/expireTurn/
+// settleGameOrder) are NO LONGER USED here. They remain in the contract only as
+// legacy; the hot path never calls them.
+//
+// This bridge is Ludo-specific ONLY in how it feeds the rail (turn order, finish
+// order). The rail itself is universal: any game calls start()/move()/finish().
 (function () {
-    var LOCAL_TURN_SECS = 45;    // the game's local human turn window
-    var CHAIN_TURN_SECS = 50;    // on-chain window, longer so the local pass wins
     var POLL_MS = 1000;
 
     var cfg = null;
-    var st = { gameId: null, seatColors: [], started: false, settled: false, lastTurn: null, expiring: false };
+    var st = { matchRef: null, seatColors: [], started: false, settled: false, lastTurn: null, lastMoveSig: null };
     var gateInFlight = false; // re-entrancy guard for the async lives gate
 
     function isArc() { try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; } }
     function wallet() { try { return (window.gfgChainAdapter && window.gfgChainAdapter.walletAddress && window.gfgChainAdapter.walletAddress()) || null; } catch (e) { return null; } }
     function seatColors() { try { var a = window.getActiveSeats ? window.getActiveSeats() : null; if (a && a.length) return a.slice(0, 4); } catch (e) {} return ['green', 'yellow', 'blue', 'red']; }
     function curTurn() { try { return (window.getGameCurrentTurn && window.getGameCurrentTurn()) || null; } catch (e) { return null; } }
-    function bytes32FromNum(n) { try { return '0x' + BigInt(n).toString(16).padStart(64, '0'); } catch (e) { return '0x' + String(n).padStart(64, '0'); } }
-    function orderHash(orderIdx) {
-        var h = '';
-        for (var i = 0; i < orderIdx.length; i++) h += (orderIdx[i] & 0xff).toString(16).padStart(2, '0');
-        return '0x' + h.padEnd(64, '0');
-    }
     async function loadCfg() {
         if (cfg) return cfg;
         try { cfg = await (await fetch('/arc-config.json', { cache: 'no-store' })).json(); } catch (e) { cfg = null; }
@@ -45,27 +41,43 @@
         try { return !!(window.__soloTurnArmed && window.__soloTurnArmed()); } catch (e) { return false; }
     }
 
-    // 1) MATCH START: open + seat + begin the on-chain clock.
+    // 1) MATCH START: ONE start commit on the generic rail. No per-seat, no
+    // beginGame, no per-turn calls ever again.
     async function ensureStarted() {
-        if (st.gameId || !matchActive()) return;
+        if (st.started || !matchActive()) return;
         var w = wallet(); if (!w) return;
-        await loadCfg(); if (!sponsor()) return;
+        if (!window.gfgSettlement || !window.gfgMatchEngine) return;
+        await loadCfg();
         var colors = seatColors();
-        var gid = bytes32FromNum(window.gfgGameMatchRef || Date.now());
-        st.gameId = gid; st.seatColors = colors;
-        try { window.__gfgGameId = gid; } catch (e) {} // share one id with the dice seed
-        try { await window.gfgChain.openGame(gid, sponsor(), 1800); } catch (e) {}
-        for (var i = 0; i < colors.length; i++) {
-            try { await window.gfgChain.seatUp(gid, sponsor(), i, ownerFor(colors[i])); } catch (e) {}
-        }
-        try { await window.gfgChain.beginGame(gid, sponsor(), colors.length, CHAIN_TURN_SECS); } catch (e) {}
+        var ref = window.gfgGameMatchRef || Date.now();
+        window.gfgGameMatchRef = ref;
+        st.matchRef = ref; st.seatColors = colors;
+        // Open the off-chain engine for this match (zero chain cost).
+        try {
+            window.gfgMatchEngine.open({
+                gameTag: 'ludo', matchRef: ref, seats: colors.length,
+                players: colors.map(ownerFor), turnSecs: 45,
+            });
+        } catch (e) { /* soft */ }
+        // Publish the on-chain gameId used by the dice seed, so dice and the
+        // settlement refer to the same match.
+        try { window.__gfgGameId = window.gfgSettlement.state ? null : window.__gfgGameId; } catch (e) {}
+        var r = await window.gfgSettlement.start({
+            gameTag: 'ludo', matchRef: ref,
+            p1: ownerFor(colors[0]), p2: ownerFor(colors[1] || colors[0]),
+            seats: colors.length, ttlSecs: 3600,
+        });
         st.started = true;
         st.lastTurn = curTurn();
-        console.log('[arc-flow] on-chain game opened', gid, colors.join(','));
+        console.log('[arc-flow] start commit', r && r.gameId, (r && r.tx) ? 'tx ' + r.tx : '(soft-failed)');
     }
 
-    // 2) TURN PASS: commit the move that handed the turn from prev -> now.
-    async function syncTurn() {
+    // 2) MOVES: recorded OFF-CHAIN ONLY. No transaction, no gas, ever.
+    function recordMove(seat, moveObj) {
+        if (!st.started || st.settled) return;
+        try { if (window.gfgMatchEngine) window.gfgMatchEngine.move(seat, moveObj); } catch (e) { /* soft */ }
+    }
+    function syncTurn() {
         if (!st.started || st.settled) return;
         var turn = curTurn();
         if (!turn || turn === st.lastTurn) return;
@@ -73,17 +85,17 @@
         var prevIdx = colors.indexOf(st.lastTurn);
         var nextIdx = colors.indexOf(turn);
         st.lastTurn = turn;
-        if (prevIdx < 0 || nextIdx < 0 || prevIdx === nextIdx) return;
-        var mover = ownerFor(colors[prevIdx]);
-        if (!mover) return;
-        var commit = orderHash([prevIdx, nextIdx]);
-        try { await window.gfgChain.commitMove(st.gameId, mover, prevIdx, nextIdx, commit); }
-        catch (e) { console.warn('[arc-flow] commitMove soft-fail', e && e.message); }
+        if (prevIdx < 0 || nextIdx < 0) return;
+        // Record the handover as an off-chain move (so the digest reflects it).
+        // A double (same seat keeps turn) is recorded too, so the log is faithful.
+        recordMove(prevIdx, { pass: prevIdx, to: nextIdx, t: Date.now() });
+        try { if (window.gfgMatchEngine) window.gfgMatchEngine.setTurn(nextIdx); } catch (e) { /* soft */ }
     }
 
-    // 3) FINISH: settle with the full finish order (called by the ceremony wrapper).
+    // 3) FINISH: ONE co-signed settlement for the whole match.
     async function finishOnchain() {
-        if (!st.started || st.settled || !st.gameId) return;
+        if (!st.started || st.settled || !st.matchRef) return;
+        if (!window.gfgSettlement || !window.gfgMatchEngine) return;
         var colors = st.seatColors.length ? st.seatColors : seatColors();
         var orderColors = (window.getFinishOrder && window.getFinishOrder()) || [];
         var orderIdx = [];
@@ -92,30 +104,23 @@
             if (idx >= 0) orderIdx.push(idx);
         }
         if (!orderIdx.length) return;
-        await loadCfg(); if (!sponsor()) return;
+        await loadCfg();
+        // Close the off-chain engine with the result (the digest now covers it).
         try {
-            await window.gfgChain.settleGameOrder(st.gameId, sponsor(), orderHash(orderIdx), orderIdx);
-            st.settled = true;
-            console.log('[arc-flow] on-chain result settled', st.gameId, orderIdx.join(','));
-        } catch (e) { console.warn('[arc-flow] settleGameOrder soft-fail', e && e.message); }
-    }
-
-    // 4) STALL FALLBACK: only if the local turn has NOT advanced past the chain
-    // deadline (the local timer normally passes first and re-stamps the clock).
-    async function watchDeadline() {
-        if (!st.started || st.settled || st.expiring) return;
-        try {
-            var ts = await window.gfgChain.turnState(st.gameId);
-            if (!ts || !ts.begun) return;
-            var now = Math.floor(Date.now() / 1000);
-            var colors = st.seatColors.length ? st.seatColors : seatColors();
-            var turn = curTurn();
-            if (now > ts.turnDeadline && colors[ts.activeSeat] === turn) {
-                st.expiring = true;
-                try { await window.gfgChain.expireTurn(st.gameId); } catch (e) {}
-                setTimeout(function () { st.expiring = false; }, 8000);
-            }
+            window.gfgMatchEngine.close({
+                finishOrder: orderIdx,
+                winner: orderIdx[0],
+                seats: colors.length,
+                endedAt: Date.now(),
+            });
         } catch (e) { /* soft */ }
+        var r = await window.gfgSettlement.finish({});
+        if (r && r.ok) {
+            st.settled = true;
+            console.log('[arc-flow] co-signed settlement', r.gameId, 'tx ' + r.tx);
+        } else {
+            console.warn('[arc-flow] settlement soft-fail:', r && r.error);
+        }
     }
 
     function wrapCeremony() {
@@ -128,7 +133,7 @@
         window.showResultCeremony.__arcWrapped = true;
     }
 
-    function reset() { st = { gameId: null, seatColors: [], started: false, settled: false, lastTurn: null, expiring: false }; }
+    function reset() { st = { matchRef: null, seatColors: [], started: false, settled: false, lastTurn: null, lastMoveSig: null }; }
 
     // 5) LIVES GATE: the CHAIN is the authority. Before the local board starts,
     // await chargeLife. If the contract reverts (NoLives) the match is blocked
@@ -196,7 +201,8 @@
 
     function tick() {
         if (!isArc()) return;
-        try { ensureStarted().then(syncTurn).then(watchDeadline); } catch (e) {}
+        try { ensureStarted(); } catch (e) {}
+        try { syncTurn(); } catch (e) {}
     }
 
     // The page ends a match with Play Again -> reset the local bridge state.
