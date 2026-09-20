@@ -102,7 +102,44 @@
         }
     }
 
-    async function dispute(gameId, revealedDigest) {
+    // FREE DISPUTE (owner-locked 2026-09-19): a dispute is a signed OFF-CHAIN
+    // event like a move - no bond, no fee, no extra transaction. It is submitted
+    // to the relayer, which runs the verifier replay for free and records the
+    // outcome; the on-chain dispute flag (if needed) is written inside the same
+    // batch window, never as a paid per-match tx.
+    async function dispute(opts) {
+        opts = opts || {};
+        var eng = engine();
+        if (!isArc()) return null;
+        var s = opts.summary || (eng && eng.summary ? eng.summary() : null);
+        if (!s) return { ok: false, error: 'no match summary' };
+        // Record the dispute locally on the off-chain log (free).
+        try { if (eng && eng.dispute) eng.dispute(opts.reason); } catch (e) { /* soft */ }
+        var revealedMoves = opts.revealedMoves || null;
+        var payload = {
+            gameId: gameId32(s.matchRef),
+            gameTag: String(s.gameTag || 'ludo'),
+            moveDigest: s.digest,
+            moveCount: Number(s.moveCount || 0),
+            reason: String(opts.reason || 'disagreement'),
+            revealedMoves: revealedMoves,
+            createdAt: Date.now(),
+        };
+        // Ask the relayer to verify + record (free; no player payment).
+        try {
+            var res = await fetch('/api/arc', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'matchDisputeFree', params: payload }),
+            });
+            var j = await res.json();
+            if (!res.ok || !j.ok) return { ok: false, error: (j && j.error) || ('dispute ' + res.status) };
+            return j;
+        } catch (e) {
+            return { ok: false, error: String(e && e.message) };
+        }
+    }
+
+    async function disputeOnchain(gameId, revealedDigest) {
         var a = adapter();
         if (!isArc() || !a || typeof a.matchDispute !== 'function') return null;
         try { var r = await a.matchDispute(gameId32(gameId), revealedDigest); return { ok: true, tx: r && (r.txHash || r) }; }
@@ -132,6 +169,11 @@
         start: start,
         finish: finish,
         dispute: dispute,
+        disputeOnchain: disputeOnchain,
+        verifyReveal: function (moves, meta, expectedDigest) {
+            var eng = engine();
+            return (eng && eng.verifyReveal) ? eng.verifyReveal(moves, meta, expectedDigest) : { ok: false, reason: 'no engine' };
+        },
         timeout: timeout,
         state: state,
         digestOf: hex32,

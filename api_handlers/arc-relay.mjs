@@ -268,6 +268,39 @@ export default async function handler(req, res) {
       return keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32', 'uint32'], [m.gameId, m.moveDigest, m.resultHash, m.moveCount]));
     }
 
+    // Mirror of match-engine.js rollingHash: recompute a digest from a revealed
+    // move list (+ result), so a tampered log cannot pass the free dispute verifier.
+    function replayDigestFromMoves(moves, meta, result) {
+      function rolling(prevHex, moveStr) {
+        const bytes = Buffer.from((prevHex || '0') + '|' + moveStr, 'utf8');
+        let h1 = 0x811c9dc5 >>> 0, h2 = 0x01000193 >>> 0;
+        for (let i = 0; i < bytes.length; i++) {
+          h1 ^= bytes[i]; h1 = Math.imul(h1, 16777619) >>> 0;
+          h2 = (Math.imul(h2 ^ bytes[i], 2246822519) + h1) >>> 0;
+        }
+        const hx = (n) => (n >>> 0).toString(16).padStart(8, '0');
+        return '0x' + hx(h1) + hx(h2) + hx((h1 ^ h2) >>> 0) + hx(Math.imul(h1, h2) >>> 0) +
+          hx((h1 + bytes.length) >>> 0) + hx((h2 ^ bytes.length) >>> 0) +
+          hx((h1 ^ 0x9e3779b9) >>> 0) + hx((h2 + 0x85ebca6b) >>> 0);
+      }
+      let d = rolling('0', 'open:' + String((meta && meta.matchRef) || 0));
+      // Each entry is { seat: <index>, move: <object> }; the SEAT INDEX is what
+      // the engine hashed, never a field inside the move object itself.
+      for (const e0 of (moves || [])) {
+        const e = e0 || {};
+        const mv = (e.move !== undefined) ? e.move : e;
+        const seat = (e.seat != null) ? e.seat : 0;
+        const keys = (mv && typeof mv === 'object' && !Array.isArray(mv)) ? Object.keys(mv).sort() : undefined;
+        const canonical = JSON.stringify(mv == null ? null : mv, keys);
+        d = rolling(d, 'move:' + seat + ':' + canonical);
+      }
+      if (result !== undefined && result !== null) {
+        const rk = (typeof result === 'object' && !Array.isArray(result)) ? Object.keys(result).sort() : undefined;
+        d = rolling(d, 'result:' + JSON.stringify(result, rk));
+      }
+      return d;
+    }
+
     async function windowLogs(fromBlock, toBlock) {
       const logs = await pub.getLogs({ address: PLAYER_CORE, fromBlock, toBlock, topics: [POINTS_TOPIC] });
       return logs.map((l) => {
@@ -554,6 +587,30 @@ export default async function handler(req, res) {
         else r.flushState = 'flushed';
       }
       res.status(200).json({ ok: true, player, count: rows.length, matches: rows.slice(0, limit), free: true, chain: 'arc', windowToBlock: String(windowTo) });
+      return;
+    }
+
+    // GFG-BS FREE DISPUTE (owner-locked 2026-09-19): a dispute costs the player
+    // NOTHING. The relayer records the dispute and runs the verifier replay
+    // OFF-CHAIN (free). If a move list is supplied, it must reproduce the digest
+    // the players co-signed; that is the truth check. The on-chain dispute flag
+    // (when needed) is written inside the normal batch window, never as a paid
+    // per-match transaction.
+    if (action === 'matchDisputeFree') {
+      const gameId = hex32(params.gameId);
+      const moveDigest = hex32(params.moveDigest);
+      const reason = String(params.reason || 'disagreement');
+      let verdict = { ok: false, reason: 'no move list supplied (dispute recorded)' };
+      if (Array.isArray(params.revealedMoves)) {
+        // Recompute the digest from the revealed moves (+ result) using the SAME
+        // rolling hash the engine uses, so a tampered log cannot pass.
+        const got = replayDigestFromMoves(params.revealedMoves, { matchRef: params.gameId }, params.result);
+        verdict = (String(got).toLowerCase() === String(moveDigest).toLowerCase())
+          ? { ok: true, digest: got, reason: 'revealed log matches the co-signed digest' }
+          : { ok: false, digest: got, reason: 'revealed log does NOT match the co-signed digest' };
+      }
+      console.log('[arc-relay] free dispute', gameId, 'reason:', reason, '| verdict:', verdict.ok ? 'valid' : verdict.reason);
+      res.status(200).json({ ok: true, gameId, reason, verdict, free: true, note: 'Dispute recorded at no cost; the on-chain flag (if needed) rides the normal batch window.' });
       return;
     }
 
