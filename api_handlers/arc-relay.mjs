@@ -229,6 +229,44 @@ export default async function handler(req, res) {
     // finalized block, builds the Merkle root, and finalizes the window on-chain.
     // There is NO off-chain store: a restart simply re-reads the chain.
     const POINTS_TOPIC = keccak256(Buffer.from('PointsRecorded(address,bytes32,uint64,uint8,uint64)'));
+    const MATCH_SETTLED_TOPIC = keccak256(Buffer.from('MatchSettled(bytes32,bytes32,bytes32,uint32,uint64)'));
+    const MATCH_STARTED_TOPIC = keccak256(Buffer.from('MatchStarted(bytes32,address,address,uint16,uint8,bytes32,uint64)'));
+    // BATCH WINDOW (owner-locked 2026-09-19): flush at BATCH_MAX matches OR when
+    // the oldest pending match is BATCH_MAX_AGE old, and NEVER flush an empty
+    // window (no pending = no cost). Both are config data, not code.
+    const BATCH_MAX = Number(process.env.GFG_Arc_BatchMax || 100);
+    const BATCH_MAX_AGE_MS = Number(process.env.GFG_Arc_BatchMaxAgeMs || 3600000); // 1h
+    let firstPendingAt = 0; // ms timestamp of the oldest pending item in-process
+
+    // GFG-BS match leaves: one leaf per MATCH (settlement), so a match is O(1)
+    // inside the window no matter how many moves it had.
+    async function matchLogs(fromBlock, toBlock) {
+      const logs = await pub.getLogs({ address: MATCH_SETTLEMENT, fromBlock, toBlock });
+      const settled = [], started = [];
+      for (const l of logs) {
+        const t = l.topics && l.topics[0];
+        if (t === MATCH_SETTLED_TOPIC) {
+          // event MatchSettled(bytes32 indexed gameId, bytes32 moveDigest, bytes32 resultHash, uint32 moveCount, uint64 settledAt)
+          const d = l.data.slice(2);
+          const chunk = (i) => d.slice(i * 64, i * 64 + 64);
+          settled.push({
+            gameId: l.topics[1],
+            moveDigest: '0x' + chunk(0),
+            resultHash: '0x' + chunk(1),
+            moveCount: Number(BigInt('0x' + chunk(2)) & 0xffffffffn),
+            settledAt: Number(BigInt('0x' + chunk(3))),
+            blockNumber: l.blockNumber, tx: l.transactionHash,
+          });
+        } else if (t === MATCH_STARTED_TOPIC) {
+          started.push({ gameId: l.topics[1], p1: '0x' + l.topics[2].slice(26), p2: '0x' + l.topics[3].slice(26), blockNumber: l.blockNumber, tx: l.transactionHash });
+        }
+      }
+      return { settled, started };
+    }
+    function matchLeaf(m) {
+      // A match settlement is ONE leaf: the co-signed move digest + result.
+      return keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32', 'uint32'], [m.gameId, m.moveDigest, m.resultHash, m.moveCount]));
+    }
 
     async function windowLogs(fromBlock, toBlock) {
       const logs = await pub.getLogs({ address: PLAYER_CORE, fromBlock, toBlock, topics: [POINTS_TOPIC] });
@@ -269,6 +307,39 @@ export default async function handler(req, res) {
 
     if (action === 'flushBatch') {
       res.status(200).json({ ok: true, ...(await flushBatchNow(params.kind === 'open' ? 'open' : 'settle')) });
+      return;
+    }
+    // GFG-BS auto window manager: called opportunistically (by any game write or
+    // a page load). It flushes ONLY when the batch is full (BATCH_MAX) or the
+    // oldest pending match is BATCH_MAX_AGE old, and never flushes empty.
+    if (action === 'tickBatch') {
+      const latest = await pub.getBlockNumber();
+      const lastTo = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'windowToBlock', args: [1] });
+      const fromBlock = lastTo === 0n ? (latest > 9999n ? latest - 9999n : 0n) : lastTo + 1n;
+      if (latest < fromBlock) { res.status(200).json({ ok: true, flushed: false, reason: 'empty', pending: 0 }); return; }
+      let ml;
+      try { ml = await matchLogs(fromBlock, latest); } catch (e) { ml = { settled: [], started: [] }; }
+      const pending = ml.settled.length;
+      if (pending === 0) { firstPendingAt = 0; res.status(200).json({ ok: true, flushed: false, reason: 'empty', pending: 0, config: { max: BATCH_MAX, ageMs: BATCH_MAX_AGE_MS } }); return; }
+      if (firstPendingAt === 0) firstPendingAt = Date.now();
+      const ageMs = Date.now() - firstPendingAt;
+      const full = pending >= BATCH_MAX;
+      const aged = ageMs >= BATCH_MAX_AGE_MS;
+      if (!full && !aged) {
+        res.status(200).json({ ok: true, flushed: false, reason: 'waiting', pending, ageMs, config: { max: BATCH_MAX, ageMs: BATCH_MAX_AGE_MS } });
+        return;
+      }
+      // Flush: ONE tx covering every pending match in the window.
+      const leaves = ml.settled.map(matchLeaf);
+      const tree = buildTree(leaves);
+      const h = await wallet.writeContract({
+        address: GAME_REGISTRY, abi: regAbi, functionName: 'finalizeWindowGas',
+        args: [1, tree.root, BigInt(leaves.length), fromBlock, BigInt(latest), windowGasWei],
+      });
+      const rc = await pub.waitForTransactionReceipt({ hash: h });
+      windowGasWei = 0n;
+      firstPendingAt = 0;
+      res.status(200).json({ ok: true, flushed: true, trigger: full ? 'full' : 'age', pending, root: tree.root, txHash: h, gas: String(rc.gasUsed), usdc: formatEther(rc.gasUsed * rc.effectiveGasPrice), config: { max: BATCH_MAX, ageMs: BATCH_MAX_AGE_MS } });
       return;
     }
     if (action === 'batchStat') {
