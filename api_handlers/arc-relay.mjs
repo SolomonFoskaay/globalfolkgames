@@ -389,8 +389,60 @@ export default async function handler(req, res) {
       return;
     }
 
+    // GFG-BS match HISTORY (FREE: eth_getLogs is a read-only RPC call, no gas).
+    // Returns a player's recent matches, each with its start + settle tx hashes
+    // so the UI can link BOTH on the explorer. Game-agnostic: filtered by wallet,
+    // not by game. Paginates backwards because the RPC caps the block range.
+    if (action === 'matchHistory') {
+      const player = getAddress(params.player);
+      const limit = Math.max(1, Math.min(Number(params.limit || 10), 50));
+      const startTopic = keccak256(toHex('MatchStarted(bytes32,address,address,uint16,uint8,bytes32,uint64)'));
+      const settledTopic = keccak256(toHex('MatchSettled(bytes32,bytes32,bytes32,uint32,uint64)'));
+      const started = [], settledMap = new Map();
+      let to = await pub.getBlockNumber();
+      const RANGE = 9000n;
+      // Walk backwards in RPC-safe chunks until we have enough matches or hit 0.
+      for (let round = 0; round < 8 && started.length < limit && to > 0n; round++) {
+        const from = to > RANGE ? to - RANGE : 0n;
+        let logs = [];
+        try { logs = await pub.getLogs({ address: MATCH_SETTLEMENT, fromBlock: from, toBlock: to }); }
+        catch (e) { break; }
+        for (const l of logs) {
+          const t0 = l.topics && l.topics[0];
+          if (t0 === startTopic) {
+            const p1 = '0x' + l.topics[1].slice(26), p2 = '0x' + l.topics[2].slice(26);
+            if (p1.toLowerCase() !== player.toLowerCase() && p2.toLowerCase() !== player.toLowerCase()) continue;
+            started.push({ gameId: l.topics[1] && l.data, block: Number(l.blockNumber), tx: l.transactionHash, raw: l });
+          } else if (t0 === settledTopic) {
+            settledMap.set((l.topics[1] || '').toLowerCase(), { tx: l.transactionHash });
+          }
+        }
+        if (from === 0n) break;
+        to = from - 1n;
+      }
+      // Re-read each match for its live state (authoritative), newest first.
+      const rows = [];
+      for (const s of started.slice(0, limit)) {
+        const gameId = s.gameId || '0x';
+        let m;
+        try { m = await pub.readContract({ address: MATCH_SETTLEMENT, abi: msAbi, functionName: 'matchOf', args: [gameId] }); }
+        catch (e) { continue; }
+        if (m[0] === '0x0000000000000000000000000000000000000000') continue;
+        rows.push({
+          gameId,
+          gameTag: Number(m[8]), seats: Number(m[9]),
+          startedAt: Number(m[5]), moveCount: Number(m[7]),
+          settled: m[10], disputed: m[11],
+          startTx: s.tx,
+          settleTx: (settledMap.get(String(gameId).toLowerCase()) || {}).tx || null,
+        });
+      }
+      rows.sort((a, b) => b.startedAt - a.startedAt);
+      res.status(200).json({ ok: true, player, count: rows.length, matches: rows.slice(0, limit), free: true, chain: 'arc' });
+      return;
+    }
+
     if (action === 'turnState') {
-      const t = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'turnState', args: [hex32(params.gameId)] });
       res.status(200).json({
         ok: true, gameId: hex32(params.gameId),
         seats: Number(t[0]), activeSeat: Number(t[1]), turnSecs: Number(t[2]),
