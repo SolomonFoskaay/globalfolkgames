@@ -411,6 +411,16 @@ async function rollDiceEngine(source) {
         return;
     }
 
+    // GFG-BS: record the roll in the OFF-CHAIN match log (zero chain cost). The
+    // roll is part of the move digest, so the settlement commits to the dice too.
+    try {
+        if (window.gfgMatchEngine && window.gfgMatchEngine.isOpen && window.gfgMatchEngine.isOpen()) {
+            var _seats = (typeof window.getActiveSeats === 'function') ? window.getActiveSeats() : [];
+            var _idx = _seats.indexOf(currentTurn);
+            window.gfgMatchEngine.move(_idx >= 0 ? _idx : 0, { roll: [rollValues[0], rollValues[1]], seat: currentTurn });
+        }
+    } catch (e) { /* soft: never block a roll */ }
+
     if (physicsAnimationLoop) cancelAnimationFrame(physicsAnimationLoop);
 
     // Dice are locked to the on-chain result (physics snaps to finalValue at rest).
