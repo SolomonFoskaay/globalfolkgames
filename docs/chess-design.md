@@ -158,8 +158,9 @@ registry and failover.
 
 - `create_chess_match`, `join_chess_match`, and `start_chess_match` require the
   signer's lives ledger and pass the same gate as Ludo (NoLives rejection).
-- One life is consumed per seat per COMPLETED match (`consume_life` on finish),
-  never on abandon, reset, or disconnect.
+- One life is CHARGED AT GAME START per seat and is NON-REFUNDABLE (owner
+  2026-09-19): win, lose, draw or abandon all spend it. Nothing refunds it, which
+  ends the abandon exploit.
 - Enforced in the program, so any frontend, including a third-party one, is
   bound by it. A third party cannot use this program to bypass lives.
 
