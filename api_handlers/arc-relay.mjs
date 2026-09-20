@@ -109,6 +109,14 @@ const rndAbi = parseAbi([
   'function revealSeed(bytes32 batchId, bytes32 seed)',
 ]);
 const bytes32 = (hexStr) => hexStr;
+// GFG-BS per-match settlement (arcv2m17): one start commit + one co-signed settle.
+const msAbi = parseAbi([
+  'function commitStart(bytes32 gameId, address p1, address p2, uint16 gameTag, uint8 seats, bytes32 commitHash, uint32 ttlSecs)',
+  'function settle(bytes32 gameId, bytes32 moveDigest, bytes32 resultHash, uint32 moveCount, uint8 v1, bytes32 r1, bytes32 s1, uint8 v2, bytes32 r2, bytes32 s2)',
+  'function dispute(bytes32 gameId, bytes32 revealedDigest)',
+  'function claimTimeout(bytes32 gameId)',
+  'function matchOf(bytes32 gameId) view returns (address p1, address p2, bytes32 commitHash, bytes32 moveDigest, bytes32 resultHash, uint64 startedAt, uint64 settleDeadline, uint32 moveCount, uint16 gameTag, uint8 seats, bool settled, bool disputed)',
+]);
 const readAbi = parseAbi([
   'function livesOf(address a) view returns (uint16 used, uint16 pool, uint64 boosterUntil, uint64 livesDay)',
   'function globalsOf(address a) view returns (uint64 purePts, uint64 lifetime, uint64 spendable)',
@@ -165,6 +173,7 @@ export default async function handler(req, res) {
     const PLAYER_CORE = __evm.contracts.playerCore;
     const GAME_REGISTRY = __evm.contracts.gameRegistry;
     const RANDOMNESS = __evm.contracts.randomness;
+    const MATCH_SETTLEMENT = __evm.contracts.matchSettlement;
     const chain = defineChain({ id: Number(__evm.chainId || CHAIN_ID), name: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC_URL] } } });
     const pub = createPublicClient({ chain, transport: http(RPC_URL) });
     const relayer = accountFor(SPONSOR_KEY);
@@ -368,6 +377,18 @@ export default async function handler(req, res) {
 
     // Read the on-chain turn clock (no gas): the browser counts down to the
     // ABSOLUTE deadline stored on-chain, never a local timer.
+    // GFG-BS match read (no gas): the on-chain settlement record for a match.
+    if (action === 'matchState') {
+      const r = await pub.readContract({ address: MATCH_SETTLEMENT, abi: msAbi, functionName: 'matchOf', args: [hex32(params.gameId)] });
+      res.status(200).json({
+        ok: true, gameId: hex32(params.gameId),
+        p1: r[0], p2: r[1], commitHash: r[2], moveDigest: r[3], resultHash: r[4],
+        startedAt: Number(r[5]), settleDeadline: Number(r[6]), moveCount: Number(r[7]),
+        gameTag: Number(r[8]), seats: Number(r[9]), settled: r[10], disputed: r[11], chain: 'arc',
+      });
+      return;
+    }
+
     if (action === 'turnState') {
       const t = await pub.readContract({ address: GAME_REGISTRY, abi: regAbi, functionName: 'turnState', args: [hex32(params.gameId)] });
       res.status(200).json({
@@ -471,6 +492,23 @@ export default async function handler(req, res) {
       case 'commitMove':
         address = GAME_REGISTRY; abi = regAbi; fn = 'commitMove';
         args = [hex32(params.gameId), getAddress(params.mover), Number(params.seat), Number(params.nextSeat), hex32(params.moveCommit)];
+        break;
+      // GFG-BS per-match settlement (arcv2m17): the gasless core.
+      case 'commitMatchStart':
+        address = MATCH_SETTLEMENT; abi = msAbi; fn = 'commitStart';
+        args = [hex32(params.gameId), getAddress(params.p1), getAddress(params.p2), Number(params.gameTag || 0), Number(params.seats || 2), hex32(params.commitHash), Number(params.ttlSecs || 3600)];
+        break;
+      case 'settleMatch':
+        address = MATCH_SETTLEMENT; abi = msAbi; fn = 'settle';
+        args = [hex32(params.gameId), hex32(params.moveDigest), hex32(params.resultHash), Number(params.moveCount), Number(params.v1), hex32(params.r1), hex32(params.s1), Number(params.v2), hex32(params.r2), hex32(params.s2)];
+        break;
+      case 'matchDispute':
+        address = MATCH_SETTLEMENT; abi = msAbi; fn = 'dispute';
+        args = [hex32(params.gameId), hex32(params.revealedDigest)];
+        break;
+      case 'matchTimeout':
+        address = MATCH_SETTLEMENT; abi = msAbi; fn = 'claimTimeout';
+        args = [hex32(params.gameId)];
         break;
       case 'expireTurn':
         address = GAME_REGISTRY; abi = regAbi; fn = 'expireTurn';

@@ -169,6 +169,30 @@
       return (mb() && mb().spendLocal) ? mb().spendLocal(gameTag, amount, reason, ref) : null;
     },
 
+    // GFG-BS per-match settlement (arcv2m17): TWO txs per match, no per-move
+    // cost. Null on svm (Solana keeps its own path).
+    commitMatchStart: async function (gameId, p1, p2, gameTag, seats, commitHash, ttlSecs) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.commitMatchStart) return a.commitMatchStart(gameId, p1, p2, gameTag, seats, commitHash, ttlSecs); return null; }
+      return null;
+    },
+    settleMatch: async function (gameId, moveDigest, resultHash, moveCount, sig1, sig2) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.settleMatch) return a.settleMatch(gameId, moveDigest, resultHash, moveCount, sig1, sig2); return null; }
+      return null;
+    },
+    matchDispute: async function (gameId, revealedDigest) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.matchDispute) return a.matchDispute(gameId, revealedDigest); return null; }
+      return null;
+    },
+    matchTimeout: async function (gameId) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.matchTimeout) return a.matchTimeout(gameId); return null; }
+      return null;
+    },
+    matchState: async function (gameId) {
+      if (chain() !== 'evm') return null;
+      const a = adapter(); if (a && a.matchState) return a.matchState(gameId);
+      return null;
+    },
+
     // On-chain proof for a game in the last flushed window (verify card).
     batchProof: async function (matchRef) {
       if (chain() !== 'evm') return null;
