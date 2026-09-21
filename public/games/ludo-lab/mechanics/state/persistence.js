@@ -40,8 +40,12 @@ function hashStateString(str) {
 }
 
 function clearPersistedState() {
+    // Purge any LEGACY localStorage board (pre-2026-09-21 builds wrote one).
+    // The live board is in-memory only now; this makes sure an old stored board
+    // can never be resumed after this deploy.
     try { localStorage.removeItem(PERSISTENCE_KEY); } catch (e) {}
     try { localStorage.removeItem(PERSISTENCE_HASH_KEY); } catch (e) {}
+    try { window.__gfgLudoLiveSnapshot = null; } catch (e) {}
 }
 // Expose for the multiplayer adapter: a stale SOLO save must never resurrect
 // divergent local state inside a shared multiplayer match.
@@ -242,33 +246,26 @@ function saveGameStateToStorage() {
         tokensSnapshot: typeof tokens !== 'undefined' ? tokens : null,
         savedAt: Date.now()
     };
-    try {
-        const payloadStr = JSON.stringify(statePayload);
-        localStorage.setItem(PERSISTENCE_KEY, payloadStr);
-        try { localStorage.setItem(PERSISTENCE_HASH_KEY, hashStateString(payloadStr)); } catch (e) {}
-    } catch (e) {
-        // Blocked localStorage (private mode / some mobile webviews): the match
-        // still plays, it just cannot resume after a refresh.
-        console.warn('PERSISTENCE: localStorage blocked, match cannot resume after refresh.', e);
-    }
+    // NO localStorage BOARD (owner 2026-09-21): the live board is held IN MEMORY
+    // for the session only. A locally-stored board is not the source of truth
+    // and can conflict with the GFG-BS window Merkle tree (stale actions), and
+    // it let a logged-out page keep playing a started match. On-chain (start
+    // commit + co-signed settlement + window flush) is the truth; points and the
+    // result live on-chain. The signed cross-device resume is built separately
+    // (item 17vii) - it will rehydrate from SIGNED match events, never from this
+    // editable snapshot.
+    window.__gfgLudoLiveSnapshot = statePayload;
 }
 
 function loadGameStateFromStorage() {
+    // Only ever resume from the IN-MEMORY snapshot (same session, e.g. a
+    // component remount). Never from localStorage: that path is removed.
     let rawData = null;
-    try { rawData = localStorage.getItem(PERSISTENCE_KEY); } catch (e) { return false; }
+    try { rawData = window.__gfgLudoLiveSnapshot ? JSON.stringify(window.__gfgLudoLiveSnapshot) : null; } catch (e) { rawData = null; }
     if (!rawData) return false;
 
-    // Integrity check: a tampered/corrupt payload (edited in the console, or a
-    // partial write) must NOT be silently resumed. Detect it, refuse it, and
-    // tell the player loudly that the altered data can never be recorded.
-    let savedDigest = null;
-    try { savedDigest = localStorage.getItem(PERSISTENCE_HASH_KEY); } catch (e) {}
-    if (savedDigest && savedDigest !== hashStateString(rawData)) {
-        clearPersistedState();
-        showPersistenceWarning('Your saved match data on this device was modified and could not be verified. It will not be recorded on-chain. A fresh match has started.');
-        displayEducationalLog("Saved match state failed its integrity check; starting fresh.");
-        return false;
-    }
+    // No integrity check needed: the in-memory snapshot cannot be edited from
+    // outside the page (there is no localStorage board to tamper with anymore).
 
     try {
         const savedState = JSON.parse(rawData);

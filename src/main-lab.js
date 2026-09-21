@@ -33,7 +33,19 @@ loadAdapter().then(function (a) { window.gfgChainAdapter = a; }).catch(function 
 initMagicBlockDice();
 
 // Activate provably-fair dice only when the gfg-dice program is deployed.
-if (GFG_DICE.programId && GFG_DICE.idl && window.magicblockDice) {
+// ARC (arcv2m17 audit): on the Arc rail the Solana ER VRF SDK must NEVER be
+// configured. Leaving it inert guarantees no Solana RPC can be reached from
+// this SDK on Arc; the Arc dice come from the committed seed via the relayer.
+if (window.GFG_CHAIN === 'evm') {
+  console.log('[chain] Arc rail active: MagicBlock ER VRF (Solana) left inert by design.');
+  if (window.magicblockDice && typeof window.magicblockDice.configure === 'function') {
+    window.magicblockDice.configure = function () {
+      console.warn('[chain] blocked magicblockDice.configure() on the Arc rail (Solana SDK stays inert).');
+      return null;
+    };
+    window.magicblockDice.__arcInert = true;
+  }
+} else if (GFG_DICE.programId && GFG_DICE.idl && window.magicblockDice) {
   window.magicblockDice.configure(GFG_DICE);
   console.log('[VRF] MagicBlock ER VRF dice configured:', GFG_DICE.programId);
 } else {

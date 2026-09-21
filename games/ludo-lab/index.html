@@ -503,11 +503,28 @@
             try {
                 var md = window.magicblockDice;
                 var wallet = window.__mpWallet ? window.__mpWallet() : null;
-                if (!md || typeof md.readLivesFor !== 'function' || !wallet) { resolve(true); return; } // SDK/wallet not ready: do not hard-block
                 // Unlimited (booster/premium) -> always allowed.
                 var prem = (window.premiumPoints && typeof window.premiumPoints.get === 'function') ? window.premiumPoints.get() : null;
                 var unt = Number(prem && prem.boosterActiveUntil ? prem.boosterActiveUntil : 0);
                 if (unt > 0 && unt > Date.now()) { resolve(true); return; }
+                // ARC (arcv2m17 audit): read lives through the chain gateway (the
+                // Arc adapter), NEVER the Solana SDK. Previously this called
+                // md.readLivesFor(wallet) with an EVM address on Arc.
+                var onArc = false;
+                try { onArc = !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { onArc = false; }
+                if (onArc) {
+                    if (!wallet || !window.gfgChain || typeof window.gfgChain.readLives !== 'function') { resolve(true); return; }
+                    window.gfgChain.readLives().then(function (r) {
+                        if (!r) { resolve(true); return; } // no ledger yet = fresh pool
+                        if (r.unlimited || r.left > 0) { resolve(true); return; }
+                        window.mpSetStatus('No lives left today - refill at midnight (GMT) or go Premium.');
+                        if (typeof window.showLivesBlocked === 'function') { try { window.showLivesBlocked(true); } catch (e) {} }
+                        else if (typeof window.showAuthBanner === 'function') { window.showAuthBanner('No lives left today. Your meter refills at midnight (GMT). Go Premium for more lives.', true); }
+                        resolve(false);
+                    }).catch(function () { resolve(true); });
+                    return;
+                }
+                if (!md || typeof md.readLivesFor !== 'function' || !wallet) { resolve(true); return; } // SDK/wallet not ready: do not hard-block
                 md.readLivesFor(wallet).then(function (r) {
                     if (!r || !r.ok) { resolve(true); return; } // ledger not created yet = fresh pool (allowed)
                     var left = Math.max(0, (r.pool || 0) - (r.used || 0));

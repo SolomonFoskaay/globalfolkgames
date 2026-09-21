@@ -142,6 +142,26 @@
         raw: r,
       };
     },
+    // LIVES read for the Arc path: { used, pool, boosterUntil, unlimited }.
+    // Mirrors the Solana readLivesFor shape so callers can treat both alike.
+    // On Solana returns null (callers keep magicblockDice.readLivesFor).
+    readLives: async function () {
+      if (chain() !== 'evm') return null;
+      const a = adapter();
+      if (!a || !a.readPlayer) return null;
+      const r = await a.readPlayer('ludo');
+      if (!r || !r.lives) return null;
+      const used = Number(r.lives.used || 0);
+      const pool = Number(r.lives.pool || 0);
+      const boosterUntil = Number(r.lives.boosterUntil || 0) * 1000; // s -> ms
+      return {
+        used: used,
+        pool: pool,
+        boosterUntil: boosterUntil,
+        unlimited: boosterUntil > Date.now(),
+        left: Math.max(0, pool - used),
+      };
+    },
     recordPoints: async function (gameTag, points, reason, matchRef, playerPubkey) {
       if (chain() === 'evm') { const a = adapter(); if (a) return a.recordPoints(gameTag, points, reason, matchRef, playerPubkey); return null; }
       return (mb() && mb().recordPoints) ? mb().recordPoints(gameTag, points, reason, matchRef, playerPubkey) : null;
@@ -151,7 +171,22 @@
       return (mb() && mb().recordGlobalPoints) ? mb().recordGlobalPoints(kind, sourceCode, points, reason, matchRef, playerPubkey) : null;
     },
     matchRefFromSignature: function (sig) {
-      if (chain() === 'evm') return Date.now();
+      if (chain() === 'evm') {
+        // STABLE Arc ref derived from the proof token. It MUST be deterministic
+        // (same token -> same ref) because the on-chain DuplicateMatchRef guard
+        // relies on it for idempotent retries. The old code returned Date.now(),
+        // which changed per call and broke retry idempotency. A hex 0x token is
+        // folded into a safe positive integer; a non-hex token is hashed.
+        try {
+          const s = String(sig || '');
+          let h = 0x811c9dc5 >>> 0;
+          for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+          // Avoid 0 (the contract rejects ref 0) and keep it below 2^31 to be
+          // safe as a u64 ref on every rail.
+          const ref = (h % 2147483647) || 1;
+          return ref;
+        } catch (e) { return (Date.now() % 2147483647) || 1; }
+      }
       return (mb() && mb().matchRefFromSignature) ? mb().matchRefFromSignature(sig) : 0;
     },
     recordResult: async function (finishOrder, points, reason, matchRef) {

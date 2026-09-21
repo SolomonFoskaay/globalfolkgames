@@ -36,11 +36,30 @@ loadAdapter().then(function (a) { window.gfgChainAdapter = a; }).catch(function 
 initMagicBlockDice();
 
 // Activate provably-fair dice only when the gfg-dice program is deployed.
-if (GFG_DICE.programId && GFG_DICE.idl && window.magicblockDice) {
+// ARC (arcv2m17 audit): on the Arc rail the Solana ER VRF SDK must NEVER be
+// configured. Configuring it on Arc was a latent Solana path; leaving it inert
+// guarantees no RPC can ever be reached from this SDK on Arc. The Arc dice come
+// from the committed seed via the relayer (window.gfgChain.roll).
+if (window.GFG_CHAIN === 'evm') {
+  console.log('[chain] Arc rail active: MagicBlock ER VRF (Solana) left inert by design.');
+} else if (GFG_DICE.programId && GFG_DICE.idl && window.magicblockDice) {
   window.magicblockDice.configure(GFG_DICE);
   console.log('[VRF] MagicBlock ER VRF dice configured:', GFG_DICE.programId);
 } else {
   console.log('[VRF] gfg-dice not configured yet — Ludo will use local rolls');
+}
+
+// A page that must not touch Solana still loads this module (many files check
+// for window.magicblockDice existence), but configure() is the only thing that
+// arms an RPC. Belt-and-braces: on Arc, refuse to arm it even if called again.
+if (window.GFG_CHAIN === 'evm' && window.magicblockDice && typeof window.magicblockDice.configure === 'function') {
+  const _origConfigure = window.magicblockDice.configure.bind(window.magicblockDice);
+  window.magicblockDice.configure = function () {
+    console.warn('[chain] blocked magicblockDice.configure() on the Arc rail (Solana SDK stays inert).');
+    return null;
+  };
+  window.magicblockDice.__arcInert = true;
+  void _origConfigure; // kept for reference; never invoked on Arc
 }
 
 console.log('Vite + Dynamic auth layer loaded (ER VRF SDK)');
