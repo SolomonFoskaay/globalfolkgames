@@ -22,6 +22,15 @@ import './dynamic-auth.js';
 import './magicblock-er-vrf.js';
 import { initMagicBlockDice } from './magicblock-er-vrf.js';
 import { GFG_DICE } from './gfg-dice-config.js';
+import { loadAdapter, CHAIN } from './chain/adapter.js';
+
+// Chain switch (arcv2m16/17): svm = Solana as today, evm = the Arc rail.
+// This MUST be set on EVERY page, not just ludo-lab: chain-gateway.js reads
+// window.GFG_CHAIN to decide Arc vs Solana. Without this line the whole site
+// except ludo-lab fell back to 'svm', so "isArc()"-guarded modules silently ran
+// their Solana branch on an Arc build. Default stays 'svm' when unset.
+window.GFG_CHAIN = CHAIN || 'svm';
+loadAdapter().then(function (a) { window.gfgChainAdapter = a; }).catch(function (e) { console.warn('[chain] adapter load failed', e); });
 
 // Expose the dice module on window (requires the Dynamic client to be ready).
 initMagicBlockDice();

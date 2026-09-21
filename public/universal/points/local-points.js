@@ -324,6 +324,28 @@
         var firstCheck = !hasChecked(gameTag); // notify once when a zero check lands
         refreshInFlight[gameTag] = (async function () {
             var ledger = null;
+            // ARC (arcv2m17 audit): read through the chain gateway, NEVER the
+            // Solana SDK. The old code called sdk.fetchPointsPdaFor unconditionally,
+            // so every page on an Arc build issued a Solana read. On Arc the
+            // gateway returns the same shape (pureLifetime/spendableBalance).
+            var onArc = false;
+            try { onArc = !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { onArc = false; }
+            if (onArc) {
+                try {
+                    var arcLedger = (window.gfgChain.fetchLedger) ? await window.gfgChain.fetchLedger(gameTag) : null;
+                    if (arcLedger) {
+                        cached[gameTag] = arcLedger;
+                        if (hasRealWallet()) markChecked(gameTag, true);
+                        persistCache();
+                        fillSlots(gameTag, arcLedger);
+                        notify(gameTag, arcLedger);
+                        return arcLedger;
+                    }
+                } catch (e) { /* soft: fall through to the cached render below */ }
+                if (hasRealWallet()) markChecked(gameTag, false);
+                if (firstCheck) notify(gameTag, null, null);
+                return cached[gameTag] || null;
+            }
             try {
                 // READ BY WALLET ADDRESS first (no signing session required —
                 // mirrors the recovery page). Falls back to the sign-in-scoped
@@ -568,7 +590,10 @@
             var tag = gameTag || DEFAULT_TAG;
             if (!magicReady()) return null;
             try {
-                var sig = await window.magicblockDice.spendLocal(tag, amount, reason, ref);
+                // ARC (arcv2m17 audit): spend through the gateway, never the
+                // Solana SDK. gfgChain.spendLocal routes to the Arc adapter on
+                // Arc and to the ER session key on Solana.
+                var sig = await window.gfgChain.spendLocal(tag, amount, reason, ref);
                 await refreshLedger(tag, true);
                 return sig || null;
             } catch (e) {

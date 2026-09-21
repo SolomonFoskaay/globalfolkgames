@@ -94,6 +94,54 @@
       if (chain() === 'evm') { const a = adapter(); if (a) return a.chargeLife(matchRef); return null; }
       return null; // Solana charges the life on-chain at begin/join
     },
+    // LEDGER READS (arcv2m17 audit): the universal modules must read through
+    // this gateway, never the Solana SDK directly. On Arc it calls the Arc
+    // adapter's readPlayer (one relayer call returns bucket + globals + lives +
+    // premium); on Solana it returns null here (the modules keep their existing
+    // Solana SDK read path). This is additive: no behaviour change on svm.
+    readPlayer: async function (gameTag) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.readPlayer) return a.readPlayer(gameTag || 'ludo'); return null; }
+      return null;
+    },
+    fetchLedger: async function (gameTag) {
+      if (chain() === 'evm') { const a = adapter(); if (a && a.fetchLedger) return a.fetchLedger(gameTag || 'ludo'); return null; }
+      return null;
+    },
+    // GLOBAL LEDGER read for the Arc path, normalized to the same field names
+    // the universal modules already expect (pureLifetime/lifetime/spendableBalance).
+    // On Solana returns null so the module keeps its existing SDK read.
+    fetchGlobalLedger: async function () {
+      if (chain() !== 'evm') return null;
+      const a = adapter();
+      if (!a || !a.readPlayer) return null;
+      const r = await a.readPlayer('ludo');
+      if (!r) return null;
+      const g = r.globals || {};
+      return {
+        pureLifetime: Number(g.pure || 0),
+        lifetime: Number(g.lifetime || 0),
+        spendableBalance: Number(g.spendable || 0),
+        raw: r,
+      };
+    },
+    // PREMIUM LEDGER read for the Arc path, normalized to the field names the
+    // profile card expects. On Solana returns null (existing SDK read kept).
+    fetchPremiumLedger: async function () {
+      if (chain() !== 'evm') return null;
+      const a = adapter();
+      if (!a || !a.readPlayer) return null;
+      const r = await a.readPlayer('ludo');
+      if (!r) return null;
+      const p = r.premium || {};
+      return {
+        premiumLifetime: Number(p.lifetime || 0),
+        premiumSpendable: Number(p.spendable || 0),
+        subscriptionLevel: Number(p.level || 0),
+        subscriptionActiveUntil: Number(p.activeUntil || 0) || null,
+        boosterActiveUntil: (r.lives && r.lives.boosterUntil) || 0,
+        raw: r,
+      };
+    },
     recordPoints: async function (gameTag, points, reason, matchRef, playerPubkey) {
       if (chain() === 'evm') { const a = adapter(); if (a) return a.recordPoints(gameTag, points, reason, matchRef, playerPubkey); return null; }
       return (mb() && mb().recordPoints) ? mb().recordPoints(gameTag, points, reason, matchRef, playerPubkey) : null;

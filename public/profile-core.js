@@ -113,6 +113,16 @@
             renderPointsLedgerCard(el, ledger, gameTag);
             return ledger;
         }
+        // ARC (arcv2m17 audit): read through the chain gateway, never the
+        // Solana SDK. Previously this page issued a Solana read on Arc.
+        try {
+            if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                const arcLedger = await window.gfgChain.fetchLedger(gameTag);
+                if (arcLedger) { renderPointsLedgerCard(el, arcLedger, gameTag); return arcLedger; }
+                el.innerHTML = '<p class="empty">Your ledger has no rewards yet. Win a match and your reward is written here permanently.</p>';
+                return null;
+            }
+        } catch (e) { /* soft: fall through to the Solana path below */ }
         const magic = window.magicblockDice;
         if (!magic || typeof magic.fetchPointsPda !== 'function' || typeof magic.pointsPda !== 'function') {
             el.innerHTML = '<p class="empty">On-chain ledger unavailable (wallet not ready).</p>';
@@ -226,6 +236,15 @@
             renderGlobalLedgerCard(el, ledger);
             return ledger;
         }
+        // ARC (arcv2m17 audit): gateway read, no Solana SDK.
+        try {
+            if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                const arcLedger = await window.gfgChain.fetchGlobalLedger();
+                if (arcLedger) { renderGlobalLedgerCard(el, arcLedger); return arcLedger; }
+                el.innerHTML = '<p class="empty">No global ledger yet. Win a match to create your cross-game record.</p>';
+                return null;
+            }
+        } catch (e) { /* soft */ }
         const magic = window.magicblockDice;
         if (!magic || typeof magic.fetchGlobalPointsPda !== 'function') {
             el.innerHTML = '<p class="empty">Global ledgers unavailable (wallet not ready).</p>';
@@ -305,6 +324,15 @@
             renderPremiumLedgerCard(el, ledger);
             return ledger;
         }
+        // ARC (arcv2m17 audit): gateway read, no Solana SDK.
+        try {
+            if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                const arcLedger = await window.gfgChain.fetchPremiumLedger();
+                if (arcLedger) { renderPremiumLedgerCard(el, arcLedger); return arcLedger; }
+                el.innerHTML = '<p class="empty">No premium points yet. Premium points come from a verified payment. <a href="/profile/subscription.html" style="color:#f87818;">Go Premium</a></p>';
+                return null;
+            }
+        } catch (e) { /* soft */ }
         const magic = window.magicblockDice;
         if (!magic || typeof magic.fetchPremiumPointsPdaFor !== 'function') {
             el.innerHTML = '<p class="empty">Premium ledger unavailable (wallet not ready).</p>';

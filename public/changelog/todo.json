@@ -292,11 +292,11 @@
         "s": "done"
       },
       {
-        "t": "(4i-2) Config-driven plan ladder (levels, premium cost, multipliers, prices as data)",
+        "t": "(4i-2) Config-driven plan ladder (levels, USDC prices, multipliers, durations as data) - premium cost is no longer the purchase currency",
         "s": "done"
       },
       {
-        "t": "(4ii) Direct activation L2 2x / L3 3x, 30 days, EXPIRY TIMER on-chain",
+        "t": "(4ii) Direct activation L2 2x / L3 3x, 30 days, EXPIRY TIMER on-chain (activation itself works; the payment trigger becomes DIRECT USDC per 4ii-3)",
         "s": "done"
       },
       {
@@ -308,11 +308,11 @@
         "s": "done"
       },
       {
-        "t": "(4ii-3) FULLY AUTOMATIC payment: relayer watches Arc for the confirmed USDC payment, then splits + activates; hard guard",
-        "s": "pending"
+        "t": "(4ii-3) FULLY AUTOMATIC payment: player pays DIRECT USDC on Arc, the relayer verifies it, then activates the subscription or in-game asset in the SAME step (no admin action, no premium-points step); hard guard against replay/wrong amount",
+        "s": "in_progress"
       },
       {
-        "t": "(4ii-3a) arcv2m15 splitter: 20% referrer / 30% escrow / 50% admin atomically",
+        "t": "(4ii-3a) USDC splitter: 20% referrer / 30% escrow / 50% admin, atomic, in the same transaction path as the payment",
         "s": "pending"
       },
       {
@@ -320,11 +320,11 @@
         "s": "pending"
       },
       {
-        "t": "(4ii-3c) Relayer payment watcher: verify amount/recipient/replay, then split + activate",
+        "t": "(4ii-3c) Relayer payment watcher: verify amount + recipient + replay, then DIRECTLY call activatePlan/activateBooster (no creditPremium)",
         "s": "pending"
       },
       {
-        "t": "(4iii) Unlimited-lives booster: DIRECT USDC purchase + WINDOW TIMER on-chain",
+        "t": "(4iii) Unlimited-lives booster: DIRECT USDC purchase + automatic on-chain window (activateBooster) in one step, no premium-points deduction",
         "s": "pending"
       },
       {
@@ -336,8 +336,8 @@
         "s": "pending"
       },
       {
-        "t": "(4v) Premium-points LEDGER RETIREMENT from the purchase flow",
-        "s": "pending"
+        "t": "(4v) RETIRE the premium-points LEDGER from the purchase flow entirely (owner 2026-09-21): subscription and in-game assets are bought with DIRECT USDC on Arc and activate instantly; premiumLifetime/premiumSpendable are no longer the purchase path",
+        "s": "in_progress"
       },
       {
         "t": "(5) Point sources",
@@ -548,6 +548,22 @@
         "s": "in_progress"
       },
       {
+        "t": "(17v) OWNER CLARIFICATION (2026-09-21): \"onchain\" means the GFG-BS model - everything in between (dice, moves, points) is signed, sealed in the window Merkle tree, and provable via the start+end commit. It does NOT mean a tx per move, and it does NOT mean frontend/Vercel/Supabase/localStorage as truth.",
+        "s": "done"
+      },
+      {
+        "t": "(17vi) REQUIRED BEHAVIOUR: a player can sign out, sign back in on ANY device, and continue the same match - unless it was flushed by the standard window (then it is final). While NOT flushed it resumes; once logged out it must NEVER be playable offline. No localStorage, because a stale local copy can conflict with the window Merkle tree and replay stale actions.",
+        "s": "pending"
+      },
+      {
+        "t": "(17vii) BUILD: persist the in-flight match as SIGNED match events addressed to the player (not editable localStorage), so any device can rehydrate the board from signed state and reconcile with the window; drop the raw board snapshot entirely.",
+        "s": "pending"
+      },
+      {
+        "t": "(17viii) Remove the localStorage board snapshot from the resume path (replace with signed rehydrate); keep only non-authoritative UI prefs if any remain.",
+        "s": "pending"
+      },
+      {
         "t": "(17i) FIX the save-on-signout hole: discard the local match on gfg:auth-changed (logout) so a started game cannot continue with no account; the life stays spent (non-refundable)",
         "s": "done"
       },
@@ -577,6 +593,114 @@
       },
       {
         "t": "(18iii) After verifying, confirm a live tx shows MatchStarted / MatchSettled by name",
+        "s": "pending"
+      },
+      {
+        "t": "(19) FULL PROJECT RESCAN (owner 2026-09-21): Arc blockers found auditing every todo item 1..end",
+        "s": "in_progress"
+      },
+      {
+        "t": "(19i) FIXED ROOT BLOCKER: window.GFG_CHAIN was only set on /games/ludo-lab (main-lab.js); every other page loaded src/main.js which never set it, so chain-gateway fell back to svm and all isArc() guards took the Solana branch on an Arc build. Now set in src/main.js too.",
+        "s": "done"
+      },
+      {
+        "t": "(19ii) FIXED Solana write on Arc: win-detection.js called window.magicblockDice.recordResult directly instead of the chain gateway (which routes to Arc). Now goes through window.gfgChain.recordResult.",
+        "s": "done"
+      },
+      {
+        "t": "(19iii) FIXED BLOCKER: local-points.js read path now routes through window.gfgChain.fetchLedger on Arc (was an unconditional Solana fetchPointsPdaFor/fetchPointsPda on every page). Solana path unchanged when chain!=evm.",
+        "s": "done"
+      },
+      {
+        "t": "(19iv) BLOCKER: public/universal/ledgers/global-ledger.js has NO isArc() guard on its READ path - same Solana fetchGlobalPointsPdaFor/fetchGlobalPointsPda calls unconditionally. Must route through the gateway/Arc adapter.",
+        "s": "pending"
+      },
+      {
+        "t": "(19v) FIXED BLOCKER: local-points.spend now uses window.gfgChain.spendLocal (routes to the Arc adapter on Arc) instead of magicblockDice.spendLocal directly.",
+        "s": "done"
+      },
+      {
+        "t": "(19vi) BLOCKER: premium-ledger read falls through to the Solana fetch when arcReadLedger() returns null (no early return). Must return an honest empty/error instead of hitting Solana.",
+        "s": "pending"
+      },
+      {
+        "t": "(19vii) BLOCKER: public/profile-core.js fetchPointsPda/fetchGlobalPointsPda/fetchPremiumPointsPdaFor (3 reads) and profile/upgrade.html (2 reads) call the Solana SDK directly; no isArc() guard.",
+        "s": "pending"
+      },
+      {
+        "t": "(19viii) BLOCKER: the whole competitions path (universal/competitions/competition-engine.js + /api/competitions + scripts/competitions-relay.mjs) is Solana-only but runs on every page (refresh at module load). Must move to Arc or be disabled on Arc until (6) is built.",
+        "s": "pending"
+      },
+      {
+        "t": "(19ix) BLOCKER: profile/upgrade.html and payment/index.html: payment/index.html unconditionally imports src/gfg-pay.js which imports @solana/web3.js + @solana/spl-token and builds Solana USDC transactions; upgrade.html reads premium via the Solana SDK. Payment on Arc must be direct USDC (see (4)).",
+        "s": "pending"
+      },
+      {
+        "t": "(19x) BLOCKER: games/chess/index.html is entirely Solana (md().read/ai/move/create/start/join/resign/offerDraw) with no isArc() guard. Chess on Arc is item (8i).",
+        "s": "pending"
+      },
+      {
+        "t": "(19xi) BLOCKER: the multiplayer rail is Solana (already tracked as (12i-2)); the ludo lives gate window.mpCheckLives reads via md.readLivesFor (Solana) with an EVM address on Arc. Must use the Arc lives reader.",
+        "s": "pending"
+      },
+      {
+        "t": "(19xii) LOADER: src/main.js and src/main-lab.js always import + configure the Solana SDK (magicblock-er-vrf.js) on every page. Must not load/configure Solana on an Arc build (or load inert).",
+        "s": "pending"
+      },
+      {
+        "t": "(19xiii) WRONG-CHAIN MATH: matchRefFromSignature/boostRefFromSignature (local-points, global-ledger, premium-ledger) use the Solana SDK on Arc; the Arc proof token is hex, not base58. NOTE: if (4v) retires the premium ledger, only local-points + global-ledger remain to fix.",
+        "s": "pending"
+      },
+      {
+        "t": "(19xiv) SERVER: several /api/* handlers the client calls on Arc are Solana relays (/api/multiplayer, /api/competitions, /api/agm, /api/affiliate, /api/signup, /api/chess). Confirm which must become Arc or be blocked when on Arc.",
+        "s": "pending"
+      },
+      {
+        "t": "(19xv) STANDALONE TOOLS: verify/verify.js, dashboard/recovery.html, dashboard/premium.html, dashboard/premium-subscribers.html, public/dash-core.js, dashboard/ops.html still probe/read/write Solana. Decide keep-as-Solana-tooling vs migrate before declaring Solana silenced.",
+        "s": "pending"
+      },
+      {
+        "t": "(19xvi) CONFIRMED-CLEAN: src/chain/svm.js is only imported when CHAIN!=evm (dead on Arc); api_handlers/arc-relay.mjs has no Solana imports; settlement/lives/premium-activate/match-history ARE properly isArc()-guarded.",
+        "s": "done"
+      },
+      {
+        "t": "(19xvii) Re-run this full audit AFTER (19iii)-(19xv) are fixed, and only then mark (11)/(12) Verification + Silence Solana done.",
+        "s": "pending"
+      },
+      {
+        "t": "(20) DIRECT USDC PAYMENTS on Arc (owner 2026-09-21): no premium-points intermediary - the architecture ALREADY specifies this",
+        "s": "in_progress"
+      },
+      {
+        "t": "(20i) Confirmed decision: the player pays USDC on Arc; the relayer verifies the payment and activates the subscription OR the in-game asset (booster) in the same flow - no manual admin crediting, no premium-points step",
+        "s": "done"
+      },
+      {
+        "t": "(20ii) ARCHITECTURE CHECK (owner 2026-09-21): NO architecture change needed. The v2 file already has arcv2m5 [18] DIRECT ACTIVATION (premium points REMOVED from the purchase flow) and [21] DIRECT ACTIVATION IMPLEMENTED, plus arcv2m15 automatic USDC payment-triggered activation with NO human step. arcv2m1-arcv2m17 are CHAIN-SHARED modules (one list, rails svm+evm); only Arc-rail code changes, Solana modules are never touched.",
+        "s": "done"
+      },
+      {
+        "t": "(20iii) Relayer: watch Arc for the confirmed USDC payment (amount + recipient + replay guard), then call activatePlan(level,30d) or activateBooster(hours) directly",
+        "s": "pending"
+      },
+      {
+        "t": "(20iv) Update (4ii-3)/(4iii) UI copy + flow so \"buy\" goes straight to a USDC payment and instant activation, and remove the premium-points credit step from every page",
+        "s": "pending"
+      },
+      {
+        "t": "(20v) Prove live: one real USDC payment activates a subscription; one activates a booster; both visible on the Arc explorer as a single activation",
+        "s": "pending"
+      },
+      {
+        "t": "(20vi) NOTE: the SERVER-SIDE direct-USDC activation ALREADY EXISTS on the SOLANA rail (api_handlers/verify-and-credit.mjs -> handleAdminActivatePremium/Booster, replay-guarded by the payment tx ref). It is NOT built on Arc: the Arc relayer has raw activatePlan/activateBooster admin writes but NO payment watcher to trigger them. Build the Arc equivalent.",
+        "s": "pending"
+      },
+      {
+        "t": "(20vii) BUILD on Arc (mirrors the Solana verify-and-credit logic): relayer watches Arc for the confirmed USDC transfer, verifies amount + recipient + not-replayed (payment_ref = the tx hash), then calls activatePlan(level,30) or activateBooster(hours) in ONE step - player taps once, unlocked instantly, no admin",
+        "s": "pending"
+      },
+      {
+        "t": "(20viii) Confirm the Arc activation writes the payment_ref on-chain as a receipt (PlayerCore has no payment_ref field on activatePlan/activateBooster yet - decide receipt field vs tx hash as the receipt)",
         "s": "pending"
       }
     ]

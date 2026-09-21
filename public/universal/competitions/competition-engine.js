@@ -52,7 +52,16 @@
         return lvl > 0 && !!(comp.tierBits & (1 << lvl));
     }
 
+    function isArc() {
+        try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; }
+    }
+
     async function refresh() {
+        // ARC (arcv2m17 audit): the competition LIFECYCLE is not yet on Arc
+        // (module (6) is pending), and /api/competitions is the Solana relay.
+        // Do NOT call it on Arc: that was a Solana read fired at module load on
+        // every page. Competitions simply read as empty on Arc until (6) ships.
+        if (isArc()) { cache = []; return; }
         try {
             const r = await fetch('/api/competitions', { cache: 'no-store' });
             const j = await r.json();
@@ -69,11 +78,13 @@
     }
 
     async function board(creator, seq) {
+        if (isArc()) return null; // Solana relay; competitions are off on Arc until (6)
         const r = await fetch('/api/competitions?seq=' + seq + '&board=1' + (creator ? '&creator=' + encodeURIComponent(creator) : ''), { cache: 'no-store' });
         return (await r.json()) || null;
     }
 
     async function enter(comp) {
+        if (isArc()) return { ok: false, error: 'not-on-arc-yet' }; // (6) pending
         var w = wallet();
         if (!w) return { ok: false, error: 'signin' };
         if (!tierOk(comp)) return { ok: false, error: 'tier' };
@@ -115,6 +126,7 @@
     // Record a finished match to live windows (M2 seam, once).
     function onFinish(env) {
         try {
+            if (isArc()) return; // Solana relay; competition lifecycle is (6), pending
             if (!env || env.schema !== 'gfg:game-result@1') return;
             var w = wallet();
             if (!w) return;
