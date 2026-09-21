@@ -1,0 +1,489 @@
+{
+  "updated": "2026-09-21",
+  "note": "ADMIN TODO LEDGER. CURRENT is the live nested list, using the owner's exact numbering. HISTORY keeps the most recent 3 archived lists, newest first; older ones are dropped so the file never grows unbounded. Rule: on every report/commit/push the agent archives the previous current to the front of history, caps history at 3, and writes the fresh full list as current. See .opencode/rules/todo-admin.md. This file is client-served, so it holds task text only, never secrets.",
+  "statusLegend": {
+    "done": "Completed and verified",
+    "in_progress": "Currently being worked on",
+    "pending": "Not started yet",
+    "deprecated": "Removed / replaced, kept for the record, do not build"
+  },
+  "current": {
+    "title": "GFG-BS settlement, Arc game core, lives + subscription (osv1Arc)",
+    "updated": "2026-09-21",
+    "items": [
+      {
+        "t": "(1) GFG-BS redesign: NO off-chain state",
+        "s": "done"
+      },
+      {
+        "t": "(1i) Delete the file batch store; no Supabase for core logic",
+        "s": "done"
+      },
+      {
+        "t": "(1ii) On-chain leaf add + window finalize, game-agnostic",
+        "s": "done"
+      },
+      {
+        "t": "(1iii) Relayer signs only; window derived from chain, restart-safe",
+        "s": "done"
+      },
+      {
+        "t": "(1iv) Dashboard gas/window read from chain events, not files",
+        "s": "done"
+      },
+      {
+        "t": "(1v) GASLESS COST FIX: per-MATCH settlement + batching",
+        "s": "in_progress"
+      },
+      {
+        "t": "(1v-a) DESIGN LOCKED + recorded in arcv2m17",
+        "s": "done"
+      },
+      {
+        "t": "(1v-b) Lives rule fixed everywhere: charged at start, non-refundable",
+        "s": "done"
+      },
+      {
+        "t": "(1v-c) MatchSettlement contract: commitStart + co-signed settle + dispute + timeout (6/6 tests)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-d) Off-chain match engine: deterministic digest, devices agree, tamper detectable",
+        "s": "done"
+      },
+      {
+        "t": "(1v-e) MEASURED: 60-move match = 2 txs, 0.005949 USDC",
+        "s": "done"
+      },
+      {
+        "t": "(1v-f) GAME-AGNOSTIC settlement rail + free match history + relayer matchHistory",
+        "s": "done"
+      },
+      {
+        "t": "(1v-g) ON-CHAIN MATCH HISTORY on the game page with clickable start/end links (FREE reads)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-h) Ludo wired to the rail: ZERO per-action txs; dice + moves + turns off-chain",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i) BATCHING SPINE: hybrid window (100 or 1h, SKIP EMPTY) + batch starts AND settlements",
+        "s": "in_progress"
+      },
+      {
+        "t": "(1v-i-1) Spec recorded: window + free dispute + verifiability + per-match timing rules",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-2) Window manager in the relayer (100 or 1h, never flush empty)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-3) Batch start commits + settlements into the window flush (one leaf per MATCH)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-4) Match history shows 'pending flush' then the BATCH tx link",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-5) Cost proof + $/1,000 table (measured 136,598 gas/flush)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-6) Cost explanation PERMANENT in staff Test results workspace (tests.json)",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-7) FIX: start commits + settlements must actually reach the chain (rail scripts loaded before the bridge)",
+        "s": "done"
+      },
+      {
+        "t": "(2) Game core on Arc (arcv2m1, game-agnostic)",
+        "s": "in_progress"
+      },
+      {
+        "t": "(2i) Board moves signed + committed per window (DEPRECATED: replaced by (1v))",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2i-1) commitMove on-chain + relayer + gateway (DEPRECATED for gameplay)",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2i-2) Arc game-flow bridge (openGame/seatUp/beginGame/commitMove per turn) (DEPRECATED when (1v) lands)",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2ii) TURN TIMERS / game clocks enforced ON-CHAIN + permissionless expire",
+        "s": "in_progress"
+      },
+      {
+        "t": "(2ii-1) Contract turn clock + permissionless expireTurn (DEPRECATED: keep the RULE)",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2ii-2) Relayer actions (seatUp/beginGame/commitMove/expireTurn) (DEPRECATED for gameplay)",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2ii-3) Live Arc proof (begin, lapse, permissionless expire, move)",
+        "s": "done"
+      },
+      {
+        "t": "(2ii-4a) Client can reach the on-chain clock (adapter + gateway passthrough)",
+        "s": "done"
+      },
+      {
+        "t": "(2ii-4b) Bridge watches the chain deadline and calls expireTurn as a stall fallback",
+        "s": "done"
+      },
+      {
+        "t": "(2iii) Win/finish order + result on-chain",
+        "s": "in_progress"
+      },
+      {
+        "t": "(2iii-1) settleGameOrder + resultOrder on-chain, relayer + gateway, live proof",
+        "s": "done"
+      },
+      {
+        "t": "(2iii-2) Bridge settles the finish order at the ceremony (DEPRECATED: folds into (1v))",
+        "s": "deprecated"
+      },
+      {
+        "t": "(2iv) House/AI rolls derive from the committed Arc seed",
+        "s": "done"
+      },
+      {
+        "t": "(2v) LIVE TEST: owner played a match (works, revealed the cost problem -> (1v))",
+        "s": "done"
+      },
+      {
+        "t": "(2vi) Off-chain match engine: session-key-signed move list + timers off-chain, ZERO txs during play",
+        "s": "done"
+      },
+      {
+        "t": "(2vii) On-chain START COMMIT (players + match id + commitment + clock; life charged here)",
+        "s": "done"
+      },
+      {
+        "t": "(2vii-a) Contract commitStart built + deployed + 6 forge tests",
+        "s": "done"
+      },
+      {
+        "t": "(2vii-b) Wire Ludo via the GAME-AGNOSTIC rail: call start() at match start",
+        "s": "done"
+      },
+      {
+        "t": "(2viii) ONE co-signed per-MATCH settlement",
+        "s": "done"
+      },
+      {
+        "t": "(2viii-a) Contract settle() built + co-signature enforcement proved",
+        "s": "done"
+      },
+      {
+        "t": "(2viii-b) Wire Ludo via the rail: engine.move() per turn + co-sign settle at the ceremony",
+        "s": "done"
+      },
+      {
+        "t": "(2xi) Retire the per-action path from the hot path",
+        "s": "done"
+      },
+      {
+        "t": "(2ix) Commit-reveal dispute + game-agnostic snapshot REPLAY",
+        "s": "in_progress"
+      },
+      {
+        "t": "(2ix-a) Dispute is a FREE off-chain signed event (like a move); no bond, no fee; rides the same batch",
+        "s": "done"
+      },
+      {
+        "t": "(2ix-b) Free off-chain verifier replay (Ludo rule replayer first)",
+        "s": "done"
+      },
+      {
+        "t": "(2ix-c) Replay result batched like any other settlement event",
+        "s": "done"
+      },
+      {
+        "t": "(2x) Timeout claim / expiry (contract done; wire client)",
+        "s": "pending"
+      },
+      {
+        "t": "(2v-b) LIVE TEST #2: play a match, confirm ZERO per-move charges + start/end + history links",
+        "s": "pending"
+      },
+      {
+        "t": "(3) Lives + anti-bypass (chain-enforced)",
+        "s": "in_progress"
+      },
+      {
+        "t": "(3i) Free tier is L0 not L1; tier read from PlayerCore on Arc",
+        "s": "done"
+      },
+      {
+        "t": "(3ii) Daily lives reset TIMER on-chain, 24h GMT+00 from block time",
+        "s": "in_progress"
+      },
+      {
+        "t": "(3ii-1) chargeLife on-chain resets by block-time day (livesDay) + pool by tier",
+        "s": "done"
+      },
+      {
+        "t": "(3ii-2) Lives module reads the on-chain pool/used/day on Arc",
+        "s": "done"
+      },
+      {
+        "t": "(3ii-3) Confirm the daily reset countdown matches the chain day boundary (live check)",
+        "s": "pending"
+      },
+      {
+        "t": "(3iii) Life charged at match START; no separate charge tx; non-refundable",
+        "s": "done"
+      },
+      {
+        "t": "(3v) FIX: lives meter refreshes IMMEDIATELY at game start (game-agnostic)",
+        "s": "done"
+      },
+      {
+        "t": "(3iv) Ladder on-chain L0 5/L1 10/L2 15/L3 20 + upkeep expiry; balances restored",
+        "s": "done"
+      },
+      {
+        "t": "(4) Subscription + premium (DIRECT USDC: no premium-points intermediary)",
+        "s": "in_progress"
+      },
+      {
+        "t": "(4i) L0..L3 ladder on-chain, config-driven; header reads true level",
+        "s": "done"
+      },
+      {
+        "t": "(4i-1) Header reads true level from PlayerCore on Arc",
+        "s": "done"
+      },
+      {
+        "t": "(4i-2) Config-driven plan ladder (levels, premium cost, multipliers, prices as data)",
+        "s": "done"
+      },
+      {
+        "t": "(4ii) Direct activation L2 2x / L3 3x, 30 days, EXPIRY TIMER on-chain",
+        "s": "done"
+      },
+      {
+        "t": "(4ii-1) activate on Arc (relayer admin write) + 30-day window from block time, live proof",
+        "s": "done"
+      },
+      {
+        "t": "(4ii-2) Tier boost at M4 flow-up uses the live level (kind=1 credit) on Arc + spend path; live proof",
+        "s": "done"
+      },
+      {
+        "t": "(4ii-3) FULLY AUTOMATIC payment: relayer watches Arc for the confirmed USDC payment, then splits + activates; hard guard",
+        "s": "pending"
+      },
+      {
+        "t": "(4ii-3a) arcv2m15 splitter: 20% referrer / 30% escrow / 50% admin atomically",
+        "s": "pending"
+      },
+      {
+        "t": "(4ii-3b) Escrow contract on Arc holding the 30% competition pool",
+        "s": "pending"
+      },
+      {
+        "t": "(4ii-3c) Relayer payment watcher: verify amount/recipient/replay, then split + activate",
+        "s": "pending"
+      },
+      {
+        "t": "(4iii) Unlimited-lives booster: DIRECT USDC purchase + WINDOW TIMER on-chain",
+        "s": "pending"
+      },
+      {
+        "t": "(4iii-1) Other in-game assets: DIRECT USDC purchase pattern (no points intermediary)",
+        "s": "pending"
+      },
+      {
+        "t": "(4iv) Daily rewards with 24h reset (fold into (1v): no standalone daily tx)",
+        "s": "pending"
+      },
+      {
+        "t": "(4v) Premium-points LEDGER RETIREMENT from the purchase flow",
+        "s": "pending"
+      },
+      {
+        "t": "(5) Point sources",
+        "s": "pending"
+      },
+      {
+        "t": "(5i) Signup bonus 500P, on-chain once-per-wallet fence (fold into (1v): no per-award tx)",
+        "s": "pending"
+      },
+      {
+        "t": "(5ii) Affiliate 20% ONCE per referral on their FIRST paid subscription (NOT monthly, NOT 12 months); active-sub gate at that moment; one payout per referral forever",
+        "s": "pending"
+      },
+      {
+        "t": "(5iii) Manual payout only (no cron, no external automation)",
+        "s": "pending"
+      },
+      {
+        "t": "(6) Competitions (arcv2m7)",
+        "s": "pending"
+      },
+      {
+        "t": "(6i) Config-driven on-chain instances (tiers multi, games multi, entry, window+duration, pool, shares)",
+        "s": "pending"
+      },
+      {
+        "t": "(6ii) Final-points x LIVE tier boost (L3 1.5x); downgrade hides instantly; L0 at freeze gets no position",
+        "s": "pending"
+      },
+      {
+        "t": "(6iii) Window start/end/duration enforced on-chain (use the (1v) clock + settlement, no per-tick txs)",
+        "s": "pending"
+      },
+      {
+        "t": "(6iv) On-chain winners + paid status; public past-winners",
+        "s": "pending"
+      },
+      {
+        "t": "(7) Multiplayer (arcv2m12)",
+        "s": "pending"
+      },
+      {
+        "t": "(7i) Match codes/join, seat ownership",
+        "s": "pending"
+      },
+      {
+        "t": "(7ii) Turn clocks + permissionless forfeit (use the (1v) clock; forfeit only at settlement/dispute)",
+        "s": "pending"
+      },
+      {
+        "t": "(7iii) Finish -> seam, one entry one result (emit into the (1v) per-match settlement)",
+        "s": "pending"
+      },
+      {
+        "t": "(8) Other games",
+        "s": "pending"
+      },
+      {
+        "t": "(8i) Chess on Arc (must use the (1v) rail: zero per-move txs; needs its own on-chain replayer)",
+        "s": "pending"
+      },
+      {
+        "t": "(8ii) Ayo Olopon + future games drop-in (same rail; replayer added when it carries money)",
+        "s": "pending"
+      },
+      {
+        "t": "(9) AGM (arcv2m14)",
+        "s": "pending"
+      },
+      {
+        "t": "(9i) Player-created challenges, maker-to-taker matching",
+        "s": "pending"
+      },
+      {
+        "t": "(9ii) Escrow in supported tokens, atomic settle (money moves on-chain; play rides (1v); needs an on-chain replayer)",
+        "s": "pending"
+      },
+      {
+        "t": "(9iii) Attaches to the same windows",
+        "s": "pending"
+      },
+      {
+        "t": "(10) Scale proof for 50-100+ games",
+        "s": "pending"
+      },
+      {
+        "t": "(10i) One leaf type + per-game tag; adding a game is data, not a contract",
+        "s": "done"
+      },
+      {
+        "t": "(10ii) Cost model at 100 games and high volume (batched, ~0.0006/day at launch; $0.027/1,000 at N=100)",
+        "s": "done"
+      },
+      {
+        "t": "(10iii) No new account per game or feature",
+        "s": "pending"
+      },
+      {
+        "t": "(11) Verification protocol (no false done)",
+        "s": "pending"
+      },
+      {
+        "t": "(11i) Every item proven with an Arc explorer link",
+        "s": "pending"
+      },
+      {
+        "t": "(11ii) Confirm Solana is not powering the feature (no runtime call)",
+        "s": "pending"
+      },
+      {
+        "t": "(11iii) Confirm nothing off-chain as core truth AND nothing charges per action",
+        "s": "pending"
+      },
+      {
+        "t": "(12) Silence Solana",
+        "s": "pending"
+      },
+      {
+        "t": "(12i) Remove runtime Solana calls from the Arc path",
+        "s": "pending"
+      },
+      {
+        "t": "(12ii) No page/module/fallback can touch Solana while on Arc",
+        "s": "pending"
+      },
+      {
+        "t": "(13) Dashboard: batch flush timer state (read-only, free)",
+        "s": "done"
+      },
+      {
+        "t": "(14) FIXES FOUND IN LIVE TEST (owner 2026-09-20)",
+        "s": "done"
+      },
+      {
+        "t": "(14i) FIX contract gameId encoding: numeric matchRef became a UTF-8 digit dump instead of 32-byte hex, so the start commit could not be read back or settled. Fixed in api_handlers/arc-relay.mjs + normalizeGameId() in src/chain/arc.js. Needs merge to main.",
+        "s": "done"
+      },
+      {
+        "t": "(14ii) FIX tx/history not displayed in the frontend: after 14i, re-verify the start tx + history row appear",
+        "s": "done"
+      },
+      {
+        "t": "(14iii) CONTRACT ADDRESS SYNC RULE + archive: rule .opencode/rules/contract-addresses.md + dashboard Contract archive (all addresses, active + superseded) + Contracts card showing ONLY active contracts",
+        "s": "done"
+      },
+      {
+        "t": "(14iv) STALE ADDRESS SWEEP: evm/README.md updated to the active set (old GameRegistry/PlayerCore kept as superseded); scripts/arc-relayer.mjs CORE updated to active PlayerCore 0x892C...",
+        "s": "done"
+      },
+      {
+        "t": "(14v) Dashboard Contracts card: MatchSettlement added as the match contract, GameRegistry relabelled 'window/flush only'",
+        "s": "done"
+      },
+      {
+        "t": "(15) Admin todo ledger (this list lives in the dashboard)",
+        "s": "done"
+      },
+      {
+        "t": "(15i) public/changelog/todo.json: current + history (max 3 snapshots)",
+        "s": "done"
+      },
+      {
+        "t": "(15ii) /dashboard/todo.html + renderer + dashboard nav + Vite input",
+        "s": "done"
+      },
+      {
+        "t": "(15iii) .opencode/rules/todo-admin.md + opencode.json instruction so the agent always refreshes it",
+        "s": "done"
+      },
+      {
+        "t": "(15iv) Seed current with the owner's live todo list",
+        "s": "done"
+      }
+    ]
+  },
+  "history": []
+}

@@ -101,6 +101,7 @@ export default defineConfig({
         'dashboard-pricing': './dashboard/pricing.html',
         'dashboard-competitions': './dashboard/competitions.html',
         'dashboard-content-guide': './dashboard/content-style-guide.html',
+        'dashboard-todo': './dashboard/todo.html',
         verify: './verify/index.html',
         // The header loader (public/global_header.js) injects the Dynamic
         // bootstrap module at runtime as /src/main.js (and /src/main-lab.js for

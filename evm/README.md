@@ -30,12 +30,21 @@ Deploy + measured cost on Arc Testnet (Phase 1), the gasless relayer
 (self-hosted, no paid sponsor plan), batching at scale and the per-game cost
 table (Phase 3), and mainnet (Phase 5). No key material is ever stored here.
 
-## Deployed on Arc Testnet (Phase 1, measured 2026-09-18)
+## Deployed on Arc Testnet (measured 2026-09-18, addresses updated 2026-09-21)
 
-- GameRegistry: `0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb`
-- Randomness:   `0xb406295b4F7E5B513b656122AfFF29AF720E9E23`
+Active set (single source of truth: `public/arc-config.json`):
+
+- PlayerCore:      `0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730` (lives, points, premium, per-game buckets)
+- MatchSettlement: `0x9171dd39f5ee581c240473080f0052c1652f0963` (per-match start commit + co-signed settle, arcv2m17)
+- GameRegistry:    `0x19BbC0C9e71318cDa9ca03994380a73B1280b38a` (batch window / flush only)
+- Randomness:      `0xb406295b4F7E5B513b656122AfFF29AF720E9E23`
 - Chain 5042002, `https://rpc.testnet.arc.io`, gas 25 Gwei, USDC is gas.
-- Deploy cost for BOTH contracts: about 0.023 USDC.
+- Deploy cost for BOTH Phase 1 contracts: about 0.023 USDC.
+
+Superseded (kept for the record, never delete):
+
+- GameRegistry (Phase 1): `0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb` (replaced 2026-09-19 by the turn-clock redeploy).
+- PlayerCore (Phase 2):   `0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc` (replaced by `0x892C...`; no balances orphaned).
 
 Updated 2026-09-19 (on-chain turn clock + finish order, arcv2m1/2ii-2iii):
 GameRegistry was redeployed (`0x19BbC0C9e71318cDa9ca03994380a73B1280b38a`)
@@ -62,8 +71,9 @@ target by roughly 5x.
 
 ## Phase 2 — PlayerCore + sponsored (gasless) session, measured 2026-09-18
 
-- PlayerCore (single per-player account): `0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc`
-  (admin = the self-hosted relayer `0xAd0A4348...86EB4`).
+- PlayerCore (single per-player account): `0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730`
+  (admin = the self-hosted relayer `0xAd0A4348...86EB4`). Superseded Phase 2 address:
+  `0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc`.
 
 Full game, sponsored by our own relayer (`node scripts/arc-relayer.mjs`):
 

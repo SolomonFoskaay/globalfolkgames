@@ -131,8 +131,15 @@ function tag32(s) {
   return '0x' + out.toString('hex');
 }
 function hex32(s) {
-  const v = String(s || '');
+  const v = String(s == null ? '' : s);
   if (/^0x[0-9a-fA-F]{64}$/.test(v)) return v;
+  // A NUMERIC ref (what JSON sends for matchRef/Date.now()) must become its
+  // 32-byte hex value, NOT a UTF-8 dump of the digits. This was a real bug: the
+  // start commit wrote the number, but later reads/settles hashed the digits, so
+  // the match could never be looked up or settled.
+  if (/^[0-9]{1,20}$/.test(v)) {
+    try { return '0x' + BigInt(v).toString(16).padStart(64, '0'); } catch (e) { /* fall through */ }
+  }
   const h = Buffer.from(v, 'utf8');
   const out = Buffer.alloc(32);
   h.copy(out, 0, 0, Math.min(32, h.length));

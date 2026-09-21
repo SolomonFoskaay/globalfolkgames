@@ -38,6 +38,27 @@ function evmAddress() {
   try { return (window.getDynamicEvmWallet && window.getDynamicEvmWallet()) || null; } catch (e) { return null; }
 }
 
+// Normalize a match reference to a 32-byte hex string, EXACTLY mirroring the
+// relayer's hex32() in api_handlers/arc-relay.mjs. This was a real bug: a
+// NUMERIC ref (Date.now() / matchRef) was written as the UTF-8 dump of its
+// digits (0x313738...) on one side and as numeric hex on the other, so the
+// start commit could never be looked up or settled and no history row appeared.
+// Defence in depth: the relayer normalizes too, so both ends agree even if one
+// is stale.
+function normalizeGameId(ref) {
+  const v = String(ref == null ? '' : ref);
+  if (/^0x[0-9a-fA-F]{64}$/.test(v)) return v;
+  if (/^[0-9]{1,20}$/.test(v)) {
+    try { return '0x' + BigInt(v).toString(16).padStart(64, '0'); } catch (e) { /* fall through */ }
+  }
+  const bytes = new TextEncoder().encode(v);
+  const out = new Uint8Array(32);
+  out.set(bytes.subarray(0, Math.min(32, bytes.length)));
+  let hex = '';
+  for (let i = 0; i < 32; i++) hex += out[i].toString(16).padStart(2, '0');
+  return '0x' + hex;
+}
+
 export const arcAdapter = {
   name: 'arc',
 
@@ -122,19 +143,21 @@ export const arcAdapter = {
 
   // GFG-BS per-match settlement (arcv2m17, the gasless core): TWO txs per match
   // total, no matter how many moves. The player pays nothing; the relayer pays.
+  // DEFENCE IN DEPTH: normalize the gameId to a 32-byte hex string here, so a
+  // numeric ref can never be mis-encoded on either side of the wire.
   async commitMatchStart(gameId, p1, p2, gameTag, seats, commitHash, ttlSecs) {
-    return relay('commitMatchStart', { gameId, p1, p2, gameTag, seats, commitHash, ttlSecs: ttlSecs || 3600 });
+    return relay('commitMatchStart', { gameId: normalizeGameId(gameId), p1, p2, gameTag, seats, commitHash, ttlSecs: ttlSecs || 3600 });
   },
   async settleMatch(gameId, moveDigest, resultHash, moveCount, sig1, sig2) {
     return relay('settleMatch', {
-      gameId, moveDigest, resultHash, moveCount,
+      gameId: normalizeGameId(gameId), moveDigest, resultHash, moveCount,
       v1: sig1.v, r1: sig1.r, s1: sig1.s,
       v2: sig2.v, r2: sig2.r, s2: sig2.s,
     });
   },
-  async matchDispute(gameId, revealedDigest) { return relay('matchDispute', { gameId, revealedDigest }); },
-  async matchTimeout(gameId) { return relay('matchTimeout', { gameId }); },
-  async matchState(gameId) { return relay('matchState', { gameId }); },
+  async matchDispute(gameId, revealedDigest) { return relay('matchDispute', { gameId: normalizeGameId(gameId), revealedDigest }); },
+  async matchTimeout(gameId) { return relay('matchTimeout', { gameId: normalizeGameId(gameId) }); },
+  async matchState(gameId) { return relay('matchState', { gameId: normalizeGameId(gameId) }); },
 
   // Permissionless upkeep: expires a stale plan on-chain and heals the lives
   // pool to the approved ladder (L0 5 / L1 10 / L2 15 / L3 20).

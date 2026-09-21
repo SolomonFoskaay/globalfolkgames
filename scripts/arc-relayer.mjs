@@ -19,7 +19,7 @@ import * as evmKeys from 'viem/accounts';
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
 const RPC = 'https://rpc.testnet.arc.io';
-const CORE = '0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc';
+const CORE = '0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730';
 const REGISTRY = '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a';
 const RANDOMNESS = '0xb406295b4F7E5B513b656122AfFF29AF720E9E23';
 

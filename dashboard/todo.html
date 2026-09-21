@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Todo | Dashboard | GlobalFolkGames</title>
+    <meta property="og:title" content="Todo | GlobalFolkGames">
+    <meta property="og:description" content="Live agent task list for the GlobalFolkGames build.">
+    <meta property="og:url" content="https://globalfolkgames.fun/dashboard/todo.html">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/changelog/changelog.css">
+    <style>
+        .todo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+        .todo-head h3 { margin: 0; }
+        .todo-when { color: #888; font-size: 0.78rem; }
+        .todo-summary { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
+        .todo-chip { font-size: 0.76rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; }
+        .todo-chip.todo-done { color: #2ecc71; border-color: rgba(46,204,113,0.4); background: rgba(46,204,113,0.08); }
+        .todo-chip.todo-progress { color: #f87818; border-color: rgba(243,156,24,0.45); background: rgba(243,156,24,0.10); }
+        .todo-chip.todo-pending { color: #aaa; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); }
+        .todo-chip.todo-deprecated { color: #9b59b6; border-color: rgba(155,89,182,0.5); background: rgba(155,89,182,0.10); }
+        .todo-list { list-style: none; margin: 0; padding: 0; }
+        .todo-item { display: flex; gap: 8px; align-items: flex-start; font-size: 0.86rem; line-height: 1.5; padding: 3px 0; overflow-wrap: anywhere; }
+        .todo-mark { flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+        .todo-text { flex: 1 1 auto; }
+        .todo-item.todo-done .todo-text { color: #7fbf9b; }
+        .todo-item.todo-progress .todo-text { color: #ffe1a1; }
+        .todo-item.todo-pending .todo-text { color: var(--muted, #bbb); }
+        .todo-item.todo-deprecated .todo-text { color: #9b59b6; text-decoration: line-through; }
+        .todo-archive { margin: 10px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px 12px; }
+        .todo-archive > summary { cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+        .todo-archive .todo-list { margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+    <main class="mobile-container dash-rail-content changelog-page admin">
+        <section class="changelog-head">
+            <a href="/dashboard/" class="changelog-back">← Dashboard</a>
+            <h2>Todo, live agent task list</h2>
+            <p class="changelog-sub">The exact list the agent is working from, in the owner's numbering. This page always shows the current list plus the last 3 archived lists, so it stays readable and never grows without bound. The agent refreshes it on every report, commit and push.</p>
+            <div class="changelog-meta">
+                <span id="changelog-role" class="changelog-role"></span>
+                <a href="/dashboard/arc.html" class="changelog-admin-link">Arc rail →</a>
+                <a href="/changelog/tests.html" class="changelog-admin-link">Test results →</a>
+            </div>
+        </section>
+
+        <div id="todo-items" class="changelog-entries">
+            <p class="empty">Checking access…</p>
+        </div>
+    </main>
+
+    <!-- Global scripts (needed for auth -> wallet role) -->
+    <script src="/global_header.js"></script>
+    <script src="/changelog/render.js"></script>
+    <script src="/dash-nav.js"></script>
+    <script src="/changelog/todo.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.requireStaffAccess) {
+                const role = await window.requireStaffAccess();
+                if (role && window.renderTodo) window.renderTodo();
+            } else if (window.renderTodo) {
+                window.renderTodo();
+            }
+            if (window.GFG_DASH_NAV) {
+                window.GFG_DASH_NAV.render({ brand: '📋 Todo', active: 'todo' });
+            }
+        });
+    </script>
+</body>
+</html>
