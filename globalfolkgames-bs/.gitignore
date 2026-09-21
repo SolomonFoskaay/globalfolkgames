@@ -1,0 +1,4 @@
+# Foundry build artifacts — never commit (same rule as programs/target).
+cache/
+out/
+broadcast/
