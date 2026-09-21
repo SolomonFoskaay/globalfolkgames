@@ -1,0 +1,22 @@
+# globalfolkgames-bs/foundry.toml
+# Standalone Foundry project for Foskaay Gasless Games Infrastructure (session rails on Arc).
+#
+# This is a SEPARATE project from ../evm (the GlobalFolkGames app contracts).
+# It deploys its own contracts. GlobalFolkGames plugs into it; the rail never
+# depends on GlobalFolkGames.
+#
+# Local-only for now: compile + test with no chain, no cost, no secrets.
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = []
+solc_version = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+
+# Arc endpoints (public, no secret). Mainnet added only when we get there.
+[rpc_endpoints]
+arc_testnet = "https://rpc.testnet.arc.io"
+arc_mainnet = "https://rpc.mainnet.arc.io"

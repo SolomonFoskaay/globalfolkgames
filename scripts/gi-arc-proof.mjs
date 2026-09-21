@@ -6,7 +6,7 @@
 //   fee in USDC -> withdraw.
 //
 // SECURITY: reads the deployer key from ~/.config/gfg/arc-sponsor.json and never
-// prints it. Addresses come from globalfolkgames-bs/deployments/arc-testnet.json.
+// prints it. Addresses come from foskaay-ggi/deployments/arc-testnet.json.
 //
 // Usage:
 //   node scripts/gi-arc-proof.mjs
@@ -22,7 +22,7 @@ import * as evmKeys from 'viem/accounts';
 const accountFor = evmKeys['private' + 'KeyToAccount'];
 
 const here = dirname(fileURLToPath(import.meta.url));
-const record = JSON.parse(readFileSync(join(here, '..', 'globalfolkgames-bs', 'deployments', 'arc-testnet.json'), 'utf8'));
+const record = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'arc-testnet.json'), 'utf8'));
 const RPC = process.env.GFG_Arc_RPC || record.rpc;
 const C = record.contracts;
 const USDC = record.usdc;
