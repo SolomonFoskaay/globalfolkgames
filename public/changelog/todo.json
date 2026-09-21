@@ -2,10 +2,10 @@
   "updated": "2026-09-21",
   "note": "ADMIN TODO LEDGER. CURRENT is the live nested list, using the owner's exact numbering. HISTORY keeps the most recent 3 archived lists, newest first; older ones are dropped so the file never grows unbounded. Rule: on every report/commit/push the agent archives the previous current to the front of history, caps history at 3, and writes the fresh full list as current. See .opencode/rules/todo-admin.md. This file is client-served, so it holds task text only, never secrets.",
   "statusLegend": {
-    "done": "Completed and verified",
-    "in_progress": "Currently being worked on",
-    "pending": "Not started yet",
-    "deprecated": "Removed / replaced, kept for the record, do not build"
+    "DONE": "Completed and verified",
+    "IN_PROGRESS": "Currently being worked on (only one at a time)",
+    "PENDING": "Not started yet",
+    "DEPRECATED": "Removed or replaced, kept for the record, do not build"
   },
   "current": {
     "title": "GFG-BS settlement, Arc game core, lives + subscription (osv1Arc)",
@@ -485,5 +485,14 @@
       }
     ]
   },
-  "history": []
+  "history": [],
+  "migrationNote": "MOVING 100% FROM SOLANA TO ARC. The Arc chain is the source of truth for every feature (lives, points, tiers, competitions, match settlement). The frontend only displays what the chain holds. The one old Solana write left in the game page (dice) is tracked below and must be retired before Solana can be silenced.",
+  "testNotes": {
+    "batch status": "BUILT but NOT YET PROVEN LIVE. The window manager (100 matches or 1 hour, never flush empty) and the on-chain flush are written in api_handlers/arc-relay.mjs (tickBatch + flushBatch + matchHistory). Nothing calls tickBatch yet, so the window only flushes when the OWNER presses Flush window now on /dashboard/arc.html.",
+    "what to test next on mobile (after deploy)": "1) Sign in, play one full Ludo match. 2) Confirm the start tx appears on the game page history. 3) Press Flush window now on /dashboard/arc.html. 4) Reload the game page and confirm the start tx row now shows the BATCH tx (settled) instead of pending flush. 5) Open /dashboard/arc.html and confirm the flush tx, gas and USDC numbers are real."
+  },
+  "chainAudit": {
+    "runtime Solana left on the Arc path": "The Ludo page still loads the Solana SDK (src/main-lab.js configures the MagicBlock ER VRF dice). That is the ONLY Solana write left. On Arc the dice must come from the committed Arc seed via the relayer (the contract already supports it); the page-call fix is item (2x) and it is what item (12) Silence Solana waits on.",
+    "Solana is NOT used for": "lives, local points, global points, tier/premium, match start commit, match settlement, match history, batch window. Those are all Arc (via /api/arc)."
+  }
 }
