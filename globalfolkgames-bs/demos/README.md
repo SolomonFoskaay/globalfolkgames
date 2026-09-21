@@ -100,8 +100,18 @@ Voxies) fit later; they need extra rails (assets) to be fair demos.
 
 ## 5. Where the demos are served
 
-**Now (solo dev, one repo):** from a **path** on the existing domain. No DNS work, no extra
-certificates, one deploy, and a link usable in a grant application immediately.
+**Now (solo dev, one repo):** from a **path** on the existing domain:
+
+> **https://globalfolkgames.fun/bs-demos/**
+
+That page is `bs-demos/index.html`. It reuses the normal GlobalFolkGames header (Dynamic-powered
+auth) and footer, with its own content between them. It lists every genre folder from this
+catalogue, shows **Live** demos as playable links and **Coming soon** demos as non-tappable cards,
+and it is mobile-first: anyone can open it on a phone and play with no download.
+
+**How to add a demo to the page:** drop the playable build into `demos/<genre>/`, then add one
+entry to the `DEMOS` array in `bs-demos/index.html` (name, icon, short description, what it proves)
+and flip its `status` to `'live'` with an `href`. Nothing else to wire.
 
 **Later (when GlobalFolkGames BS becomes its own repo):** its own subdomain, not before.
 

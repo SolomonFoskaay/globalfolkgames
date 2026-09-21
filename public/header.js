@@ -68,6 +68,7 @@
             {
                 heading: 'Discover',
                 items: [
+                    { label: '🧪 BS Demos', href: '/bs-demos/', match: 'bs-demos' },
                     { label: 'Premium Plans', href: '/profile/subscription.html', match: 'pricing' },
                     { label: 'What’s New', href: '/changelog/', match: 'changelog' },
                     { label: 'About', href: '/about/', match: 'about' },
