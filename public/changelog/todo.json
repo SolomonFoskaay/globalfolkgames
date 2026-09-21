@@ -100,6 +100,18 @@
         "s": "done"
       },
       {
+        "t": "(1v-i-8) FIX matchHistory on the live site: the relay baked fallback was missing matchSettlement, so when the server could not fetch arc-config.json the history read a null address and returned unreadable - fixed + defensive guard",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-9) FIX duplicate start commit: the 1s tick fired ensureStarted twice while the first commit was still in flight, so a second identical commit reverted on-chain with Exists() (one wasted tx) - single-flight guard added",
+        "s": "done"
+      },
+      {
+        "t": "(1v-i-10) PROVE the batch end to end on the live site (start -> play -> flush -> history shows the batch tx)",
+        "s": "pending"
+      },
+      {
         "t": "(2) Game core on Arc (arcv2m1, game-agnostic)",
         "s": "in_progress"
       },
@@ -140,6 +152,10 @@
         "s": "done"
       },
       {
+        "t": "(2ii-4c) FIX start-commit race (the idle tick re-entered the async start); single-flight guard on ensureStarted",
+        "s": "done"
+      },
+      {
         "t": "(2iii) Win/finish order + result on-chain",
         "s": "in_progress"
       },
@@ -150,6 +166,10 @@
       {
         "t": "(2iii-2) Bridge settles the finish order at the ceremony (DEPRECATED: folds into (1v))",
         "s": "deprecated"
+      },
+      {
+        "t": "(2iii-3) DIAGNOSED the two live start txs (6 Aug window): 0xad..8448 SUCCESS, 0xa0..5ff3 FAILED with Exists() - an identical duplicate, not a settlement failure",
+        "s": "done"
       },
       {
         "t": "(2iv) House/AI rolls derive from the committed Arc seed",
@@ -210,6 +230,10 @@
       {
         "t": "(2x) Timeout claim / expiry (contract done; wire client)",
         "s": "pending"
+      },
+      {
+        "t": "(2x-a) Contract guards confirmed on Arc: NoMatch, AlreadySettled, BadSig, NotExpired, NotPlayer, Exists (custom errors, so the UI must decode them)",
+        "s": "done"
       },
       {
         "t": "(2v-b) LIVE TEST #2: play a match, confirm ZERO per-move charges + start/end + history links",
@@ -432,6 +456,10 @@
         "s": "pending"
       },
       {
+        "t": "(12i-1) FIX dice still on Solana: on Arc the user seat fell through to the Solana SDK inside dice.js; routed to the gasless committed-seed branch (already used by the computer seat). The last per-roll Solana write is retired.",
+        "s": "done"
+      },
+      {
         "t": "(12ii) No page/module/fallback can touch Solana while on Arc",
         "s": "pending"
       },
@@ -482,6 +510,22 @@
       {
         "t": "(15iv) Seed current with the owner's live todo list",
         "s": "done"
+      },
+      {
+        "t": "(16) DICE MODEL on Arc (owner question 2026-09-21: why is dice not free inside the batch)",
+        "s": "in_progress"
+      },
+      {
+        "t": "(16i) Measured fact: the Arc dice derivation is ALREADY gasless and off-chain - the relayer derives the roll from the committed seed (rollDice) at ZERO gas and ZERO tx; it is NOT a Solana write once the page bug above is fixed",
+        "s": "done"
+      },
+      {
+        "t": "(16ii) DECISION NEEDED from the owner: the seed is currently a relayer env secret committed, not yet revealed/finalised in the window; nothing stores the per-roll dice on-chain, so proof needs the seed reveal + window Merkle proof - confirm this model or ask for dice randomness derived fully from the batched window (no env secret)",
+        "s": "pending"
+      },
+      {
+        "t": "(16iii) Build the committed-seed path that matches the owner decision, then prove one real roll end to end on Arc",
+        "s": "pending"
       }
     ]
   },

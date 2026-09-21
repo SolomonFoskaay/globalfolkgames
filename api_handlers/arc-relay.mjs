@@ -43,6 +43,7 @@ async function arcEvmConfig() {
   } catch (e) { /* fall through to baked values */ }
   _evmCfg = { chainId: 5042002, rpc: 'https://rpc.testnet.arc.io', contracts: {
     playerCore: '0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730',
+    matchSettlement: '0x9171dd39f5ee581c240473080f0052c1652f0963',
     gameRegistry: '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a',
     randomness: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23' } };
   return _evmCfg;
@@ -538,6 +539,10 @@ export default async function handler(req, res) {
     // so the UI can link BOTH on the explorer. Game-agnostic: filtered by wallet,
     // not by game. Paginates backwards because the RPC caps the block range.
     if (action === 'matchHistory') {
+      if (!MATCH_SETTLEMENT) {
+        res.status(200).json({ ok: true, player: params.player, count: 0, matches: [], free: true, chain: 'arc', note: 'match settlement address not configured' });
+        return;
+      }
       const player = getAddress(params.player);
       const limit = Math.max(1, Math.min(Number(params.limit || 10), 50));
       const startTopic = keccak256(toHex('MatchStarted(bytes32,address,address,uint16,uint8,bytes32,uint64)'));
