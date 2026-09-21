@@ -1,4 +1,4 @@
-# GlobalFolkGames GI — Gasless Infrastructure (STANDALONE PROJECT SPEC)
+# GlobalFolkGames Gasless Infrastructure (STANDALONE PROJECT SPEC)
 
 > **This is the LONG-FORM WORKING NOTE, staff/repo only. It is NOT served and NOT the source of
 > truth.** The authoritative spec lives in `public/changelog/architecture.json` module
@@ -12,10 +12,11 @@ explicitly started.
 **Scope:** a standalone, chain-agnostic, game-type-agnostic **gasless infrastructure** for Arc
 (Circle EVM). GlobalFolkGames is its FIRST user, not its purpose.
 
-**NAMING (owner decision 2026-09-21):** the product is **GlobalFolkGames GI —
-Gasless Infrastructure**. The name says what a game developer and their players GET
-(gasless play, cheap for the sponsor), not what it is technically. Earlier working names
-("GFG-BS", "Batched Settlement", "Session Rails") are RETIRED as product names:
+**NAMING (owner decision 2026-09-21):** the full product name is **GlobalFolkGames Gasless
+Infrastructure**, shortened to **GlobalFolkGames GI** where the context is already clear (GI stands
+for Gasless Infrastructure, so the short form can carry it in brackets). The name says what a game
+developer and their players GET (gasless play, cheap for the sponsor), not what it is technically.
+Earlier working names ("GFG-BS", "Batched Settlement", "Session Rails") are RETIRED as product names:
 
 - **"Batched Settlement"** is now the name of **one optional pattern**, not the product.
 - **"Session Rails"** was too much jargon; it described mechanism, not benefit.
@@ -29,7 +30,7 @@ npm packages stay brand-first: `@globalfolkgames/gi-sdk` and `@globalfolkgames/g
 
 ## 0. The one-line description
 
-**GlobalFolkGames GI is the Arc equivalent of MagicBlock's Ephemeral Rollup: a game opens a
+**GlobalFolkGames Gasless Infrastructure (GI) is the Arc equivalent of MagicBlock's Ephemeral Rollup: a game opens a
 session on-chain, everything inside is free, and one small settlement closes it.**
 
 A game opens a session, plays however it wants inside (moves, dice, points, timers, trades,
@@ -52,7 +53,7 @@ The single biggest mistake this project could make is **forcing GFG's own opinio
 developer**. MagicBlock's rail is deliberately *unopinionated*: it hands a dev primitives and lets
 them decide their own account layout, their own commit cadence, and their own cost profile.
 
-So GlobalFolkGames GI is split in two, and the line between them is absolute:
+So GlobalFolkGames Gasless Infrastructure (GI) is split in two, and the line between them is absolute:
 
 ### CORE — the unopinionated primitives (what we build)
 These make **no decision for the game**. Any game type, any account layout, any cadence.
@@ -79,7 +80,7 @@ dev does not have to start from zero.
 
 ### The rule that follows from this
 > **A game developer who wants a separate on-chain account per player, per feature, and a commit
-> on every single turn must be able to do that on GlobalFolkGames GI and pay more if they like.
+> on every single turn must be able to do that on GlobalFolkGames Gasless Infrastructure (GI) and pay more if they like.
 > That is their cost to optimise.** Our job is to make the *floor* ridiculously cheap, not to
 > dictate how anyone uses it.
 
@@ -91,7 +92,7 @@ setup, and even a careless dev does not spend much. Freedom comes from the floor
 ## 1. What is actually generic (the whole point)
 
 MagicBlock does NOT know what a board game is. It gives you a room: delegated accounts, free
-execution, commit back. The game fills the room. GlobalFolkGames GI must be the same.
+execution, commit back. The game fills the room. GlobalFolkGames Gasless Infrastructure (GI) must be the same.
 
 **Think of GFG GI as a ROOM, not a board.** The room has walls (open/settle), a door (the session
 key), a clock (session lifetime), and a locked box (the committed randomness seed). What happens
@@ -101,18 +102,18 @@ inside is entirely the game's business:
 - An MMORPG: a persistent galaxy, territories, war zones, player cities.
 - Anything else: whatever the designer invents.
 
-To GlobalFolkGames GI all of these are the SAME thing: a participant set, an opaque state model the game
+To GlobalFolkGames Gasless Infrastructure (GI) all of these are the SAME thing: a participant set, an opaque state model the game
 defines, signed events, and one settlement. **The rail must never learn a single game concept.**
-If GlobalFolkGames GI ever contains the words board, token, position, seat count, turn or dice, it is already
+If GlobalFolkGames Gasless Infrastructure (GI) ever contains the words board, token, position, seat count, turn or dice, it is already
 wrong.
 
 | Layer | Knows about games? | What it holds |
 |---|---|---|
-| **GlobalFolkGames GI Core** (standalone) | NO | Sessions, seats/participants (any number), session keys, randomness, signed state, settlement, batching, fees |
+| **GlobalFolkGames Gasless Infrastructure (GI) Core** (standalone) | NO | Sessions, seats/participants (any number), session keys, randomness, signed state, settlement, batching, fees |
 | **A game** (Ludo, chess, idle, MMORPG) | YES | Its own world: board, houses, streets, war zones, galaxies, whatever. It only needs to emit signed state into the room. |
 
 **Consequence:** an idle game's "real estate plot" and Ludo's "token position" are the SAME thing
-to GlobalFolkGames GI: an opaque signed state blob inside a session. The core must never inspect it.
+to GlobalFolkGames Gasless Infrastructure (GI): an opaque signed state blob inside a session. The core must never inspect it.
 
 ### Must not be baked into the core
 - No "board", "position", "token", "seat count is 2", "turn", "dice" concepts.
@@ -133,7 +134,7 @@ to GlobalFolkGames GI: an opaque signed state blob inside a session. The core mu
 MagicBlock is SVM-only. It cannot run on Arc (confirmed: research library, section 4). The
 *effect* ports; the *mechanism* differs. This table is the mental model:
 
-| MagicBlock (Solana) | GlobalFolkGames GI (Arc) | Same effect? |
+| MagicBlock (Solana) | GlobalFolkGames Gasless Infrastructure (GI) (Arc) | Same effect? |
 |---|---|---|
 | Delegate account to ER | **Open session** (one tx: participants + committed seed hash + rules) | Yes: room exists on-chain |
 | Free ER execution | **Signed off-chain session state** inside the session window | Yes: zero chain cost inside |
@@ -142,7 +143,7 @@ MagicBlock is SVM-only. It cannot run on Arc (confirmed: research library, secti
 | Session key (ephemeral signer + token PDA) | **Session key** (ephemeral signer + scope/expiry recorded at Open) | Yes: silent, no popups |
 | ER VRF | **Commit-reveal randomness** (one seed per session, derive all rolls from it) | Yes: verifiable, no per-roll cost |
 | Commit batching (N commits) | **Merkle window flush** (many sessions, one root) | Yes: O(1) cost |
-| Protocol fee on sessions/commits | **GlobalFolkGames GI fee on open/settle** | Yes: self-sustaining |
+| Protocol fee on sessions/commits | **GlobalFolkGames Gasless Infrastructure (GI) fee on open/settle** | Yes: self-sustaining |
 
 Honest note: on Arc there is no "delegation program" to delegate to. The session account is a
 normal contract account; "delegation" here means "your session is active and hosted by the rail".
@@ -182,7 +183,7 @@ That is the whole rail. A game onboards by implementing exactly these calls.
 
 ## 4. Why this is tamper-proof WITHOUT co-signing
 
-The earlier design (GlobalFolkGames GI v1) required BOTH players to co-sign a settlement. That was wrong:
+The earlier design (GlobalFolkGames Gasless Infrastructure (GI) v1) required BOTH players to co-sign a settlement. That was wrong:
 - MagicBlock does not do it.
 - Solo play has no second signer.
 - It made the anchor unbuildable and was the source of the recent pain.
@@ -215,7 +216,7 @@ feature and every player, and the whole program had to be rebuilt to consolidate
 premium, the last result, and a bounded table of per-game buckets (24 bytes each, keyed by an
 8-byte game tag). Adding a game never adds an account and never needs a program change.
 
-**GlobalFolkGames GI must obey the same law from day one:**
+**GlobalFolkGames Gasless Infrastructure (GI) must obey the same law from day one:**
 
 - ONE account per PARTICIPANT, not one per feature, not one per game, not one per match.
 - The account holds every platform value the participant earns or owns, in fixed slots.
@@ -233,7 +234,7 @@ and all sessions. This keeps the permanent footprint at exactly one account per 
 how many games or features the platform ever adds.
 
 ```
-Game  --emit signed event-->  GlobalFolkGames GI Session  --batched-->  Arc
+Game  --emit signed event-->  GlobalFolkGames Gasless Infrastructure (GI) Session  --batched-->  Arc
                                    |
                                    +--> value rail (points, lives, premium, AGM, ERC-20 ...)
                                    |
@@ -252,13 +253,13 @@ one more slot/event type inside the same room, at no per-action cost.
 **delegation session (0.0003 SOL)** and **commits (0.0001 SOL each)**. About 10% goes to the
 protocol, 90% to the validator. They monetise **sessions and state commits**, not usage.
 
-**GlobalFolkGames GI equivalent:**
+**GlobalFolkGames Gasless Infrastructure (GI) equivalent:**
 - The rail charges a **small fee on OPEN (session) and on SETTLE/commit**, configurable per game.
-- Fee destination is configurable to: the GlobalFolkGames GI deployer/admin wallet, or an on-chain escrow
+- Fee destination is configurable to: the GlobalFolkGames Gasless Infrastructure (GI) deployer/admin wallet, or an on-chain escrow
   the deployer withdraws from.
 - **The fee applies on DEVNET TOO, and it goes to the owner's wallet.** This is deliberate and is
   a real differentiator: MagicBlock's devnet "everything looks free" left devs unable to know what
-  mainnet would cost them. GlobalFolkGames GI devnet charges the same shape as mainnet, so a dev tests against
+  mainnet would cost them. GlobalFolkGames Gasless Infrastructure (GI) devnet charges the same shape as mainnet, so a dev tests against
   the true economics before they commit.
 - **GlobalFolkGames pays like any other game.** It is the proof of concept and the battle test; if
   the first user is exempt, the economics are never actually exercised before mainnet.
@@ -282,7 +283,7 @@ MagicBlock's integration is a package + macros, not a code copy:
   `#[ephemeral]` macros.
 - Client side: `@magicblock-labs/ephemeral-rollups-sdk` alongside `@solana/web3.js`.
 
-GlobalFolkGames GI must ship the same way. Consuming it must never mean forking it or copying contracts:
+GlobalFolkGames Gasless Infrastructure (GI) must ship the same way. Consuming it must never mean forking it or copying contracts:
 
 - **`@globalfolkgames/bs-sdk`** (npm package): `open()`, `act()`, `dispute()`, `settle()`, plus read
   helpers. This is the one-line integration a game uses.
@@ -290,14 +291,14 @@ GlobalFolkGames GI must ship the same way. Consuming it must never mean forking 
   game's own contract to call the rail directly.
 - **A per-game adapter** (small, ~50 lines) that serialises that game's state into the opaque
   session payload. Ludo has one; chess has one; an idle game has one. This is the ONLY game-specific
-  code, and it lives in the GAME, never in GlobalFolkGames GI.
+  code, and it lives in the GAME, never in GlobalFolkGames Gasless Infrastructure (GI).
 
-So: adding GlobalFolkGames GI to an existing game = install the package, write a small adapter, call four
+So: adding GlobalFolkGames Gasless Infrastructure (GI) to an existing game = install the package, write a small adapter, call four
 functions. No contract editing, no rebuild of the rail.
 
 **Package naming rule (do not regress):** the npm scope is `@globalfolkgames`, NEVER `@gfg`.
 "GFG" is a monogram and is too generic to build a brand on; every install, README and import that
-shows the full name is free brand distribution. The short "GlobalFolkGames GI" is for internal prose only.
+shows the full name is free brand distribution. The short "GlobalFolkGames Gasless Infrastructure (GI)" is for internal prose only.
 
 **Deploy cost:** one-time gas, single-digit to low-tens of dollars on Arc (research: roughly 100x
 cheaper than Solana's refundable rent). Using the rail yourself costs only the per-session fee,
@@ -327,14 +328,14 @@ globalfolkgames-bs/          <- standalone project (own Foundry project, own con
 ```
 
 GlobalFolkGames then keeps its OWN contracts (game core, points, lives, subscription) and
-**calls into GlobalFolkGames GI**. The game owns its economy; the rail owns the room.
+**calls into GlobalFolkGames Gasless Infrastructure (GI)**. The game owns its economy; the rail owns the room.
 
 Contract size: EVM cap is 24 KB per contract. This split keeps every piece small. Research
 estimate for the core: roughly 500-1,500 lines of Solidity.
 
 ---
 
-## 8. What GlobalFolkGames GI explicitly does NOT do
+## 8. What GlobalFolkGames Gasless Infrastructure (GI) explicitly does NOT do
 
 - It does not enforce game rules (except inside an optional per-game verifier during a dispute).
 - It does not know participant counts, seat meanings, boards, dice, or scoring.
@@ -362,7 +363,7 @@ estimate for the core: roughly 500-1,500 lines of Solidity.
    replays the moves with real Ludo rules and decides the true winner, for free. It proves the
    tamper-proof claim end to end, it is half of the points-trust fix, and it is the pattern every
    future game copies.
-8. **Naming:** the product is **"GlobalFolkGames GI — Gasless Infrastructure"** (owner 2026-09-21).
+8. **Naming:** the product is **"GlobalFolkGames Gasless Infrastructure"** (owner 2026-09-21).
    The name sells the benefit (gasless play, cheap for the sponsor) not the mechanism. Short form
    "GFG GI" is internal only, after the full name has appeared. npm packages are
    **`@globalfolkgames/gi-sdk`** and **`@globalfolkgames/gi-contracts`**. "Batched Settlement" is
@@ -406,7 +407,7 @@ Building the Ludo verifier in v1 matters because (a) Ludo is the first game and 
 proves the whole tamper-proof claim, (b) today points are credited on trust, and the verifier is
 part of fixing that, and (c) every future game copies this pattern.
 
-### Why the name is "GlobalFolkGames GI — Gasless Infrastructure"?
+### Why the name is "GlobalFolkGames Gasless Infrastructure"?
 
 Because a product name should sell the benefit, not the mechanism. "Gasless Infrastructure" tells a
 game developer and their players exactly what they get: gasless play, and a sponsor cost low enough
@@ -466,7 +467,7 @@ their fee model charges for **sessions and commits**.
 transactions never touch it until a commit. That is why MagicBlock runs its own ER endpoints and
 their commit links use a custom explorer URL.
 
-**How GlobalFolkGames GI does the same on Arc (honest, and deliberately simple):**
+**How GlobalFolkGames Gasless Infrastructure (GI) does the same on Arc (honest, and deliberately simple):**
 - There is **no ER on Arc**, and we do not pretend otherwise. There is nothing new to run: no
   validator, no RPC, no rollup node.
 - The fast layer is **signed session state**: every action is signed by the player's session key and
@@ -481,7 +482,7 @@ their commit links use a custom explorer URL.
 > Nothing is "lost off-chain without proof": a modified action breaks the signature, so a fake
 > result cannot settle. The middle is not a trusted server, it is signed state waiting to be sealed.
 
-**Why a developer might choose GlobalFolkGames GI over MagicBlock ER:** it works on EVM (Arc) where
+**Why a developer might choose GlobalFolkGames Gasless Infrastructure (GI) over MagicBlock ER:** it works on EVM (Arc) where
 ER cannot run; gas is a stablecoin (USDC) not a volatile token; there is no infrastructure to
 operate; the shape is familiar (open, free work, settle) so porting is conceptual; and the fee is
 **per session**, not per commit, so a heavy game is not punished.
@@ -494,5 +495,5 @@ operate; the shape is familiar (open, free work, settle) so porting is conceptua
 - We will need our own **session reader/explorer** so sessions and receipts are visible. MagicBlock
   had the same need and runs its own explorer.
 
-**Because the fast layer is not a live VM, we do not call GlobalFolkGames GI an "ER".** It gives the
+**Because the fast layer is not a live VM, we do not call GlobalFolkGames Gasless Infrastructure (GI) an "ER".** It gives the
 same *effect* (free work inside, one settlement) through a simpler mechanism.

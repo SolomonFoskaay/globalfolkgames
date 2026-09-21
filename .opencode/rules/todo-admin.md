@@ -40,12 +40,12 @@ and HOW to keep it from growing without bound.
 3. **Archive the previous `current` to the FRONT of `history`** (newest first)
    before you replace it with a fresh full list. Give the snapshot its own
    `title` and `updated`.
-4. **Cap `history` at 3 snapshots.** If archiving makes it 4, drop the oldest
-   (the one at the end). The file is always ONE live list plus AT MOST 3
-   archives: the last 3 lists stay, and the newest (the 4th slot) is always the
-   fresh current list.
+4. **Cap `history` at 10 snapshots** (owner 2026-09-21, was 3). If archiving makes
+   it 11, drop the oldest (the one at the end). The file is always ONE live list
+   plus AT MOST 10 archives: the last 10 lists stay, and the newest (the 11th
+   slot) is always the fresh current list.
 5. **Never let the file grow unbounded.** Never append a list without archiving
-   and trimming. Never keep more than 3 history entries.
+   and trimming. Never keep more than 10 history entries.
 6. **Update the top-level `updated` date** to the day you wrote it.
 
 ## Shape of `public/changelog/todo.json`
@@ -74,7 +74,7 @@ Solana). These are how the owner knows when to test what.
   object with `current` replaced and `history` prepended + trimmed. This is a
   protected content file: see `.opencode/rules/content-protection.md`. Never
   write back an object loaded from a different path, and never drop `history`
-  entries beyond the 3-entry cap silently without preserving the rule.
+  entries beyond the 10-entry cap silently without preserving the rule.
 - If the task has no multi-step work, still do not corrupt the file: only touch
   it when the todo list actually changes.
 
@@ -83,4 +83,4 @@ Solana). These are how the owner knows when to test what.
 - The owner must be able to open `/dashboard/todo.html` on a phone at any time
   and see exactly what the agent is doing, without re-reading a transcript.
 - A list that grows forever becomes unreadable, so only the current list plus
-  the last 3 snapshots are kept.
+  the last 10 snapshots are kept.
