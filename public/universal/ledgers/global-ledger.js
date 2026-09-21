@@ -227,6 +227,27 @@
         var firstCheck = !hasChecked(); // notify once when a zero check lands
         refreshInFlight = (async function () {
             var ledger = null;
+            // ARC (arcv2m17 audit): read through the chain gateway, NEVER the
+            // Solana SDK. The old code called sdk.fetchGlobalPointsPdaFor
+            // unconditionally, so every page on an Arc build hit Solana.
+            var onArc = false;
+            try { onArc = !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { onArc = false; }
+            if (onArc) {
+                try {
+                    var arcLedger = (window.gfgChain.fetchGlobalLedger) ? await window.gfgChain.fetchGlobalLedger() : null;
+                    if (arcLedger) {
+                        cached = arcLedger;
+                        if (hasRealWallet()) markChecked(true);
+                        persistCache(arcLedger);
+                        fillSlots(arcLedger);
+                        notify(arcLedger);
+                        return arcLedger;
+                    }
+                } catch (e) { /* soft */ }
+                if (hasRealWallet()) markChecked(false);
+                if (firstCheck) notify(null);
+                return cached || null;
+            }
             try {
                 // READ BY WALLET ADDRESS first (no signing session required —
                 // mirrors the recovery page). Falls back to the sign-in-scoped

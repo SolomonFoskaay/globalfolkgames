@@ -195,9 +195,26 @@
         refreshInFlight = (async function () {
             var ledger = null;
             try {
-                // Arc rail: read PlayerCore through the relayer (same on-chain truth).
+                // Arc rail: read PlayerCore through the relayer (same on-chain
+                // truth). On Arc this is the ONLY read path: if it returns null
+                // we must NOT fall through to the Solana SDK (that was a real
+                // Solana read on the Arc build). Return the honest cached/empty
+                // state instead.
                 if (isArc()) {
                     ledger = await arcReadLedger();
+                    if (ledger) {
+                        cached = ledger;
+                        if (hasRealWallet()) markChecked(true);
+                        persistCache(ledger);
+                        fillSlots(ledger);
+                        notify(ledger);
+                        return ledger;
+                    }
+                    if (hasRealWallet()) markChecked(false);
+                    if (firstCheck) notify(null);
+                    var arcFallback = cached || null;
+                    if (arcFallback) fillSlots(arcFallback);
+                    return arcFallback;
                 }
                 var addr = readAddress();
                 var sdk = window.magicblockDice;
@@ -242,7 +259,10 @@
         spend: async function (amount, reason, ref) {
             if (!magicReady()) return null;
             try {
-                var sig = await window.magicblockDice.spendPremiumPoints(amount, reason, ref);
+                // ARC (arcv2m17 audit): spend through the gateway, never the
+                // Solana SDK. gfgChain.spendGlobal routes to the Arc adapter on
+                // Arc and to the ER session key on Solana.
+                var sig = await window.gfgChain.spendGlobal(amount, reason, ref);
                 await refreshLedger(true);
                 lastSpend = { amount: amount, reason: reason, ref: ref, sig: sig, at: Date.now() };
                 notify(cached);

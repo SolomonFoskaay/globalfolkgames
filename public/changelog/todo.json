@@ -292,11 +292,11 @@
         "s": "done"
       },
       {
-        "t": "(4i-2) Config-driven plan ladder (levels, premium cost, multipliers, prices as data)",
+        "t": "(4i-2) Config-driven plan ladder (levels, USDC prices, multipliers, durations as data) - premium cost is no longer the purchase currency",
         "s": "done"
       },
       {
-        "t": "(4ii) Direct activation L2 2x / L3 3x, 30 days, EXPIRY TIMER on-chain",
+        "t": "(4ii) Direct activation L2 2x / L3 3x, 30 days, EXPIRY TIMER on-chain (activation itself works; the payment trigger becomes DIRECT USDC per 4ii-3)",
         "s": "done"
       },
       {
@@ -308,11 +308,11 @@
         "s": "done"
       },
       {
-        "t": "(4ii-3) FULLY AUTOMATIC payment: relayer watches Arc for the confirmed USDC payment, then splits + activates; hard guard",
-        "s": "pending"
+        "t": "(4ii-3) FULLY AUTOMATIC payment: player pays DIRECT USDC on Arc, the relayer verifies it, then activates the subscription or in-game asset in the SAME step (no admin action, no premium-points step); hard guard against replay/wrong amount",
+        "s": "in_progress"
       },
       {
-        "t": "(4ii-3a) arcv2m15 splitter: 20% referrer / 30% escrow / 50% admin atomically",
+        "t": "(4ii-3a) USDC splitter: 20% referrer / 30% escrow / 50% admin, atomic, in the same transaction path as the payment",
         "s": "pending"
       },
       {
@@ -320,11 +320,11 @@
         "s": "pending"
       },
       {
-        "t": "(4ii-3c) Relayer payment watcher: verify amount/recipient/replay, then split + activate",
+        "t": "(4ii-3c) Relayer payment watcher: verify amount + recipient + replay, then DIRECTLY call activatePlan/activateBooster (no creditPremium)",
         "s": "pending"
       },
       {
-        "t": "(4iii) Unlimited-lives booster: DIRECT USDC purchase + WINDOW TIMER on-chain",
+        "t": "(4iii) Unlimited-lives booster: DIRECT USDC purchase + automatic on-chain window (activateBooster) in one step, no premium-points deduction",
         "s": "pending"
       },
       {
@@ -336,8 +336,8 @@
         "s": "pending"
       },
       {
-        "t": "(4v) Premium-points LEDGER RETIREMENT from the purchase flow",
-        "s": "pending"
+        "t": "(4v) RETIRE the premium-points LEDGER from the purchase flow entirely (owner 2026-09-21): subscription and in-game assets are bought with DIRECT USDC on Arc and activate instantly; premiumLifetime/premiumSpendable are no longer the purchase path",
+        "s": "in_progress"
       },
       {
         "t": "(5) Point sources",
@@ -608,16 +608,16 @@
         "s": "done"
       },
       {
-        "t": "(19iii) BLOCKER: public/universal/points/local-points.js has NO isArc() guard on its READ path - it calls sdk.fetchPointsPdaFor/fetchPointsPda (Solana) unconditionally, on every page (header injects it). Must route reads through the gateway/Arc adapter.",
-        "s": "pending"
+        "t": "(19iii) FIXED BLOCKER: local-points.js read path now routes through window.gfgChain.fetchLedger on Arc (was an unconditional Solana fetchPointsPdaFor/fetchPointsPda on every page). Solana path unchanged when chain!=evm.",
+        "s": "done"
       },
       {
         "t": "(19iv) BLOCKER: public/universal/ledgers/global-ledger.js has NO isArc() guard on its READ path - same Solana fetchGlobalPointsPdaFor/fetchGlobalPointsPda calls unconditionally. Must route through the gateway/Arc adapter.",
         "s": "pending"
       },
       {
-        "t": "(19v) BLOCKER: local-points.spend and premium-ledger.spend call window.magicblockDice.spendLocal/spendPremiumPoints directly (Solana writes) when competitions entry runs. Must route through gfgChain.spendLocal/spendGlobal.",
-        "s": "pending"
+        "t": "(19v) FIXED BLOCKER: local-points.spend now uses window.gfgChain.spendLocal (routes to the Arc adapter on Arc) instead of magicblockDice.spendLocal directly.",
+        "s": "done"
       },
       {
         "t": "(19vi) BLOCKER: premium-ledger read falls through to the Solana fetch when arcReadLedger() returns null (no early return). Must return an honest empty/error instead of hitting Solana.",
@@ -648,7 +648,7 @@
         "s": "pending"
       },
       {
-        "t": "(19xiii) WRONG-CHAIN MATH: matchRefFromSignature/boostRefFromSignature (local-points, global-ledger, premium-ledger) use the Solana SDK on Arc; the Arc proof token is hex, not base58. Route via gateway.",
+        "t": "(19xiii) WRONG-CHAIN MATH: matchRefFromSignature/boostRefFromSignature (local-points, global-ledger, premium-ledger) use the Solana SDK on Arc; the Arc proof token is hex, not base58. NOTE: if (4v) retires the premium ledger, only local-points + global-ledger remain to fix.",
         "s": "pending"
       },
       {
@@ -665,6 +665,42 @@
       },
       {
         "t": "(19xvii) Re-run this full audit AFTER (19iii)-(19xv) are fixed, and only then mark (11)/(12) Verification + Silence Solana done.",
+        "s": "pending"
+      },
+      {
+        "t": "(20) DIRECT USDC PAYMENTS on Arc (owner 2026-09-21): no premium-points intermediary - the architecture ALREADY specifies this",
+        "s": "in_progress"
+      },
+      {
+        "t": "(20i) Confirmed decision: the player pays USDC on Arc; the relayer verifies the payment and activates the subscription OR the in-game asset (booster) in the same flow - no manual admin crediting, no premium-points step",
+        "s": "done"
+      },
+      {
+        "t": "(20ii) ARCHITECTURE CHECK (owner 2026-09-21): NO architecture change needed. The v2 file already has arcv2m5 [18] DIRECT ACTIVATION (premium points REMOVED from the purchase flow) and [21] DIRECT ACTIVATION IMPLEMENTED, plus arcv2m15 automatic USDC payment-triggered activation with NO human step. arcv2m1-arcv2m17 are CHAIN-SHARED modules (one list, rails svm+evm); only Arc-rail code changes, Solana modules are never touched.",
+        "s": "done"
+      },
+      {
+        "t": "(20iii) Relayer: watch Arc for the confirmed USDC payment (amount + recipient + replay guard), then call activatePlan(level,30d) or activateBooster(hours) directly",
+        "s": "pending"
+      },
+      {
+        "t": "(20iv) Update (4ii-3)/(4iii) UI copy + flow so \"buy\" goes straight to a USDC payment and instant activation, and remove the premium-points credit step from every page",
+        "s": "pending"
+      },
+      {
+        "t": "(20v) Prove live: one real USDC payment activates a subscription; one activates a booster; both visible on the Arc explorer as a single activation",
+        "s": "pending"
+      },
+      {
+        "t": "(20vi) NOTE: the SERVER-SIDE direct-USDC activation ALREADY EXISTS on the SOLANA rail (api_handlers/verify-and-credit.mjs -> handleAdminActivatePremium/Booster, replay-guarded by the payment tx ref). It is NOT built on Arc: the Arc relayer has raw activatePlan/activateBooster admin writes but NO payment watcher to trigger them. Build the Arc equivalent.",
+        "s": "pending"
+      },
+      {
+        "t": "(20vii) BUILD on Arc (mirrors the Solana verify-and-credit logic): relayer watches Arc for the confirmed USDC transfer, verifies amount + recipient + not-replayed (payment_ref = the tx hash), then calls activatePlan(level,30) or activateBooster(hours) in ONE step - player taps once, unlocked instantly, no admin",
+        "s": "pending"
+      },
+      {
+        "t": "(20viii) Confirm the Arc activation writes the payment_ref on-chain as a receipt (PlayerCore has no payment_ref field on activatePlan/activateBooster yet - decide receipt field vs tx hash as the receipt)",
         "s": "pending"
       }
     ]
