@@ -1,41 +1,99 @@
-# GlobalFolkGames BS — Session Rails (STANDALONE PROJECT SPEC)
+# GlobalFolkGames GI — Gasless Infrastructure (STANDALONE PROJECT SPEC)
 
-**Status:** approved in principle by the owner (2026-09-21). NOT built. No code until Step 1 is
+> **This is the LONG-FORM WORKING NOTE, staff/repo only. It is NOT served and NOT the source of
+> truth.** The authoritative spec lives in `public/changelog/architecture.json` module
+> **`arcv2m18`** and renders on the staff Architecture V2 page (`/changelog/architecture-v2.html`).
+> If the two ever disagree, **architecture.json wins**. This file exists for the extra prose and
+> reasoning that is too long for a module entry.
+
+**Status:** approved in principle by the owner (2026-09-21). NOT built. No code until Step 3 is
 explicitly started.
 **Owner:** Solomon Foskaay
-**Scope:** a standalone, chain-agnostic, game-type-agnostic on-chain execution layer for Arc
+**Scope:** a standalone, chain-agnostic, game-type-agnostic **gasless infrastructure** for Arc
 (Circle EVM). GlobalFolkGames is its FIRST user, not its purpose.
+
+**NAMING (owner decision 2026-09-21):** the product is **GlobalFolkGames GI —
+Gasless Infrastructure**. The name says what a game developer and their players GET
+(gasless play, cheap for the sponsor), not what it is technically. Earlier working names
+("GFG-BS", "Batched Settlement", "Session Rails") are RETIRED as product names:
+
+- **"Batched Settlement"** is now the name of **one optional pattern**, not the product.
+- **"Session Rails"** was too much jargon; it described mechanism, not benefit.
+- **Never call it an "ER" or "Ephemeral Rollup".** That is MagicBlock's specific SVM technology.
+  On EVM it would be false, and it would break the project's terminology rule.
+
+Internal short form, only inside staff docs after the full name has appeared: **GFG GI**.
+npm packages stay brand-first: `@globalfolkgames/gi-sdk` and `@globalfolkgames/gi-contracts`.
 
 ---
 
 ## 0. The one-line description
 
-**GlobalFolkGames BS is the Arc equivalent of MagicBlock's Ephemeral Rollup: a room you open
-on-chain, do everything inside for free, and settle back to the chain once.**
+**GlobalFolkGames GI is the Arc equivalent of MagicBlock's Ephemeral Rollup: a game opens a
+session on-chain, everything inside is free, and one small settlement closes it.**
 
 A game opens a session, plays however it wants inside (moves, dice, points, timers, trades,
 rewards), and settles once. Everything inside is off-chain-but-signed; only open and settle
 touch the chain. It is NOT a board-game system. Ludo is just the first thing that will live in it.
 
-**Naming (owner decision 2026-09-21):** the full brand name is used everywhere a stranger can see
-it. The product is written **"GlobalFolkGames BS"**; the short form **"GFG-BS"** is used only in
-internal docs after the full name has appeared. npm packages: `@globalfolkgames/bs-sdk` and
-`@globalfolkgames/bs-contracts`. Reason: a monogram is too generic to build a brand on, and every
-install/README/import showing the full name is free brand distribution (MagicBlock did not brand
-their product "MB-ER").
+**The benefit, in one line:** players never pay gas and never see a wallet popup; the game sponsor
+pays a tiny fixed fee per session instead of paying for every action, so an on-chain game can be as
+cheap to run as a web2 backend while staying transparent and provable.
 
 **Do not call it an "ER" unless it literally is one.** MagicBlock's ER is an SVM runtime; this is
-a session/channel layer on EVM. Inaccurate naming that implies ER tech would break trust and
+a session/settlement layer on EVM. Inaccurate naming that implies ER tech would break trust and
 violate the project's terminology rule.
+
+---
+
+## 0b. CORE vs OPTIONAL (the most important structural rule)
+
+The single biggest mistake this project could make is **forcing GFG's own opinions on every game
+developer**. MagicBlock's rail is deliberately *unopinionated*: it hands a dev primitives and lets
+them decide their own account layout, their own commit cadence, and their own cost profile.
+
+So GlobalFolkGames GI is split in two, and the line between them is absolute:
+
+### CORE — the unopinionated primitives (what we build)
+These make **no decision for the game**. Any game type, any account layout, any cadence.
+
+| # | Contract | Responsibility |
+|---|---|---|
+| 1 | **SessionRegistry** | open/close a session; participant authorities; session-key registration (scope + expiry) |
+| 2 | **SessionState** | accept signed session events (opaque payload + sequence number + digest) |
+| 3 | **Randomness** | commit-reveal seed(s); derive `hash(seed, counter)`. Used only by games that ask for it |
+| 4 | **FeeVault** | per-session fee collection; configurable destination |
+
+**Core = 4 contracts.** Nothing else is required to ship a gasless game.
+
+### OPTIONAL — GFG's own opinions, offered as patterns (never enforced)
+A dev may use these, or ignore them, or build their own. They exist as examples and helpers so a
+dev does not have to start from zero.
+
+| Pattern | What it is | Why it is optional |
+|---|---|---|
+| **Batched Settlement** | fold many session settlements into one Merkle root per window | A dev may want an immediate commit per session. Cadence is theirs. |
+| **Managed Accounts** (PlayerCore-style) | ONE account per player with slots for every game/feature | A cost optimisation. A dev may prefer one account per game, or per match, or ephemeral accounts. |
+| **Verifiers** | a per-game referee that replays a dispute | Only games that carry money truly need one. Legal-free games need none. |
+| **House / relayer as a participant** | the AI or house seat is a participant whose authority is the relayer key | Only games with an AI or house opponent need it. |
+
+### The rule that follows from this
+> **A game developer who wants a separate on-chain account per player, per feature, and a commit
+> on every single turn must be able to do that on GlobalFolkGames GI and pay more if they like.
+> That is their cost to optimise.** Our job is to make the *floor* ridiculously cheap, not to
+> dictate how anyone uses it.
+
+The core should be cheap enough that a well-optimised dev spends far less than on a normal EVM
+setup, and even a careless dev does not spend much. Freedom comes from the floor being low.
 
 ---
 
 ## 1. What is actually generic (the whole point)
 
 MagicBlock does NOT know what a board game is. It gives you a room: delegated accounts, free
-execution, commit back. The game fills the room. GFG-BS must be the same.
+execution, commit back. The game fills the room. GlobalFolkGames GI must be the same.
 
-**Think of GFG-BS as a ROOM, not a board.** The room has walls (open/settle), a door (the session
+**Think of GFG GI as a ROOM, not a board.** The room has walls (open/settle), a door (the session
 key), a clock (session lifetime), and a locked box (the committed randomness seed). What happens
 inside is entirely the game's business:
 - Ludo: a board, tokens, dice.
@@ -43,18 +101,18 @@ inside is entirely the game's business:
 - An MMORPG: a persistent galaxy, territories, war zones, player cities.
 - Anything else: whatever the designer invents.
 
-To GFG-BS all of these are the SAME thing: a participant set, an opaque state model the game
+To GlobalFolkGames GI all of these are the SAME thing: a participant set, an opaque state model the game
 defines, signed events, and one settlement. **The rail must never learn a single game concept.**
-If GFG-BS ever contains the words board, token, position, seat count, turn or dice, it is already
+If GlobalFolkGames GI ever contains the words board, token, position, seat count, turn or dice, it is already
 wrong.
 
 | Layer | Knows about games? | What it holds |
 |---|---|---|
-| **GFG-BS Core** (standalone) | NO | Sessions, seats/participants (any number), session keys, randomness, signed state, settlement, batching, fees |
+| **GlobalFolkGames GI Core** (standalone) | NO | Sessions, seats/participants (any number), session keys, randomness, signed state, settlement, batching, fees |
 | **A game** (Ludo, chess, idle, MMORPG) | YES | Its own world: board, houses, streets, war zones, galaxies, whatever. It only needs to emit signed state into the room. |
 
 **Consequence:** an idle game's "real estate plot" and Ludo's "token position" are the SAME thing
-to GFG-BS: an opaque signed state blob inside a session. The core must never inspect it.
+to GlobalFolkGames GI: an opaque signed state blob inside a session. The core must never inspect it.
 
 ### Must not be baked into the core
 - No "board", "position", "token", "seat count is 2", "turn", "dice" concepts.
@@ -75,7 +133,7 @@ to GFG-BS: an opaque signed state blob inside a session. The core must never ins
 MagicBlock is SVM-only. It cannot run on Arc (confirmed: research library, section 4). The
 *effect* ports; the *mechanism* differs. This table is the mental model:
 
-| MagicBlock (Solana) | GFG-BS (Arc) | Same effect? |
+| MagicBlock (Solana) | GlobalFolkGames GI (Arc) | Same effect? |
 |---|---|---|
 | Delegate account to ER | **Open session** (one tx: participants + committed seed hash + rules) | Yes: room exists on-chain |
 | Free ER execution | **Signed off-chain session state** inside the session window | Yes: zero chain cost inside |
@@ -84,7 +142,7 @@ MagicBlock is SVM-only. It cannot run on Arc (confirmed: research library, secti
 | Session key (ephemeral signer + token PDA) | **Session key** (ephemeral signer + scope/expiry recorded at Open) | Yes: silent, no popups |
 | ER VRF | **Commit-reveal randomness** (one seed per session, derive all rolls from it) | Yes: verifiable, no per-roll cost |
 | Commit batching (N commits) | **Merkle window flush** (many sessions, one root) | Yes: O(1) cost |
-| Protocol fee on sessions/commits | **GFG-BS fee on open/settle** | Yes: self-sustaining |
+| Protocol fee on sessions/commits | **GlobalFolkGames GI fee on open/settle** | Yes: self-sustaining |
 
 Honest note: on Arc there is no "delegation program" to delegate to. The session account is a
 normal contract account; "delegation" here means "your session is active and hosted by the rail".
@@ -124,7 +182,7 @@ That is the whole rail. A game onboards by implementing exactly these calls.
 
 ## 4. Why this is tamper-proof WITHOUT co-signing
 
-The earlier design (GFG-BS v1) required BOTH players to co-sign a settlement. That was wrong:
+The earlier design (GlobalFolkGames GI v1) required BOTH players to co-sign a settlement. That was wrong:
 - MagicBlock does not do it.
 - Solo play has no second signer.
 - It made the anchor unbuildable and was the source of the recent pain.
@@ -157,7 +215,7 @@ feature and every player, and the whole program had to be rebuilt to consolidate
 premium, the last result, and a bounded table of per-game buckets (24 bytes each, keyed by an
 8-byte game tag). Adding a game never adds an account and never needs a program change.
 
-**GFG-BS must obey the same law from day one:**
+**GlobalFolkGames GI must obey the same law from day one:**
 
 - ONE account per PARTICIPANT, not one per feature, not one per game, not one per match.
 - The account holds every platform value the participant earns or owns, in fixed slots.
@@ -175,7 +233,7 @@ and all sessions. This keeps the permanent footprint at exactly one account per 
 how many games or features the platform ever adds.
 
 ```
-Game  --emit signed event-->  GFG-BS Session  --batched-->  Arc
+Game  --emit signed event-->  GlobalFolkGames GI Session  --batched-->  Arc
                                    |
                                    +--> value rail (points, lives, premium, AGM, ERC-20 ...)
                                    |
@@ -194,13 +252,13 @@ one more slot/event type inside the same room, at no per-action cost.
 **delegation session (0.0003 SOL)** and **commits (0.0001 SOL each)**. About 10% goes to the
 protocol, 90% to the validator. They monetise **sessions and state commits**, not usage.
 
-**GFG-BS equivalent:**
+**GlobalFolkGames GI equivalent:**
 - The rail charges a **small fee on OPEN (session) and on SETTLE/commit**, configurable per game.
-- Fee destination is configurable to: the GFG-BS deployer/admin wallet, or an on-chain escrow
+- Fee destination is configurable to: the GlobalFolkGames GI deployer/admin wallet, or an on-chain escrow
   the deployer withdraws from.
 - **The fee applies on DEVNET TOO, and it goes to the owner's wallet.** This is deliberate and is
   a real differentiator: MagicBlock's devnet "everything looks free" left devs unable to know what
-  mainnet would cost them. GFG-BS devnet charges the same shape as mainnet, so a dev tests against
+  mainnet would cost them. GlobalFolkGames GI devnet charges the same shape as mainnet, so a dev tests against
   the true economics before they commit.
 - **GlobalFolkGames pays like any other game.** It is the proof of concept and the battle test; if
   the first user is exempt, the economics are never actually exercised before mainnet.
@@ -224,7 +282,7 @@ MagicBlock's integration is a package + macros, not a code copy:
   `#[ephemeral]` macros.
 - Client side: `@magicblock-labs/ephemeral-rollups-sdk` alongside `@solana/web3.js`.
 
-GFG-BS must ship the same way. Consuming it must never mean forking it or copying contracts:
+GlobalFolkGames GI must ship the same way. Consuming it must never mean forking it or copying contracts:
 
 - **`@globalfolkgames/bs-sdk`** (npm package): `open()`, `act()`, `dispute()`, `settle()`, plus read
   helpers. This is the one-line integration a game uses.
@@ -232,14 +290,14 @@ GFG-BS must ship the same way. Consuming it must never mean forking it or copyin
   game's own contract to call the rail directly.
 - **A per-game adapter** (small, ~50 lines) that serialises that game's state into the opaque
   session payload. Ludo has one; chess has one; an idle game has one. This is the ONLY game-specific
-  code, and it lives in the GAME, never in GFG-BS.
+  code, and it lives in the GAME, never in GlobalFolkGames GI.
 
-So: adding GFG-BS to an existing game = install the package, write a small adapter, call four
+So: adding GlobalFolkGames GI to an existing game = install the package, write a small adapter, call four
 functions. No contract editing, no rebuild of the rail.
 
 **Package naming rule (do not regress):** the npm scope is `@globalfolkgames`, NEVER `@gfg`.
 "GFG" is a monogram and is too generic to build a brand on; every install, README and import that
-shows the full name is free brand distribution. The short "GFG-BS" is for internal prose only.
+shows the full name is free brand distribution. The short "GlobalFolkGames GI" is for internal prose only.
 
 **Deploy cost:** one-time gas, single-digit to low-tens of dollars on Arc (research: roughly 100x
 cheaper than Solana's refundable rent). Using the rail yourself costs only the per-session fee,
@@ -269,14 +327,14 @@ globalfolkgames-bs/          <- standalone project (own Foundry project, own con
 ```
 
 GlobalFolkGames then keeps its OWN contracts (game core, points, lives, subscription) and
-**calls into GlobalFolkGames BS**. The game owns its economy; the rail owns the room.
+**calls into GlobalFolkGames GI**. The game owns its economy; the rail owns the room.
 
 Contract size: EVM cap is 24 KB per contract. This split keeps every piece small. Research
 estimate for the core: roughly 500-1,500 lines of Solidity.
 
 ---
 
-## 8. What GFG-BS explicitly does NOT do
+## 8. What GlobalFolkGames GI explicitly does NOT do
 
 - It does not enforce game rules (except inside an optional per-game verifier during a dispute).
 - It does not know participant counts, seat meanings, boards, dice, or scoring.
@@ -304,12 +362,11 @@ estimate for the core: roughly 500-1,500 lines of Solidity.
    replays the moves with real Ludo rules and decides the true winner, for free. It proves the
    tamper-proof claim end to end, it is half of the points-trust fix, and it is the pattern every
    future game copies.
-8. **Naming:** the full brand goes everywhere a stranger can see it. The product is written
-   **"GlobalFolkGames BS"**; the short form "GFG-BS" is used only in internal docs after the full
-   name has appeared. npm packages are **`@globalfolkgames/bs-sdk`** and
-   **`@globalfolkgames/bs-contracts`**. Reason: a monogram ("GFG") is too generic to build a brand
-   on, and every install/README/import that shows the full name is free brand distribution. This
-   mirrors MagicBlock, who did not brand their product "MB-ER".
+8. **Naming:** the product is **"GlobalFolkGames GI — Gasless Infrastructure"** (owner 2026-09-21).
+   The name sells the benefit (gasless play, cheap for the sponsor) not the mechanism. Short form
+   "GFG GI" is internal only, after the full name has appeared. npm packages are
+   **`@globalfolkgames/gi-sdk`** and **`@globalfolkgames/gi-contracts`**. "Batched Settlement" is
+   now one optional pattern, not the product; "Session Rails" is retired. Never call it an "ER".
 
 **Still open (answer before build):**
 9. **Participant account scope:** one account per player for the whole platform (the PlayerCore
@@ -349,23 +406,93 @@ Building the Ludo verifier in v1 matters because (a) Ludo is the first game and 
 proves the whole tamper-proof claim, (b) today points are credited on trust, and the verifier is
 part of fixing that, and (c) every future game copies this pattern.
 
-### Why not call it "GFG-BS" everywhere?
+### Why the name is "GlobalFolkGames GI — Gasless Infrastructure"?
 
-"GFG" is a monogram: it means nothing unless you already know the brand. For a standalone product
-that OTHER developers will install, the full name should be what they see. So the product is
-"GlobalFolkGames BS", packages are `@globalfolkgames/...`, and the short form is only an internal
-convenience. Every developer who installs it, reads the README, or imports it in their code sees
-"GlobalFolkGames" — free brand distribution. MagicBlock did the same: their product is not "MB-ER".
+Because a product name should sell the benefit, not the mechanism. "Gasless Infrastructure" tells a
+game developer and their players exactly what they get: gasless play, and a sponsor cost low enough
+to compete with a web2 backend. Earlier names failed this test: "Batched Settlement" described one
+optional pattern, and "Session Rails" was internal jargon.
+
+The brand is kept whole because the full name is what a developer sees on every install, README and
+import, which is free brand distribution. It is never shortened to a monogram for strangers (a
+monogram means nothing until you are already famous). Packages are `@globalfolkgames/gi-sdk` and
+`@globalfolkgames/gi-contracts`. MagicBlock did the same: their product is not branded "MB-ER".
 
 ---
 
-## 10. Build order (after this document is approved)
+## 11. Build order (after this document is approved)
 
-1. Write `globalfolkgames-bs/` skeleton + `README.md` (the plug-in contract). No logic.
+The CORE is built first, and only the core. Optional patterns come later, as separate opt-in work.
+
+**CORE (the 4 contracts — this is what we build now):**
+1. Project skeleton + `README.md` (the plug-in contract). No logic. **DONE (Step 1).**
 2. `SessionRegistry` + `SessionState` + session keys. Test open/act/settle with a fake game.
-3. `Randomness` (commit-reveal) + `BatchWindow` (Merkle flush). Test.
-4. `FeeVault`. Test fee routing to the chosen destination.
-5. Plug **Ludo** in as the first game (single-player first, then multiplayer).
-6. Then points, lives, premium, and later competitions / AGM / ERC-20, as event types.
+3. `Randomness` (commit-reveal, N streams) + `FeeVault`. Test.
+4. Each step ends with a live Arc testnet proof before the next step starts.
 
-Each step ends with a live Arc testnet proof before the next step starts.
+**OPTIONAL PATTERNS (offered, never enforced — built only when a game asks):**
+5. Batched Settlement (Merkle window flush).
+6. Managed Accounts (PlayerCore-style single account per player).
+7. Verifiers (per game; Ludo first).
+8. Plug **Ludo** in as the first real user of the rail.
+9. Then points, lives, premium, and later competitions / AGM / ERC-20, as event/slot types.
+
+---
+
+## Appendix B — What is the fast layer? (the question every dev asks)
+
+Written plainly, because a game developer will ask "what happens to our data, and are you taking us
+off the main chain?"
+
+**Is it on-chain or off-chain?** Both, in two layers. Sessions are a **fast layer** where play
+happens for free, and Arc is the **permanent layer** where records land. Nothing is a private
+database.
+
+**How MagicBlock's version works (their words, summarised):**
+- **Base layer (Solana):** permanent, slow (~400 ms), costs gas. This is the record.
+- **Ephemeral Rollup (ER):** a fast copy of the same virtual machine (10 ms slots) that can execute
+  against accounts that have been **delegated** to it. Transactions there are free.
+- **Delegation:** an account's ownership is temporarily handed to a Delegation Program so a
+  validator can execute on it in the ER.
+- **Commit:** the ER pushes changed state **back to the base layer**, where it becomes permanent and
+  visible to normal explorers. Commits are the point at which real cost appears.
+- **Undelegate:** commit plus return ownership to your program.
+
+**Why "ephemeral"?** Because the ER's own state is temporary by design: a validator can be
+restarted, so only what has been **committed to base** is guaranteed permanent. That is exactly why
+their fee model charges for **sessions and commits**.
+
+**Why transactions don't appear on normal explorers:** explorers index the base chain, and ER
+transactions never touch it until a commit. That is why MagicBlock runs its own ER endpoints and
+their commit links use a custom explorer URL.
+
+**How GlobalFolkGames GI does the same on Arc (honest, and deliberately simple):**
+- There is **no ER on Arc**, and we do not pretend otherwise. There is nothing new to run: no
+  validator, no RPC, no rollup node.
+- The fast layer is **signed session state**: every action is signed by the player's session key and
+  folded into a digest. It costs nothing because it is not a transaction.
+- At settlement, the digest and whatever the developer chooses to commit are written to **Arc base**
+  permanently. A tampered action breaks the signature, so a fake result cannot settle.
+- Cost appears on **open and settle only**. The middle is free.
+
+**The answer to "where do our game records go?":**
+> Your records end up **on Arc base**, permanently, every time a session settles. In between, play
+> runs free in the session layer, every action is signed, and everything is sealed into a digest.
+> Nothing is "lost off-chain without proof": a modified action breaks the signature, so a fake
+> result cannot settle. The middle is not a trusted server, it is signed state waiting to be sealed.
+
+**Why a developer might choose GlobalFolkGames GI over MagicBlock ER:** it works on EVM (Arc) where
+ER cannot run; gas is a stablecoin (USDC) not a volatile token; there is no infrastructure to
+operate; the shape is familiar (open, free work, settle) so porting is conceptual; and the fee is
+**per session**, not per commit, so a heavy game is not punished.
+
+**Honest limits (never oversell):**
+- The free middle is **off-chain signed state**, not a live parallel VM. A third party cannot read
+  mid-session state the way they can read a delegated ER account.
+- Our settlement is submitted by a **relayer**, which is trusted for *timing*, never for *truth*
+  (signatures decide truth).
+- We will need our own **session reader/explorer** so sessions and receipts are visible. MagicBlock
+  had the same need and runs its own explorer.
+
+**Because the fast layer is not a live VM, we do not call GlobalFolkGames GI an "ER".** It gives the
+same *effect* (free work inside, one settlement) through a simpler mechanism.
