@@ -5,4 +5,4 @@
 Planned responsibility: open and close sessions, record each participant's signing authority,
 and store the session's scope and expiry.
 
-Design reference: `../docs/gfg-bs-spec.md`, section 3 (OPEN / SETTLE) and section 4 (authority).
+Design reference: `../docs/globalfolkgames-bs-spec.md`, section 3 (OPEN / SETTLE) and section 4 (authority).

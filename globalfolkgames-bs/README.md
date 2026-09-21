@@ -3,7 +3,7 @@
 **Status: SKELETON ONLY. No logic yet. Step 1 of the build order.**
 Nothing here is deployed, and nothing in the GlobalFolkGames app uses it yet.
 
-The full design is in [`../docs/gfg-bs-spec.md`](../docs/gfg-bs-spec.md). Read that first.
+The full design is in [`../docs/globalfolkgames-bs-spec.md`](../docs/globalfolkgames-bs-spec.md). Read that first.
 
 ---
 
@@ -55,6 +55,12 @@ globalfolkgames-bs/
     ParticipantAccount.sol   ONE account per player; append-only value slots
     FeeVault.sol             rail fee collection; configurable destination / escrow
     verifiers/               per-game verifiers (Ludo ships first)
+  demos/                     small playable demos, one per popular genre (see demos/README.md)
+    idle-farm/               idle/clicker: hundreds of actions, still free inside the session
+    endless-runner/          casual: art reused from the owner's forked web2 runner
+    arena-1v1/               PvP: two players, seat authority, verifier on dispute
+    tiny-mmo/                MMORPG-lite: many participants in one session
+    land-grid/               metaverse-ish: plots/buildings as opaque state
   test/                      Foundry tests
   packages/
     sdk/                     @globalfolkgames/bs-sdk — the one-line integration

@@ -226,16 +226,20 @@ MagicBlock's integration is a package + macros, not a code copy:
 
 GFG-BS must ship the same way. Consuming it must never mean forking it or copying contracts:
 
-- **`@gfg-bs/sdk`** (npm package): `open()`, `act()`, `dispute()`, `settle()`, plus read helpers.
-  This is the one-line integration a game uses.
-- **`@gfg-bs/contracts`** (Solidity interfaces + deployed addresses per network): for a game's own
-  contract to call the rail directly.
+- **`@globalfolkgames/bs-sdk`** (npm package): `open()`, `act()`, `dispute()`, `settle()`, plus read
+  helpers. This is the one-line integration a game uses.
+- **`@globalfolkgames/bs-contracts`** (Solidity interfaces + deployed addresses per network): for a
+  game's own contract to call the rail directly.
 - **A per-game adapter** (small, ~50 lines) that serialises that game's state into the opaque
   session payload. Ludo has one; chess has one; an idle game has one. This is the ONLY game-specific
   code, and it lives in the GAME, never in GFG-BS.
 
 So: adding GFG-BS to an existing game = install the package, write a small adapter, call four
 functions. No contract editing, no rebuild of the rail.
+
+**Package naming rule (do not regress):** the npm scope is `@globalfolkgames`, NEVER `@gfg`.
+"GFG" is a monogram and is too generic to build a brand on; every install, README and import that
+shows the full name is free brand distribution. The short "GFG-BS" is for internal prose only.
 
 **Deploy cost:** one-time gas, single-digit to low-tens of dollars on Arc (research: roughly 100x
 cheaper than Solana's refundable rent). Using the rail yourself costs only the per-session fee,
@@ -357,7 +361,7 @@ convenience. Every developer who installs it, reads the README, or imports it in
 
 ## 10. Build order (after this document is approved)
 
-1. Write `gfg-bs/` skeleton + `README.md` (the plug-in contract). No logic.
+1. Write `globalfolkgames-bs/` skeleton + `README.md` (the plug-in contract). No logic.
 2. `SessionRegistry` + `SessionState` + session keys. Test open/act/settle with a fake game.
 3. `Randomness` (commit-reveal) + `BatchWindow` (Merkle flush). Test.
 4. `FeeVault`. Test fee routing to the chosen destination.

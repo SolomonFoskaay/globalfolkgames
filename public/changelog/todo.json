@@ -724,7 +724,7 @@
         "s": "pending"
       },
       {
-        "t": "(21) GlobalFolkGames BS - STANDALONE SESSION RAIL (owner-approved 2026-09-21; spec docs/gfg-bs-spec.md)",
+        "t": "(21) GlobalFolkGames BS - STANDALONE SESSION RAIL (owner-approved 2026-09-21; spec docs/globalfolkgames-bs-spec.md)",
         "s": "in_progress"
       },
       {
@@ -790,6 +790,22 @@
       {
         "t": "(21xvi) Each step ends with a LIVE Arc testnet proof before the next step starts",
         "s": "pending"
+      },
+      {
+        "t": "(21xvii) DEMO CATALOGUE: globalfolkgames-bs/demos/README.md created - genre popularity table from the live DappRadar top 50 (RPG/idle/PvP/casual lead; board games rare, which is the differentiation). Demos planned: idle-farm, endless-runner, arena-1v1, tiny-mmo, land-grid. Ludo stays the GFG flagship, not the demo.",
+        "s": "done"
+      },
+      {
+        "t": "(21xviii) CORRECTION RECORDED: the endless-runner is a GRAPHICS SOURCE only (owner forked a web2/iOS Subway-Surfers-style clone); we port the art to a web canvas, not its architecture. It is NOT a genre choice.",
+        "s": "done"
+      },
+      {
+        "t": "(21xix) DEMOS SERVED FROM A PATH on the existing domain for now (no DNS/subdomain work while solo); a subdomain only when GlobalFolkGames BS becomes its own repo.",
+        "s": "done"
+      },
+      {
+        "t": "(21xx) SPEC RENAMED: docs/gfg-bs-spec.md -> docs/globalfolkgames-bs-spec.md; npm scope fixed to @globalfolkgames (never @gfg); all stale references updated.",
+        "s": "done"
       }
     ]
   },

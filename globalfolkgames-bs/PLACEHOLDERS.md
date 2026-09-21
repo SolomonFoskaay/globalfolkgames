@@ -14,4 +14,4 @@ packages/sdk/               - @globalfolkgames/bs-sdk (built once the contracts 
 packages/contracts/         - @globalfolkgames/bs-contracts (interfaces + deployed addresses)
 
 Build order and the two laws (no game concepts; one account per player) are in ../README.md
-and ../../docs/gfg-bs-spec.md.
+and ../../docs/globalfolkgames-bs-spec.md.
