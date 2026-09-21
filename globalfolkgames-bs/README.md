@@ -55,12 +55,13 @@ globalfolkgames-bs/
     ParticipantAccount.sol   ONE account per player; append-only value slots
     FeeVault.sol             rail fee collection; configurable destination / escrow
     verifiers/               per-game verifiers (Ludo ships first)
-  demos/                     small playable demos, one per popular genre (see demos/README.md)
-    idle-farm/               idle/clicker: hundreds of actions, still free inside the session
-    endless-runner/          casual: art reused from the owner's forked web2 runner
-    arena-1v1/               PvP: two players, seat authority, verifier on dispute
-    tiny-mmo/                MMORPG-lite: many participants in one session
-    land-grid/               metaverse-ish: plots/buildings as opaque state
+  demos/                     playable demos organised BY GENRE (see demos/README.md)
+    idle/                    idle / clicker / farming
+    casual/                  hyper-casual / arcade / runner
+    pvp/                     PvP arena / 1v1 / battle cards
+    mmorpg/                  RPG / MMORPG / MMO strategy
+    metaverse/               sandbox / virtual land / building
+    board/                   board / tile / traditional (GlobalFolkGames' own, live)
   test/                      Foundry tests
   packages/
     sdk/                     @globalfolkgames/bs-sdk — the one-line integration

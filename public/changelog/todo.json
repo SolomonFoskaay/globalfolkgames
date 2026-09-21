@@ -806,6 +806,10 @@
       {
         "t": "(21xx) SPEC RENAMED: docs/gfg-bs-spec.md -> docs/globalfolkgames-bs-spec.md; npm scope fixed to @globalfolkgames (never @gfg); all stale references updated.",
         "s": "done"
+      },
+      {
+        "t": "(21xxi) DEMOS REORGANISED BY GENRE (owner 2026-09-21): demos/<genre>/ folders so a dev opens their own genre. Folders: idle, casual, pvp, mmorpg, metaverse, board. The runner is CASUAL/hyper-casual (its art comes from the owner forked web2 clone; not a genre choice). Each genre folder has its own README (who it is for, why the rail fits, what it must prove, adapter surface).",
+        "s": "done"
       }
     ]
   },
