@@ -102,6 +102,14 @@ contract SessionStateTest {
         st.recordEvent(bytes32("nope"), 0, 1, keccak256("x"));
     }
 
+    function testCannotRecordEmptyPayload() public {
+        // AUDIT FIX: a zero payload hash is not a real event and is refused.
+        bytes32 id = _newSession();
+        vm.prank(P1);
+        vm.expectRevert();
+        st.recordEvent(id, 0, 1, bytes32(0));
+    }
+
     function testCannotRecordAfterExpiry() public {
         bytes32 id = _newSession();
         vm.warp(block.timestamp + TTL + 1);
@@ -183,10 +191,31 @@ contract SessionStateTest {
         st.recordEvent(id, 0, 2, keccak256("late"));
     }
 
+    function testCannotCommitDigestOverRecordedEvents() public {
+        // AUDIT FIX: an off-chain digest may not overwrite history that was built
+        // from real on-chain events, or recorded events would be discarded.
+        bytes32 id = _newSession();
+        vm.prank(P1);
+        st.recordEvent(id, 0, 1, keccak256("real"));
+        vm.prank(P1);
+        vm.expectRevert();
+        st.commitDigest(id, keccak256("fake"), 99);
+    }
+
+    function testCannotCommitEmptyDigest() public {
+        bytes32 id = _newSession();
+        vm.prank(P1);
+        vm.expectRevert();
+        st.commitDigest(id, bytes32(0), 1);
+    }
+
     // --------------------------------------------------------- final seal
 
     function testAuthorisedCanSealFinal() public {
+        // AUDIT FIX: sealing is post-play, so the session must be CLOSED first.
         bytes32 id = _newSession();
+        vm.prank(OWNER);
+        reg.close(id);
         vm.prank(P2);
         st.sealFinal(id, keccak256("final"));
         require(st.finalDigest(id) == keccak256("final"), "sealed");
@@ -194,6 +223,8 @@ contract SessionStateTest {
 
     function testCannotSealTwice() public {
         bytes32 id = _newSession();
+        vm.prank(OWNER);
+        reg.close(id);
         vm.prank(P1);
         st.sealFinal(id, keccak256("final"));
         vm.prank(P1);
@@ -206,6 +237,40 @@ contract SessionStateTest {
         vm.prank(STRANGER);
         vm.expectRevert();
         st.sealFinal(id, keccak256("final"));
+    }
+
+    function testCannotSealWhileOpen() public {
+        // AUDIT FIX: an open session cannot be sealed, so a premature result can
+        // never be presented as final.
+        bytes32 id = _newSession();
+        vm.prank(P1);
+        vm.expectRevert();
+        st.sealFinal(id, keccak256("premature"));
+    }
+
+    function testCannotSealExpiredOpenSession() public {
+        // AUDIT FIX: expiry alone does not make a result final; the session must
+        // still be CLOSED, so a stale open session cannot be sealed.
+        bytes32 id = _newSession();
+        vm.warp(block.timestamp + TTL + 1);
+        vm.prank(P1);
+        vm.expectRevert();
+        st.sealFinal(id, keccak256("stale"));
+    }
+
+    function testCannotSealUnknownSession() public {
+        vm.prank(P1);
+        vm.expectRevert();
+        st.sealFinal(bytes32("nope"), keccak256("final"));
+    }
+
+    function testCannotSealEmptyDigest() public {
+        bytes32 id = _newSession();
+        vm.prank(OWNER);
+        reg.close(id);
+        vm.prank(P1);
+        vm.expectRevert();
+        st.sealFinal(id, bytes32(0));
     }
 
     // ------------------------------------------------------------ bounds
