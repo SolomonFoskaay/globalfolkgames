@@ -810,6 +810,10 @@
       {
         "t": "(21xxi) DEMOS REORGANISED BY GENRE (owner 2026-09-21): demos/<genre>/ folders so a dev opens their own genre. Folders: idle, casual, pvp, mmorpg, metaverse, board. The runner is CASUAL/hyper-casual (its art comes from the owner forked web2 clone; not a genre choice). Each genre folder has its own README (who it is for, why the rail fits, what it must prove, adapter surface).",
         "s": "done"
+      },
+      {
+        "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /bs-demos/ page created (bs-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
+        "s": "done"
       }
     ]
   },
