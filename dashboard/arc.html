@@ -50,7 +50,18 @@
         <section class="game-card" style="text-align:left; border:1px solid #7838f8;">
             <h3>Contracts (Arc Testnet)</h3>
             <div class="arc-grid" id="arc-contracts"><p class="empty">Loading…</p></div>
-            <p class="arc-note">PlayerCore is the single per-player account (lives, points, premium, per-game buckets). GameRegistry holds match starts/ends with a TTL. Randomness holds the committed and revealed dice seeds.</p>
+            <p class="arc-note">MatchSettlement holds each match's start commit and its co-signed settlement (arcv2m17). PlayerCore is the single per-player account (lives, points, premium, per-game buckets). GameRegistry records the batch window / flush only. Randomness holds the committed and revealed dice seeds.</p>
+        </section>
+
+        <section class="game-card" style="text-align:left; border:1px solid #7838f8;">
+            <h3>Contract archive (every address ever deployed)</h3>
+            <div class="arc-table-wrap">
+                <table class="arc-table" id="arc-contract-archive">
+                    <thead><tr><th>Contract</th><th>Address</th><th>Status</th><th>Note</th></tr></thead>
+                    <tbody><tr><td colspan="4">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <p class="arc-note">Superseded addresses are never deleted: the archive is the memory of the project. The Contracts card above shows ONLY the active set, so it can never point at something dead.</p>
         </section>
 
         <section class="game-card" style="text-align:left; border:1px solid #2ecc71;">
@@ -173,6 +184,29 @@
                 return '<div class="arc-card"><div class="k">' + esc(label) + '</div><div class="v ' + (cls || '') + '">' + esc(value) + '</div></div>';
             }
 
+            // Contract archive: every address ever deployed, active AND superseded.
+            // The active set is also in /arc-config.json; this table is the memory
+            // and must never lose an entry (see .opencode/rules/contract-addresses.md).
+            const CONTRACT_ARCHIVE = [
+                { name: 'PlayerCore', address: '0x892CdbeD707425cdD3F0b0f9FE5428084E2FC730', status: 'active', note: 'Lives, points, premium, per-game buckets.' },
+                { name: 'MatchSettlement', address: '0x9171dd39f5ee581c240473080f0052c1652f0963', status: 'active', note: 'Per-match start commit + co-signed settle (arcv2m17).' },
+                { name: 'GameRegistry', address: '0x19BbC0C9e71318cDa9ca03994380a73B1280b38a', status: 'active', note: 'Batch window / flush only (no longer the match contract).' },
+                { name: 'Randomness', address: '0xb406295b4F7E5B513b656122AfFF29AF720E9E23', status: 'active', note: 'Committed + revealed dice seeds.' },
+                { name: 'GameRegistry (Phase 1)', address: '0xC0d3c82994e31d8C97A589aCCd480B2Cf36311eb', status: 'superseded', date: '2026-09-19', note: 'Replaced by the turn-clock redeploy.' },
+                { name: 'PlayerCore (Phase 2)', address: '0xcebA2d46ea6d30BC32f6A6dC336c9b8adb3F56cc', status: 'superseded', date: '2026-09-21', note: 'Replaced by 0x892C..., no balances orphaned.' }
+            ];
+            function renderContractArchive(explorer) {
+                const host = document.querySelector('#arc-contract-archive tbody');
+                if (!host) return;
+                host.innerHTML = CONTRACT_ARCHIVE.map(function (c) {
+                    const link = explorer ? '<a class="arc-addr" href="' + explorer + '/address/' + c.address + '" target="_blank" rel="noreferrer">' + esc(c.address) + '</a>' : esc(c.address);
+                    const badge = c.status === 'active'
+                        ? '<span style="color:#2ecc71;font-weight:700;">active</span>'
+                        : '<span style="color:#f87818;font-weight:700;">' + esc(c.status) + (c.date ? ' ' + esc(c.date) : '') + '</span>';
+                    return '<tr><td>' + esc(c.name) + '</td><td>' + link + '</td><td>' + badge + '</td><td>' + esc(c.note) + '</td></tr>';
+                }).join('');
+            }
+
             async function load() {
                 const btn = el('arc-refresh'); if (btn) btn.disabled = true;
                 try {
@@ -186,10 +220,13 @@
 
                 el('arc-contracts').innerHTML =
                     addrCard('PlayerCore (per-player)', evm.contracts.playerCore, evm.explorer) +
-                    addrCard('GameRegistry (matches)', evm.contracts.gameRegistry, evm.explorer) +
+                    addrCard('MatchSettlement (match start + settle)', evm.contracts.matchSettlement, evm.explorer) +
+                    addrCard('GameRegistry (window/flush only)', evm.contracts.gameRegistry, evm.explorer) +
                     addrCard('Randomness (dice seed)', evm.contracts.randomness, evm.explorer) +
                     card('Chain id', String(evm.chainId)) +
                     card('Gas token', 'USDC (' + evm.usdcDecimalsNative + ' decimals native)');
+
+                renderContractArchive(evm.explorer);
 
                 el('arc-relayer').innerHTML =
                     addrCard('Relayer address (pays gas)', evm.sponsor, evm.explorer) +

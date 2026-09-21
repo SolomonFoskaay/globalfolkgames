@@ -75,6 +75,11 @@
                 { key: 'run-sheet', label: '🧾 Launch run sheet', href: '/dashboard/run-sheet.md' }
             ] });
         }
+        if (!sections.some(sec => (sec.items || []).some(it => it.key === 'todo'))) {
+            sections.push({ heading: 'Todo', items: [
+                { key: 'todo', label: '📋 Live todo list', href: '/dashboard/todo.html' }
+            ] });
+        }
         const active = cfg.active || '';
         if (document.getElementById('dash-rail')) return; // already rendered
 

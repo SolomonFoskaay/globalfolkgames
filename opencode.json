@@ -7,6 +7,7 @@
     ".opencode/rules/content-style-guide.md",
     ".opencode/rules/env-access.md",
     ".opencode/rules/content-protection.md",
-    ".opencode/rules/todo-status.md"
+    ".opencode/rules/todo-status.md",
+    ".opencode/rules/todo-admin.md"
   ]
 }
