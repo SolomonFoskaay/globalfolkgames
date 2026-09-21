@@ -64,7 +64,10 @@ contract SessionState {
     error BadSequence();
     error TooManyEvents();
     error AlreadyCommitted();
-    error NothingToCommit();
+    error AlreadyHasEvents();
+    error AlreadySealed();
+    error EmptyDigest();
+    error EmptyPayload();
 
     constructor(address registry_) {
         if (registry_ == address(0)) revert UnknownOrClosedSession();
@@ -90,6 +93,9 @@ contract SessionState {
         // Strictly increasing: a later event may not reuse or go below the last
         // sequence. (The first event may use any starting sequence.)
         if (st.eventCount != 0 && sequence <= st.lastSequence) revert BadSequence();
+        // AUDIT FIX (2026-09-21): reject a zero payload hash so an empty event
+        // can never be anchored. Every real payload hashes to a non-zero value.
+        if (payloadHash == bytes32(0)) revert EmptyPayload();
 
         bytes32 d = keccak256(abi.encodePacked(st.digest, seat, sequence, payloadHash));
         st.digest = d;
@@ -103,6 +109,11 @@ contract SessionState {
     /// @notice Commit a digest computed OFF-chain (the gasless path). The caller
     ///         must be an authorised signer for at least one seat of the
     ///         session. This is how a game anchors a whole match for one tx.
+    /// @dev AUDIT FIX (2026-09-21): this may ONLY be used when the session has NO
+    ///      recorded on-chain events yet. Otherwise a signer could record real
+    ///      events and then overwrite the running digest with an unrelated one,
+    ///      discarding the recorded history. A session follows ONE of the two
+    ///      paths: on-chain events (recordEvent) OR an off-chain digest.
     /// @param digest the running/final digest the game computed off-chain.
     /// @param eventCount how many events that digest covers (informational,
     ///        stored so a verifier knows the claimed length).
@@ -113,6 +124,10 @@ contract SessionState {
 
         State storage st = _state[sessionId];
         if (st.committed) revert AlreadyCommitted();
+        // AUDIT FIX: refuse to overwrite a digest that came from real on-chain
+        // events, so recorded history can never be discarded.
+        if (st.eventCount != 0) revert AlreadyHasEvents();
+        if (digest == bytes32(0)) revert EmptyDigest();
 
         st.digest = digest;
         st.eventCount = eventCount;
@@ -122,13 +137,19 @@ contract SessionState {
     }
 
     /// @notice Seal a FINAL digest for a session (the settlement anchor). Only an
-    ///         authorised signer may seal, and only once. Recorded separately so
-    ///         a closed session still exposes its final proof.
+    ///         authorised signer may seal, and only once.
+    /// @dev AUDIT FIX (2026-09-21): sealing now requires the session to be CLOSED
+    ///      in the registry. Previously a signer could seal a "final" digest while
+    ///      the session was still open (or even expired), so a premature or stale
+    ///      result could be presented as final. Closing first makes the final
+    ///      digest necessarily post-play.
     function sealFinal(bytes32 sessionId, bytes32 digest) external {
-        if (!_isAnyAuthority(sessionId, msg.sender, registry.getSession(sessionId).participantCount)) {
-            revert NotAuthorisedSigner();
-        }
-        require(finalDigest[sessionId] == bytes32(0), "already sealed");
+        SessionRegistry.Session memory s = registry.getSession(sessionId);
+        // Must exist and be CLOSED (status 2). Open (1) and unknown (0) are refused.
+        if (s.status != 2) revert UnknownOrClosedSession();
+        if (!_isAnyAuthority(sessionId, msg.sender, s.participantCount)) revert NotAuthorisedSigner();
+        if (digest == bytes32(0)) revert EmptyDigest();
+        if (finalDigest[sessionId] != bytes32(0)) revert AlreadySealed();
         finalDigest[sessionId] = digest;
         emit DigestCommitted(sessionId, msg.sender, digest, _state[sessionId].eventCount);
     }

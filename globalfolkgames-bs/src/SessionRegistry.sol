@@ -9,6 +9,18 @@ pragma solidity ^0.8.24;
 /// game: no board, token, position, seat count, turn or dice. Game state is an
 /// opaque payload handled by SessionState.
 ///
+/// @notice SESSION KEYS: a player may register a standing EPHEMERAL key (a
+/// throwaway signer the browser keeps locally) that signs in-session events
+/// silently, so the player never sees a wallet popup during play. This mirrors
+/// MagicBlock's two-component model: an ephemeral keypair PLUS an on-chain
+/// record of its SCOPE and EXPIRY. On EVM the on-chain half is a mapping entry
+/// here (a session token was a separate PDA on Solana; a slot is the EVM
+/// equivalent and costs no extra account). The key is scoped to the PLAYER,
+/// not to one session, so a game opening one session per match does not force
+/// a re-registration every match (the rail serves many sessions by name, and
+/// the key is reusable by name). Scope is an opaque hash: the rail never
+/// learns what the scope means (Law 1). Keys are revocable at any time.
+///
 /// @dev DESIGN LAWS (do not violate — they are why this rail is reusable):
 ///   1. THE RAIL NEVER LEARNS A GAME CONCEPT. Participant count is data, not code.
 ///   2. UNOPINIONATED: no account layout, no commit cadence and no batching
@@ -59,6 +71,28 @@ contract SessionRegistry {
     /// runs the house/AI seats); that is the game's choice, not the rail's.
     mapping(bytes32 => mapping(uint8 => address)) private _authority;
 
+    /// A standing SESSION KEY: an ephemeral signer a player authorises once, so
+    /// in-session events sign silently (no wallet popup). The on-chain half of
+    /// MagicBlock's two-component model (the off-chain half is the keypair).
+    struct SessionKey {
+        address owner;        // the player who registered it (the real wallet)
+        uint64 validUntil;    // absolute expiry; 0 = never registered/revoked
+        bytes32 scopeHash;    // OPAQUE scope commitment; the rail never parses it
+        bool revoked;         // killed by the owner; permanent
+    }
+
+    /// key address => SessionKey. A key belongs to ONE owner and is reusable
+    /// across every session where that owner is a seat's authority.
+    mapping(address => SessionKey) private _sessionKeys;
+
+    /// owner => list of keys it registered, so revocation can be enumerated
+    /// without any unbounded scan of all keys (bounded by MAX_SESSION_KEYS).
+    mapping(address => address[]) private _keysOf;
+
+    /// Hard cap on standing keys per owner, so registration cannot be used to
+    /// grief storage, and any owner-side loop stays bounded.
+    uint8 public constant MAX_SESSION_KEYS = 16;
+
     /// owner => nonce, to derive collision-free, un-front-runnable session ids.
     mapping(address => uint64) public nonces;
 
@@ -80,6 +114,8 @@ contract SessionRegistry {
     event SessionClosed(bytes32 indexed sessionId, address indexed owner, uint64 closedAt);
     event AuthoritySet(bytes32 indexed sessionId, uint8 indexed seat, address authority);
     event OperatorSet(address operator);
+    event SessionKeyRegistered(address indexed owner, address indexed key, uint64 validUntil, bytes32 scopeHash);
+    event SessionKeyRevoked(address indexed owner, address indexed key);
 
     error NotOwner();
     error NotOperatorOrOwner();
@@ -91,6 +127,9 @@ contract SessionRegistry {
     error ZeroAddress();
     error AlreadyClosed();
     error BadSeat();
+    error TooManySessionKeys();
+    error AlreadyRevoked();
+    error KeyOwnedByAnother();
 
     /// @param feeRecipient_ the wallet that receives session fees (the deployer).
     /// @param operator_ optional address allowed to force-close any session; may
@@ -168,6 +207,61 @@ contract SessionRegistry {
         emit OperatorSet(operator_);
     }
 
+    // ------------------------------------------------------- session keys
+
+    /// @notice Register (or re-register/rotate) a standing SESSION KEY: an
+    ///         ephemeral signer that may act for the caller's seats until
+    ///         `validUntil`. One call, then no popups in play.
+    /// @dev The caller is the key's OWNER (their real wallet). A key can never be
+    ///      registered for another owner, so a key cannot be hijacked or made to
+    ///      act for someone else.
+    /// @param key the ephemeral signer address (never zero).
+    /// @param validUntil absolute unix time the key dies. Must be in the future.
+    ///        An expiry in the past would create a dead key, so it is refused.
+    /// @param scopeHash OPAQUE commitment to what the key may do (e.g. a game tag
+    ///        and allowed actions). The rail NEVER parses it; a game may compare
+    ///        it to its own scope when it consumes an event.
+    function registerSessionKey(address key, uint64 validUntil, bytes32 scopeHash) external {
+        if (key == address(0)) revert ZeroAddress();
+        if (validUntil <= block.timestamp) revert SessionExpired();
+
+        SessionKey storage sk = _sessionKeys[key];
+        // A live key owned by someone else cannot be stolen by re-registering it:
+        // only its owner may change it, and only after it has died or been revoked.
+        // (An expired-but-unrevoked key is dead, so the original owner can reuse
+        // the address; a key that is still live and unrevoked is protected.)
+        if (sk.owner != address(0) && sk.owner != msg.sender) {
+            if (!sk.revoked && block.timestamp <= sk.validUntil) revert KeyOwnedByAnother();
+        }
+
+        bool isNew = sk.owner == address(0);
+        if (isNew) {
+            if (_keysOf[msg.sender].length >= MAX_SESSION_KEYS) revert TooManySessionKeys();
+            _keysOf[msg.sender].push(key);
+        }
+
+        sk.owner = msg.sender;
+        sk.validUntil = validUntil;
+        sk.scopeHash = scopeHash;
+        sk.revoked = false;
+
+        emit SessionKeyRegistered(msg.sender, key, validUntil, scopeHash);
+    }
+
+    /// @notice Revoke a standing session key the caller owns, immediately. This
+    ///         is the on-chain half of "revocable": a leaked ephemeral key is
+    ///         useless the moment its owner revokes it.
+    /// @dev Only the key's owner may revoke it. Revocation is one-way; the same
+    ///      address may be registered again later, but the revoked registration
+    ///      itself is dead for good.
+    function revokeSessionKey(address key) external {
+        SessionKey storage sk = _sessionKeys[key];
+        if (sk.owner != msg.sender) revert NotOwner();
+        if (sk.revoked) revert AlreadyRevoked();
+        sk.revoked = true;
+        emit SessionKeyRevoked(msg.sender, key);
+    }
+
     // ---------------------------------------------------------------- reads
 
     /// @notice Full session record.
@@ -188,13 +282,42 @@ contract SessionRegistry {
 
     /// @notice Whether an address may sign for a seat right now. Used by
     ///         SessionState to authorise events. Returns false for everything
-    ///         that is not a live, properly-authorised seat.
+    ///         that is not a live, properly-authorised seat, OR a live standing
+    ///         session key whose OWNER is that seat's authority.
+    /// @dev Two paths, one source of truth (the seat authority):
+    ///      1. `who` IS the seat authority (a direct wallet signature).
+    ///      2. `who` is a registered, unexpired, unrevoked session key whose
+    ///         owner is the seat authority (the silent-play path).
+    ///      A key therefore inherits EXACTLY its owner's seats and nothing more.
     function canSign(bytes32 sessionId, uint8 seat, address who) external view returns (bool) {
         if (!isLive(sessionId)) return false;
         Session storage s = _sessions[sessionId];
         if (seat >= s.participantCount) return false;
         address a = _authority[sessionId][seat];
-        return a != address(0) && a == who;
+        if (a == address(0)) return false;
+        if (a == who) return true;
+        // Session-key path: the key must be live AND owned by the seat authority.
+        SessionKey storage sk = _sessionKeys[who];
+        return sk.owner == a && !sk.revoked && block.timestamp <= sk.validUntil && sk.validUntil != 0;
+    }
+
+    /// @notice Whether a standing session key is usable right now (registered,
+    ///         unexpired, unrevoked). Read helper for games and the SDK.
+    function isSessionKeyLive(address key) public view returns (bool) {
+        SessionKey storage sk = _sessionKeys[key];
+        return sk.owner != address(0) && !sk.revoked && sk.validUntil != 0 && block.timestamp <= sk.validUntil;
+    }
+
+    /// @notice The full standing-key record for an address (all-zero if never
+    ///         registered).
+    function sessionKeyOf(address key) external view returns (SessionKey memory) {
+        return _sessionKeys[key];
+    }
+
+    /// @notice The keys an owner has registered (bounded by MAX_SESSION_KEYS),
+    ///         so a client can revoke them all without on-chain enumeration.
+    function keysOf(address ownerAddr) external view returns (address[] memory) {
+        return _keysOf[ownerAddr];
     }
 
     // ------------------------------------------------------------- internal

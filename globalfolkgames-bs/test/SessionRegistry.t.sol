@@ -7,6 +7,8 @@ import {SessionRegistry} from "../src/SessionRegistry.sol";
 interface Vm {
     function warp(uint256) external;
     function prank(address) external;
+    function startPrank(address) external;
+    function stopPrank() external;
     function expectRevert() external;
     function expectRevert(bytes4) external;
 }
@@ -23,6 +25,7 @@ contract SessionRegistryTest {
     address constant OWNER = address(0xA11CE);      // a game operator
     address constant OTHER = address(0xB0B);        // an unrelated third party
     address constant RELAYER = address(0x5E1A);
+    address constant KEY = address(0x5E55107);
     uint64 constant TTL = 1 hours;
 
     function setUp() public {
@@ -214,5 +217,155 @@ contract SessionRegistryTest {
     function testConstructorRejectsZeroFeeRecipient() public {
         vm.expectRevert();
         new SessionRegistry(address(0), address(0));
+    }
+
+    // --------------------------------------------------------- session keys
+    // A session key is an ephemeral signer the player registers once, so play
+    // never pops a wallet. The on-chain half records scope + expiry, matching
+    // MagicBlock's two-component model. These tests are the security proof.
+
+    uint64 constant KEY_TTL = 1 hours;
+
+    function _liveKeySession() internal returns (bytes32 id) {
+        vm.prank(OWNER);
+        id = reg.open(2, TTL, 0, 0);
+        vm.prank(OWNER);
+        reg.setAuthority(id, 0, OWNER); // this owner plays seat 0 themselves
+    }
+
+    function testRegisterAndUseSessionKey() public {
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, bytes32("scope:ludo"));
+        require(reg.isSessionKeyLive(KEY), "key live");
+        require(reg.canSign(id, 0, KEY), "key signs owner's seat");
+    }
+
+    function testKeyInheritsOnlyItsOwnersSeats() public {
+        // OWNER holds seat 0; OTHER holds seat 1. OWNER's key must not reach seat 1.
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.setAuthority(id, 1, OTHER);
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        require(reg.canSign(id, 0, KEY), "owner seat ok");
+        require(!reg.canSign(id, 1, KEY), "cannot sign another owner's seat");
+    }
+
+    function testStrangerKeyCannotSign() public {
+        bytes32 id = _liveKeySession();
+        // A key registered by OTHER is no use for OWNER's seat.
+        vm.prank(OTHER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        require(!reg.canSign(id, 0, KEY), "stranger key rejected");
+    }
+
+    function testRevokedKeyCannotSign() public {
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.prank(OWNER);
+        reg.revokeSessionKey(KEY);
+        require(!reg.isSessionKeyLive(KEY), "revoked is not live");
+        require(!reg.canSign(id, 0, KEY), "revoked key rejected");
+    }
+
+    function testExpiredKeyCannotSign() public {
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.warp(uint64(block.timestamp) + KEY_TTL + 1);
+        require(!reg.isSessionKeyLive(KEY), "expired is not live");
+        require(!reg.canSign(id, 0, KEY), "expired key rejected");
+    }
+
+    function testOnlyOwnerCanRevokeOwnKey() public {
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.prank(OTHER);
+        vm.expectRevert();
+        reg.revokeSessionKey(KEY);
+    }
+
+    function testCannotRevokeTwice() public {
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.prank(OWNER);
+        reg.revokeSessionKey(KEY);
+        vm.prank(OWNER);
+        vm.expectRevert();
+        reg.revokeSessionKey(KEY);
+    }
+
+    function testCannotRegisterKeyWithPastExpiry() public {
+        vm.prank(OWNER);
+        vm.expectRevert();
+        reg.registerSessionKey(KEY, uint64(block.timestamp), 0);
+    }
+
+    function testCannotRegisterZeroKey() public {
+        vm.prank(OWNER);
+        vm.expectRevert();
+        reg.registerSessionKey(address(0), uint64(block.timestamp) + KEY_TTL, 0);
+    }
+
+    function testLiveKeyCannotBeStolenByReRegistration() public {
+        // A key that is live and owned by OWNER cannot be re-registered by OTHER
+        // to make it act for OTHER's seats.
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.setAuthority(id, 1, OTHER);
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.prank(OTHER);
+        vm.expectRevert();
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        require(!reg.canSign(id, 1, KEY), "still not OTHER's seat");
+    }
+
+    function testOwnerCanRotateKeyAfterRevocation() public {
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        vm.prank(OWNER);
+        reg.revokeSessionKey(KEY);
+        // Re-register the same address under the same owner: allowed.
+        vm.prank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + 2 hours, bytes32("scope:2"));
+        require(reg.isSessionKeyLive(KEY), "rotated key live");
+        require(reg.sessionKeyOf(KEY).scopeHash == bytes32("scope:2"), "new scope");
+    }
+
+    function testKeyRegistrationIsCapped() public {
+        uint8 cap = reg.MAX_SESSION_KEYS();
+        vm.startPrank(OWNER);
+        for (uint160 i = 0; i < cap; i++) {
+            reg.registerSessionKey(address(0x1000 + i), uint64(block.timestamp) + KEY_TTL, 0);
+        }
+        vm.expectRevert();
+        reg.registerSessionKey(address(0x9999), uint64(block.timestamp) + KEY_TTL, 0);
+        vm.stopPrank();
+    }
+
+    function testKeysOfIsEnumerableForRevocation() public {
+        vm.startPrank(OWNER);
+        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
+        reg.registerSessionKey(address(0x7777), uint64(block.timestamp) + KEY_TTL, 0);
+        vm.stopPrank();
+        address[] memory keys = reg.keysOf(OWNER);
+        require(keys.length == 2, "two keys");
+        require(keys[0] == KEY && keys[1] == address(0x7777), "order preserved");
+    }
+
+    function testScopeIsOpaqueToTheRail() public {
+        // The rail stores the scope hash and never interprets it: two keys with
+        // totally different scopes behave identically.
+        bytes32 id = _liveKeySession();
+        vm.prank(OWNER);
+        reg.registerSessionKey(address(0xAAA1), uint64(block.timestamp) + KEY_TTL, bytes32("idle:plots"));
+        vm.prank(OWNER);
+        reg.registerSessionKey(address(0xAAA2), uint64(block.timestamp) + KEY_TTL, bytes32("mmo:galaxy"));
+        require(reg.canSign(id, 0, address(0xAAA1)), "scope A signs");
+        require(reg.canSign(id, 0, address(0xAAA2)), "scope B signs");
+        require(reg.sessionKeyOf(address(0xAAA1)).scopeHash == bytes32("idle:plots"), "stored verbatim");
     }
 }
