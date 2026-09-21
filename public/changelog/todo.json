@@ -16,11 +16,11 @@
         "s": "in_progress"
       },
       {
-        "t": "(1i) SessionRegistry DONE - open/close sessions, participant authorities, session keys scope+expiry, 1..N participants, un-front-runnable ids, capped TTL; 21/21 tests",
+        "t": "(1i) SessionRegistry DONE - open/close sessions, participant authorities, session keys scope+expiry, 1..N participants, un-front-runnable ids, capped TTL; 35/35 tests",
         "s": "done"
       },
       {
-        "t": "(1ii) SessionState DONE - signed events with strictly-increasing sequence (no replay/reorder), opaque payloads, off-chain digest commit + final seal, bounded storage; 21/21 tests",
+        "t": "(1ii) SessionState DONE - signed events with strictly-increasing sequence (no replay/reorder), opaque payloads, off-chain digest commit + final seal, bounded storage; 28/28 tests",
         "s": "done"
       },
       {
