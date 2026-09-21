@@ -33,7 +33,7 @@
       },
       {
         "t": "(1v) GASLESS COST FIX: per-MATCH settlement + batching",
-        "s": "in_progress"
+        "s": "done"
       },
       {
         "t": "(1v-a) DESIGN LOCKED + recorded in arcv2m17",
@@ -68,8 +68,8 @@
         "s": "done"
       },
       {
-        "t": "(1v-i) BATCHING SPINE: hybrid window (100 or 1h, SKIP EMPTY) + batch starts AND settlements",
-        "s": "in_progress"
+        "t": "(1v-i) BATCHING SPINE: hybrid window (100 or 1h, SKIP EMPTY) + batch starts AND settlements + opportunistic tick after a real settlement (no cron)",
+        "s": "done"
       },
       {
         "t": "(1v-i-1) Spec recorded: window + free dispute + verifiability + per-match timing rules",
@@ -556,11 +556,19 @@
         "s": "pending"
       },
       {
-        "t": "(17vii) PART DONE: the localStorage BOARD is removed - the live board is in-memory only (window.__gfgLudoLiveSnapshot), loadGameStateFromStorage no longer reads localStorage, and legacy stored boards are purged. Cross-device SIGNED rehydrate (resume on another device from signed match events) is still to build.",
+        "t": "(17vii) SIGNED RESUME (owner decisions 2026-09-21): the relayer stores the SIGNED match log, content-addressed by its digest (tamper-evident); any device fetches the same signed bytes and replays the board. Frontend only renders. Lifetime: until the window flushes (then final). Build AFTER GFG-BS is proven (see 17ix).",
         "s": "in_progress"
       },
       {
         "t": "(17viii) DONE: the localStorage board snapshot is removed from the resume path (no board in localStorage; only an in-memory session snapshot). Legacy keys purged on clear.",
+        "s": "done"
+      },
+      {
+        "t": "(17ix) BUILD (owner-approved 2026-09-21): relayer-side SIGNED match-log store, keyed by the match digest; a getter so any device can fetch + replay it; list unfinished matches under the Ludo board with a Resume button; auto-final once the window flushes. Does NOT add per-move on-chain tx (stays 2 txs + 1 flush).",
+        "s": "pending"
+      },
+      {
+        "t": "(17x) CONFIRMED DESIGN FACT: the Solana multiplayer board (MatchBoard, gfgboard2) stores players/turn/timers + ONLY the LAST 32-byte move hash (each move overwrites it) - NOT the full board. Both devices replay their own local move list against that hash. GFG-BS is stronger: the WHOLE match folds into ONE co-signed digest sealed in the window Merkle tree, so full reconstruction is provable from signed data + the window seal.",
         "s": "done"
       },
       {

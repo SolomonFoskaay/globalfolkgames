@@ -138,9 +138,29 @@
         if (r && r.ok) {
             st.settled = true;
             console.log('[arc-flow] co-signed settlement', r.gameId, 'tx ' + r.tx);
+            // OPPORTUNISTIC WINDOW FLUSH (no cron, per the project rule): after a
+            // real settlement lands, ask the relayer whether the window is ready
+            // (100 matches OR 1h old). It flushes ONLY when ready and NEVER an
+            // empty window, so this adds no cost on a quiet day. This is what
+            // makes the batch self-close from real activity instead of a button.
+            tickBatch();
         } else {
             console.warn('[arc-flow] settlement soft-fail:', r && r.error);
         }
+    }
+
+    // Fire-and-forget window tick: the relayer decides (full OR aged) and skips
+    // an empty window. Soft-fail; never blocks the ceremony.
+    function tickBatch() {
+        try {
+            fetch('/api/arc', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'tickBatch' }),
+            }).then(function (res) { return res.json(); }).then(function (j) {
+                if (j && j.flushed) console.log('[arc-flow] window flushed', j.pending, 'match(es), tx ' + j.txHash);
+                else if (j) console.log('[arc-flow] window not ready:', j.reason || 'waiting', j.pending != null ? '(' + j.pending + ' pending)' : '');
+            }).catch(function () { /* soft */ });
+        } catch (e) { /* soft */ }
     }
 
     function wrapCeremony() {
