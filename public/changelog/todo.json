@@ -814,6 +814,26 @@
       {
         "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /bs-demos/ page created (bs-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
         "s": "done"
+      },
+      {
+        "t": "(21xxiii) RENAMED (owner 2026-09-21): product is now GlobalFolkGames GI - Gasless Infrastructure (sells the BENEFIT, not the mechanism). \"Batched Settlement\" demoted to ONE OPTIONAL PATTERN; \"Session Rails\" retired; never call it an ER. npm: @globalfolkgames/gi-sdk + gi-contracts.",
+        "s": "done"
+      },
+      {
+        "t": "(21xxiv) CORE vs OPTIONAL RULE (owner 2026-09-21): CORE = 4 unopinionated contracts (SessionRegistry, SessionState, Randomness, FeeVault). OPTIONAL patterns = Batched Settlement, Managed Accounts (PlayerCore-style), Verifiers, House-as-participant. The rail must NOT force GFG opinion; a dev wanting an account per feature + a commit per turn must be able to do it and pay more. Make the FLOOR ridiculously cheap, never dictate usage.",
+        "s": "done"
+      },
+      {
+        "t": "(21xxv) SPEC HOME FIXED (owner 2026-09-21): the authoritative spec now lives in architecture.json module arcv2m18 (staff Architecture V2 page). docs/globalfolkgames-bs-spec.md is the long-form working note only, repo/staff, NOT served and NOT the source of truth (architecture.json wins on disagreement).",
+        "s": "done"
+      },
+      {
+        "t": "(21xxvi) ADDED to arcv2m18: the \"what is the fast layer\" explanation (how MagicBlock ER works vs how GFG GI does the same EFFECT on Arc with no ER), the honest limits (signed state not a live VM; relayer trusted for timing not truth; we ship our own session reader/explorer), and why a dev might pick GI over ER.",
+        "s": "done"
+      },
+      {
+        "t": "(21xxvii) STEP 3 (code) remains PENDED at the owner's instruction. Next when unpended: SessionRegistry + SessionState + session keys, tested with a fake game. Build CORE only.",
+        "s": "pending"
       }
     ]
   },
