@@ -7,7 +7,7 @@
 //
 // DATA: /changelog/todo.json. The agent refreshes it on every report/commit/push
 // (see .opencode/rules/todo-admin.md): it archives the previous current to the
-// front of history, keeps at most 3 snapshots, and writes the fresh full list.
+// front of history, keeps at most 10 snapshots, and writes the fresh full list.
 // This file is client-served, so it holds task text only, never secrets.
 (function () {
   var TODO_JSON = '/changelog/todo.json';
@@ -101,7 +101,7 @@
   function historyHtml(hist) {
     if (!Array.isArray(hist) || !hist.length) {
       return '<section class="game-card"><h3>Recent lists</h3>'
-        + '<p class="empty">No archived lists yet. The last 3 snapshots will appear here as new lists are posted.</p></section>';
+        + '<p class="empty">No archived lists yet. The last 10 snapshots will appear here as new lists are posted.</p></section>';
     }
     var blocks = hist.map(function (h, i) {
       return '<details class="todo-archive"' + (i === 0 ? ' open' : '') + '>'
@@ -111,7 +111,7 @@
         + '</details>';
     }).join('');
     return '<section class="game-card"><h3>Recent lists</h3>'
-      + '<p style="color:var(--muted); font-size:0.84rem; line-height:1.55;">The last 3 archived lists, newest first. Older snapshots are dropped so this file never grows without bound.</p>'
+      + '<p style="color:var(--muted); font-size:0.84rem; line-height:1.55;">The last 10 archived lists, newest first. Older snapshots are dropped so this file never grows without bound.</p>'
       + blocks + '</section>';
   }
 
