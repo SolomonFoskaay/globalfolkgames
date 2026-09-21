@@ -1,17 +1,20 @@
-GlobalFolkGames BS — placeholder files
+GlobalFolkGames Gasless Infrastructure (GI) — build map
 
-Every file listed here is intentionally empty of logic. It exists only so Step 2 onward has a
-known home. Do NOT add logic to any of these without the owner's per-step approval.
+CORE is 4 unopinionated contracts and NOTHING else. No optional pattern is core.
 
-src/SessionState.sol        - Step 2: accept signed session events; sequence numbers; digest
-src/Randomness.sol          - Step 3: commit-reveal seed(s); derive hash(seed, counter)
-src/BatchWindow.sol         - Step 3: Merkle root per window; per-session proof
-src/ParticipantAccount.sol  - Step 4: ONE account per player; append-only value slots (PlayerCore law)
-src/FeeVault.sol            - Step 4: rail fee collection; configurable destination / escrow
-src/verifiers/LudoVerifier.sol - Step 5: the Ludo referee (replays moves; decides a dispute)
-test/                       - Foundry tests, written alongside each step
-packages/sdk/               - @globalfolkgames/bs-sdk (built once the contracts are stable)
-packages/contracts/         - @globalfolkgames/bs-contracts (interfaces + deployed addresses)
+src/SessionRegistry.sol        - CORE 1: open/close sessions; participant authorities; session keys (scope + expiry)
+src/SessionState.sol           - CORE 2: accept signed session events; sequence numbers; digest
+src/Randomness.sol             - CORE 3: commit-reveal seed(s); derive hash(seed, counter)
+src/FeeVault.sol               - CORE 4: per-session fee collection; configurable destination
+src/verifiers/                 - OPTIONAL: per-game verifier (the Ludo referee replays moves; decides a dispute)
 
-Build order and the two laws (no game concepts; one account per player) are in ../README.md
-and ../../docs/globalfolkgames-bs-spec.md.
+NOT core, NOT in this contract set (OPTIONAL patterns a game may adopt, offered as examples only):
+- Batched Settlement (Merkle root per window)
+- Managed Accounts (PlayerCore-style, one account per player with slots)
+
+test/                          - Foundry tests, written alongside each step
+packages/sdk/                  - @globalfolkgames/gi-sdk (built once the contracts are stable)
+packages/contracts/            - @globalfolkgames/gi-contracts (interfaces + deployed addresses)
+
+CORE vs OPTIONAL, the two laws and the build order are in ../README.md
+and ../../docs/globalfolkgames-bs-spec.md. Authoritative spec: architecture.json `arcv2m18`.

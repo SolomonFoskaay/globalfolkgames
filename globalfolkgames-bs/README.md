@@ -1,18 +1,21 @@
-# GlobalFolkGames BS — Session Rails (standalone project)
+# GlobalFolkGames Gasless Infrastructure (GI) (standalone project)
 
-**Status: SKELETON ONLY. No logic yet. Step 1 of the build order.**
-Nothing here is deployed, and nothing in the GlobalFolkGames app uses it yet.
+**Status: CORE IN PROGRESS. Three of four core contracts built and tested**
+(`SessionRegistry`, `SessionState`, `Randomness`). Nothing is deployed, and
+nothing in the GlobalFolkGames app uses it yet.
 
 The full design is in [`../docs/globalfolkgames-bs-spec.md`](../docs/globalfolkgames-bs-spec.md). Read that first.
+The authoritative spec is `public/changelog/architecture.json` module `arcv2m18`.
 
 ---
 
 ## What this is (one paragraph)
 
-GlobalFolkGames BS is a **room** you open on-chain, do everything inside for free, and settle back
-to the chain once. It is the Arc (Circle EVM) equivalent of MagicBlock's Ephemeral Rollup: free
-execution inside a session, one small on-chain cost to open and one to settle. It is a **standalone
-project** on purpose: any game can plug into it, and GlobalFolkGames is only its first user.
+GlobalFolkGames Gasless Infrastructure (GI) is a **room** you open on-chain, do everything inside for
+free, and settle back to the chain once. It is the Arc (Circle EVM) equivalent of MagicBlock's
+Ephemeral Rollup: free execution inside a session, one small on-chain cost to open and one to settle.
+It is a **standalone project** on purpose: any game can plug into it, and GlobalFolkGames is only its
+first user. Players never pay gas and never see a wallet popup.
 
 It is **not** a board-game system. Ludo, chess, an idle game and an MMORPG are all the same thing to
 this rail: a set of participants, an opaque state model the game defines, signed events, and one
@@ -35,9 +38,9 @@ it has already gone wrong.
 
 ## Naming
 
-The full brand name is used everywhere a stranger can see it: **GlobalFolkGames BS**. The short
-form **GFG-BS** is used only in internal docs after the full name has appeared. Packages are
-`@globalfolkgames/bs-sdk` and `@globalfolkgames/bs-contracts`.
+The full brand name is used everywhere a stranger can see it: **GlobalFolkGames Gasless
+Infrastructure**. The short form **GFG GI** is used only in internal docs after the full name has
+appeared. Packages are `@globalfolkgames/gi-sdk` and `@globalfolkgames/gi-contracts`.
 
 Never call this an "ER": MagicBlock's ER is an SVM runtime, this is a session/channel layer on EVM.
 
@@ -47,14 +50,12 @@ Never call this an "ER": MagicBlock's ER is an SVM runtime, this is a session/ch
 
 ```
 globalfolkgames-bs/
-  src/
-    SessionRegistry.sol      open / close sessions; participant authorities; scope + expiry
+  src/                       CORE — the 4 unopinionated contracts (nothing else is core)
+    SessionRegistry.sol      open / close sessions; participant authorities; session keys (scope + expiry)
     SessionState.sol         accept signed session events; sequence numbers; digest
     Randomness.sol           commit-reveal seed(s); derive hash(seed, counter)
-    BatchWindow.sol          Merkle root per window; per-session proof
-    ParticipantAccount.sol   ONE account per player; append-only value slots
-    FeeVault.sol             rail fee collection; configurable destination / escrow
-    verifiers/               per-game verifiers (Ludo ships first)
+    FeeVault.sol             per-session fee collection; configurable destination
+    verifiers/               OPTIONAL per-game verifiers (a verifier is a pattern, not core)
   demos/                     playable demos organised BY GENRE (see demos/README.md)
     idle/                    idle / clicker / farming
     casual/                  hyper-casual / arcade / runner
@@ -64,31 +65,54 @@ globalfolkgames-bs/
     board/                   board / tile / traditional (GlobalFolkGames' own, live)
   test/                      Foundry tests
   packages/
-    sdk/                     @globalfolkgames/bs-sdk — the one-line integration
-    contracts/               @globalfolkgames/bs-contracts — interfaces + deployed addresses
+    sdk/                     @globalfolkgames/gi-sdk — the one-line integration
+    contracts/               @globalfolkgames/gi-contracts — interfaces + deployed addresses
 ```
 
-All files are empty placeholders right now. They are created in later steps, one at a time, each
-ending with a live Arc testnet proof before the next step starts.
+`BatchWindow.sol` and `ParticipantAccount.sol` are **NOT** core and are **not** part of this
+contract set: they are OPTIONAL patterns a game may adopt, offered as examples, never enforced
+(see CORE vs OPTIONAL below). Core files are built one at a time, each ending with a live Arc
+testnet proof before the next step starts.
 
 ---
 
-## The two laws this project must obey
+## CORE vs OPTIONAL (the most important rule — never blur this line)
 
-### 1. The rail never learns a game concept
+This rail is deliberately **unopinionated**, exactly like MagicBlock's: it hands a developer
+primitives and lets them decide their own account layout, commit cadence and cost profile.
+
+### CORE — the 4 unopinionated primitives (what we build)
+These make **no decision for the game**. Any game type, any account layout, any cadence.
+
+| # | Contract | Responsibility |
+|---|---|---|
+| 1 | **SessionRegistry** | open/close a session; participant authorities; session-key registration (scope + expiry) |
+| 2 | **SessionState** | accept signed session events (opaque payload + sequence number + digest) |
+| 3 | **Randomness** | commit-reveal seed(s); derive `hash(seed, counter)`. Used only by games that ask for it |
+| 4 | **FeeVault** | per-session fee collection; configurable destination |
+
+**Core = 4 contracts.** Nothing else is required to ship a gasless game.
+
+### OPTIONAL — GFG's own opinions, offered as patterns (never enforced)
+A developer may use these, or ignore them, or build their own. They are examples, not requirements.
+
+| Pattern | What it is | Why it is optional |
+|---|---|---|
+| **Batched Settlement** | fold many session settlements into one Merkle root per window | A dev may want an immediate commit per session. Cadence is theirs. |
+| **Managed Accounts** (PlayerCore-style) | ONE account per player with slots for every game/feature | A cost optimisation. A dev may prefer one account per game, per match, or ephemeral accounts. |
+| **Verifiers** | a per-game referee that replays a dispute | Only games that carry money truly need one. Free games need none. |
+| **House / relayer as a participant** | the AI or house seat is a participant whose authority is the relayer key | Only games with an AI or house opponent need it. |
+
+### Law 1 — the rail never learns a game concept
 No board, token, position, seat count, turn or dice in the rail. The game's state is an opaque
 payload. A real-estate grid, a war zone and a galaxy are all the same to the rail.
 
-### 2. ONE participant account per player, append-only
-Learned the hard way on Solana: a separate on-chain account per player per feature made sponsor
-cost grow with every feature, and the whole program had to be rebuilt to consolidate. The fix was a
-single `PlayerCore` account per player holding lives, points, premium and a bounded table of
-per-game buckets keyed by an 8-byte game tag. Adding a game or a feature never adds an account.
-
-So here: one account per participant for the whole platform. New games and new features add
-**slots**, never accounts. A `version` byte goes FIRST from day one, new fields go LAST, and any
-layout change ships a permissionless, idempotent `migrate_*` in the SAME deploy, so an existing
-player's points and lives can never be touched or orphaned by an upgrade.
+### Law 2 — account layout is the developer's choice, but upgrades must be safe
+The rail does NOT mandate one account per player. It supports a dev who wants one account per
+feature, per match, or per game, unchanged. Where GFG offers its own optimisation (Managed Accounts),
+it does so as an OPTIONAL pattern: `version` byte first, new fields last, a permissionless idempotent
+`migrate_*` in the SAME deploy, never `init_if_needed` onto a changed seed, so an upgrade never
+touches or orphans a player's data. That is an offered example, never a rule the rail enforces.
 
 ---
 
@@ -110,11 +134,15 @@ Modelled on MagicBlock, who charge for **sessions and commits**, not usage:
 
 ## Build order
 
-1. **This skeleton + README.** No logic.
-2. SessionRegistry + SessionState + session keys. Test open/act/settle with a fake game.
-3. Randomness (commit-reveal, N streams) + BatchWindow (Merkle flush). Test.
-4. ParticipantAccount + FeeVault. Test.
+CORE first, and only the core:
+
+1. **Skeleton + README.** DONE.
+2. SessionRegistry + SessionState + session keys. DONE (`35/35` + `28/28` tests).
+3. Randomness (commit-reveal, N streams). DONE (`17/17` tests).
+4. FeeVault (per-session fee, configurable destination). This step.
 5. Plug Ludo in as the first game (single-player first, then multiplayer).
-6. Then points, lives and premium as slot/event types; later competitions, AGM, ERC-20 rewards.
+
+OPTIONAL patterns come later, as separate opt-in work, only when a game asks:
+Batched Settlement (Merkle), Managed Accounts (PlayerCore-style), Verifiers (Ludo first).
 
 Each step ends with a **live Arc testnet proof** before the next step starts.
