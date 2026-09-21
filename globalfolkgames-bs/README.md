@@ -3,7 +3,7 @@
 **Status: SKELETON ONLY. No logic yet. Step 1 of the build order.**
 Nothing here is deployed, and nothing in the GlobalFolkGames app uses it yet.
 
-The full design is in [`../docs/gfg-bs-spec.md`](../docs/gfg-bs-spec.md). Read that first.
+The full design is in [`../docs/globalfolkgames-bs-spec.md`](../docs/globalfolkgames-bs-spec.md). Read that first.
 
 ---
 
@@ -55,6 +55,13 @@ globalfolkgames-bs/
     ParticipantAccount.sol   ONE account per player; append-only value slots
     FeeVault.sol             rail fee collection; configurable destination / escrow
     verifiers/               per-game verifiers (Ludo ships first)
+  demos/                     playable demos organised BY GENRE (see demos/README.md)
+    idle/                    idle / clicker / farming
+    casual/                  hyper-casual / arcade / runner
+    pvp/                     PvP arena / 1v1 / battle cards
+    mmorpg/                  RPG / MMORPG / MMO strategy
+    metaverse/               sandbox / virtual land / building
+    board/                   board / tile / traditional (GlobalFolkGames' own, live)
   test/                      Foundry tests
   packages/
     sdk/                     @globalfolkgames/bs-sdk — the one-line integration

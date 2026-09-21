@@ -835,7 +835,7 @@
       "id": "arcv2m18",
       "title": "GlobalFolkGames BS - standalone session rails on Arc (the room any game plugs into)",
       "status": "planned",
-      "summary": "A STANDALONE project (its own contracts, its own deploy) that any game plugs into: open a session on-chain, do everything inside for free, settle back once. It is the Arc (Circle EVM) equivalent of MagicBlock's Ephemeral Rollup. Game-type-agnostic: a Ludo board, an idle game's plots and streets, and an MMORPG's galaxy are all the same to the rail - participants, an opaque state model the game defines, signed events, one settlement. GlobalFolkGames is its FIRST user, not its purpose. Full spec: docs/gfg-bs-spec.md.",
+      "summary": "A STANDALONE project (its own contracts, its own deploy) that any game plugs into: open a session on-chain, do everything inside for free, settle back once. It is the Arc (Circle EVM) equivalent of MagicBlock's Ephemeral Rollup. Game-type-agnostic: a Ludo board, an idle game's plots and streets, and an MMORPG's galaxy are all the same to the rail - participants, an opaque state model the game defines, signed events, one settlement. GlobalFolkGames is its FIRST user, not its purpose. Full spec: docs/globalfolkgames-bs-spec.md.",
       "expectedInput": {
         "summary": "What GlobalFolkGames BS receives.",
         "items": [
@@ -856,7 +856,7 @@
         ]
       },
       "details": [
-        "APPROVED 2026-09-21 by the owner. Spec of record: docs/gfg-bs-spec.md. NOT built: Step 1 (empty skeleton globalfolkgames-bs/ + README + foundry.toml) is the only thing that exists.",
+        "APPROVED 2026-09-21 by the owner. Spec of record: docs/globalfolkgames-bs-spec.md. NOT built: Step 1 (empty skeleton globalfolkgames-bs/ + README + foundry.toml) is the only thing that exists.",
         "WHY STANDALONE: GlobalFolkGames cannot launch on mainnet without it, and other game devs must be able to use it without touching GlobalFolkGames. It deploys its own contracts and GlobalFolkGames calls into it; the game owns its economy, the rail owns the room.",
         "LAW 1 - THE RAIL NEVER LEARNS A GAME CONCEPT: no board, token, position, seat count, turn or dice in the rail. The game's state is an opaque payload. A real-estate grid, a war zone and a galaxy are all equal.",
         "LAW 2 - ONE ACCOUNT PER PLAYER, APPEND-ONLY: a separate on-chain account per player per feature made sponsor cost grow with every feature on Solana and forced a full program rebuild. Fix: one account per player holding lives, points, premium and per-game buckets keyed by an 8-byte game tag. version FIRST, new fields LAST, permissionless idempotent migrate_* in the SAME deploy, never init_if_needed onto a changed seed. An upgrade must never touch or orphan a player's points or lives.",
@@ -892,7 +892,7 @@
     "R19 COMMUNITY POSTS ARE TEXT-ONLY ON-CHAIN (owner 2026-08-24): forum posts carry pure text + LINK/EMBED references only (video/images fetched and rendered on the frontend by URL); no media bytes stored on-chain, keeping chain data small and every post gasless on the ER."
   ],
   "implementationOrder": [
-    "0. arcv2m18 GlobalFolkGames BS (STANDALONE session rails): a separate project + its own contracts, deploy-once, that any game plugs into. Build it first, then plug arcv2m1 games into it (Ludo first), then value rails (arcv2m3/arcv2m4/arcv2m10). Spec: docs/gfg-bs-spec.md. NOT built yet - Step 1 skeleton only (globalfolkgames-bs/).",
+    "0. arcv2m18 GlobalFolkGames BS (STANDALONE session rails): a separate project + its own contracts, deploy-once, that any game plugs into. Build it first, then plug arcv2m1 games into it (Ludo first), then value rails (arcv2m3/arcv2m4/arcv2m10). Spec: docs/globalfolkgames-bs-spec.md. NOT built yet - Step 1 skeleton only (globalfolkgames-bs/).",
     "1. arcv2m1 + arcv2m2 + arcv2m3 + arcv2m4 for Ludo: Ludo whole, testable now. Per-game local PDA (program tweak + redeploy), pure base writes, multiplier at arcv2m4 flow-up, 3 global ledgers. Test it.",
     "2. arcv2m5 + arcv2m10 launch engine (launch gate - all build ahead of launch): premium points ledger [gfgprem, player] + admin credit + CONFIG-DRIVEN plan ladder (levels added as data): Level-2 $5 / Nigeria N5,000 + Level-3 3x $10 discount / Nigeria N8,000 + 30-day active sub (on-chain, no auto-renew) + multiplier at arcv2m4 flow-up + lives (5/10 per day, GMT+00 reset) + daily reward (25P/200P).",
     "3. arcv2m6 launch sources (launch gate): 500P signup bonus (on-chain fence) + 12-month affiliate (15% of each referred subscription month in USD cents, referrer must hold an active Level-2 sub that month or the month is forfeited, 60-day inactive pair-forfeit, manual Naira payout 3-7 days).",
