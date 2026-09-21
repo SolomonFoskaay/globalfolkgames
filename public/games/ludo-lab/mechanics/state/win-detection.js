@@ -297,7 +297,12 @@
             const m3Award = window.localPoints
                 && (window.localPoints.lastAward || window.localPoints.lastSeenAward);
             const mirrorPoints = (m3Award && m3Award.points > 0) ? m3Award.points : 0;
-            const promise = window.magicblockDice
+            // Route through the CHAIN GATEWAY, never the Solana SDK directly.
+            // On Arc the gateway returns { ok, batched: true } (the points write
+            // already emitted the window leaf); on Solana it calls the ER record.
+            // Calling window.magicblockDice here bypassed the gateway and issued
+            // a Solana write on the Arc path.
+            const promise = chain
                 .recordResult(finishOrder.slice(), mirrorPoints, 1, matchRef)
                 .then((sig) => {
                     window.__lastOnchainGameRecordSig = sig || null;
