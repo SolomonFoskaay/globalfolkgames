@@ -316,7 +316,14 @@ async function rollDiceEngine(source) {
     let rollValues = null;
     for (let attempt = 1; attempt <= MAX_ROLL_ATTEMPTS && !rollValues; attempt++) {
         if (attempt > 1) await sleepMs(ONCHAIN_RETRY_DELAY_MS);
-        if (isUserSeat && window.gfgChain && window.gfgChain.available()) {
+        // On Arc EVERY seat (user AND computer) rolls through the gasless
+        // committed-seed derivation (gfgChain.roll -> relayer rollDice). The
+        // old `isUserSeat && gfgChain.available()` guard sent the user seat
+        // down the Solana SDK path on Arc too (available() returns true there),
+        // which was the last Solana write in the game. Route the user seat to
+        // the Arc branch as the COMPUTER branch already does.
+        const onArc = !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc());
+        if (isUserSeat && window.gfgChain && window.gfgChain.available() && !onArc) {
             try {
                 if (totalDisplay) totalDisplay.innerText = 'VRF roll...';
                 displayEducationalLog(`${currentTurn.toUpperCase()}: Requesting provably-fair roll [${window.gfgChain.label()}]...`);

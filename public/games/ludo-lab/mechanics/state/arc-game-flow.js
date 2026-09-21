@@ -22,6 +22,10 @@
     var cfg = null;
     var st = { matchRef: null, seatColors: [], started: false, settled: false, lastTurn: null, lastMoveSig: null };
     var gateInFlight = false; // re-entrancy guard for the async lives gate
+    var startInFlight = false; // guard: the start commit is async (~3s); the 1s
+    // tick must not fire a SECOND start for the same match. Without this the
+    // duplicate lost the race and reverted on-chain with Exists() (one wasted tx).
+    var lastStartRef = null; // the matchRef a start commit was already attempted for
 
     function isArc() { try { return !!(window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()); } catch (e) { return false; } }
     function wallet() { try { return (window.gfgChainAdapter && window.gfgChainAdapter.walletAddress && window.gfgChainAdapter.walletAddress()) || null; } catch (e) { return null; } }
@@ -45,6 +49,10 @@
     // beginGame, no per-turn calls ever again.
     async function ensureStarted() {
         if (st.started || !matchActive()) return;
+        // Single-flight: a start commit takes ~3s, but this is called on a 1s
+        // tick. If one is already in flight, do nothing (no duplicate on-chain
+        // tx). Same for a ref we already attempted.
+        if (startInFlight) return;
         var w = wallet(); if (!w) return;
         if (!window.gfgSettlement || !window.gfgMatchEngine) {
             // Do NOT fail silently: if the rail is missing, retry on the next tick
@@ -54,8 +62,10 @@
         await loadCfg();
         var colors = seatColors();
         var ref = window.gfgGameMatchRef || Date.now();
+        if (lastStartRef === ref) return; // already committed this match
         window.gfgGameMatchRef = ref;
         st.matchRef = ref; st.seatColors = colors;
+        startInFlight = true;
         // Open the off-chain engine for this match (zero chain cost).
         try {
             window.gfgMatchEngine.open({
@@ -66,12 +76,18 @@
         // Publish the on-chain gameId used by the dice seed, so dice and the
         // settlement refer to the same match.
         try { window.__gfgGameId = window.gfgSettlement.state ? null : window.__gfgGameId; } catch (e) {}
-        var r = await window.gfgSettlement.start({
-            gameTag: 'ludo', matchRef: ref,
-            p1: ownerFor(colors[0]), p2: ownerFor(colors[1] || colors[0]),
-            seats: colors.length, ttlSecs: 3600,
-        });
+        var r;
+        try {
+            r = await window.gfgSettlement.start({
+                gameTag: 'ludo', matchRef: ref,
+                p1: ownerFor(colors[0]), p2: ownerFor(colors[1] || colors[0]),
+                seats: colors.length, ttlSecs: 3600,
+            });
+        } finally {
+            startInFlight = false;
+        }
         st.started = true;
+        lastStartRef = ref;
         st.lastTurn = curTurn();
         console.log('[arc-flow] start commit', r && r.gameId, (r && r.tx) ? 'tx ' + r.tx : '(soft-failed)');
     }
@@ -221,7 +237,7 @@
     try {
         var origPlayAgain = window.playAgainAfterCeremony;
         if (typeof origPlayAgain === 'function' && !origPlayAgain.__arcWrapped) {
-            window.playAgainAfterCeremony = function () { try { reset(); } catch (e) {} return origPlayAgain.apply(this, arguments); };
+            window.playAgainAfterCeremony = function () { try { reset(); startInFlight = false; lastStartRef = null; } catch (e) {} return origPlayAgain.apply(this, arguments); };
             window.playAgainAfterCeremony.__arcWrapped = true;
         }
     } catch (e) { /* soft */ }
