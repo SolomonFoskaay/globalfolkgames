@@ -760,8 +760,8 @@
         "s": "done"
       },
       {
-        "t": "(21ix) Architecture recording: NEW module arcv2m18 (Option A) - keep arcv2m17 as the in-app settlement module",
-        "s": "in_progress"
+        "t": "(21ix) Architecture recorded: NEW module arcv2m18 added (additive, 38 insertions / 0 deletions); arcv2m17 kept as the in-app settlement module; implementationOrder[0] points at the standalone build first",
+        "s": "done"
       },
       {
         "t": "(21x) STEP 1 DONE: empty globalfolkgames-bs/ skeleton + README + foundry.toml + placeholders (no logic); main build unaffected",
