@@ -235,6 +235,25 @@ function processTokenMovementExecution(selectedTokenIndex) {
             );
         } catch (e) { /* soft */ }
     }
+
+    // GFG-BS SIGNED MOVE LOG (arcv2m17): record EVERY real move - human AND
+    // computer seat - into the match's signed off-chain log, which becomes the
+    // co-signed settlement digest and is sealed in the batch window. This is
+    // what makes the whole single-player match reconstructable and provable on
+    // Arc, with ZERO per-move transactions. Soft-fail; never blocks the move.
+    try {
+        if (window.gfgSettlement && typeof window.gfgSettlement.recordMove === 'function') {
+            window.gfgSettlement.recordMove(currentTurn, {
+                token: selectedTokenIndex,
+                from: (currentPiece._prevPath === undefined ? 0 : currentPiece._prevPath),
+                to: currentPiece.pathIndex,
+                steps: currentPiece.stepsWalked,
+                d1: lastDiceRoll1 || appliedMoveValue,
+                d2: lastDiceRoll2 || 0,
+                captured: false,
+            });
+        }
+    } catch (e) { /* soft */ }
     try { if (currentPiece) currentPiece._prevPath = currentPiece.pathIndex; } catch (e) {}
 
     if (currentTurnMoves.length > 0) {

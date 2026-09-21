@@ -502,6 +502,12 @@
 
     function matchRefForSig(sig) {
         if (!sig) return '0';
+        // ARC (arcv2m17 audit): prefer the gateway's stable ref (hex-safe on Arc).
+        try {
+            if (window.gfgChain && typeof window.gfgChain.matchRefFromSignature === 'function') {
+                return String(window.gfgChain.matchRefFromSignature(sig));
+            }
+        } catch (e) { /* fall through */ }
         try {
             if (window.magicblockDice && typeof window.magicblockDice.matchRefFromSignature === 'function') {
                 return String(window.magicblockDice.matchRefFromSignature(sig));
@@ -516,6 +522,18 @@
     // write passes the guard while staying provably bound to that win.
     function boostRefForSig(sig) {
         if (!sig) return '0';
+        // ARC: there is no dedicated boost-ref on the Arc gateway; derive a
+        // distinct stable ref from the same token so it never collides with the
+        // win ref (which uses the gateway's plain matchRefFromSignature).
+        try {
+            if (window.gfgChain && window.gfgChain.isArc && window.gfgChain.isArc()) {
+                const base = String(window.gfgChain.matchRefFromSignature(sig) || '0');
+                let h = 0x811c9dc5 >>> 0;
+                const s = 'boost|' + base;
+                for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+                return String((h % 2147483647) || 1);
+            }
+        } catch (e) { /* fall through */ }
         try {
             if (window.magicblockDice && typeof window.magicblockDice.boostRefFromSignature === 'function') {
                 return String(window.magicblockDice.boostRefFromSignature(sig));

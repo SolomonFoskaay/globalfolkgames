@@ -288,6 +288,15 @@
     // client's matchRefFromSignature used by the game's own reward wiring.
     function matchRefFor(proofSig) {
         if (!proofSig) return '0';
+        // ARC (arcv2m17 audit): on Arc the proof token is a HEX seed hash, not a
+        // base58 signature, so the Solana SDK math would give a wrong ref. The
+        // gateway returns a valid numeric ref for Arc (and the same base58 math
+        // on Solana), so always prefer it.
+        try {
+            if (window.gfgChain && typeof window.gfgChain.matchRefFromSignature === 'function') {
+                return String(window.gfgChain.matchRefFromSignature(proofSig));
+            }
+        } catch (e) { /* fall through */ }
         try {
             if (window.magicblockDice && typeof window.magicblockDice.matchRefFromSignature === 'function') {
                 return String(window.magicblockDice.matchRefFromSignature(proofSig));

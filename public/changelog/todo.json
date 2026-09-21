@@ -33,7 +33,7 @@
       },
       {
         "t": "(1v) GASLESS COST FIX: per-MATCH settlement + batching",
-        "s": "in_progress"
+        "s": "done"
       },
       {
         "t": "(1v-a) DESIGN LOCKED + recorded in arcv2m17",
@@ -68,8 +68,8 @@
         "s": "done"
       },
       {
-        "t": "(1v-i) BATCHING SPINE: hybrid window (100 or 1h, SKIP EMPTY) + batch starts AND settlements",
-        "s": "in_progress"
+        "t": "(1v-i) BATCHING SPINE: hybrid window (100 or 1h, SKIP EMPTY) + batch starts AND settlements + opportunistic tick after a real settlement (no cron)",
+        "s": "done"
       },
       {
         "t": "(1v-i-1) Spec recorded: window + free dispute + verifiability + per-match timing rules",
@@ -556,12 +556,32 @@
         "s": "pending"
       },
       {
-        "t": "(17vii) BUILD: persist the in-flight match as SIGNED match events addressed to the player (not editable localStorage), so any device can rehydrate the board from signed state and reconcile with the window; drop the raw board snapshot entirely.",
+        "t": "(17vii) SIGNED RESUME (owner decisions 2026-09-21): the relayer stores the SIGNED match log, content-addressed by its digest (tamper-evident); any device fetches the same signed bytes and replays the board. Frontend only renders. Lifetime: until the window flushes (then final). Build AFTER GFG-BS is proven (see 17ix).",
+        "s": "in_progress"
+      },
+      {
+        "t": "(17viii) DONE: the localStorage board snapshot is removed from the resume path (no board in localStorage; only an in-memory session snapshot). Legacy keys purged on clear.",
+        "s": "done"
+      },
+      {
+        "t": "(17ix) BUILD (owner-approved 2026-09-21): relayer-side SIGNED match-log store, keyed by the match digest; a getter so any device can fetch + replay it; list unfinished matches under the Ludo board with a Resume button; auto-final once the window flushes. Does NOT add per-move on-chain tx (stays 2 txs + 1 flush).",
         "s": "pending"
       },
       {
-        "t": "(17viii) Remove the localStorage board snapshot from the resume path (replace with signed rehydrate); keep only non-authoritative UI prefs if any remain.",
-        "s": "pending"
+        "t": "(17x) CONFIRMED DESIGN FACT: the Solana multiplayer board (MatchBoard, gfgboard2) stores players/turn/timers + ONLY the LAST 32-byte move hash (each move overwrites it) - NOT the full board. Both devices replay their own local move list against that hash. GFG-BS is stronger: the WHOLE match folds into ONE co-signed digest sealed in the window Merkle tree, so full reconstruction is provable from signed data + the window seal.",
+        "s": "done"
+      },
+      {
+        "t": "(17xi) FIXED THE REAL GAP (owner 2026-09-21): the computer seat and the HUMAN seat moves were NOT in the signed match log - only dice was Arc-derived and only turn handovers were logged, so the digest did not reflect real moves for either seat. Now EVERY real move (human + computer, via processTokenMovementExecution, the single point both use) is recorded into the GFG-BS signed log (gfgSettlement.recordMove) and sealed in the window. ZERO per-move txs still.",
+        "s": "done"
+      },
+      {
+        "t": "(17xii) FIXED: match-engine open() now carries seatColors so a move recorded by COLOUR maps to its seat index in the deterministic digest; recordMove added to the settlement rail (game-agnostic).",
+        "s": "done"
+      },
+      {
+        "t": "(17xiii) NOTE (honest): the computer is still an OFF-CHAIN opponent (ai.js picks the move, the local board applies it). It is now SIGNED and sealed like the human seat, so the match is provable - but the AI decision itself is not a chain event, and does not need to be (same as Solana MP, where only the last move hash is on-chain).",
+        "s": "done"
       },
       {
         "t": "(17i) FIX the save-on-signout hole: discard the local match on gfg:auth-changed (logout) so a started game cannot continue with no account; the life stays spent (non-refundable)",
@@ -640,16 +660,16 @@
         "s": "pending"
       },
       {
-        "t": "(19xi) BLOCKER: the multiplayer rail is Solana (already tracked as (12i-2)); the ludo lives gate window.mpCheckLives reads via md.readLivesFor (Solana) with an EVM address on Arc. Must use the Arc lives reader.",
-        "s": "pending"
+        "t": "(19xi) FIXED BLOCKER: the ludo multiplayer lives gate (window.mpCheckLives) now reads via window.gfgChain.readLives() on Arc (was md.readLivesFor with an EVM address = a Solana read on Arc). Gateway readLives() added.",
+        "s": "done"
       },
       {
-        "t": "(19xii) LOADER: src/main.js and src/main-lab.js always import + configure the Solana SDK (magicblock-er-vrf.js) on every page. Must not load/configure Solana on an Arc build (or load inert).",
-        "s": "pending"
+        "t": "(19xii) FIXED LOADER: on the Arc rail the Solana SDK is loaded but NEVER configured - configure() is blocked and returns inert, so isConfigured()/available() are false and no Solana RPC can be armed on Arc. main.js + main-lab.js both guarded.",
+        "s": "done"
       },
       {
-        "t": "(19xiii) WRONG-CHAIN MATH: matchRefFromSignature/boostRefFromSignature (local-points, global-ledger, premium-ledger) use the Solana SDK on Arc; the Arc proof token is hex, not base58. NOTE: if (4v) retires the premium ledger, only local-points + global-ledger remain to fix.",
-        "s": "pending"
+        "t": "(19xiii) FIXED WRONG-CHAIN MATH: matchRefFromSignature/boostRefFromSignature now prefer the gateway; the Arc ref is a STABLE deterministic hash of the hex proof token (was Date.now(), which changed per call and broke retry idempotency). local-points, global-ledger, premium-ledger all route via the gateway.",
+        "s": "done"
       },
       {
         "t": "(19xiv) SERVER: several /api/* handlers the client calls on Arc are Solana relays (/api/multiplayer, /api/competitions, /api/agm, /api/affiliate, /api/signup, /api/chess). Confirm which must become Arc or be blocked when on Arc.",

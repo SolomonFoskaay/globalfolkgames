@@ -162,12 +162,43 @@
         return { r: '0x' + String(sig).slice(2, 66), s: '0x' + String(sig).slice(66, 130), v: v };
     }
 
+    // SIGNED MOVE RECORD (arcv2m17, game-agnostic): a game calls this for EVERY
+    // real move, human or AI, so the whole match is in the co-signed digest and
+    // sealed in the batch window. `seat` may be a numeric index OR a game colour
+    // name (Ludo passes 'green'/'red'/...); a colour is mapped to its seat index
+    // using the match's own seat order (set at start()). Zero chain cost.
+    function recordMove(seat, moveObj) {
+        var eng = engine();
+        if (!eng || typeof eng.move !== 'function') return null;
+        var idx = Number(seat);
+        if (!Number.isFinite(idx)) {
+            // Map a colour/name to its seat index using the match's own seat
+            // order captured at open() (Ludo passes 'green'/'red'/...).
+            var s = (eng.state && eng.state()) || null;
+            var colors = (s && s.seatColors) || null;
+            if (colors && colors.length) {
+                idx = colors.indexOf(String(seat));
+            }
+            if (!Number.isFinite(idx) || idx < 0) idx = 0;
+        }
+        try {
+            var d = eng.move(idx, moveObj);
+            // Keep the engine's turn pointer in step with the recorded seat.
+            if (eng.setTurn) eng.setTurn(idx);
+            return d;
+        } catch (e) {
+            console.warn('[match-settlement] recordMove soft-fail:', e && e.message);
+            return null;
+        }
+    }
+
     window.gfgSettlement = {
         isEnabled: isArc,
         tags: function () { return Object.assign({}, GAME_TAGS); },
         tagOf: tagOf,
         start: start,
         finish: finish,
+        recordMove: recordMove,
         dispute: dispute,
         disputeOnchain: disputeOnchain,
         verifyReveal: function (moves, meta, expectedDigest) {

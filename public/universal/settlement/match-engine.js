@@ -57,6 +57,10 @@
             gameTag: String(opts.gameTag || 'ludo'),
             matchRef: opts.matchRef || nowMs(),
             players: Array.isArray(opts.players) ? opts.players.slice() : [],
+            // seatColors: the game's own seat order (e.g. Ludo ['green','red']),
+            // so a move recorded by COLOUR can be mapped to its seat index for
+            // the deterministic digest. Game-agnostic: any game may omit it.
+            seatColors: Array.isArray(opts.seatColors) ? opts.seatColors.slice() : [],
             seats: Number(opts.seats || 2),
             turnSecs: Number(opts.turnSecs || 50),
             digest: rollingHash('0', 'open:' + String(opts.matchRef || nowMs())),

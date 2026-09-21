@@ -193,6 +193,14 @@
 
     function matchRefFor(proofSig) {
         if (!proofSig) return '0';
+        // ARC (arcv2m17 audit): on Arc the proof token is a hex seed hash, so the
+        // Solana base58 math gives a wrong ref. Prefer the gateway's stable ref
+        // on both rails.
+        try {
+            if (window.gfgChain && typeof window.gfgChain.matchRefFromSignature === 'function') {
+                return String(window.gfgChain.matchRefFromSignature(proofSig));
+            }
+        } catch (e) { /* fall through */ }
         try {
             if (window.magicblockDice && typeof window.magicblockDice.matchRefFromSignature === 'function') {
                 return String(window.magicblockDice.matchRefFromSignature(proofSig));
