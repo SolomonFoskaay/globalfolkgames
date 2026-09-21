@@ -572,6 +572,18 @@
         "s": "done"
       },
       {
+        "t": "(17xi) FIXED THE REAL GAP (owner 2026-09-21): the computer seat and the HUMAN seat moves were NOT in the signed match log - only dice was Arc-derived and only turn handovers were logged, so the digest did not reflect real moves for either seat. Now EVERY real move (human + computer, via processTokenMovementExecution, the single point both use) is recorded into the GFG-BS signed log (gfgSettlement.recordMove) and sealed in the window. ZERO per-move txs still.",
+        "s": "done"
+      },
+      {
+        "t": "(17xii) FIXED: match-engine open() now carries seatColors so a move recorded by COLOUR maps to its seat index in the deterministic digest; recordMove added to the settlement rail (game-agnostic).",
+        "s": "done"
+      },
+      {
+        "t": "(17xiii) NOTE (honest): the computer is still an OFF-CHAIN opponent (ai.js picks the move, the local board applies it). It is now SIGNED and sealed like the human seat, so the match is provable - but the AI decision itself is not a chain event, and does not need to be (same as Solana MP, where only the last move hash is on-chain).",
+        "s": "done"
+      },
+      {
         "t": "(17i) FIX the save-on-signout hole: discard the local match on gfg:auth-changed (logout) so a started game cannot continue with no account; the life stays spent (non-refundable)",
         "s": "done"
       },

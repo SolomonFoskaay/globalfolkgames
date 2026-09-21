@@ -71,6 +71,7 @@
             window.gfgMatchEngine.open({
                 gameTag: 'ludo', matchRef: ref, seats: colors.length,
                 players: colors.map(ownerFor), turnSecs: 45,
+                seatColors: colors,
             });
         } catch (e) { /* soft */ }
         // Publish the on-chain gameId used by the dice seed, so dice and the
