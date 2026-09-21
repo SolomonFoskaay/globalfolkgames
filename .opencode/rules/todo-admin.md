@@ -15,11 +15,23 @@ and HOW to keep it from growing without bound.
 
 ## The rule (run on EVERY report, commit and push)
 
+0. **NEVER rewrite, reword, renumber, remove or `deprecated` an existing todo
+   item without the owner's explicit approval in that turn.** The list is the
+   owner's plan. Add new items (numbered to fit) and flip a status only when the
+   work is genuinely finished. If an item looks wrong or unnecessary, ASK first.
+   Do not "clean up" the list.
+0b. **The list stays until the migration is complete.** Solana -> Arc is not
+   finished, so nothing is deleted or archived out of `current` until the owner
+   says the migration is done.
+
 1. **Write the fresh, full list as `current`.** Use the owner's exact nested
    numbering (`(1)`, `(1i)`, `(2)`, `(2i)` ...). One item per line, each with a
-   status: `done` (`[x]`), `in_progress` (`[•]`), `pending` (`[ ]`), or
-   `deprecated` (`[~]`, removed/replaced, kept for the record, do not build).
-   Exactly one item is `in_progress` while work remains.
+   status: `done` (`[DONE]`), `in_progress` (`[WORKING]`), `pending`
+   (`[PENDING]`), or `deprecated` (`[DEPRECATED]`, removed/replaced, kept for
+   the record, do not build). Exactly one item is `in_progress` while work
+   remains. **In chat, print the status as a plain UPPERCASE word at the END of
+   the line, never a symbol at the start** (e.g.
+   `(14i) FIX contract gameId encoding. DONE`).
 2. **Update on EVERY completed step, not just at the end.** The moment a step
    is truly finished (built, deployed, tested), flip its status in `todo.json`
    and then re-output the CURRENT full list in chat, so the file and the chat
@@ -49,6 +61,11 @@ and HOW to keep it from growing without bound.
 ```
 
 `items[].s` is one of `done`, `in_progress`, `pending`, `deprecated`.
+
+Optional additive blocks (plain terms, never remove them once set): `migrationNote`
+(one-sentence status of the Solana -> Arc move), `testNotes` (batch status + what
+to test next, in plain words), `chainAudit` (what runs on Arc, what is still on
+Solana). These are how the owner knows when to test what.
 
 ## Safe edit (never rewrite the world)
 

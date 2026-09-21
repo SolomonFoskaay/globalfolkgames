@@ -27,10 +27,10 @@
     return res.json();
   }
   function marker(s) {
-    if (s === 'done') return '[x]';
-    if (s === 'in_progress') return '[•]';
-    if (s === 'deprecated') return '[~]';
-    return '[ ]';
+    if (s === 'done') return '[DONE]';
+    if (s === 'in_progress') return '[WORKING]';
+    if (s === 'deprecated') return '[DEPRECATED]';
+    return '[PENDING]';
   }
   function statusClass(s) {
     if (s === 'done') return 'todo-done';
@@ -60,11 +60,30 @@
   function summaryHtml(items) {
     var c = counts(items);
     return '<div class="todo-summary">'
-      + '<span class="todo-chip todo-done">' + c.done + ' done</span>'
-      + '<span class="todo-chip todo-progress">' + c.in_progress + ' in progress</span>'
-      + '<span class="todo-chip todo-pending">' + c.pending + ' pending</span>'
-      + (c.deprecated ? '<span class="todo-chip todo-deprecated">' + c.deprecated + ' deprecated</span>' : '')
+      + '<span class="todo-chip todo-done">' + c.done + ' DONE</span>'
+      + '<span class="todo-chip todo-progress">' + c.in_progress + ' WORKING</span>'
+      + '<span class="todo-chip todo-pending">' + c.pending + ' PENDING</span>'
+      + (c.deprecated ? '<span class="todo-chip todo-deprecated">' + c.deprecated + ' DEPRECATED</span>' : '')
       + '</div>';
+  }
+
+  // Plain-terms notes block (migration status, what to test, chain audit).
+  function notesHtml(data) {
+    var blocks = [];
+    if (data.migrationNote) {
+      blocks.push('<p class="todo-note-lead">' + esc(data.migrationNote) + '</p>');
+    }
+    function section(title, obj) {
+      if (!obj || typeof obj !== 'object') return '';
+      var rows = Object.keys(obj).map(function (k) {
+        return '<div class="todo-note-row"><div class="todo-note-k">' + esc(k) + '</div><div class="todo-note-v">' + esc(obj[k]) + '</div></div>';
+      }).join('');
+      return '<h4 class="todo-note-h">' + esc(title) + '</h4>' + rows;
+    }
+    blocks.push(section('Batch status, in plain terms', data.testNotes));
+    blocks.push(section('Chain audit (what is on Arc, what is left on Solana)', data.chainAudit));
+    if (!blocks.length) return '';
+    return '<section class="game-card todo-notes">' + blocks.join('') + '</section>';
   }
 
   function currentHtml(cur) {
@@ -105,7 +124,7 @@
       host.innerHTML = '<p class="empty">Could not load todo.json (' + esc(e.message) + ').</p>';
       return;
     }
-    host.innerHTML = currentHtml(cache.current) + historyHtml(cache.history);
+    host.innerHTML = notesHtml(cache) + currentHtml(cache.current) + historyHtml(cache.history);
   }
 
   window.renderTodo = renderTodo;
