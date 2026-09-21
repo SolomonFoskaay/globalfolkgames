@@ -855,6 +855,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     setTimeout(() => {
+        // ANTI-CHEAT (owner 2026-09-21): never resume a saved match when nobody
+        // is signed in. Otherwise a logged-out page would keep playing an
+        // already-started board (free unlimited play). Signed out = fresh setup.
+        var _signedIn = false;
+        try {
+            if (window.currentUser) _signedIn = true;
+            else {
+                var _a = window.gfgChainAdapter;
+                if (_a && typeof _a.walletAddress === 'function' && _a.walletAddress()) _signedIn = true;
+                else if (typeof window.getDynamicSolanaWallet === 'function' && window.getDynamicSolanaWallet()) _signedIn = true;
+                else if (typeof window.getDynamicEvmWallet === 'function' && window.getDynamicEvmWallet()) _signedIn = true;
+            }
+        } catch (e) { _signedIn = false; }
+        if (!_signedIn) {
+            if (typeof window.clearPersistedState === 'function') { try { window.clearPersistedState(); } catch (e) {} }
+            displayEducationalLog("Sign in to start a match. Ready for fresh setup.");
+            return;
+        }
         if (typeof loadGameStateFromStorage === 'function') {
             const stateFound = loadGameStateFromStorage();
             if (!stateFound) {

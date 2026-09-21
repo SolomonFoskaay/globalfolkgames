@@ -48,6 +48,41 @@ function clearPersistedState() {
 window.clearPersistedState = clearPersistedState;
 
 // ---------------------------------------------------------------------------
+// SIGN-OUT = MATCH OVER (anti-cheat, owner 2026-09-21).
+//
+// Before this, the saved board survived a logout: a player could sign in,
+// start a match, sign out, and keep playing the already-loaded board with no
+// account. That was free unlimited play (and could fire a second start commit
+// when a stale save reloaded). The fix: when auth goes away, the local match
+// is DISCARDED - a match requires a signed-in player. The life already spent at
+// match start is non-refundable, so logging out can never be a free restart.
+//
+// This is deliberately conservative: it clears the local resume cache and the
+// win/detection state, and reloads to a clean, signed-out setup. It never
+// touches on-chain data; the chain remains the source of truth.
+// ---------------------------------------------------------------------------
+function discardMatchOnSignOut() {
+    try { clearPersistedState(); } catch (e) {}
+    try { if (typeof window.resetWinDetection === 'function') window.resetWinDetection(); } catch (e) {}
+    try { if (typeof window.setMatchStatus === 'function') window.setMatchStatus('abandoned'); } catch (e) {}
+    try {
+        // A signed-out page must not offer to resume or replay: return to a
+        // fresh setup once, without a reload loop.
+        if (typeof setupConfigurationLocked !== 'undefined' && setupConfigurationLocked) {
+            setupConfigurationLocked = false;
+            const startBtn = document.getElementById('startMatchBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.style.background = '#2ecc71';
+                startBtn.style.color = '#fff';
+                startBtn.innerText = 'Start Arena Match';
+            }
+        }
+    } catch (e) { /* soft */ }
+}
+window.discardMatchOnSignOut = discardMatchOnSignOut;
+
+// ---------------------------------------------------------------------------
 // Pending on-chain push queue ("backup plan with a tamper-proof hash").
 //
 // When an on-chain record (match result proof, future M3/M4 reward record)
@@ -488,3 +523,37 @@ function handleConfirmationCallback(userApproved) {
         window.location.reload();
     }, 500);
 }
+
+// Bind the sign-out discard. gfg:auth-changed fires on both sign-in and sign-out,
+// so only act when there is genuinely NO signed-in user. Guarded so a transient
+// wallet-not-ready state cannot wipe a live match by accident: we require the
+// absence to persist briefly before discarding.
+(function () {
+    var missSince = 0;
+    function signedIn() {
+        try {
+            if (window.currentUser) return true;
+            var a = window.gfgChainAdapter;
+            if (a && typeof a.walletAddress === 'function' && a.walletAddress()) return true;
+            if (typeof window.getDynamicSolanaWallet === 'function' && window.getDynamicSolanaWallet()) return true;
+            if (typeof window.getDynamicEvmWallet === 'function' && window.getDynamicEvmWallet()) return true;
+        } catch (e) { /* treat as signed out */ }
+        return false;
+    }
+    function recheck() {
+        if (typeof window.getMatchStatus === 'function' && window.getMatchStatus() !== 'in-progress') return;
+        if (signedIn()) { missSince = 0; return; }
+        if (!missSince) { missSince = Date.now(); return; }
+        if (Date.now() - missSince < 4000) return; // grace: ignore a transient blip
+        missSince = 0;
+        console.warn('[persistence] sign-out detected during a live match: discarding the local match.');
+        discardMatchOnSignOut();
+    }
+    try {
+        window.addEventListener('gfg:auth-changed', function () {
+            // Give the header a moment to resolve the wallet before judging.
+            setTimeout(recheck, 400);
+        });
+        window.addEventListener('load', function () { setTimeout(recheck, 1200); });
+    } catch (e) { /* soft */ }
+})();

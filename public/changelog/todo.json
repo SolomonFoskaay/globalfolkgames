@@ -232,6 +232,10 @@
         "s": "pending"
       },
       {
+        "t": "(2x-b) FIX the logout hole: the single-player board survives sign-out in localStorage, so a started match stays playable with no account (free unlimited play). Needs one-source-of-truth enforcement (see (17)).",
+        "s": "done"
+      },
+      {
         "t": "(2x-a) Contract guards confirmed on Arc: NoMatch, AlreadySettled, BadSig, NotExpired, NotPlayer, Exists (custom errors, so the UI must decode them)",
         "s": "done"
       },
@@ -460,6 +464,10 @@
         "s": "done"
       },
       {
+        "t": "(12i-2) CONFIRMED the multiplayer rail (public/universal/multiplayer/multiplayer.js) still runs on Solana via src/magicblock-er-vrf.js (joinBoardMatch/commitMove/finishBoardMatch) - it must move to Arc or be retired before Solana is silenced",
+        "s": "pending"
+      },
+      {
         "t": "(12ii) No page/module/fallback can touch Solana while on Arc",
         "s": "pending"
       },
@@ -520,11 +528,55 @@
         "s": "done"
       },
       {
+        "t": "(16iii) DECISION (owner 2026-09-21): derive dice from the BATCHED WINDOW root at flush time - no relayer seed secret, no separate on-chain commit, zero extra cost, rolls stay free derivations like moves",
+        "s": "in_progress"
+      },
+      {
+        "t": "(16iv) Prove-ability trade-off accepted: a roll is verifiable when the window flushes (usually within the hour), not instantly, because the window root is the seal",
+        "s": "pending"
+      },
+      {
+        "t": "(16v) Build the batched-window dice derivation (remove GFG_Arc_Dice_Seed), then prove one real roll recomputable from the on-chain window root",
+        "s": "pending"
+      },
+      {
         "t": "(16ii) DECISION NEEDED from the owner: the seed is currently a relayer env secret committed, not yet revealed/finalised in the window; nothing stores the per-roll dice on-chain, so proof needs the seed reveal + window Merkle proof - confirm this model or ask for dice randomness derived fully from the batched window (no env secret)",
         "s": "pending"
       },
       {
-        "t": "(16iii) Build the committed-seed path that matches the owner decision, then prove one real roll end to end on Arc",
+        "t": "(17) SINGLE-PLAYER BOARD: one source of truth (no localStorage, survives reload + logout)",
+        "s": "in_progress"
+      },
+      {
+        "t": "(17i) FIX the save-on-signout hole: discard the local match on gfg:auth-changed (logout) so a started game cannot continue with no account; the life stays spent (non-refundable)",
+        "s": "done"
+      },
+      {
+        "t": "(17ii) FIX reload: rebuild the live board from the signed off-chain move log held in memory for the match window, or drop it - never resume from editable localStorage",
+        "s": "done"
+      },
+      {
+        "t": "(17iii) Confirmed design: keep moves off-chain inside the signed window (2 txs + 1 flush per match); do NOT add a tx per move, which would break the GFG-BS cost model",
+        "s": "done"
+      },
+      {
+        "t": "(17iv) Analyse and report whether this fully closes the logout/double-tx loophole, then implement",
+        "s": "done"
+      },
+      {
+        "t": "(18) PUBLIC explorer readability: verify the contracts so the official Arc explorer decodes our function + event names instead of \"contract call\"",
+        "s": "pending"
+      },
+      {
+        "t": "(18i) Confirmed: this is Circle ArcScan \"Verify & Publish\"; the same flow carries to Arc mainnet unchanged (ERC-20/contract verification is standard)",
+        "s": "done"
+      },
+      {
+        "t": "(18ii) Verify MatchSettlement, PlayerCore, GameRegistry, Randomness on ArcScan (needs the explorer verification flow / an owner API key)",
+        "s": "pending"
+      },
+      {
+        "t": "(18iii) After verifying, confirm a live tx shows MatchStarted / MatchSettled by name",
         "s": "pending"
       }
     ]
