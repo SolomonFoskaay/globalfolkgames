@@ -326,102 +326,114 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
     </section>
 
     <section class="ggi-card" id="demos">
-        <h2 class="ggi-h2">Demos</h2>
+        <h2 class="ggi-h2">The first demo: porting a real on-chain game</h2>
         <p class="ggi-body">
-            These demos exist so you can open a genre you already build for and watch gasless play
-            working, instead of taking it on trust. Each one is a real game running on the live
-            contracts, and you can inspect any of its sessions in the
-            <a href="/ggi-explorer/">Explorer</a>.
+            The demo is a port of MagicBlock's open-source <b>solana-generals</b> game. We use their
+            model, their names and their graphics, and swap the rail underneath: MagicBlock's
+            Ephemeral Rollup becomes <b>Foskaay GGI</b>. This section is the build guide. If the build
+            ever needs to differ, THIS page is updated first, then the code follows.
         </p>
 
-        <div class="ggi-h3">Demo 1, live: Idle Farm (the cost proof)</div>
-        <p class="ggi-body">
-            <b>Why this one first.</b> Idle games produce the most actions of any genre. If the rail
-            can make an idle farm gasless and cheap, it can make almost anything work. This demo is
-            the clearest answer to the question every dev asks: "what does it actually cost me?"
-        </p>
+        <div class="ggi-h3">First, the model (get this right or everything drifts)</div>
+        <ul class="ggi-list">
+            <li><b>The board is the game's, not the player's.</b> One board is SHARED by every player.
+                In their game it is one account, <span class="ggi-mono">Game</span>, holding the grid
+                and the player seats.</li>
+            <li><b>A player owns, at most, one player account.</b> Everything about that player lives
+                in it (their score, their per-board holdings, their stats). One account, many slots,
+                so cost does not grow per feature. This is the same lesson we learned on Solana.</li>
+            <li><b>A player joins a board.</b> Joining records the player's authority in the board's
+                seat list. It does not create a board per player.</li>
+            <li><b>Only the game's own rules may change the board.</b> The rules live in the game's
+                contract, never in the browser.</li>
+        </ul>
+        <div class="ggi-note">
+            <b>What is core and what is the game dev's.</b> MagicBlock's rail is only: an account is
+            delegated to a validator, executed for free inside, committed back. Everything else in
+            their sample (<span class="ggi-mono">Game</span>,
+            <span class="ggi-mono">GamePlayer</span>, <span class="ggi-mono">GameCell</span>, and the
+            systems) is the EXTERNAL GAME DEV's code, not the rail. A player account is the game
+            dev's choice, not rail core. Foskaay GGI is the same: our core is the room, the game owns
+            its world.
+        </div>
 
+        <div class="ggi-h3">The port, name for name</div>
+        <p class="ggi-body">
+            Their concept on the left, the Foskaay GGI equivalent on the right. Names are kept as-is
+            where possible so a developer reading their code can follow ours.
+        </p>
         <table class="ggi-table">
-            <thead><tr><th>What the player does</th><th>What happens on-chain</th></tr></thead>
+            <thead><tr><th>MagicBlock (SVM)</th><th>Foskaay GGI (Arc, EVM)</th><th>Status</th></tr></thead>
             <tbody>
-                <tr><td>Taps to plant, water, harvest, upgrade</td><td>Nothing. Every action is signed off-chain by a session key and folded into a digest.</td></tr>
-                <tr><td>Opens the game</td><td>One transaction: open a session (you, the sponsor, pay it).</td></tr>
-                <tr><td>Collects a random crop bonus</td><td>Free. The value comes from the seed sealed before play.</td></tr>
-                <tr><td>Finishes the run</td><td>One settlement: close, reveal the seed, seal the result, pay the session fee.</td></tr>
+                <tr><td><span class="ggi-mono">Game</span> component (the shared board, one account)</td><td>The game's OWN contract storage (e.g. <span class="ggi-mono">Game</span> struct in a Solidity contract). Not rail core.</td><td>Game builds it</td></tr>
+                <tr><td><span class="ggi-mono">GamePlayer</span> (seat inside the board)</td><td>A seat struct inside the game contract (authority + score).</td><td>Game builds it</td></tr>
+                <tr><td>Systems <span class="ggi-mono">join / start / command / tick / finish</span></td><td>Solidity functions on the game contract with the SAME rules, validated on-chain.</td><td>Game builds it</td></tr>
+                <tr><td>Delegate account to the ER</td><td>Open a GGI <b>session</b> and register the game account against it.</td><td>Rail: session exists; the game-account link is the small piece to add</td></tr>
+                <tr><td>Free execute inside the ER</td><td>Player-signed actions submitted by the sponsor. Arc has no free execution, so the SPONSOR pays each write; batching cuts the count.</td><td>Rail: sponsor relay + batching (honest EVM limit)</td></tr>
+                <tr><td>Authorise a signer (delegation authority)</td><td><span class="ggi-mono">SessionRegistry.canSign(sessionId, seat, who)</span> - the game contract checks it before every move.</td><td>Rail: present and proven</td></tr>
+                <tr><td>ERC VRF</td><td><span class="ggi-mono">Randomness</span> commit-reveal, N streams.</td><td>Rail: present</td></tr>
+                <tr><td>Commit / undelegate</td><td>GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
+                <tr><td>Session + commit fees</td><td><span class="ggi-mono">FeeVault</span> per-session fee.</td><td>Rail: present</td></tr>
+                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public GGI <a href="/ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
+                <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
             </tbody>
         </table>
 
-        <div class="ggi-h3">What the demo screen shows</div>
+        <div class="ggi-h3">What this mapping proves is missing</div>
         <ul class="ggi-list">
-            <li>A grid of plots that grow and are harvested, so it looks alive, not like a test page.</li>
-            <li>A live meter: <b>actions this session: N</b>, <b>chain writes: 2</b>, <b>cost so far: $0.0000x</b>. It proves heavy play is free.</li>
-            <li>A random bonus crop, so a visitor sees commit-reveal randomness working.</li>
-            <li>A button to open this exact session in the Explorer, so the trust claim is one tap away.</li>
+            <li><b>Board and player accounts are NOT rail core.</b> They are the game's contract, exactly
+                as in their sample. We do not add them to core.</li>
+            <li><b>The authorisation hook already exists.</b> <span class="ggi-mono">canSign</span> is
+                the equivalent of delegation authority, and a game contract can use it today.</li>
+            <li><b>The one genuine gap:</b> nothing today ties a specific game account to a session in a
+                discoverable way. The game can pass its own <span class="ggi-mono">sessionId</span> into
+                its contract and check <span class="ggi-mono">canSign</span>, which works, but a reader
+                cannot look up "which game account belongs to this session" from the rail. That is the
+                small addition worth making, and it is what the port will confirm.</li>
+            <li><b>The EVM limit, stated plainly:</b> there is no side chain to mutate accounts for free.
+                Where MagicBlock is free in the ER, Foskaay GGI makes the SPONSOR pay per write, and
+                batching reduces the number of writes. We do not pretend otherwise.</li>
         </ul>
 
-        <div class="ggi-h3">The exact rules (the build follows this, no deviation)</div>
-        <ul class="ggi-list">
-            <li><b>Session:</b> 1 participant (single player), ttl 3600 seconds.</li>
-            <li><b>Randomness:</b> 1 stream, committed at open with a seed, revealed at settle.</li>
-            <li><b>Actions:</b> plant, water, harvest, upgrade, each folded into the digest with an increasing sequence number. Payload is the game's own; the rail never reads it.</li>
-            <li><b>Scoring:</b> purely the game's own (coins earned). The rail does not score.</li>
-            <li><b>Settle:</b> at the run's end or on demand, close + reveal + seal + one session fee.</li>
-            <li><b>Fee:</b> read at runtime with the SDK; never hardcoded.</li>
-        </ul>
-
-        <div class="ggi-h3">Two modes you can switch between in the demo</div>
-        <p class="ggi-body">
-            The same game is playable in <b>both</b> settlement modes, so you can compare real numbers
-            on real sessions instead of trusting a claim:
-        </p>
+        <div class="ggi-h3">Two settlement modes, tested on the same game</div>
         <table class="ggi-table">
             <thead><tr><th>Mode</th><th>What happens</th><th>Best for</th></tr></thead>
             <tbody>
-                <tr><td><b>Unbatched</b> (default)</td><td>Each session settles on its own: close, reveal, seal, one fee. The result is final immediately.</td><td>Anything that needs an instant per-session result.</td></tr>
-                <tr><td><b>Batched</b></td><td>The session's digest is submitted into a window; the window flushes (full or past deadline) into one Merkle root. Cheaper per game, final when the window flushes.</td><td>Idle and casual where a short delay is fine.</td></tr>
+                <tr><td><b>Unbatched</b></td><td>Every action is anchored on-chain as it happens (sponsor paid). Final instantly, most expensive.</td><td>Games that need an instant on-chain result per action.</td></tr>
+                <tr><td><b>Batched</b></td><td>Action digests roll into a window; the window flushes into ONE Merkle root. Cheapest, final when the window flushes.</td><td>Most games. The default target.</td></tr>
             </tbody>
         </table>
-        <p class="ggi-tiny">
-            Switch modes on the demo screen and the live cost meter changes with it. That is the whole
-            point: the same game, two cost tiers, your choice.
-        </p>
 
-        <div class="ggi-h3">Who pays, and how the demo pays</div>
-        <p class="ggi-body">
-            Players pay nothing. The sponsor (the game operator) pays the tiny gas and the per-session
-            fee. In this demo the sponsor is a small serverless function that signs those two
-            transactions on the player's behalf, so the player just taps and plays. It reads the
-            sponsor key and the Arc RPC from the environment; the key never reaches the browser.
-        </p>
-        <div class="ggi-note">
-            <b>Standalone by design.</b> The demo shares the deployment and the sponsor key with the
-            host site for convenience, but it is its own project: it imports nothing from the host
-            game platform and keeps no host state. When the infrastructure moves to its own repo, the
-            demo moves with it unchanged.
+        <div class="ggi-h3">The ported game, a-z (this is the build spec)</div>
+        <ol class="ggi-list">
+            <li><b>Board (game-owned, shared).</b> One on-chain board account holding the grid and the
+                player seats, created by the game operator. Same fields as their
+                <span class="ggi-mono">Game</span>: status, size, players, cells.</li>
+            <li><b>Player account (player-owned, one per player).</b> Holds the player's score and any
+                per-player data. One account, many slots.</li>
+            <li><b>Join.</b> A player joins the board; the board records the player's authority.</li>
+            <li><b>Open the session.</b> The sponsor opens a GGI session for the match and registers
+                the board against it.</li>
+            <li><b>Command (the move).</b> The player's action is validated on-chain by the same rules as
+                their <span class="ggi-mono">command</span> system (adjacency, ownership, strength),
+                and the board and player account are updated.</li>
+            <li><b>Tick (the clock).</b> Their <span class="ggi-mono">tick</span> system grows cell
+                strength over time. On Arc this is a permissionless call anyone may make, or a
+                batched periodic write, never a cron server.</li>
+            <li><b>Settle.</b> The session settles: seal the digest, reveal the seed, charge the
+                one session fee. The final board state is on-chain.</li>
+            <li><b>Read-only frontend.</b> The UI subscribes to the board and player accounts and
+                renders them. It owns no state and keeps no local truth.</li>
+            <li><b>Explorer.</b> The same session is inspectable in the GGI Explorer.</li>
+        </ol>
+
+        <div class="ggi-note good">
+            <b>Why this port is the right test.</b> If the game contract can hold the board, check
+            <span class="ggi-mono">canSign</span> for every move, and settle through GGI with real
+            measured unbatched and batched costs, then GGI is proven as the Arc equivalent of the rail
+            their sample uses. Anything the port cannot express is a real gap we fix in core, optional,
+            or the packages, and we will know exactly where.
         </div>
-        <p class="ggi-tiny">
-            Environment variables used: <span class="ggi-mono">GFG_Arc_Gasless_Sponsor_Key</span> and
-            <span class="ggi-mono">GFG_Arc_RPC</span> (both already set on the deployment).
-        </p>
-
-        <div class="ggi-note">
-            <b>Honest scope of the demo:</b> one player, one session, no accounts and no persistence
-            beyond the session. It is a proof of the rail, not a finished game. Anything beyond this
-            spec goes into a later demo, and this page is updated FIRST whenever the build and the
-            spec need to diverge.
-        </div>
-
-        <div class="ggi-h3">More demos, planned</div>
-        <table class="ggi-table">
-            <thead><tr><th>Demo</th><th>Genre</th><th>What it adds</th></tr></thead>
-            <tbody>
-                <tr><td>Endless runner</td><td>Casual / arcade</td><td>Short sessions, motion, instant fun</td></tr>
-                <tr><td>Arena 1v1</td><td>PvP</td><td>Two participants, an AI seat, per-seat signing</td></tr>
-                <tr><td>Card draw</td><td>Card</td><td>One random stream per player (N streams)</td></tr>
-                <tr><td>Tiny MMO</td><td>MMORPG</td><td>Many participants, persistent world shape</td></tr>
-                <tr><td>Land grid</td><td>Metaverse</td><td>A plot grid, batched settlement at scale</td></tr>
-            </tbody>
-        </table>
     </section>
 
     <section class="ggi-card" id="usecases">

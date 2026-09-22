@@ -10,6 +10,9 @@
 src = "src"
 out = "out"
 test = "test"
+# examples/ holds reference code (e.g. the port proof that a game's own contract
+# can be gated by a GGI session). It compiles and is tested, but it is NOT part of
+# the deployable core/optional set in src/.
 script = "script"
 libs = ["lib"]
 solc_version = "0.8.24"
