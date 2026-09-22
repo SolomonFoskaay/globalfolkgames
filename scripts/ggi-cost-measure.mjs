@@ -42,8 +42,8 @@ const stateAbi = parseAbi([
 ]);
 const rndAbi = parseAbi(['function reveal(bytes32 sessionId, bytes32[] seeds)']);
 const vaultAbi = parseAbi([
-  'function chargeOpen(bytes32 sessionId)',
-  'function chargeSettle(bytes32 sessionId)',
+  'function chargeSession(bytes32 sessionId)',
+  
 ]);
 const erc20Abi = parseAbi([
   'function balanceOf(address) view returns (uint256)',
@@ -115,8 +115,7 @@ async function measure(label, req, rows) {
   await measure('reveal (seed)', { address: C.Randomness, abi: rndAbi, functionName: 'reveal', args: [sessionId, [seed]], account }, rows);
   await measure('sealFinal (result)', { address: C.SessionState, abi: stateAbi, functionName: 'sealFinal', args: [sessionId, keccak256(toBytes('final'))], account }, rows);
   await measure('USDC.approve (fee)', { address: USDC, abi: erc20Abi, functionName: 'approve', args: [C.FeeVault, 10_000n], account }, rows);
-  await measure('chargeOpen (rail fee)', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeOpen', args: [sessionId], account }, rows);
-  await measure('chargeSettle (rail fee)', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeSettle', args: [sessionId], account }, rows);
+  await measure('chargeSession (rail fee)', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeSession', args: [sessionId], account }, rows);
 
   const end = await usdcBalance();
   const total = start - end;
@@ -138,8 +137,7 @@ async function measure(label, req, rows) {
     byLabel['reveal (seed)'].usdc +
     byLabel['sealFinal (result)'].usdc +
     byLabel['USDC.approve (fee)'].usdc +
-    byLabel['chargeOpen (rail fee)'].usdc +
-    byLabel['chargeSettle (rail fee)'].usdc;
+    byLabel['chargeSession (rail fee)'].usdc;
   const perEvent = Number(formatUnits(one.cost, 6));
 
   const gamesPerDollarA = costOfSessionA > 0 ? 1 / costOfSessionA : Infinity;

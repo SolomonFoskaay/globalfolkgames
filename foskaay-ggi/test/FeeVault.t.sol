@@ -40,8 +40,7 @@ contract MockUSDC {
     }
 }
 
-/// A token that LIES: reports success but moves nothing. Proves the vault does
-/// not let a bad token inflate its accounting.
+/// A token that LIES: reports success but moves nothing.
 contract LyingToken {
     function decimals() external pure returns (uint8) {
         return 6;
@@ -56,8 +55,11 @@ contract LyingToken {
     }
 }
 
-/// Security + behaviour tests for FeeVault (Foskaay GGI core contract 4 of 4), the
-/// ONE core contract that holds value.
+/// Security + behaviour tests for FeeVault (Foskaay GGI core contract 4 of 4).
+///
+/// ONE charge per session, at settle (measured cost fix 2026-09-22): a two-stage
+/// open+settle fee plus a per-session approve made fee collection ~39% of a
+/// session's Arc cost. Now there is a single `chargeSession`.
 contract FeeVaultTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -68,14 +70,13 @@ contract FeeVaultTest {
     address constant SPONSOR = address(0x59005);
     address constant STRANGER = address(0xBAD0);
     bytes32 constant S1 = keccak256("session-1");
-    uint256 constant OPEN_FEE = 1000;   // 0.001 USDC (6 decimals)
-    uint256 constant SETTLE_FEE = 500;  // 0.0005 USDC
+    uint256 constant FEE = 1500; // 0.0015 USDC (6 decimals) - placeholder, owner-set
 
     function setUp() public {
         usdc = new MockUSDC();
         vault = new FeeVault(OWNER, DEST, address(usdc));
         vm.prank(OWNER);
-        vault.setFees(OPEN_FEE, SETTLE_FEE);
+        vault.setFee(FEE);
         usdc.mint(SPONSOR, 1_000_000);
         vm.prank(SPONSOR);
         usdc.approve(address(vault), type(uint256).max);
@@ -83,86 +84,72 @@ contract FeeVaultTest {
 
     // ------------------------------------------------------------- happy path
 
-    function testOpenAndSettleFeeCollected() public {
+    function testChargeSessionCollectsFee() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        vm.prank(SPONSOR);
-        vault.chargeSettle(S1);
-        require(vault.collected(address(usdc)) == OPEN_FEE + SETTLE_FEE, "collected both");
-        require(usdc.balanceOf(address(vault)) == OPEN_FEE + SETTLE_FEE, "vault holds fee");
-        (address o, address s) = vault.paymentOf(S1);
-        require(o == SPONSOR && s == SPONSOR, "payers recorded");
+        vault.chargeSession(S1);
+        require(vault.collected(address(usdc)) == FEE, "fee collected");
+        require(usdc.balanceOf(address(vault)) == FEE, "vault holds fee");
+        (address payer, uint256 amount) = vault.paymentOf(S1);
+        require(payer == SPONSOR && amount == FEE, "payer + amount recorded");
     }
 
     function testChargePullsExactAmountOnly() public {
-        // Unlimited approval must never let the vault take more than the fee.
         uint256 before = usdc.balanceOf(SPONSOR);
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        require(before - usdc.balanceOf(SPONSOR) == OPEN_FEE, "exact fee only");
+        vault.chargeSession(S1);
+        require(before - usdc.balanceOf(SPONSOR) == FEE, "exact fee only");
     }
 
-    function testAbandonedSessionPaysNoSettleFee() public {
+    function testCannotChargeTwice() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        require(vault.settlePaidBy(S1) == address(0), "no settle payer");
-        require(vault.collected(address(usdc)) == OPEN_FEE, "open only");
-    }
-
-    // ------------------------------------------------------- stage guards
-
-    function testCannotChargeOpenTwice() public {
-        vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
         vm.prank(SPONSOR);
         vm.expectRevert();
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
     }
 
-    function testCannotChargeSettleWithoutOpen() public {
+    function testEachSessionChargedOnce() public {
+        bytes32 s2 = keccak256("session-2");
         vm.prank(SPONSOR);
-        vm.expectRevert();
-        vault.chargeSettle(S1);
-    }
-
-    function testCannotChargeSettleTwice() public {
+        vault.chargeSession(S1);
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        vm.prank(SPONSOR);
-        vault.chargeSettle(S1);
-        vm.prank(SPONSOR);
-        vm.expectRevert();
-        vault.chargeSettle(S1);
+        vault.chargeSession(s2);
+        require(vault.collected(address(usdc)) == FEE * 2, "two sessions, two fees");
     }
 
     function testNoFeeConfiguredReverts() public {
         FeeVault fresh = new FeeVault(OWNER, DEST, address(usdc));
         vm.prank(SPONSOR);
         vm.expectRevert();
-        fresh.chargeOpen(S1);
+        fresh.chargeSession(S1);
     }
 
     function testMissingAllowanceReverts() public {
-        // A payer with no allowance cannot be charged (the mock enforces it).
         usdc.mint(STRANGER, 1_000_000);
         vm.prank(STRANGER);
         vm.expectRevert();
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
     }
 
-    function testLyingTokenCannotInflateAccounting() public {
-        // A token returning true without moving funds must NOT be recorded as
-        // revenue... here it returns true, so accounting would rise. This asserts
-        // the vault's behaviour is exactly "trust a true return", which is why the
-        // fee asset is a KNOWN, owner-set USDC address and never a player choice.
+    function testZeroFeeDisablesCharging() public {
+        vm.prank(OWNER);
+        vault.setFee(0);
+        vm.prank(SPONSOR);
+        vm.expectRevert();
+        vault.chargeSession(S1);
+    }
+
+    function testLyingTokenBehaviourIsContained() public {
+        // A token returning true without moving funds would inflate accounting.
+        // This is why the fee asset is a KNOWN deploy-time USDC address, never a
+        // player or game choice.
         LyingToken liar = new LyingToken();
         FeeVault v2 = new FeeVault(OWNER, DEST, address(liar));
         vm.prank(OWNER);
-        v2.setFees(OPEN_FEE, SETTLE_FEE);
+        v2.setFee(FEE);
         vm.prank(SPONSOR);
-        v2.chargeOpen(S1);
-        require(v2.collected(address(liar)) == OPEN_FEE, "accounting follows return value");
-        // The real vault is only ever pointed at the canonical USDC address.
+        v2.chargeSession(S1);
+        require(v2.collected(address(liar)) == FEE, "accounting follows the token");
         require(vault.feeToken() == address(usdc), "real vault points at USDC");
     }
 
@@ -170,7 +157,7 @@ contract FeeVaultTest {
 
     function testOnlyOwnerCanWithdraw() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
         vm.prank(STRANGER);
         vm.expectRevert();
         vault.withdraw(address(usdc));
@@ -178,36 +165,27 @@ contract FeeVaultTest {
 
     function testWithdrawGoesToDestination() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
         vm.prank(OWNER);
         vault.withdraw(address(usdc));
-        require(usdc.balanceOf(DEST) == OPEN_FEE, "destination paid");
+        require(usdc.balanceOf(DEST) == FEE, "destination paid");
         require(vault.collected(address(usdc)) == 0, "accounting cleared");
     }
 
-    function testCannotWithdrawTooMuch() public {
-        // Two sessions' fees collected; one withdrawal moves exactly the collected
-        // total, never the vault's whole token balance (a stray transfer stays put).
+    function testWithdrawMovesOnlyCollectedNotStrayBalance() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        bytes32 s2 = keccak256("session-2");
-        vm.prank(SPONSOR);
-        vault.chargeOpen(s2);
+        vault.chargeSession(S1);
         // A stray direct transfer must not become withdrawable revenue.
         usdc.mint(SPONSOR, 999_999);
         vm.prank(SPONSOR);
         usdc.transfer(address(vault), 999_999);
-        require(vault.collected(address(usdc)) == OPEN_FEE * 2, "only real fees counted");
+        require(vault.collected(address(usdc)) == FEE, "only real fee counted");
         vm.prank(OWNER);
         vault.withdraw(address(usdc));
-        require(usdc.balanceOf(DEST) == OPEN_FEE * 2, "only collected withdrawn");
+        require(usdc.balanceOf(DEST) == FEE, "only collected withdrawn");
     }
 
-    function testCannotWithdrawTwiceWithNothing() public {
-        vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        vm.prank(OWNER);
-        vault.withdraw(address(usdc));
+    function testCannotWithdrawWithNothing() public {
         vm.prank(OWNER);
         vm.expectRevert();
         vault.withdraw(address(usdc));
@@ -218,7 +196,7 @@ contract FeeVaultTest {
     function testOnlyOwnerCanConfigure() public {
         vm.prank(STRANGER);
         vm.expectRevert();
-        vault.setFees(1, 1);
+        vault.setFee(1);
         vm.prank(STRANGER);
         vm.expectRevert();
         vault.setFeeToken(STRANGER);
@@ -230,31 +208,16 @@ contract FeeVaultTest {
         vault.setOwner(STRANGER);
     }
 
-    function testFeeChangeDoesNotRetroChargeOpen() public {
-        // The open was already paid at the old price; a later fee change cannot
-        // make the vault pull more for a session whose open is done.
+    function testFeeChangeDoesNotAffectAlreadyChargedSession() public {
         vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
+        vault.chargeSession(S1);
         vm.prank(OWNER);
-        vault.setFees(OPEN_FEE * 10, SETTLE_FEE);
-        // Charging open again is refused regardless of the new price.
+        vault.setFee(FEE * 10);
+        (address payer, uint256 amount) = vault.paymentOf(S1);
+        require(payer == SPONSOR && amount == FEE, "paid amount locked at charge time");
         vm.prank(SPONSOR);
         vm.expectRevert();
-        vault.chargeOpen(S1);
-    }
-
-    function testSettleUsesLockedOpenPrice() public {
-        // AUDIT FIX (2026-09-21): the settle fee is LOCKED at open, so an owner
-        // fee change between open and settle can never alter this session's price.
-        vm.prank(SPONSOR);
-        vault.chargeOpen(S1);
-        vm.prank(OWNER);
-        vault.setFees(OPEN_FEE, SETTLE_FEE * 3);
-        uint256 before = usdc.balanceOf(SPONSOR);
-        vm.prank(SPONSOR);
-        vault.chargeSettle(S1);
-        require(before - usdc.balanceOf(SPONSOR) == SETTLE_FEE, "locked settle price, not current");
-        require(vault.lockedSettleFee(S1) == SETTLE_FEE, "lock recorded at open");
+        vault.chargeSession(S1); // already charged, regardless of new price
     }
 
     function testCannotSetZeroAddresses() public {

@@ -1,69 +1,64 @@
 {
   "chainId": 5042002,
-  "measuredAt": "2026-09-22T03:11:20.938Z",
+  "measuredAt": "2026-09-22T03:30:55.155Z",
   "sponsor": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
   "perOperation": [
     {
       "label": "open (session start)",
-      "usdc": 0.003018,
-      "gasUsed": "120731"
+      "usdc": 0.003445,
+      "gasUsed": "137831"
     },
     {
       "label": "setAuthority seat 0",
       "usdc": 0.001289,
-      "gasUsed": "51550"
+      "gasUsed": "51538"
     },
     {
       "label": "setAuthority seat 1",
       "usdc": 0.001283,
-      "gasUsed": "51334"
+      "gasUsed": "51322"
     },
     {
       "label": "registerSessionKey",
-      "usdc": 0.000866,
-      "gasUsed": "34624"
+      "usdc": 0.002902,
+      "gasUsed": "116076"
     },
     {
       "label": "recordEvent (1 event tx)",
-      "usdc": 0.002806,
-      "gasUsed": "112229"
+      "usdc": 0.002805,
+      "gasUsed": "112217"
     },
     {
       "label": "close (session end)",
       "usdc": 0.000858,
-      "gasUsed": "34338"
+      "gasUsed": "34326"
     },
     {
       "label": "reveal (seed)",
       "usdc": 0.003214,
-      "gasUsed": "128565"
+      "gasUsed": "128553"
     },
     {
       "label": "sealFinal (result)",
       "usdc": 0.001646,
-      "gasUsed": "65841"
+      "gasUsed": "65829"
     },
     {
       "label": "USDC.approve (fee)",
-      "usdc": 0.000959,
-      "gasUsed": "38326"
+      "usdc": 0.001385,
+      "gasUsed": "55426"
     },
     {
-      "label": "chargeOpen (rail fee)",
-      "usdc": 0.003858,
-      "gasUsed": "114344"
-    },
-    {
-      "label": "chargeSettle (rail fee)",
-      "usdc": 0.002809,
-      "gasUsed": "92350"
+      "label": "chargeSession (rail fee)",
+      "usdc": 0.004725,
+      "gasUsed": "128961"
     }
   ],
-  "sessionModelA_settleOnce_total": 0.019799999999999998,
-  "sessionModelA_returningPlayerPerGame": 0.016362,
-  "perOnchainEvent": 0.002806,
-  "gamesPerDollar_settleOnce_new": 50,
-  "gamesPerDollar_settleOnce_returning": 61,
+  "sessionModelA_settleOnce_total": 0.020746999999999998,
+  "sessionModelA_returningPlayerPerGame": 0.015273,
+  "perOnchainEvent": 0.002805,
+  "gamesPerDollar_settleOnce_new": 48,
+  "gamesPerDollar_settleOnce_returning": 65,
   "gamesPerDollar_commitPerAction_50": 6,
-  "runTotalUsdc": 0.022606
+  "runTotalUsdc": 0.023552
 }

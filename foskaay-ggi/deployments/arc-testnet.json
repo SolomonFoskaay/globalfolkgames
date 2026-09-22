@@ -4,12 +4,12 @@
   "rpc": "https://rpc.testnet.arc.io",
   "explorer": "https://explorer.testnet.arc.io",
   "usdc": "0x3600000000000000000000000000000000000000",
-  "deployedAt": "2026-09-22T00:11:04.967Z",
+  "deployedAt": "2026-09-22T03:30:00.590Z",
   "deployer": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
   "contracts": {
-    "SessionRegistry": "0x46A34743e8210F5C8C574b7CbEe1C1cb5Ca63bE5",
-    "SessionState": "0xf464d11660bFC091481D2D688FeaD97447f69E43",
-    "Randomness": "0x50CD0A75ca6412f751BEb6E7E4d48da2D5aea6Db",
-    "FeeVault": "0xDf400D629425289229eE563A1460137139FAd6bd"
+    "SessionRegistry": "0xf0Ff3e2644daB956549e5455dbBc5af568218c84",
+    "SessionState": "0x1e1E7743B635491C9Ba2750910576160A2ED63af",
+    "Randomness": "0x73248a55e4Ee7d830f2B08dD52474c2Bf732b5dA",
+    "FeeVault": "0x2d045827227198511e9bA7959680380C09d5b6C4"
   }
 }
