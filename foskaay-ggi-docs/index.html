@@ -406,27 +406,37 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         </table>
 
         <div class="ggi-h3">The ported game, a-z (this is the build spec)</div>
-        <ol class="ggi-list">
-            <li><b>Board (game-owned, shared).</b> One on-chain board account holding the grid and the
-                player seats, created by the game operator. Same fields as their
-                <span class="ggi-mono">Game</span>: status, size, players, cells.</li>
-            <li><b>Player account (player-owned, one per player).</b> Holds the player's score and any
-                per-player data. One account, many slots.</li>
-            <li><b>Join.</b> A player joins the board; the board records the player's authority.</li>
-            <li><b>Open the session.</b> The sponsor opens a GGI session for the match and registers
-                the board against it.</li>
-            <li><b>Command (the move).</b> The player's action is validated on-chain by the same rules as
-                their <span class="ggi-mono">command</span> system (adjacency, ownership, strength),
-                and the board and player account are updated.</li>
-            <li><b>Tick (the clock).</b> Their <span class="ggi-mono">tick</span> system grows cell
-                strength over time. On Arc this is a permissionless call anyone may make, or a
-                batched periodic write, never a cron server.</li>
-            <li><b>Settle.</b> The session settles: seal the digest, reveal the seed, charge the
-                one session fee. The final board state is on-chain.</li>
-            <li><b>Read-only frontend.</b> The UI subscribes to the board and player accounts and
-                renders them. It owns no state and keeps no local truth.</li>
-            <li><b>Explorer.</b> The same session is inspectable in the GGI Explorer.</li>
-        </ol>
+        <p class="ggi-body">
+            We keep their structure and their names so anyone can follow both codebases side by side.
+            Their game is a 16x8 grid (128 cells) with two players, cell kinds and strengths, a tick
+            clock, and a finish step. Here is every piece and the exact Foskaay GGI call it uses.
+        </p>
+        <table class="ggi-table">
+            <thead><tr><th>Step</th><th>MagicBlock (their code)</th><th>Foskaay GGI (our port)</th></tr></thead>
+            <tbody>
+                <tr><td>Create the board</td><td><span class="ggi-mono">AddEntity</span> + <span class="ggi-mono">InitializeComponent(Game)</span> with <span class="ggi-mono">status=Generate</span></td><td>Deploy/initialize the game's own <span class="ggi-mono">Game</span> contract account. No GGI call yet.</td></tr>
+                <tr><td>Make it live</td><td><span class="ggi-mono">createDelegateInstruction</span> (delegate the component to the ER)</td><td>Sponsor opens a session: <span class="ggi-mono">ggi.open({ participants: 2, ttlSecs, seeds })</span>, then <span class="ggi-mono">ggi.setGameState(sessionId, boardAddress)</span>. Same idea: the board is now owned by a live session.</td></tr>
+                <tr><td>Generate the map</td><td>system <span class="ggi-mono">generate</span></td><td>Game contract function <span class="ggi-mono">generate()</span>, gated by <span class="ggi-mono">registry.canSign(sessionId, seat, caller)</span>.</td></tr>
+                <tr><td>Lobby</td><td><span class="ggi-mono">status = Lobby</span></td><td>Same field, same meaning.</td></tr>
+                <tr><td>Join</td><td>system <span class="ggi-mono">join</span> sets <span class="ggi-mono">players[i].authority</span></td><td>Game function <span class="ggi-mono">join(seat)</span>; the sponsor sets the seat authority once: <span class="ggi-mono">ggi.setAuthority(sessionId, seat, playerAddress)</span>, so the chain knows who may play that seat.</td></tr>
+                <tr><td>Ready</td><td><span class="ggi-mono">players[i].ready = true</span></td><td>Same field.</td></tr>
+                <tr><td>Start</td><td>system <span class="ggi-mono">start</span> sets <span class="ggi-mono">status = Playing</span></td><td>Same, gated by <span class="ggi-mono">canSign</span>.</td></tr>
+                <tr><td>The move</td><td>system <span class="ggi-mono">command</span> (adjacency, ownership, strength, invade math)</td><td>Game function <span class="ggi-mono">command(...)</span> with the SAME rules, gated by <span class="ggi-mono">canSign</span>. In unbatched mode the sponsor anchors it on-chain per action; in batched mode it rolls into a window.</td></tr>
+                <tr><td>The clock</td><td>system <span class="ggi-mono">tick</span> (strength grows over time)</td><td>Game function <span class="ggi-mono">tick()</span>, PERMISSIONLESS (anyone may call it), or a batched periodic write. Never a cron server.</td></tr>
+                <tr><td>Finish</td><td>system <span class="ggi-mono">finish</span> sets <span class="ggi-mono">status = Finished</span></td><td>Game function <span class="ggi-mono">finish()</span>, then GGI settles: <span class="ggi-mono">ggi.settle(sessionId, { digest, seeds })</span> seals the result, reveals the seed and charges the one session fee.</td></tr>
+                <tr><td>Settle / commit back</td><td>commit + undelegate</td><td><span class="ggi-mono">ggi.settle(...)</span> for one match, or the optional <span class="ggi-mono">BatchedSettlement</span> window for many.</td></tr>
+                <tr><td>Read the game</td><td>subscribe to the component on the ER, decode</td><td>Read the game's board account from Arc (or decode the session's anchored actions). The frontend only renders; it owns nothing.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="ggi-h3">The rules we copy exactly (from their code)</div>
+        <ul class="ggi-list">
+            <li>Board: <span class="ggi-mono">status</span> (Generate, Lobby, Playing, Finished), <span class="ggi-mono">size_x</span> 16, <span class="ggi-mono">size_y</span> 8, two <span class="ggi-mono">players</span>, 128 <span class="ggi-mono">cells</span>.</li>
+            <li>Cell kinds: Field, City, Capital, Mountain, Forest. Owner: Player(0/1) or Nobody.</li>
+            <li>Move rules: cells must be adjacent; the source must be owned by the mover; Mountains are not walkable; source needs more than 1 strength; strength moved is a chosen percent.</li>
+            <li>Invade: if the target is yours, add strength; otherwise apply damage, and Forest halves the damage; the target is conquered when damage exceeds its strength.</li>
+            <li>Tick growth: Capital +1 every 5s, City +1 every 10s, Field +1 every 60s.</li>
+        </ul>
 
         <div class="ggi-note good">
             <b>Why this port is the right test.</b> If the game contract can hold the board, check
