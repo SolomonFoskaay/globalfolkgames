@@ -26,21 +26,81 @@ npm install @foskaay/ggi-sdk viem
 
 This is the part most first-time integrators get wrong, so it is stated plainly:
 
-- **Players pay nothing.** Ever. No gas, no top-ups.
-- **The game pays a small fixed fee per session** (once at open, once at settle).
-  It is charged in USDC, and the amount is read from the chain at runtime with
+- **Players pay nothing.** Ever. No gas, no top-ups, no popups. This rail has no
+  player-pay option at all, by design.
+- **The game pays a small fixed fee per session** (charged once, at settle). It is
+  charged in USDC, and the amount is read from the chain at runtime with
   `ggi.fees()`, never hardcoded here.
-- **Whoever submits the transaction pays the Arc gas.** In production that is
-  your **sponsor/relayer** (a server-side wallet your game controls), not the
-  player. Your game's backend builds and sends `open` and `settle` on the
-  player's behalf, so the player sees a normal "tap and play" experience.
-- **During play, nothing is sent to the chain at all.** Actions are signed by a
-  session key and folded into a digest locally. Only open and settle are
-  transactions.
+- **The game operator (a sponsor/relayer) submits and pays the transactions.** The
+  player's wallet is their **identity** and the **session-key authoriser**, nothing
+  more. A player with an empty wallet plays fine.
+- **During play, nothing is sent to the chain.** Actions are signed by a session
+  key and folded into a digest locally. Only open and settle are transactions.
 
-So the two wallets in a real game are: the **player's session key** (signs
-actions, holds no funds) and your **sponsor wallet** (pays the tiny gas and the
-per-session fee). A player's own wallet never has to be funded.
+So a real game has two roles: the **player's wallet** (identity, no funds needed)
+and your **sponsor wallet** (pays the tiny gas and the per-session fee).
+
+---
+
+## A wallet is required (it is the identity)
+
+You cannot credit points to nobody, so a wallet must be connected. Which wallet is
+your choice: Dynamic, MetaMask, or anything that provides a viem `WalletClient`.
+The SDK is wallet-agnostic: it accepts any `walletClient`.
+
+```js
+import { createWalletClient, custom, http } from 'viem';
+
+// Any provider works. For an injected wallet:
+const walletClient = createWalletClient({
+  chain,
+  transport: custom(window.ethereum),
+  account: (await window.ethereum.request({ method: 'eth_requestAccounts' }))[0],
+});
+```
+
+The player signs **one** thing per session (authorising their session key). After
+that, every action signs silently and costs nothing.
+
+---
+
+## The authority rule (the #1 integration trap)
+
+A session that never sets a **seat authority** can never be settled. `commitDigest`
+and `sealFinal` only accept a call from an authorised seat signer, so if you open a
+session and skip authorities, settlement reverts and you will not know why.
+
+Two ways to get it right:
+
+```js
+// Option A (easiest): pass authorities to open(), it sets them for you.
+const { sessionId } = await ggi.open({
+  participants: 1,
+  ttlSecs: 3600,
+  authorities: [playerAddress],   // index = seat
+});
+
+// Option B: call setAuthority yourself before you settle.
+await ggi.setAuthority(sessionId, 0, playerAddress);
+```
+
+If you forget, `settle()` now throws a clear message instead of a terse revert:
+"this session has no seat authority, so it cannot be settled."
+
+---
+
+## In the browser (no bundler needed)
+
+The package ships a ready browser bundle, so a plain HTML page can use it:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@foskaay/ggi-sdk/dist/ggi-sdk.browser.js"></script>
+<script>
+  const { foldDigest, payloadHashOf, ZERO_DIGEST, GgiClient } = window.GgiSdk;
+</script>
+```
+
+Or with a bundler, import it normally: `import { GgiClient } from '@foskaay/ggi-sdk'`.
 
 ---
 
