@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-21",
+  "updated": "2026-09-22",
   "note": "ADMIN TODO LEDGER. CURRENT is the live nested list; HISTORY keeps the most recent 10 archived lists (owner 2026-09-21, was 3), newest first; older ones are dropped so the file never grows unbounded. Rule: on every report/commit/push the agent archives the previous current to the front of history, caps history at 10, and writes the fresh full list as current. See .opencode/rules/todo-admin.md. This file is client-served, so it holds task text only, never secrets.",
   "statusLegend": {
     "DONE": "Completed and verified",
@@ -8,12 +8,12 @@
     "DEPRECATED": "Removed or replaced, kept for the record, do not build"
   },
   "current": {
-    "title": "Foskaay Gasless Games Infrastructure (GGI) - build the core, then the first demo",
-    "updated": "2026-09-21",
+    "title": "Foskaay Gasless Games Infrastructure (GGI) - core, SDK, first on-chain game demo, cost proof",
+    "updated": "2026-09-22",
     "items": [
       {
         "t": "(1) Foskaay GGI CORE - 4 unopinionated contracts (the rail)",
-        "s": "in_progress"
+        "s": "done"
       },
       {
         "t": "(1i) SessionRegistry DONE - open/close sessions, participant authorities, session keys scope+expiry, 1..N participants, un-front-runnable ids, capped TTL; 35/35 tests",
@@ -49,59 +49,71 @@
       },
       {
         "t": "(2) Foskaay GGI SDK - the one-line integration",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(2ii) @foskaay/ggi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(2iii) A README a stranger can follow: install, adapter, four calls, measured cost",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(3) FIRST DEMO - prove Foskaay GGI works for a real game",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(3i) Choose the first demo genre (owner pick: idle or casual). Decide before building.",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(3ii) Build the demo 50-line adapter (the only game-specific code)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(3iii) Wire the demo to the SDK and prove it plays gasless end to end",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(3iv) Ship the demo live and playable from /ggi-demos/ on a phone",
-        "s": "pending"
+        "s": "done"
+      },
+      {
+        "t": "(3v) Ported MagicBlock on-chain Generals to Arc as the first real demo: GeneralsGame.sol keeps the board and rules on-chain, every move gated by canSign; 138/138 forge tests",
+        "s": "done"
+      },
+      {
+        "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /ggi-demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
+        "s": "done"
       },
       {
         "t": "(4) Cost proof (the number that sells Foskaay GGI)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(4i) Measure the real per-session sponsor cost on Arc and publish it vs MagicBlock ER",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(4ii) Prove the floor: heavy play costs the same as light play inside a session",
-        "s": "pending"
+        "s": "done"
+      },
+      {
+        "t": "(4iii) Live measured cost per match on Arc testnet, unbatched vs batched, recorded in foskaay-ggi/deployments/generals-cost.json",
+        "s": "done"
       },
       {
         "t": "(5) OPTIONAL patterns - offered, never enforced (build only when a game asks)",
-        "s": "pending"
+        "s": "in_progress"
       },
       {
         "t": "(5i) Batched Settlement - Merkle window flush, cadence chosen by the dev (never forced to 100/1h)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(5ii) Managed Accounts - PlayerCore-style single account per player with slots (a cost optimisation)",
@@ -113,7 +125,7 @@
       },
       {
         "t": "(5iv) Session reader/explorer - so sessions and receipts are visible (MagicBlock needed one too)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(6) GFG itself migrates onto Foskaay GGI (later - after GI is proven)",
@@ -142,6 +154,140 @@
     ]
   },
   "history": [
+    {
+      "title": "Foskaay Gasless Games Infrastructure (GGI) - build the core, then the first demo",
+      "updated": "2026-09-21",
+      "items": [
+        {
+          "t": "(1) Foskaay GGI CORE - 4 unopinionated contracts (the rail)",
+          "s": "in_progress"
+        },
+        {
+          "t": "(1i) SessionRegistry DONE - open/close sessions, participant authorities, session keys scope+expiry, 1..N participants, un-front-runnable ids, capped TTL; 35/35 tests",
+          "s": "done"
+        },
+        {
+          "t": "(1ii) SessionState DONE - signed events with strictly-increasing sequence (no replay/reorder), opaque payloads, off-chain digest commit + final seal, bounded storage; 28/28 tests",
+          "s": "done"
+        },
+        {
+          "t": "(1iii) Session keys - silent signer + on-chain scope/expiry token, so players never see a popup",
+          "s": "done"
+        },
+        {
+          "t": "(1iv) Randomness - commit-reveal seed(s), stored as a LIST for future extra streams; hash(seed, counter)",
+          "s": "done"
+        },
+        {
+          "t": "(1v) FeeVault - per-session fee on open and settle; destination = owner wallet; charged on devnet too",
+          "s": "done"
+        },
+        {
+          "t": "(1vi) Foundry tests for each core contract (local, no chain, no cost)",
+          "s": "done"
+        },
+        {
+          "t": "(1vii) Live Arc testnet proof: one real session opened, acted on, settled, and verified on-chain",
+          "s": "done"
+        },
+        {
+          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+          "s": "done"
+        },
+        {
+          "t": "(2) Foskaay GGI SDK - the one-line integration",
+          "s": "pending"
+        },
+        {
+          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "s": "pending"
+        },
+        {
+          "t": "(2ii) @foskaay/ggi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
+          "s": "pending"
+        },
+        {
+          "t": "(2iii) A README a stranger can follow: install, adapter, four calls, measured cost",
+          "s": "pending"
+        },
+        {
+          "t": "(3) FIRST DEMO - prove Foskaay GGI works for a real game",
+          "s": "pending"
+        },
+        {
+          "t": "(3i) Choose the first demo genre (owner pick: idle or casual). Decide before building.",
+          "s": "pending"
+        },
+        {
+          "t": "(3ii) Build the demo 50-line adapter (the only game-specific code)",
+          "s": "pending"
+        },
+        {
+          "t": "(3iii) Wire the demo to the SDK and prove it plays gasless end to end",
+          "s": "pending"
+        },
+        {
+          "t": "(3iv) Ship the demo live and playable from /ggi-demos/ on a phone",
+          "s": "pending"
+        },
+        {
+          "t": "(4) Cost proof (the number that sells Foskaay GGI)",
+          "s": "pending"
+        },
+        {
+          "t": "(4i) Measure the real per-session sponsor cost on Arc and publish it vs MagicBlock ER",
+          "s": "pending"
+        },
+        {
+          "t": "(4ii) Prove the floor: heavy play costs the same as light play inside a session",
+          "s": "pending"
+        },
+        {
+          "t": "(5) OPTIONAL patterns - offered, never enforced (build only when a game asks)",
+          "s": "pending"
+        },
+        {
+          "t": "(5i) Batched Settlement - Merkle window flush, cadence chosen by the dev (never forced to 100/1h)",
+          "s": "pending"
+        },
+        {
+          "t": "(5ii) Managed Accounts - PlayerCore-style single account per player with slots (a cost optimisation)",
+          "s": "pending"
+        },
+        {
+          "t": "(5iii) Verifiers - per-game referee for disputes (Ludo first, when it matters)",
+          "s": "pending"
+        },
+        {
+          "t": "(5iv) Session reader/explorer - so sessions and receipts are visible (MagicBlock needed one too)",
+          "s": "pending"
+        },
+        {
+          "t": "(6) GFG itself migrates onto Foskaay GGI (later - after GI is proven)",
+          "s": "pending"
+        },
+        {
+          "t": "(6i) Decide how GFG maximises GI (owner call: account layout, cadence, patterns)",
+          "s": "pending"
+        },
+        {
+          "t": "(6ii) Ludo becomes the first real GFG game on GI",
+          "s": "pending"
+        },
+        {
+          "t": "(6iii) Then points, lives, premium as event/slot types",
+          "s": "pending"
+        },
+        {
+          "t": "(6iv) Then multiplayer, competitions, AGM, ERC-20 rewards",
+          "s": "pending"
+        },
+        {
+          "t": "(6v) Retire the old GFG settlement path (arcv2m17) once GI carries everything",
+          "s": "pending"
+        }
+      ]
+    },
     {
       "title": "Foskaay GGI build started (SessionRegistry + SessionState in progress)",
       "updated": "2026-09-21",
