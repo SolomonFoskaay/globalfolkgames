@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Foskaay Gasless Games Infrastructure (GGI) Docs</title>
+    <meta property="og:title" content="Foskaay Gasless Games Infrastructure (GGI) Docs">
+    <meta property="og:description" content="Add gasless play to any on-chain game: open a session, do everything inside for free, settle once. Players never pay gas and never see a wallet popup. Four small contracts, no infrastructure to run.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/foskaay-ggi-docs/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Foskaay Gasless Games Infrastructure (GGI) Docs">
+    <meta name="twitter:description" content="Add gasless play to any on-chain game: open a session, do everything inside for free, settle once.">
+    <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta name="description" content="Foskaay Gasless Games Infrastructure (GGI) documentation: add gasless play to any on-chain game on Arc. Open a session, do everything inside for free, settle once. Players pay nothing, no wallet popups, no infrastructure to run.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .ggi-wrap { max-width: 820px; margin: 0 auto; padding: 28px 16px 72px; }
+        .ggi-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+        .ggi-eyebrow { color: #f39c12; font-weight: 800; letter-spacing: 0.04em; font-size: 0.78rem; }
+        .ggi-h1 { font-size: 1.6rem; color: #fff; margin: 6px 0 10px; line-height: 1.25; }
+        .ggi-h2 { color: #fff; font-size: 1.18rem; margin: 0 0 10px; }
+        .ggi-h3 { color: #f39c12; font-size: 0.98rem; margin: 16px 0 6px; }
+        .ggi-body { color: #ddd; font-size: 0.92rem; line-height: 1.75; }
+        .ggi-body b { color: #fff; }
+        .ggi-body a { color: #f39c12; }
+        .ggi-list { color: #ddd; font-size: 0.92rem; line-height: 1.75; padding-left: 18px; margin: 8px 0; }
+        .ggi-list li { margin-bottom: 6px; }
+        .ggi-callout { border-left: 3px solid #9b59b6; background: rgba(155,89,182,0.08); border-radius: 0 10px 10px 0; padding: 12px 14px; margin: 12px 0; color: #e8e8e8; font-size: 0.9rem; line-height: 1.7; }
+        .ggi-callout.good { border-left-color: #2ecc71; background: rgba(46,204,113,0.08); }
+        .ggi-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; }
+        .ggi-table th, .ggi-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+        .ggi-table th { color: #f39c12; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .ggi-code { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 14px; margin: 10px 0; overflow-x: auto; }
+        .ggi-code code { color: #e8e8e8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; line-height: 1.7; white-space: pre; }
+        .ggi-pill { display: inline-block; font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.03em; }
+        .ggi-pill.testnet { background: rgba(243,156,18,0.16); color: #f39c12; border: 1px solid rgba(243,156,18,0.4); }
+        .ggi-pill.mainnet { background: rgba(46,204,113,0.14); color: #2ecc71; border: 1px solid rgba(46,204,113,0.4); }
+        .ggi-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; word-break: break-all; color: #cfe8ff; }
+        .ggi-tiny { font-size: 0.78rem; color: #999; line-height: 1.6; margin-top: 10px; }
+        .ggi-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; }
+        .ggi-toc a { font-size: 0.8rem; text-decoration: none; color: #f39c12; background: rgba(243,156,18,0.08); border: 1px solid rgba(243,156,18,0.25); border-radius: 999px; padding: 5px 11px; }
+    </style>
+</head>
+<body>
+
+<main class="ggi-wrap">
+
+    <section class="ggi-card">
+        <div class="ggi-eyebrow">FOSKAAY GASLESS GAMES INFRASTRUCTURE (GGI)</div>
+        <h1 class="ggi-h1">Add gasless play to any on-chain game</h1>
+        <p class="ggi-body">
+            Foskaay Gasless Games Infrastructure (GGI) lets a game open a <b>session</b> on-chain, do
+            everything inside for free, and settle once. Players never pay gas and never see a wallet
+            popup. The game pays a small fixed fee per session instead of a fee per action, so an
+            on-chain game can be as cheap to run as a normal web2 backend.
+        </p>
+        <div class="ggi-toc">
+            <a href="#why">Why use it</a>
+            <a href="#how">How it works</a>
+            <a href="#unopinionated">Built to fit your game</a>
+            <a href="#quickstart">Quickstart</a>
+            <a href="#contracts">Contracts</a>
+            <a href="#fees">Fees</a>
+            <a href="#hardware">What you run</a>
+        </div>
+    </section>
+
+    <section class="ggi-card" id="why">
+        <h2 class="ggi-h2">Why use it</h2>
+        <ul class="ggi-list">
+            <li><b>Players pay nothing.</b> No gas, no top-ups, no "insufficient funds" on a phone.</li>
+            <li><b>No wallet popups during play.</b> A session key signs every action silently.</li>
+            <li><b>Cheap by design.</b> The fee is per session, never per move, so a busy game costs the same as a quiet one.</li>
+            <li><b>Any game type.</b> A board game, an idle farm, a card game and a whole MMO are the same to the rail: participants, an opaque state, signed events, one settlement.</li>
+            <li><b>Nothing to run.</b> There is no validator, no RPC node and no rollup to operate. You deploy nothing extra.</li>
+            <li><b>Provable results.</b> Every action is signed, so a tampered action breaks the signature and a fake result cannot settle.</li>
+            <li><b>True costs, up front.</b> Fees are charged on testnet too, so you see real mainnet economics before you commit.</li>
+        </ul>
+    </section>
+
+    <section class="ggi-card" id="how">
+        <h2 class="ggi-h2">How it works</h2>
+        <p class="ggi-body">
+            Think of a session as a <b>room</b>. You open the room, everything inside is free, and you
+            settle it once at the end. Only the open and the settle touch the chain.
+        </p>
+        <table class="ggi-table">
+            <thead><tr><th>Step</th><th>What happens</th><th>On-chain?</th></tr></thead>
+            <tbody>
+                <tr><td><b>Open</b></td><td>Create the session: participants, an optional rules blob, a lifetime, and an optional committed random seed.</td><td>Yes, one transaction</td></tr>
+                <tr><td><b>Act</b></td><td>Record a signed action. The payload is opaque; the rail never reads it. As many actions as you like.</td><td>No, free</td></tr>
+                <tr><td><b>Settle</b></td><td>Close the session, reveal any committed seed, and seal the final digest.</td><td>Yes, one transaction</td></tr>
+            </tbody>
+        </table>
+        <div class="ggi-callout good">
+            <b>The result is tamper-evident.</b> Every action carries a signature and a sequence number,
+            all folded into one digest. Anyone can replay the action log and check it matches the sealed
+            digest, so the outcome cannot be quietly changed after the fact.
+        </div>
+    </section>
+
+    <section class="ggi-card" id="unopinionated">
+        <h2 class="ggi-h2">Built to fit your game, never the other way round</h2>
+        <p class="ggi-body">
+            GGI is deliberately <b>unopinionated</b>. It gives you primitives and makes no decision for
+            your game. It does not care how many players you have, how your data is laid out, or how
+            often you settle.
+        </p>
+        <div class="ggi-h3">The core (everything you need to ship)</div>
+        <table class="ggi-table">
+            <thead><tr><th>Contract</th><th>What it does</th></tr></thead>
+            <tbody>
+                <tr><td><b>SessionRegistry</b></td><td>Open and close a session; set who may act for each participant; register session keys with scope and expiry.</td></tr>
+                <tr><td><b>SessionState</b></td><td>Accept signed actions: an opaque payload, a sequence number and a running digest.</td></tr>
+                <tr><td><b>Randomness</b></td><td>Commit-reveal random seeds for the games that ask. One stream by default, or as many as your game needs.</td></tr>
+                <tr><td><b>FeeVault</b></td><td>Collect the per-session fee and send it to a destination you choose.</td></tr>
+            </tbody>
+        </table>
+        <div class="ggi-h3">Optional patterns (use them, ignore them, or build your own)</div>
+        <ul class="ggi-list">
+            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window. The cadence is yours.</li>
+            <li><b>Managed accounts.</b> One account per player with slots for every game and feature.</li>
+            <li><b>Verifiers.</b> A per-game referee that settles a disagreement by replaying the actions.</li>
+            <li><b>House or relayer as a participant.</b> For games with an AI or house opponent.</li>
+        </ul>
+        <div class="ggi-callout">
+            A developer who wants a separate account per player, per feature, and a commit on every turn
+            can do exactly that here and pay a little more. That is your cost to optimise. Our job is to
+            make the floor cheap, not to tell you how to build.
+        </div>
+    </section>
+
+    <section class="ggi-card" id="quickstart">
+        <h2 class="ggi-h2">Quickstart</h2>
+        <p class="ggi-body">
+            Integrating is three things: install a package, write a small adapter for your game, and call
+            four functions. There is no fork and no contract to copy.
+        </p>
+        <div class="ggi-code"><code>npm install @foskaay/ggi-sdk</code></div>
+        <ol class="ggi-list">
+            <li><b>Install</b> <span class="ggi-mono">@foskaay/ggi-sdk</span> (and <span class="ggi-mono">@foskaay/ggi-contracts</span> if your own contract calls the rail directly).</li>
+            <li><b>Write a small adapter</b> that turns your game's state into the opaque payload. This is the only game-specific code, and it lives in your game.</li>
+            <li><b>Call four functions:</b> open, act, settle, and (optionally) dispute.</li>
+        </ol>
+        <div class="ggi-code"><code>// Pseudo-code: the shape of an integration
+const ggi = new GgiClient({ network: 'arc-testnet' });
+
+// 1. open a session for this match (one transaction)
+const sessionId = await ggi.open({
+  participants: 2,
+  ttlSecs: 3600,
+  rulesHash: hashOf(myGameRules),
+  seedCommit: optionalCommit,
+});
+
+// 2. record actions during play: free, signed, no popup
+await ggi.act(sessionId, { seat: 0, sequence: 1, payload: myMove });
+
+// 3. settle once at the end (one transaction)
+await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</code></div>
+        <p class="ggi-tiny">
+            Full API reference and the adapter example ship with the SDK README. This page is the
+            overview; the package docs go deeper.
+        </p>
+    </section>
+
+    <section class="ggi-card" id="contracts">
+        <h2 class="ggi-h2">Contracts</h2>
+        <p class="ggi-body">
+            The same four core contracts are deployed per network. The addresses below are public and
+            safe to use in your app.
+        </p>
+
+        <div class="ggi-h3"><span class="ggi-pill testnet">TESTNET</span> Arc Testnet (chain id 5042002)</div>
+        <table class="ggi-table">
+            <thead><tr><th>Contract</th><th>Address</th></tr></thead>
+            <tbody>
+                <tr><td>SessionRegistry</td><td class="ggi-mono">0x46A34743e8210F5C8C574b7CbEe1C1cb5Ca63bE5</td></tr>
+                <tr><td>SessionState</td><td class="ggi-mono">0xf464d11660bFC091481D2D688FeaD97447f69E43</td></tr>
+                <tr><td>Randomness</td><td class="ggi-mono">0x50CD0A75ca6412f751BEb6E7E4d48da2D5aea6Db</td></tr>
+                <tr><td>FeeVault</td><td class="ggi-mono">0xDf400D629425289229eE563A1460137139FAd6bd</td></tr>
+            </tbody>
+        </table>
+        <p class="ggi-tiny">
+            RPC <span class="ggi-mono">https://rpc.testnet.arc.io</span> &nbsp;|&nbsp;
+            Explorer <span class="ggi-mono">https://explorer.testnet.arc.io</span> &nbsp;|&nbsp;
+            USDC <span class="ggi-mono">0x3600000000000000000000000000000000000000</span>
+        </p>
+
+        <div class="ggi-h3"><span class="ggi-pill mainnet">MAINNET</span> Arc Mainnet (chain id 5042)</div>
+        <table class="ggi-table">
+            <thead><tr><th>Contract</th><th>Address</th></tr></thead>
+            <tbody>
+                <tr><td>SessionRegistry</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
+                <tr><td>SessionState</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
+                <tr><td>Randomness</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
+                <tr><td>FeeVault</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
+            </tbody>
+        </table>
+        <p class="ggi-tiny">
+            Mainnet addresses will appear here, in the same format, once deployment is done. Nothing in
+            the SDK hardcodes these, so switching networks is one setting.
+        </p>
+    </section>
+
+    <section class="ggi-card" id="fees">
+        <h2 class="ggi-h2">Fees</h2>
+        <ul class="ggi-list">
+            <li><b>Players pay nothing.</b> Always. The game pays a small fixed fee per session.</li>
+            <li><b>Charged twice per session:</b> once at open and once at settle. An abandoned session pays only the open fee.</li>
+            <li><b>Never per action.</b> A thousand moves and one move cost the same, so heavy games are not punished.</li>
+            <li><b>Paid in USDC,</b> a stablecoin, so the price does not swing with a volatile token.</li>
+            <li><b>Set by the operator,</b> changeable with one call and never baked into your code: the SDK reads the current fee at runtime.</li>
+        </ul>
+        <div class="ggi-h3">How the cost compares</div>
+        <p class="ggi-body">
+            MagicBlock is a leader in gasless gaming on Solana, and their model bills a delegation
+            session plus each commit. Here is where Foskaay GGI stands beside it, at a standard
+            $100 per SOL:
+        </p>
+        <table class="ggi-table">
+            <thead><tr><th></th><th>MagicBlock (Solana)</th><th>Foskaay GGI (Arc)</th></tr></thead>
+            <tbody>
+                <tr><td>Per session</td><td>0.0003 SOL (about $0.03)</td><td>Owner-set, per session</td></tr>
+                <tr><td>Per commit</td><td>0.0001 SOL (about $0.01)</td><td>Included in settle</td></tr>
+                <tr><td>A match (1 session + 2 commits)</td><td>0.0005 SOL (about $0.05)</td><td>About $0.0015 all-in on testnet</td></tr>
+                <tr><td>Denominated in</td><td>VOLATILE token</td><td>Stable USDC</td></tr>
+                <tr><td>Infrastructure you run</td><td>ER endpoints</td><td>None</td></tr>
+            </tbody>
+        </table>
+        <div class="ggi-callout">
+            <b>Why you might pick Foskaay GGI.</b> It works on EVM, specifically Arc, where an ER cannot
+            run. Gas is a stablecoin, not a volatile token. There is no infrastructure to operate. The
+            fee is per session, not per commit, so a heavy game is not punished. And because fees are
+            charged on testnet too, you measure your real mainnet cost before you commit to anything.
+        </div>
+        <p class="ggi-tiny">
+            Exact numbers depend on your usage and on-chain gas. The point is the shape: a fixed cost per
+            session, in a stablecoin, with nothing to run.
+        </p>
+    </section>
+
+    <section class="ggi-card" id="hardware">
+        <h2 class="ggi-h2">What you run</h2>
+        <p class="ggi-body">
+            <b>Nothing extra.</b> There is no validator, no RPC node and no rollup to operate. You
+            deploy your own game as usual and call the four core contracts. The rail handles the room;
+            your game owns its economy.
+        </p>
+        <div class="ggi-callout good">
+            <b>Honest limits, so there are no surprises.</b> Inside a session the state is signed, not a
+            live parallel machine, so a third party cannot read your mid-session state the way they can
+            read a public account. A relayer submits the settlement, and it is trusted for <b>timing</b>,
+            never for <b>truth</b> (the signatures decide what is true). And the rail ships its own
+            session reader so sessions and receipts are visible.
+        </div>
+    </section>
+
+    <div class="ggi-tiny" style="text-align:center; margin-top: 18px;">
+        Foskaay Gasless Games Infrastructure (GGI). Built by Foskaay for GlobalFolkGames and for any
+        game that wants gasless play on Arc.
+    </div>
+
+</main>
+
+<script src="/global_header.js"></script>
+</body>
+</html>

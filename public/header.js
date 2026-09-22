@@ -69,6 +69,7 @@
                 heading: 'Discover',
                 items: [
                     { label: '🧪 GGI Demos', href: '/ggi-demos/', match: 'ggi-demos' },
+                    { label: '🛠️ GGI Docs', href: '/foskaay-ggi-docs/', match: 'foskaay-ggi-docs' },
                     { label: 'Premium Plans', href: '/profile/subscription.html', match: 'pricing' },
                     { label: 'What’s New', href: '/changelog/', match: 'changelog' },
                     { label: 'About', href: '/about/', match: 'about' },
