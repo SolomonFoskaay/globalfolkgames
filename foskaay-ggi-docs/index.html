@@ -123,7 +123,7 @@
         </table>
         <div class="ggi-h3">Optional patterns (use them, ignore them, or build your own)</div>
         <ul class="ggi-list">
-            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window. The cadence is yours.</li>
+            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window, for the cheapest tier. <b>You choose the window</b> on-chain: 10 games every 35 minutes, or 1,000 games every 24 hours, or anything in between. Flushing is permissionless (no admin, no server). The trade-off: a result becomes final when the window flushes, so use it only where that is acceptable to your players.</li>
             <li><b>Managed accounts.</b> One account per player with slots for every game and feature.</li>
             <li><b>Verifiers.</b> A per-game referee that settles a disagreement by replaying the actions.</li>
             <li><b>House or relayer as a participant.</b> For games with an AI or house opponent.</li>
@@ -177,13 +177,19 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
         </p>
 
         <div class="ggi-h3"><span class="ggi-pill testnet">TESTNET</span> Arc Testnet (chain id 5042002)</div>
+        <p class="ggi-body">
+            These addresses are <b>permanent</b>. The contracts are upgradeable behind
+            proxies, so improving the rail never changes an address and never moves
+            your data.
+        </p>
         <table class="ggi-table">
             <thead><tr><th>Contract</th><th>Address</th></tr></thead>
             <tbody>
-                <tr><td>SessionRegistry</td><td class="ggi-mono">0x46A34743e8210F5C8C574b7CbEe1C1cb5Ca63bE5</td></tr>
-                <tr><td>SessionState</td><td class="ggi-mono">0xf464d11660bFC091481D2D688FeaD97447f69E43</td></tr>
-                <tr><td>Randomness</td><td class="ggi-mono">0x50CD0A75ca6412f751BEb6E7E4d48da2D5aea6Db</td></tr>
-                <tr><td>FeeVault</td><td class="ggi-mono">0xDf400D629425289229eE563A1460137139FAd6bd</td></tr>
+                <tr><td>SessionRegistry</td><td class="ggi-mono">0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5</td></tr>
+                <tr><td>SessionState</td><td class="ggi-mono">0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e</td></tr>
+                <tr><td>Randomness</td><td class="ggi-mono">0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b</td></tr>
+                <tr><td>FeeVault</td><td class="ggi-mono">0x4cf542791faeb683f878bd3d119683e0C02F9905</td></tr>
+                <tr><td>BatchedSettlement <span class="ggi-pill" style="background:rgba(155,89,182,0.16);color:#9b59b6;border:1px solid rgba(155,89,182,0.4);">OPTIONAL</span></td><td class="ggi-mono">0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4</td></tr>
             </tbody>
         </table>
         <p class="ggi-tiny">
