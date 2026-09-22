@@ -1,6 +1,6 @@
 {
   "name": "@foskaay/ggi-contracts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Solidity interfaces and deployed addresses for Foskaay Gasless Games Infrastructure (GGI). Install, point at a network, call four functions.",
   "license": "MIT",
   "type": "module",
@@ -11,8 +11,12 @@
   ],
   "main": "deployments/index.js",
   "exports": {
-    ".": "./deployments/index.js",
-    "./deployments": "./deployments/index.js"
+    ".": {
+      "import": "./deployments/index.js",
+      "default": "./deployments/index.js"
+    },
+    "./deployments": "./deployments/index.js",
+    "./addresses.json": "./deployments/addresses.json"
   },
   "keywords": [
     "foskaay",

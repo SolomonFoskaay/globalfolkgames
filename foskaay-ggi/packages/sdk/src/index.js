@@ -29,9 +29,13 @@ import {
   getAddress,
 } from 'viem';
 
-// Addresses are imported as a JS object (not JSON) so every bundler and Node
-// version works the same way. The JSON file remains the single source of truth.
-import addresses from '../../contracts/deployments/addresses.js';
+// Addresses come from the PUBLISHED dependency @foskaay/ggi-contracts, not a
+// relative repo path: a relative path works in the monorepo but breaks the
+// moment the SDK is installed on its own (which is exactly how a game dev gets
+// it). Requiring the sibling package keeps one source of truth and makes the
+// published SDK self-contained.
+import ggiContracts from '@foskaay/ggi-contracts';
+const addresses = ggiContracts.all;
 
 // ---------------------------------------------------------------- ABIs
 
