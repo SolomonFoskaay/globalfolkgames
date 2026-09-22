@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {SessionRegistry} from "../../src/SessionRegistry.sol";
+import {SessionRegistry} from "../../../src/SessionRegistry.sol";
 
 /// @title GeneralsGame — the ported on-chain game (MagicBlock solana-generals -> Arc + GGI).
 ///
@@ -59,7 +59,7 @@ contract GeneralsGame {
     event Started(uint256 indexed boardId);
     event Commanded(uint256 indexed boardId, uint8 playerIndex, uint8 sourceX, uint8 sourceY, uint8 targetX, uint8 targetY, uint8 strengthPercent);
     event TickDone(uint256 indexed boardId, uint64 tickNextSlot);
-    event Finished(uint256 indexed boardId);
+    event Finished(uint256 indexed boardId, uint8 playerIndex);
 
     error StatusIsNotGenerate();
     error StatusIsNotLobby();
@@ -221,12 +221,27 @@ contract GeneralsGame {
         emit TickDone(boardId, b.tickNextSlot);
     }
 
-    /// @notice Finish the game (their `finish` system).
-    function finish(uint256 boardId) external {
-        Board storage b = _authorised(boardId, 0);
+    /// @notice Finish the game (their `finish` system): the caller wins only when
+    ///         NO cell is owned by any other player (last one standing).
+    function finish(uint256 boardId, uint8 playerIndex) external {
+        Board storage b = _authorised(boardId, playerIndex);
         if (b.status != GameStatus.Playing) revert StatusIsNotPlaying();
-        b.status = GameStatus.Finished;
-        emit Finished(boardId);
+        if (playerIndex >= 2) revert PlayerIsNotPayer();
+
+        bool finished = true;
+        for (uint8 x = 0; x < b.sizeX && finished; x++) {
+            for (uint8 y = 0; y < b.sizeY; y++) {
+                GameCell storage c = _cell(b, x, y);
+                if (c.ownerKind == GameCellOwnerKind.Player && c.ownerPlayer != playerIndex) {
+                    finished = false;
+                    break;
+                }
+            }
+        }
+        if (finished) {
+            b.status = GameStatus.Finished;
+            emit Finished(boardId, playerIndex);
+        }
     }
 
     // ---------------------------------------------------------------- reads
@@ -268,33 +283,36 @@ contract GeneralsGame {
         return s > 255 ? 255 : uint8(s);
     }
 
-    /// @dev Deterministic generation, no randomness needed: mountains and forests
-    ///      on a fixed pattern, cities on some fields, one capital per seat.
+    /// @dev The map, copied EXACTLY from their `generate` system: the whole board
+    ///      is fields, then four cities, then one capital per seat. Their sample
+    ///      leaves mountains and forests commented out, so we add none either.
+    ///      No randomness: the same board every time, like theirs.
     function _generate(Board storage b) private {
+        // whole map is fields
         for (uint8 x = 0; x < b.sizeX; x++) {
             for (uint8 y = 0; y < b.sizeY; y++) {
                 GameCell storage c = b.cells[uint256(y) * uint256(b.sizeX) + uint256(x)];
-                if ((x + y) % 11 == 0) {
-                    c.kind = GameCellKind.Mountain;
-                    c.strength = 0;
-                } else if ((x * 3 + y * 7) % 13 == 0) {
-                    c.kind = GameCellKind.Forest;
-                    c.strength = 0;
-                } else if ((x + y) % 9 == 0) {
-                    c.kind = GameCellKind.City;
-                    c.strength = 40;
-                } else {
-                    c.kind = GameCellKind.Field;
-                    c.strength = 0;
-                }
+                c.kind = GameCellKind.Field;
                 c.ownerKind = GameCellOwnerKind.Nobody;
                 c.ownerPlayer = 0;
+                c.strength = 0;
             }
         }
-        // capitals per seat
-        GameCell storage c0 = b.cells[uint256(b.sizeY - 1) * uint256(b.sizeX) + 0];
-        c0.kind = GameCellKind.Capital; c0.ownerKind = GameCellOwnerKind.Player; c0.ownerPlayer = 0; c0.strength = 20;
-        GameCell storage c1 = b.cells[uint256(0) * uint256(b.sizeX) + uint256(b.sizeX - 1)];
-        c1.kind = GameCellKind.Capital; c1.ownerKind = GameCellOwnerKind.Player; c1.ownerPlayer = 1; c1.strength = 20;
+        // cities (corners + center), exactly their coordinates
+        _put(b, 2, 5, GameCellKind.City, GameCellOwnerKind.Nobody, 0, 40);
+        _put(b, 13, 2, GameCellKind.City, GameCellOwnerKind.Nobody, 0, 40);
+        _put(b, 7, 3, GameCellKind.City, GameCellOwnerKind.Nobody, 0, 40);
+        _put(b, 8, 4, GameCellKind.City, GameCellOwnerKind.Nobody, 0, 40);
+        // players' capitals, exactly their coordinates
+        _put(b, 1, 1, GameCellKind.Capital, GameCellOwnerKind.Player, 0, 20);
+        _put(b, 14, 6, GameCellKind.Capital, GameCellOwnerKind.Player, 1, 20);
+    }
+
+    function _put(Board storage b, uint8 x, uint8 y, GameCellKind kind, GameCellOwnerKind ownerKind, uint8 ownerPlayer, uint8 strength) private {
+        GameCell storage c = b.cells[uint256(y) * uint256(b.sizeX) + uint256(x)];
+        c.kind = kind;
+        c.ownerKind = ownerKind;
+        c.ownerPlayer = ownerPlayer;
+        c.strength = strength;
     }
 }

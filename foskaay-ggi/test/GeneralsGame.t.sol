@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {GeneralsGame} from "../examples/GeneralsGame/GeneralsGame.sol";
+import {GeneralsGame} from "../demos/pvp/generals/GeneralsGame.sol";
 import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {Deploy} from "./Deploy.sol";
 
@@ -14,6 +14,11 @@ interface Vm {
 /// PROOF of the port: the ported generals game runs fully on-chain, and every
 /// action is authorised by a live GGI session. Two players, real moves, real
 /// rules, no frontend trust.
+///
+/// The game contract lives in the demo folder (`demos/pvp/generals/`); this test
+/// lives in the standard Foundry `test/` path so `forge test` finds it. That is
+/// the whole reason for the split: Foundry has one test path, and the demo stays
+/// self-contained with its game.
 contract GeneralsGameTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -65,26 +70,32 @@ contract GeneralsGameTest {
         require(reg.gameStateOf(sid) == address(game), "board linked to the session");
         require(uint256(game.boardStatus(BOARD)) == 2, "Playing");
 
-        // P1 owns its capital at (0, 7). Move strength toward an adjacent field.
-        // Capital is at x=0, y=sizeY-1=7. Target (1,7) is adjacent.
-        vm.prank(P1);
-        game.command(BOARD, 0, 0, 7, 1, 7, 50);
+        // The generated map puts P1's capital at (1,1), exactly their coordinates.
+        GeneralsGame.GameCell memory cap = game.cellOf(BOARD, 1, 1);
+        require(cap.kind == GeneralsGame.GameCellKind.Capital, "capital at (1,1)");
+        require(cap.ownerPlayer == 0, "capital owned by P1");
 
-        GeneralsGame.GameCell memory target = game.cellOf(BOARD, 1, 7);
+        // Move half of the capital's movable strength into the adjacent field (2,1).
+        // moved = (20 - 1) * 50 / 100 = 9, which conquers the empty field.
+        vm.prank(P1);
+        game.command(BOARD, 0, 1, 1, 2, 1, 50);
+
+        GeneralsGame.GameCell memory target = game.cellOf(BOARD, 2, 1);
         require(target.ownerKind == GeneralsGame.GameCellOwnerKind.Player, "invaded a cell");
         require(target.ownerPlayer == 0, "owned by P1 now");
+        require(target.strength == 9, "conquer leftover strength");
 
-        // finish
+        // Last-one-standing: P2 still holds its capital, so finish(0) must NOT end it.
         vm.prank(P1);
-        game.finish(BOARD);
-        require(uint256(game.boardStatus(BOARD)) == 3, "Finished");
+        game.finish(BOARD, 0);
+        require(uint256(game.boardStatus(BOARD)) == 2, "not finished while opponent lives");
     }
 
     function testStrangerCannotMove() public {
         _startedGame();
         vm.prank(STRANGER);
         vm.expectRevert();
-        game.command(BOARD, 0, 0, 7, 1, 7, 50);
+        game.command(BOARD, 0, 1, 1, 2, 1, 50);
     }
 
     function testPlayerCannotPlayOtherSeat() public {
@@ -92,7 +103,7 @@ contract GeneralsGameTest {
         // P2 tries to move P1's cell
         vm.prank(P2);
         vm.expectRevert();
-        game.command(BOARD, 0, 0, 7, 1, 7, 50);
+        game.command(BOARD, 0, 1, 1, 2, 1, 50);
     }
 
     function testMovesBlockedAfterSessionCloses() public {
@@ -101,19 +112,27 @@ contract GeneralsGameTest {
         reg.close(sid);
         vm.prank(P1);
         vm.expectRevert();
-        game.command(BOARD, 0, 0, 7, 1, 7, 50);
+        game.command(BOARD, 0, 1, 1, 2, 1, 50);
     }
 
     function testTickIsPermissionlessAndGrowsStrength() public {
         _startedGame();
-        // capital at (0,7) owned by P1, strength 20
-        uint8 before = game.cellOf(BOARD, 0, 7).strength;
-        // advance blocks so the tick clock moves; anyone may call tick
+        // P1 capital at (1,1) starts at strength 20.
+        uint8 before = game.cellOf(BOARD, 1, 1).strength;
+        // Advance so the tick clock crosses a 5-second boundary (100 ticks at
+        // TICKS_PER_SECOND=20); a stranger may call tick, no cron needed.
         vm.roll(block.number + 200);
         vm.prank(STRANGER);
         game.tick(BOARD);
-        uint8 afterStrength = game.cellOf(BOARD, 0, 7).strength;
-        require(afterStrength >= before, "capital strength did not fall");
+        uint8 afterStrength = game.cellOf(BOARD, 1, 1).strength;
+        require(afterStrength == before + 1, "capital grew by 1 on the 5s tick");
+    }
+
+    function testFinishRefusedForStranger() public {
+        _startedGame();
+        vm.prank(STRANGER);
+        vm.expectRevert();
+        game.finish(BOARD, 0);
     }
 
     function testCannotStartOutsideLiveSession() public {
