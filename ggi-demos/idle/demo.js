@@ -189,12 +189,18 @@
         return j;
     }
 
-    // We do not hide the real cost: we read the sponsor's actual spend is complex
-    // client-side, so we show the SESSION MODEL (2 writes unbatched, 3-4 batched)
-    // multiplied by the measured per-write cost. The exact figure comes from the
-    // cost measurement script and is stated in the docs.
-    var PER_WRITE_USD = 0.0030; // measured Arc cost per write, see /foskaay-ggi-docs/#fees
-    function accountWrites(n) { S.writes += n; S.costUsd = S.writes * PER_WRITE_USD; setMeter(); }
+    // REAL COST, never estimated. Every sponsored call returns the actual USDC the
+    // sponsor spent for it (gasUsed x effectiveGasPrice, read from the receipt by
+    // the relay). We add up those real amounts and show the running total, so a
+    // dev testing this sees the true cost live. NO hardcoded figures anywhere.
+    function accountRealCost(res, writes) {
+        if (writes) S.writes += writes;
+        if (res && res.costUsdc6 != null) {
+            var real = Number(res.costUsdc6) / 1e6;
+            if (isFinite(real) && real >= 0) S.costUsd += real;
+        }
+        setMeter();
+    }
 
     // ---- run lifecycle --------------------------------------------------------
     async function startRun() {
@@ -226,7 +232,7 @@
             });
             S.sessionId = openRes.sessionId;
             // open + setAuthority = 2 sponsored writes, per the docs spec
-            accountWrites(2);
+            accountRealCost(openRes, 2);
             log('Session opened: ' + S.sessionId);
             $('if-core-line').innerHTML = 'Session live. <b>You never pay a fee.</b> Actions are free; they are signed and folded into the result.';
             $('if-session-line').innerHTML = 'Session <span class="if-mono">' + S.sessionId + '</span>';
@@ -249,15 +255,15 @@
         try {
             if (S.mode === 'batched') {
                 // batched: submit the digest into a window, then flush if ready
-                await relay('batchSubmit', { sessionId: S.sessionId, digest: S.digest, maxSize: 4, windowSecs: 600 });
-                accountWrites(1);
+                var sub = await relay('batchSubmit', { sessionId: S.sessionId, digest: S.digest, maxSize: 4, windowSecs: 600 });
+                accountRealCost(sub, 1);
                 log('Digest submitted to a batch window.');
                 var f = await relay('batchFlush', {});
-                if (f && f.tx) { accountWrites(1); log('Window flushed into one Merkle root.'); }
+                if (f && f.tx) { accountRealCost(f, 1); log('Window flushed into one Merkle root.'); }
                 else { log('Window not ready to flush yet (needs to be full or past its deadline).'); }
             } else {
-                await relay('settle', { sessionId: S.sessionId, digest: S.digest, seeds: [S.seed] });
-                accountWrites(2);
+                var stl = await relay('settle', { sessionId: S.sessionId, digest: S.digest, seeds: [S.seed] });
+                accountRealCost(stl, 5);
                 log('Settled: closed, seed revealed, result sealed (instant).');
             }
             S.running = false;

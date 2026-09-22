@@ -81,11 +81,29 @@ function clients() {
   return { account, pub, wallet };
 }
 
+// Send one sponsored transaction and return BOTH the receipt and the REAL cost
+// the sponsor paid for it, in USDC base units (6dp), computed from the receipt:
+// gasUsed x effectiveGasPrice. This is never estimated or hardcoded: it is what
+// Arc actually charged, so the demo can show the truth (this is marketing for the
+// tool, and a fake number would destroy the trust the tool sells).
 async function send(wallet, pub, req) {
   const hash = await wallet.writeContract(req);
   const rc = await pub.waitForTransactionReceipt({ hash });
   if (rc.status !== 'success') throw new Error('tx reverted: ' + hash);
-  return rc;
+  let costUsdc6 = 0n;
+  try {
+    const gasUsed = rc.gasUsed || 0n;
+    let price = rc.effectiveGasPrice;
+    if (price == null) {
+      const tx = await pub.getTransaction({ hash });
+      price = tx.gasPrice || 0n;
+    }
+    // Arc's native asset is USDC with 18 decimals, so gasUsed x price is in
+    // 18dp USDC. The ERC-20 view is 6dp, so divide by 1e12 to match the token.
+    const wei18 = gasUsed * (price || 0n);
+    costUsdc6 = wei18 / 1_000_000_000_000n;
+  } catch (_) { /* cost stays 0 if the receipt lacks the fields */ }
+  return { rc, hash, costUsdc6 };
 }
 
 // One-time approval of the FeeVault so the sponsor can pay the session fee.
@@ -93,11 +111,12 @@ async function ensureFeeAllowance(wallet, pub, account) {
   const current = await pub.readContract({
     address: USDC, abi: erc20Abi, functionName: 'allowance', args: [account.address, ADDR.FeeVault],
   });
-  if (current >= 10_000_000n) return; // plenty for many sessions
-  await send(wallet, pub, {
+  if (current >= 10_000_000n) return 0n; // plenty for many sessions
+  const r = await send(wallet, pub, {
     address: USDC, abi: erc20Abi, functionName: 'approve',
     args: [ADDR.FeeVault, 100_000_000n], account, // 100 USDC allowance, sponsor's own funds
   });
+  return r.costUsdc6;
 }
 
 async function doOpen(body) {
@@ -112,13 +131,14 @@ async function doOpen(body) {
       functionName: 'commitHashOf', args: [body.seeds],
     });
   }
-  const rc = await send(wallet, pub, {
+  const r0 = await send(wallet, pub, {
     address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'open',
     args: [participants, BigInt(ttlSecs), rulesHash, seedCommit], account,
   });
-  const log = rc.logs.find((l) => l.address.toLowerCase() === ADDR.SessionRegistry.toLowerCase());
+  const log = r0.rc.logs.find((l) => l.address.toLowerCase() === ADDR.SessionRegistry.toLowerCase());
   const sessionId = log ? log.topics[1] : null;
-  const txs = [rc.transactionHash];
+  const txs = [r0.hash];
+  let costUsdc6 = r0.costUsdc6;
 
   // CRITICAL (found by the demo outsider test): sealFinal and commitDigest only
   // accept a call from a SEAT AUTHORITY. A game that opens a session and never
@@ -134,52 +154,57 @@ async function doOpen(body) {
       address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'setAuthority',
       args: [sessionId, seat, auth], account,
     });
-    txs.push(r.transactionHash);
+    txs.push(r.hash);
+    costUsdc6 += r.costUsdc6;
   }
 
-  return { sessionId, seedCommit, tx: txs[0], txs };
+  return { sessionId, seedCommit, tx: txs[0], txs, costUsdc6: costUsdc6.toString() };
 }
 
 async function doSetAuthority(body) {
   const { account, pub, wallet } = clients();
-  const rc = await send(wallet, pub, {
+  const r = await send(wallet, pub, {
     address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'setAuthority',
     args: [body.sessionId, Number(body.seat), body.authority], account,
   });
-  return { tx: rc.transactionHash };
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
 }
 
 async function doSettle(body) {
   const { account, pub, wallet } = clients();
   const txs = [];
+  let costUsdc6 = 0n;
   // 1. close
-  txs.push((await send(wallet, pub, { address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'close', args: [body.sessionId], account })).transactionHash);
+  { const r = await send(wallet, pub, { address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'close', args: [body.sessionId], account }); txs.push(r.hash); costUsdc6 += r.costUsdc6; }
   // 2. reveal (optional)
   if (Array.isArray(body.seeds) && body.seeds.length) {
-    txs.push((await send(wallet, pub, { address: ADDR.Randomness, abi: rndAbi, functionName: 'reveal', args: [body.sessionId, body.seeds], account })).transactionHash);
+    const r = await send(wallet, pub, { address: ADDR.Randomness, abi: rndAbi, functionName: 'reveal', args: [body.sessionId, body.seeds], account }); txs.push(r.hash); costUsdc6 += r.costUsdc6;
   }
   // 3. seal the game's final digest
   if (body.digest) {
-    txs.push((await send(wallet, pub, { address: ADDR.SessionState, abi: stateAbi, functionName: 'sealFinal', args: [body.sessionId, body.digest], account })).transactionHash);
+    const r = await send(wallet, pub, { address: ADDR.SessionState, abi: stateAbi, functionName: 'sealFinal', args: [body.sessionId, body.digest], account }); txs.push(r.hash); costUsdc6 += r.costUsdc6;
   }
   // 4. the ONE per-session fee (sponsor pays; player never pays)
-  await ensureFeeAllowance(wallet, pub, account);
-  txs.push((await send(wallet, pub, { address: ADDR.FeeVault, abi: vaultAbi, functionName: 'chargeSession', args: [body.sessionId], account })).transactionHash);
-  return { txs };
+  costUsdc6 += await ensureFeeAllowance(wallet, pub, account);
+  { const r = await send(wallet, pub, { address: ADDR.FeeVault, abi: vaultAbi, functionName: 'chargeSession', args: [body.sessionId], account }); txs.push(r.hash); costUsdc6 += r.costUsdc6; }
+  return { txs, costUsdc6: costUsdc6.toString() };
 }
 
 async function doBatchSubmit(body) {
   const { account, pub, wallet } = clients();
+  let costUsdc6 = 0n;
   // ensure the game's window rules exist (set once). Different devs choose their
   // own cadence; the demo uses a small window so a flush is quick to see.
   try {
     const count = await pub.readContract({ address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'windowCount', args: [account.address] });
     if (count === 0n) {
-      await send(wallet, pub, { address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'setWindowConfig', args: [Number(body.maxSize || 4), Number(body.windowSecs || 600)], account });
+      const r = await send(wallet, pub, { address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'setWindowConfig', args: [Number(body.maxSize || 4), Number(body.windowSecs || 600)], account });
+      costUsdc6 += r.costUsdc6;
     }
   } catch (_) { /* config may already be set */ }
   const rc = await send(wallet, pub, { address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'submit', args: [body.sessionId, body.digest], account });
-  return { tx: rc.transactionHash };
+  costUsdc6 += rc.costUsdc6;
+  return { tx: rc.hash, costUsdc6: costUsdc6.toString() };
 }
 
 async function doBatchFlush(body) {
@@ -191,10 +216,10 @@ async function doBatchFlush(body) {
     const can = await pub.readContract({ address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'canFlush', args: [owner, BigInt(i)] });
     if (can) {
       const rc = await send(wallet, pub, { address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'flush', args: [owner, BigInt(i)], account });
-      return { tx: rc.transactionHash, windowId: i };
+      return { tx: rc.hash, windowId: i, costUsdc6: rc.costUsdc6.toString() };
     }
   }
-  return { tx: null, note: 'no window ready to flush yet' };
+  return { tx: null, costUsdc6: '0', note: 'no window ready to flush yet' };
 }
 
 export default async function handler(req, res) {
