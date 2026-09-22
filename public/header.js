@@ -68,14 +68,13 @@
             {
                 heading: 'Discover',
                 items: [
-                    { label: '🧪 GGI Demos', href: '/ggi-demos/', match: 'ggi-demos' },
-                    { label: '🛠️ GGI Docs', href: '/foskaay-ggi-docs/', match: 'foskaay-ggi-docs' },
                     { label: 'Premium Plans', href: '/profile/subscription.html', match: 'pricing' },
                     { label: 'What’s New', href: '/changelog/', match: 'changelog' },
                     { label: 'About', href: '/about/', match: 'about' },
                     { label: 'Forum', href: '/forum/', match: 'forum' },
                     { label: 'Support', href: '/support/', match: 'support' },
-                    { label: 'Contact', href: '/contact/', match: 'contact' }
+                    { label: 'Contact', href: '/contact/', match: 'contact' },
+                    { label: '🎮 Foskaay GGI Demos', href: '/ggi-demos/', match: 'ggi' }
                 ]
             },
             {
