@@ -167,11 +167,21 @@ export class GgiClient {
 
   // ------------------------------------------------------------ OPEN
 
-  /// Open a session. One transaction. Returns { sessionId, tx }.
+  /// Open a session. One transaction (+ one per authority you pass).
+  /// Returns { sessionId, tx, txs, seedCommit }.
+  ///
+  /// IMPORTANT (this was a real integration blind spot): a session that never
+  /// sets a seat authority can NEVER be settled, because SessionState only
+  /// accepts commitDigest/sealFinal from an authorised seat signer. So if you
+  /// pass `authorities`, this sets them for you right after open. Do that, or
+  /// call setAuthority() yourself before you settle. The most common setup is
+  /// one authority per player (their wallet or their session key).
+  ///
   /// @param cfg.participants 1..64
   /// @param cfg.ttlSecs up to 7 days
   /// @param cfg.rulesHash optional commitment to your rules blob (default zero)
   /// @param cfg.seeds optional array; if given, its commitment is sealed at open
+  /// @param cfg.authorities optional array of seat authorities (index = seat), set after open
   async open(cfg = {}) {
     this.requireWallet();
     const participants = Number(cfg.participants || 1);
@@ -197,7 +207,23 @@ export class GgiClient {
       (l) => l.address && l.address.toLowerCase() === this.addresses.SessionRegistry.toLowerCase()
     );
     const sessionId = log ? log.topics[1] : null;
-    return { sessionId, tx: rc.transactionHash, seedCommit };
+
+    // Set seat authorities if the caller gave them, so the session is settlable.
+    const txs = [rc.transactionHash];
+    if (Array.isArray(cfg.authorities) && cfg.authorities.length) {
+      for (let seat = 0; seat < participants; seat++) {
+        const auth = cfg.authorities[seat] || cfg.authorities[0];
+        if (!auth) continue;
+        const r = await this.write({
+          address: this.addresses.SessionRegistry,
+          abi: registryAbi,
+          functionName: 'setAuthority',
+          args: [sessionId, seat, getAddress(auth)],
+        });
+        txs.push(r.transactionHash);
+      }
+    }
+    return { sessionId, tx: rc.transactionHash, txs, seedCommit };
   }
 
   /// Set who may sign for a seat (call before play).
@@ -268,8 +294,8 @@ export class GgiClient {
 
   // ------------------------------------------------------------ SETTLE
 
-  /// Settle a session. One transaction: close, reveal seeds, seal final digest,
-  /// and pay the open/settle fee. Returns { tx, revealed, sealed }.
+  /// Settle a session. Closes it, reveals seeds, seals the final digest and pays
+  /// the one per-session fee. Returns { tx, revealed, sealed, paid }.
   /// @param cfg.digest the final digest from your off-chain log
   /// @param cfg.mode 'events' (recorded on-chain) or 'digest' (off-chain log)
   /// @param cfg.seeds optional seeds to reveal (must match the open commitment)
@@ -277,6 +303,28 @@ export class GgiClient {
   async settle(sessionId, cfg = {}) {
     this.requireWallet();
     const out = { tx: [], revealed: false, sealed: false, paid: false };
+
+    // PRE-FLIGHT (blind-spot guard): sealing a final digest requires an authorised
+    // seat signer. If none is set, the on-chain call reverts with a terse error.
+    // We check first and throw a clear, actionable message instead.
+    if (cfg.digest) {
+      const session = await this.getSession(sessionId);
+      const count = Number(session.participantCount || 0);
+      let anyAuthority = false;
+      for (let seat = 0; seat < count; seat++) {
+        const a = await this.publicClient.readContract({
+          address: this.addresses.SessionRegistry, abi: registryAbi,
+          functionName: 'authorityOf', args: [sessionId, seat],
+        }).catch(() => '0x0000000000000000000000000000000000000000');
+        if (a && a !== '0x0000000000000000000000000000000000000000') { anyAuthority = true; break; }
+      }
+      if (!anyAuthority) {
+        throw new Error(
+          'GGI: this session has no seat authority, so it cannot be settled. ' +
+          'Call setAuthority(sessionId, seat, signer) first, or pass { authorities } to open().'
+        );
+      }
+    }
 
     // 1. your game's final digest (optional: only if you kept the log off-chain
     //    and want it anchored; a game that recorded events on-chain skips this).

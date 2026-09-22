@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Idle Farm (gasless demo) | Foskaay GGI</title>
+    <meta property="og:title" content="Idle Farm, a gasless on-chain demo">
+    <meta property="og:description" content="Hundreds of actions, two chain writes. Play an idle farm that runs fully on-chain with zero gas and zero wallet popups. Powered by Foskaay Gasless Games Infrastructure.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/ggi-demos/idle/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Idle Farm, a gasless on-chain demo">
+    <meta name="twitter:description" content="Hundreds of actions, two chain writes. Zero gas, zero popups.">
+    <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta name="description" content="Idle Farm demo: play a fully on-chain idle game with zero gas and zero wallet popups. Prove that heavy play costs the same as light play. Powered by Foskaay Gasless Games Infrastructure.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .if-wrap { max-width: 720px; margin: 0 auto; padding: 20px 12px 90px; }
+        .if-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+        .if-eyebrow { color: #f39c12; font-weight: 800; letter-spacing: 0.04em; font-size: 0.72rem; }
+        .if-h1 { font-size: 1.4rem; color: #fff; margin: 6px 0 6px; line-height: 1.25; }
+        .if-body { color: #ddd; font-size: 0.9rem; line-height: 1.7; }
+        .if-body b { color: #fff; }
+        .if-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; word-break: break-all; color: #cfe8ff; }
+        .if-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 2px; }
+        .if-stat { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 11px; padding: 10px 8px; text-align: center; }
+        .if-stat .n { color: #fff; font-weight: 800; font-size: 1.15rem; }
+        .if-stat .l { color: #999; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+        .if-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+        .if-plot { aspect-ratio: 1 / 1; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: transform 0.12s ease, background 0.2s ease; position: relative; overflow: hidden; }
+        .if-plot:active { transform: scale(0.96); }
+        .if-plot .emoji { font-size: 1.7rem; line-height: 1; }
+        .if-plot .lvl { font-size: 0.62rem; color: #bbb; margin-top: 3px; }
+        .if-plot.ready { background: rgba(46,204,113,0.14); border-color: rgba(46,204,113,0.45); }
+        .if-plot.water { background: rgba(52,152,219,0.16); border-color: rgba(52,152,219,0.45); }
+        .if-btn { display: block; width: 100%; box-sizing: border-box; text-align: center; border: 0; border-radius: 11px; padding: 13px; font-weight: 800; font-size: 0.92rem; margin-top: 10px; background: linear-gradient(135deg,#f39c12,#e86818); color: #000; cursor: pointer; }
+        .if-btn.ghost { background: transparent; border: 1px solid #333; color: #f39c12; }
+        .if-btn:disabled { opacity: 0.5; cursor: default; }
+        .if-toggle { display: flex; gap: 6px; margin: 8px 0; }
+        .if-tgl { flex: 1; text-align: center; padding: 10px 6px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: #bbb; }
+        .if-tgl.active { background: linear-gradient(135deg,#f39c12,#e86818); color: #000; border-color: transparent; }
+        .if-note { border-left: 3px solid #9b59b6; background: rgba(155,89,182,0.08); border-radius: 0 10px 10px 0; padding: 10px 12px; margin: 10px 0; color: #e8e8e8; font-size: 0.84rem; line-height: 1.6; }
+        .if-note.good { border-left-color: #2ecc71; background: rgba(46,204,113,0.08); }
+        .if-note.warn { border-left-color: #f39c12; background: rgba(243,156,18,0.08); }
+        .if-tiny { font-size: 0.74rem; color: #999; line-height: 1.55; }
+        .if-log { max-height: 130px; overflow-y: auto; background: rgba(0,0,0,0.35); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
+        .if-log div { font-size: 0.74rem; color: #bbb; font-family: ui-monospace, monospace; line-height: 1.5; }
+        .if-hide { display: none; }
+    </style>
+</head>
+<body>
+
+<main class="if-wrap">
+
+    <section class="if-card">
+        <div class="if-eyebrow">FOSKAAY GGI DEMO</div>
+        <h1 class="if-h1">Idle Farm</h1>
+        <p class="if-body">
+            Plant, water and harvest. Every tap is an <b>action</b>, and every action is free:
+            it is signed silently and folded into one result. Only the start and the finish touch the
+            chain. Watch the meter: that is the whole point.
+        </p>
+        <div class="if-note">Players pay nothing. The game pays a tiny fee per session. There are no wallet popups during play.</div>
+    </section>
+
+    <section class="if-card">
+        <div class="if-meter">
+            <div class="if-stat"><div class="n" id="if-actions">0</div><div class="l">actions</div></div>
+            <div class="if-stat"><div class="n" id="if-writes">0</div><div class="l">chain writes</div></div>
+            <div class="if-stat"><div class="n" id="if-cost">$0.000000</div><div class="l">cost so far</div></div>
+        </div>
+        <div class="if-note good" id="if-core-line">Connect a wallet to start. Your wallet is your identity; you never pay a fee.</div>
+    </section>
+
+    <section class="if-card">
+        <div class="if-tiny" style="margin-bottom:4px;">Settlement mode</div>
+        <div class="if-toggle">
+            <div class="if-tgl active" data-mode="unbatched">Unbatched (instant result)</div>
+            <div class="if-tgl" data-mode="batched">Batched (cheapest)</div>
+        </div>
+        <div class="if-tiny" id="if-mode-note">Each session settles on its own. The result is final immediately.</div>
+    </section>
+
+    <section class="if-card">
+        <button class="if-btn" id="if-connect">Connect wallet</button>
+        <div class="if-grid" id="if-grid"></div>
+        <button class="if-btn ghost" id="if-water-all" disabled>Water all ready plots</button>
+        <button class="if-btn" id="if-finish" disabled>Finish run (settle)</button>
+        <div class="if-log" id="if-log"></div>
+    </section>
+
+    <section class="if-card">
+        <div class="if-tiny" id="if-session-line">No session yet.</div>
+        <button class="if-btn ghost" id="if-explorer" disabled>Open this session in the Explorer</button>
+    </section>
+
+</main>
+
+<script src="/global_header.js"></script>
+<script src="/dash-nav.js"></script>
+<script src="/ggi-nav.js"></script>
+<script src="/ggi-demos/idle/ggi-sdk.browser.js"></script>
+<script src="/ggi-demos/idle/demo.js"></script>
+<script>window.GFG_GGI_NAV.render({ active: 'demos' });</script>
+</body>
+</html>
