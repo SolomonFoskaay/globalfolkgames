@@ -130,6 +130,12 @@
                 <b style="color:#fff">What this proves.</b> The game's board is its OWN contract on Arc, not browser state. Every move calls the contract, and the contract checks the GGI session before it accepts a move. The rail underneath is <a href="/foskaay-ggi-docs/">Foskaay Gasless Games Infrastructure</a>, and you can see every session in the <a href="/ggi-explorer/">GGI Explorer</a>. The game is a port of MagicBlock's open-source Generals sample, with their graphics.
             </p>
         </div>
+
+        <div class="gg-panel">
+            <p class="gg-note">
+                <b style="color:#fff">How the cost works, plainly.</b> Arc has no free execution layer, so every move in this demo is a real on-chain transaction. The sponsor (the game operator) pays it, never you. Batching (the optional GGI pattern) folds the final settlement of many matches into one on-chain stamp; it does not remove the per-move writes. A game that keeps its board off-chain during play and settles once pays far less.
+            </p>
+        </div>
     </div>
 </main>
 
