@@ -1,0 +1,69 @@
+{
+  "chainId": 5042002,
+  "measuredAt": "2026-09-22T03:11:20.938Z",
+  "sponsor": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
+  "perOperation": [
+    {
+      "label": "open (session start)",
+      "usdc": 0.003018,
+      "gasUsed": "120731"
+    },
+    {
+      "label": "setAuthority seat 0",
+      "usdc": 0.001289,
+      "gasUsed": "51550"
+    },
+    {
+      "label": "setAuthority seat 1",
+      "usdc": 0.001283,
+      "gasUsed": "51334"
+    },
+    {
+      "label": "registerSessionKey",
+      "usdc": 0.000866,
+      "gasUsed": "34624"
+    },
+    {
+      "label": "recordEvent (1 event tx)",
+      "usdc": 0.002806,
+      "gasUsed": "112229"
+    },
+    {
+      "label": "close (session end)",
+      "usdc": 0.000858,
+      "gasUsed": "34338"
+    },
+    {
+      "label": "reveal (seed)",
+      "usdc": 0.003214,
+      "gasUsed": "128565"
+    },
+    {
+      "label": "sealFinal (result)",
+      "usdc": 0.001646,
+      "gasUsed": "65841"
+    },
+    {
+      "label": "USDC.approve (fee)",
+      "usdc": 0.000959,
+      "gasUsed": "38326"
+    },
+    {
+      "label": "chargeOpen (rail fee)",
+      "usdc": 0.003858,
+      "gasUsed": "114344"
+    },
+    {
+      "label": "chargeSettle (rail fee)",
+      "usdc": 0.002809,
+      "gasUsed": "92350"
+    }
+  ],
+  "sessionModelA_settleOnce_total": 0.019799999999999998,
+  "sessionModelA_returningPlayerPerGame": 0.016362,
+  "perOnchainEvent": 0.002806,
+  "gamesPerDollar_settleOnce_new": 50,
+  "gamesPerDollar_settleOnce_returning": 61,
+  "gamesPerDollar_commitPerAction_50": 6,
+  "runTotalUsdc": 0.022606
+}

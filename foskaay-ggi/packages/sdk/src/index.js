@@ -27,7 +27,10 @@ import {
   toBytes,
   encodePacked,
   getAddress,
+  recoverMessageAddress,
 } from 'viem';
+
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 // Addresses come from the PUBLISHED dependency @foskaay/ggi-contracts, not a
 // relative repo path: a relative path works in the monorepo but breaks the
@@ -437,6 +440,43 @@ export class GgiClient {
       args: [this.addresses.FeeVault, amount],
     });
     return true;
+  }
+  // ------------------------------------------------------------ session keys
+
+  /// Create a fresh ephemeral session keypair in the browser/app. This is the
+  /// throwaway signer that makes play silent (no wallet popup per action).
+  /// Returns { privateKey, address }. Keep the private key in memory only (or an
+  /// encrypted store), register the ADDRESS on-chain once, and use it to sign.
+  /// An outsider should never have to know how to do this: it is one call.
+  createSessionKey() {
+    const privateKey = generatePrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    return { privateKey, address: account.address, account };
+  }
+
+  /// Sign one action string with a session key (silent, no wallet popup).
+  /// `key` is the object from createSessionKey(), or a raw private key.
+  /// Returns the signature hex, ready to store with your off-chain log.
+  async signAction(key, signThis) {
+    const pk = typeof key === 'string' ? key : key && key.privateKey;
+    if (!pk) throw new Error('GGI: signAction needs a session key from createSessionKey().');
+    const acct = privateKeyToAccount(pk);
+    return acct.signMessage({ message: signThis });
+  }
+
+  /// Record an action AND sign it in one call, so a game does not have to stitch
+  /// the two together. Returns { state, digest, signThis, signature }.
+  async actSigned(state, action, key) {
+    const r = this.act(state, action);
+    const signature = await this.signAction(key, r.signThis);
+    return { ...r, signature };
+  }
+
+  /// Verify an action signature recovers to the expected session-key address.
+  /// This is what a game (or its verifier) runs during a dispute.
+  async verifyAction(signThis, signature, expectedKeyAddress) {
+    const got = await recoverMessageAddress({ message: signThis, signature });
+    return got.toLowerCase() === getAddress(expectedKeyAddress).toLowerCase();
   }
 }
 
