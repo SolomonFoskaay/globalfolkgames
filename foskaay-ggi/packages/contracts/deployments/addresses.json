@@ -8,12 +8,15 @@
     "usdc": "0x3600000000000000000000000000000000000000",
     "usdcDecimals": 6,
     "contracts": {
-      "SessionRegistry": "0x46A34743e8210F5C8C574b7CbEe1C1cb5Ca63bE5",
-      "SessionState": "0xf464d11660bFC091481D2D688FeaD97447f69E43",
-      "Randomness": "0x50CD0A75ca6412f751BEb6E7E4d48da2D5aea6Db",
-      "FeeVault": "0xDf400D629425289229eE563A1460137139FAd6bd"
+      "SessionRegistry": "0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5",
+      "SessionState": "0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e",
+      "Randomness": "0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b",
+      "FeeVault": "0x4cf542791faeb683f878bd3d119683e0C02F9905",
+      "BatchedSettlement": "0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4"
     },
-    "deployedAt": "2026-09-22"
+    "deployedAt": "2026-09-22",
+    "upgradeable": true,
+    "pattern": "UUPS proxies; permanent addresses"
   },
   "mainnet": {
     "name": "Arc Mainnet",

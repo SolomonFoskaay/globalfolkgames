@@ -383,6 +383,58 @@ token) on the **`osv1Arc`** branch. Solana is frozen on `osv1` as the fallback.
   (`/changelog/research.html`); the build phases belong to arcv2m16, and
   architecture.json changes need the owner's explicit approval.
 
+### Foskaay Gasless Games Infrastructure (GGI, arcv2m18)
+
+The rail OTHER game devs adopt to make games gasless on Arc. It is a STANDALONE
+project (`foskaay-ggi/`, its own Foundry project, its own deploy, moving to its
+own repo later) and is DISTINCT from arcv2m17 (GFG-BS, the discarded opinionated
+design). Never merge the two. Full name is **Foskaay Gasless Games
+Infrastructure**; short form **Foskaay GGI** ("Foskaay" is never shortened).
+Never call it an "ER". Spec lives in `architecture.json` module `arcv2m18`; the
+long-form note is `docs/foskaay-ggi-spec.md`; the public docs page is
+`/foskaay-ggi-docs/`.
+
+- **CORE = exactly 4 unopinionated contracts:** SessionRegistry, SessionState,
+  Randomness, FeeVault. BatchedSettlement is an OPTIONAL separate contract, never
+  core. Optional patterns are OFFERED, never enforced: Batched Settlement,
+  Managed Accounts (PlayerCore-style), Verifiers, House/relayer-as-participant.
+- **Law 1:** the rail never learns a game concept (no board/token/position/seat/
+  turn/dice). **Law 2:** account layout is the DEV's choice; upgrades must be safe.
+- **THE CONTRACTS ARE UPGRADEABLE (UUPS proxies, locked 2026-09-22).** The proxy
+  addresses are PERMANENT. Do NOT deploy fresh addresses on mainnet: that strands
+  every open session and all data (the exact mistake publishing-first caught on
+  testnet). Rules for ANY agent touching these contracts:
+  1. **Storage layout is APPEND-ONLY.** Never reorder, rename or remove a state
+     variable, including the `uint256[20] __gap` and the `version` marker. New
+     variables consume from the top of the gap and the gap shrinks by the same
+     number of slots. A reorder reads live data as garbage.
+  2. **Never re-add a constructor with state.** Initialization goes through
+     `initialize()` (re-init guarded); the implementation is
+     `_disableInitializers()` so it can never be used directly. Logic-only
+     upgrades must NOT bump `version`; layout changes MUST.
+  3. **ALWAYS run the upgrade-safety tests** (`foskaay-ggi/test/UpgradeSafety.t.sol`)
+     which prove an upgrade keeps the address and preserves data. Run the full
+     suite (`forge test` in `foskaay-ggi/`, 126 tests) before any deploy.
+  4. **Report after every contract upgrade:** state plainly to the owner (a) the
+     proxy address unchanged, (b) that open sessions and all data were checked to
+     still read correctly, (c) the tx, and (d) the new logic version/summary.
+     Silence after an upgrade is not acceptable.
+  5. Upgrade authority is the owner now; move it to a timelock or multisig BEFORE
+     mainnet (a single key that can silently repoint the logic is a trust risk on
+     a rail other devs build on).
+- **Batching is DEV-CONFIGURED, never imposed.** A game calls `setWindowConfig`
+  on the OPTIONAL BatchedSettlement (e.g. 10 games/35min, or 1000/24h). Each
+  window snapshots its rules at open. Flush is PERMISSIONLESS (full or past
+  deadline); no admin, cron, server or manual button sits in the flush path.
+- **Deploy mechanics:** `forge script script/DeployGI.s.sol:DeployGI --rpc-url
+  <arc> --private-key <key> --broadcast`. The forge cache/broadcast files contain
+  the deploy key, so they are gitignored AND scrubbed locally after each deploy
+  (defense in depth). Packages: `@foskaay/ggi-sdk`, `@foskaay/ggi-contracts` on
+  npm; the SDK reads the per-session fee at runtime, never hardcoded.
+- **Cost (measured, never claimed):** ~63 games/$1 unbatched on Arc testnet;
+  batching is the path to hundreds-to-thousands. Always re-measure with
+  `node scripts/ggi-cost-measure.mjs` and update the recorded numbers.
+
 ## Core architecture (current)
 
 - **Player identity:** Solana wallet via Dynamic wallet (email OTP). Session-key

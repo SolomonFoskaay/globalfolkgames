@@ -27,7 +27,10 @@ import {
   toBytes,
   encodePacked,
   getAddress,
+  recoverMessageAddress,
 } from 'viem';
+
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 // Addresses come from the PUBLISHED dependency @foskaay/ggi-contracts, not a
 // relative repo path: a relative path works in the monorepo but breaks the
@@ -73,15 +76,11 @@ const rndAbi = parseAbi([
 ]);
 
 const vaultAbi = parseAbi([
-  'function chargeOpen(bytes32 sessionId)',
-  'function chargeSettle(bytes32 sessionId)',
-  'function withdraw(address token)',
-  'function openFee() view returns (uint256)',
-  'function settleFee() view returns (uint256)',
+  'function chargeSession(bytes32 sessionId)',
+  'function sessionFee() view returns (uint256)',
   'function feeToken() view returns (address)',
   'function collected(address token) view returns (uint256)',
-  'function lockedSettleFee(bytes32 sessionId) view returns (uint256)',
-  'function paymentOf(bytes32 sessionId) view returns (address, address)',
+  'function paymentOf(bytes32 sessionId) view returns (address, uint256)',
 ]);
 
 const erc20Abi = parseAbi([
@@ -274,28 +273,13 @@ export class GgiClient {
   /// @param cfg.digest the final digest from your off-chain log
   /// @param cfg.mode 'events' (recorded on-chain) or 'digest' (off-chain log)
   /// @param cfg.seeds optional seeds to reveal (must match the open commitment)
-  /// @param cfg.payFee default true; charges the per-session fee
+  /// @param cfg.payFee default true; charges the single per-session fee
   async settle(sessionId, cfg = {}) {
     this.requireWallet();
-    const out = { tx: [], revealed: false, sealed: false };
+    const out = { tx: [], revealed: false, sealed: false, paid: false };
 
-    // 1. fee (open stage) - charge before closing, so the session is live.
-    if (cfg.payFee !== false) {
-      const fee = await this.fees();
-      if (fee.open > 0n) {
-        await this.ensureAllowance(fee.open + fee.settle);
-        out.tx.push(
-          (await this.write({
-            address: this.addresses.FeeVault,
-            abi: vaultAbi,
-            functionName: 'chargeOpen',
-            args: [sessionId],
-          })).transactionHash
-        );
-      }
-    }
-
-    // 2. your game's final digest
+    // 1. your game's final digest (optional: only if you kept the log off-chain
+    //    and want it anchored; a game that recorded events on-chain skips this).
     if (cfg.mode === 'digest' && cfg.digest) {
       await this.write({
         address: this.addresses.SessionState,
@@ -305,7 +289,7 @@ export class GgiClient {
       });
     }
 
-    // 3. close the session
+    // 2. close the session
     await this.write({
       address: this.addresses.SessionRegistry,
       abi: registryAbi,
@@ -313,7 +297,8 @@ export class GgiClient {
       args: [sessionId],
     });
 
-    // 4. reveal seeds if any were committed
+    // 3. reveal seeds if any were committed. OPTIONAL on purpose: a game that
+    //    asked for no randomness never calls this and never pays for it.
     if (Array.isArray(cfg.seeds) && cfg.seeds.length) {
       await this.write({
         address: this.addresses.Randomness,
@@ -324,7 +309,7 @@ export class GgiClient {
       out.revealed = true;
     }
 
-    // 5. seal the final digest
+    // 4. seal the final digest
     if (cfg.digest) {
       await this.write({
         address: this.addresses.SessionState,
@@ -335,18 +320,20 @@ export class GgiClient {
       out.sealed = true;
     }
 
-    // 6. fee (settle stage, locked at open)
+    // 5. the ONE per-session fee
     if (cfg.payFee !== false) {
       const fee = await this.fees();
-      if (fee.settle > 0n) {
+      if (fee.session > 0n) {
+        await this.ensureAllowance(fee.session);
         out.tx.push(
           (await this.write({
             address: this.addresses.FeeVault,
             abi: vaultAbi,
-            functionName: 'chargeSettle',
+            functionName: 'chargeSession',
             args: [sessionId],
           })).transactionHash
         );
+        out.paid = true;
       }
     }
 
@@ -410,15 +397,15 @@ export class GgiClient {
     });
   }
 
-  /// The CURRENT fees, read from chain at runtime (never hardcoded).
+  /// The CURRENT fee, read from chain at runtime (never hardcoded). There is one
+  /// per-session fee, charged once at settle.
   async fees() {
-    if (!this.addresses.FeeVault) return { open: 0n, settle: 0n, token: null };
-    const [open, settle, token] = await Promise.all([
-      this.publicClient.readContract({ address: this.addresses.FeeVault, abi: vaultAbi, functionName: 'openFee' }),
-      this.publicClient.readContract({ address: this.addresses.FeeVault, abi: vaultAbi, functionName: 'settleFee' }),
+    if (!this.addresses.FeeVault) return { session: 0n, token: null };
+    const [session, token] = await Promise.all([
+      this.publicClient.readContract({ address: this.addresses.FeeVault, abi: vaultAbi, functionName: 'sessionFee' }),
       this.publicClient.readContract({ address: this.addresses.FeeVault, abi: vaultAbi, functionName: 'feeToken' }),
     ]);
-    return { open, settle, token };
+    return { session, token };
   }
 
   async ensureAllowance(amount) {
@@ -437,6 +424,43 @@ export class GgiClient {
       args: [this.addresses.FeeVault, amount],
     });
     return true;
+  }
+  // ------------------------------------------------------------ session keys
+
+  /// Create a fresh ephemeral session keypair in the browser/app. This is the
+  /// throwaway signer that makes play silent (no wallet popup per action).
+  /// Returns { privateKey, address }. Keep the private key in memory only (or an
+  /// encrypted store), register the ADDRESS on-chain once, and use it to sign.
+  /// An outsider should never have to know how to do this: it is one call.
+  createSessionKey() {
+    const privateKey = generatePrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    return { privateKey, address: account.address, account };
+  }
+
+  /// Sign one action string with a session key (silent, no wallet popup).
+  /// `key` is the object from createSessionKey(), or a raw private key.
+  /// Returns the signature hex, ready to store with your off-chain log.
+  async signAction(key, signThis) {
+    const pk = typeof key === 'string' ? key : key && key.privateKey;
+    if (!pk) throw new Error('GGI: signAction needs a session key from createSessionKey().');
+    const acct = privateKeyToAccount(pk);
+    return acct.signMessage({ message: signThis });
+  }
+
+  /// Record an action AND sign it in one call, so a game does not have to stitch
+  /// the two together. Returns { state, digest, signThis, signature }.
+  async actSigned(state, action, key) {
+    const r = this.act(state, action);
+    const signature = await this.signAction(key, r.signThis);
+    return { ...r, signature };
+  }
+
+  /// Verify an action signature recovers to the expected session-key address.
+  /// This is what a game (or its verifier) runs during a dispute.
+  async verifyAction(signThis, signature, expectedKeyAddress) {
+    const got = await recoverMessageAddress({ message: signThis, signature });
+    return got.toLowerCase() === getAddress(expectedKeyAddress).toLowerCase();
   }
 }
 

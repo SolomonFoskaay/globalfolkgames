@@ -22,15 +22,39 @@ npm install @foskaay/ggi-sdk viem
 
 ---
 
+## Who pays what (read this first)
+
+This is the part most first-time integrators get wrong, so it is stated plainly:
+
+- **Players pay nothing.** Ever. No gas, no top-ups.
+- **The game pays a small fixed fee per session** (once at open, once at settle).
+  It is charged in USDC, and the amount is read from the chain at runtime with
+  `ggi.fees()`, never hardcoded here.
+- **Whoever submits the transaction pays the Arc gas.** In production that is
+  your **sponsor/relayer** (a server-side wallet your game controls), not the
+  player. Your game's backend builds and sends `open` and `settle` on the
+  player's behalf, so the player sees a normal "tap and play" experience.
+- **During play, nothing is sent to the chain at all.** Actions are signed by a
+  session key and folded into a digest locally. Only open and settle are
+  transactions.
+
+So the two wallets in a real game are: the **player's session key** (signs
+actions, holds no funds) and your **sponsor wallet** (pays the tiny gas and the
+per-session fee). A player's own wallet never has to be funded.
+
+---
+
 ## The four calls
 
 ```js
-import { GgiClient } from '@foskaay/ggi-sdk';
+import { GgiClient, ZERO_DIGEST } from '@foskaay/ggi-sdk';
 import { createWalletClient, http } from 'viem';
 
+// The walletClient is your SPONSOR wallet (the one that pays gas). On a server
+// it is a key you control; for a quick local test it can be any funded wallet.
 const ggi = new GgiClient({
   network: 'testnet',                 // 'testnet' | 'mainnet'
-  walletClient,                       // a viem WalletClient that signs
+  walletClient,                       // pays gas for open and settle
 });
 
 // 1. OPEN a session (one transaction)
@@ -42,8 +66,16 @@ const { sessionId } = await ggi.open({
 });
 
 // 2. ACT during play: FREE, signed, no popup, no chain write
+const key = ggi.createSessionKey();   // the player's throwaway signer
+await ggi.registerSessionKey(key.address, Math.floor(Date.now() / 1000) + 3600);
+
 let state = { sessionId, digest: ZERO_DIGEST, eventCount: 0 };
-state = ggi.act(state, { seat: 0, sequence: 1, payload: myMove }).state;
+const step = await ggi.actSigned(
+  state,
+  { seat: 0, sequence: 1, payload: myMove },
+  key
+);
+state = step.state;                   // keep this; store step.signature with your log
 
 // 3. SETTLE once at the end (one transaction): close + reveal + seal + fee
 await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });
@@ -53,6 +85,29 @@ if (disagreement) ggi.dispute(sessionId, myReveal);
 ```
 
 That is the entire API surface. Everything else is read helpers.
+
+---
+
+## Proving it is tamper-proof (the whole point)
+
+An action's signature is what makes the result trustable. You can show this in
+four lines: sign an action, verify it, then change the action and watch the
+signature stop matching.
+
+```js
+const key = ggi.createSessionKey();
+const state = { sessionId, digest: ZERO_DIGEST, eventCount: 0 };
+
+const a = await ggi.actSigned(state, { seat: 0, sequence: 1, payload: { move: 'e4' } }, key);
+await ggi.verifyAction(a.signThis, a.signature, key.address);   // true
+
+// Tamper with the move: the same signature no longer matches.
+const b = ggi.act(state, { seat: 0, sequence: 1, payload: { move: 'e5' } });
+await ggi.verifyAction(b.signThis, a.signature, key.address);   // false
+```
+
+That is why a fake result cannot settle: the digest the chain receives is bound
+to signatures over the exact actions.
 
 ---
 
@@ -71,10 +126,16 @@ A session key is a throwaway signer your player authorises once, so actions sign
 silently while they play:
 
 ```js
-await ggi.registerSessionKey(sessionKeyAddress, validUntil, scopeHash);
+const key = ggi.createSessionKey();                       // make one
+await ggi.registerSessionKey(key.address, validUntil);    // authorise it once
+// sign every action with it:
+await ggi.signAction(key, someActionString);
 // when the player leaves or you suspect a leak:
-await ggi.revokeSessionKey(sessionKeyAddress);
+await ggi.revokeSessionKey(key.address);
 ```
+
+`createSessionKey()` holds the private key in memory only. If you persist it,
+store it encrypted (for example in IndexedDB behind a key), never in plain text.
 
 ---
 

@@ -61,9 +61,8 @@ const rndAbi = parseAbi([
   'function revealed(bytes32 sessionId) view returns (bool)',
 ]);
 const vaultAbi = parseAbi([
-  'function setFees(uint256 openFee, uint256 settleFee)',
-  'function chargeOpen(bytes32 sessionId)',
-  'function chargeSettle(bytes32 sessionId)',
+  'function setFee(uint256 sessionFee)',
+  'function chargeSession(bytes32 sessionId)',
   'function withdraw(address token)',
   'function collected(address token) view returns (uint256)',
   'function paymentOf(bytes32 sessionId) view returns (address, address)',
@@ -74,8 +73,7 @@ const erc20Abi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
 ]);
 
-const OPEN_FEE = 1000n;   // 0.001 USDC
-const SETTLE_FEE = 500n;  // 0.0005 USDC
+const SESSION_FEE = 1500n; // 0.0015 USDC (placeholder, owner-set)
 const TTL = 3600n;
 
 async function tx(label, req) {
@@ -112,8 +110,8 @@ async function usdc() {
   const spender = me;
 
   // Fee setup + approval (exact-amount pull; approve just the two fees).
-  await tx('FeeVault.setFees', { address: C.FeeVault, abi: vaultAbi, functionName: 'setFees', args: [OPEN_FEE, SETTLE_FEE], account });
-  await tx('USDC.approve(fee)', { address: USDC, abi: erc20Abi, functionName: 'approve', args: [C.FeeVault, OPEN_FEE + SETTLE_FEE], account });
+  await tx('FeeVault.setFee', { address: C.FeeVault, abi: vaultAbi, functionName: 'setFee', args: [SESSION_FEE], account });
+  await tx('USDC.approve(fee)', { address: USDC, abi: erc20Abi, functionName: 'approve', args: [C.FeeVault, SESSION_FEE], account });
 
   let sessionId;
   {
@@ -165,8 +163,7 @@ async function usdc() {
   console.log('   final sealed:', sealed === st.digest);
 
   // ---- 7. fees: charge open + settle, then withdraw --------------------------
-  await tx('FeeVault.chargeOpen', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeOpen', args: [sessionId], account });
-  await tx('FeeVault.chargeSettle', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeSettle', args: [sessionId], account });
+  await tx('FeeVault.chargeSession', { address: C.FeeVault, abi: vaultAbi, functionName: 'chargeSession', args: [sessionId], account });
   const collected = await pub.readContract({ address: C.FeeVault, abi: vaultAbi, functionName: 'collected', args: [USDC] });
   console.log('7. fee collected:', formatUnits(collected, 6), 'USDC');
   await tx('FeeVault.withdraw', { address: C.FeeVault, abi: vaultAbi, functionName: 'withdraw', args: [USDC], account });

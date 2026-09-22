@@ -5,26 +5,24 @@ import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {SessionState} from "../src/SessionState.sol";
 import {Randomness} from "../src/Randomness.sol";
 import {FeeVault} from "../src/FeeVault.sol";
+import {BatchedSettlement} from "../src/BatchedSettlement.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface VmDeploy {
     function startBroadcast() external;
     function stopBroadcast() external;
-    function envAddress(string calldata name) external returns (address);
 }
 
-/// Arc Testnet deploy for the FOUR core Foskaay Gasless Games Infrastructure
-/// contracts. NO secrets live here: at run time the deployer key comes from the
-/// environment (or the local key file), e.g.
-///   forge script script/DeployGI.s.sol:DeployGI \
-///     --rpc-url $GFG_Arc_RPC --private-key $GFG_Arc_Gasless_Sponsor_Key --broadcast
+/// Arc testnet/deploy script for the FOUR core GlobalFolkGames Gasless Games
+/// Infrastructure (GGI) contracts, behind UUPS proxies.
 ///
+/// WHY PROXIES: the proxy address is PERMANENT. Upgrading public logic never
+/// moves an address, so sessions and data are never stranded (the exact mistake
+/// of redeploying fresh addresses). The owner controls upgrades now; before
+/// mainnet that moves to a timelock or multisig.
+///
+/// NO secrets live here: at run time the deployer key comes from the environment.
 /// On Arc the gas token is USDC, so the sponsor only needs test USDC.
-///
-/// Constructor arguments (all public, no secrets):
-///   SessionRegistry(feeRecipient = deployer, operator = 0)  -> operator disabled
-///   SessionState(registry)
-///   Randomness(registry)
-///   FeeVault(owner = deployer, destination = deployer, feeToken = Arc USDC ERC-20)
 contract DeployGI {
     VmDeploy constant vm = VmDeploy(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -34,15 +32,48 @@ contract DeployGI {
 
     function run()
         external
-        returns (address registry, address state, address randomness, address feeVault)
+        returns (address registry, address state, address randomness, address feeVault, address batched)
     {
         vm.startBroadcast();
-        // The deployer (msg.sender in broadcast) is the owner / fee recipient.
-        SessionRegistry reg = new SessionRegistry(msg.sender, address(0));
-        SessionState st = new SessionState(address(reg));
-        Randomness rnd = new Randomness(address(reg));
-        FeeVault fv = new FeeVault(msg.sender, msg.sender, ARC_USDC);
+
+        // 1. SessionRegistry: implementation + proxy(initialize)
+        SessionRegistry regImpl = new SessionRegistry();
+        registry = address(new ERC1967Proxy(
+            address(regImpl),
+            abi.encodeCall(SessionRegistry.initialize, (msg.sender, address(0)))
+        ));
+
+        // 2. SessionState points at the registry PROXY
+        SessionState stImpl = new SessionState();
+        state = address(new ERC1967Proxy(
+            address(stImpl),
+            abi.encodeCall(SessionState.initialize, (registry))
+        ));
+
+        // 3. Randomness points at the registry PROXY
+        Randomness rndImpl = new Randomness();
+        randomness = address(new ERC1967Proxy(
+            address(rndImpl),
+            abi.encodeCall(Randomness.initialize, (registry))
+        ));
+
+        // 4. FeeVault(owner, destination, feeToken)
+        FeeVault fvImpl = new FeeVault();
+        feeVault = address(new ERC1967Proxy(
+            address(fvImpl),
+            abi.encodeCall(FeeVault.initialize, (msg.sender, msg.sender, ARC_USDC))
+        ));
+
+        // 5. BatchedSettlement — OPTIONAL pattern. Only the admin is set here; each
+        //    GAME sets its own window rules on-chain (10 games/35min, 1000/24h,
+        //    whatever fits). The rail imposes no cadence.
+        BatchedSettlement bsImpl = new BatchedSettlement();
+        batched = address(new ERC1967Proxy(
+            address(bsImpl),
+            abi.encodeCall(BatchedSettlement.initialize, (msg.sender))
+        ));
+
         vm.stopBroadcast();
-        return (address(reg), address(st), address(rnd), address(fv));
+        return (registry, state, randomness, feeVault, batched);
     }
 }

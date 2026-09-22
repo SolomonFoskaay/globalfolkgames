@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+
 /// @title SessionRegistry — Foskaay Gasless Games Infrastructure (GGI), CORE contract 1 of 4.
 ///
 /// @notice Opens and closes a SESSION: the room a game plays inside for free.
@@ -38,7 +41,18 @@ pragma solidity ^0.8.24;
 ///   - Expiry is enforced on every write, so a stale session cannot be acted on.
 ///   - All state-changing paths are O(1) or bounded by the participant list,
 ///     which is capped, so gas cannot be griefed with unbounded loops.
-contract SessionRegistry {
+/// @dev UPGRADEABLE (UUPS, owner-controlled for now; timelock/multisig before
+///      mainnet). The proxy address is permanent, so sessions and data never move.
+///      STORAGE RULES (do not violate, or live data is read as garbage):
+///        - the layout below is APPEND-ONLY: never reorder, rename or remove a
+///          state variable, including the gaps;
+///        - new state variables go where a gap slot is, and the gap shrinks by
+///          exactly the same number of slots;
+///        - `version` is the first NEW variable added after launch, so a reader
+///          can tell which layout an account has.
+///      `initialize` replaces the constructor; the implementation contract is
+///      initialized with `_disableInitializers()` so it can never be used directly.
+contract SessionRegistry is Initializable, UUPSUpgradeable {
     /// Hard cap on participants per session. 1 participant is a solo/simulation
     /// session; up to 64 covers party games, tournaments and MMO rooms.
     uint8 public constant MAX_PARTICIPANTS = 64;
@@ -96,12 +110,22 @@ contract SessionRegistry {
     /// owner => nonce, to derive collision-free, un-front-runnable session ids.
     mapping(address => uint64) public nonces;
 
-    /// The protocol fee recipient (the owner wallet). Set at deploy.
-    address public immutable feeRecipient;
+    /// The protocol fee recipient (the owner wallet). Storage (not immutable) so
+    /// it survives behind a proxy.
+    address public feeRecipient;
 
     /// Optional operator that may administratively close ANY session (used to
     /// wind down an abandoned game). Zero address disables it.
     address public operator;
+
+    /// Layout marker for readers/migrations. 0 on the first deployed layout.
+    /// Bump ONLY when the storage layout changes, never for a logic-only upgrade.
+    uint8 public version;
+
+    /// Reserved slots so future state variables can be appended without shifting
+    /// any existing slot. Each future variable consumes from the top of this gap.
+    /// DO NOT reorder or remove.
+    uint256[20] private __gap;
 
     event SessionOpened(
         bytes32 indexed sessionId,
@@ -131,14 +155,28 @@ contract SessionRegistry {
     error AlreadyRevoked();
     error KeyOwnedByAnother();
 
+    /// @notice Initialize the proxy. Replaces the old constructor (a proxy never
+    ///         runs the implementation's constructor).
     /// @param feeRecipient_ the wallet that receives session fees (the deployer).
     /// @param operator_ optional address allowed to force-close any session; may
     ///        be zero to disable that power entirely (recommended at first).
-    constructor(address feeRecipient_, address operator_) {
+    function initialize(address feeRecipient_, address operator_) external initializer {
         if (feeRecipient_ == address(0)) revert ZeroAddress();
         feeRecipient = feeRecipient_;
         operator = operator_;
         emit OperatorSet(operator_);
+    }
+
+    /// @notice The implementation contract is initialized with initializers
+    ///         disabled, so it can never be used directly (only via the proxy).
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Only the fee recipient (the protocol owner) may authorize an upgrade.
+    ///      Before mainnet this moves to a timelock or multisig.
+    function _authorizeUpgrade(address) internal override {
+        if (msg.sender != feeRecipient) revert NotOwner();
     }
 
     /// @notice Open a new session. The caller becomes the session OWNER (the game

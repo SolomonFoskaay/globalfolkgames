@@ -15,6 +15,7 @@
 (function () {
     var PAGES = [
         { key: 'demos', label: '🎮 Demos', href: '/ggi-demos/' },
+        { key: 'explorer', label: '🔎 Explorer', href: '/ggi-explorer/' },
         { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi-docs/' },
         { key: 'get-started', label: '🚀 Get started', href: '/foskaay-ggi-docs/#get-started' },
         { key: 'faq', label: '❓ FAQ and fixes', href: '/foskaay-ggi-docs/#faq' }

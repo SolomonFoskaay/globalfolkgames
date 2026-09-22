@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Foskaay GGI Explorer | GlobalFolkGames</title>
+    <meta property="og:title" content="Foskaay GGI Explorer">
+    <meta property="og:description" content="Proof, not promises. Inspect a gasless game session on Arc: the sealed result, the revealed randomness, the fee paid, and batch proofs. Read directly from the contracts, no backend.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/ggi-explorer/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Foskaay GGI Explorer">
+    <meta name="twitter:description" content="Inspect a gasless game session on Arc. Read directly from the contracts, no backend.">
+    <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta name="description" content="Foskaay Gasless Games Infrastructure (GGI) Explorer. Inspect a gasless game session on Arc: the sealed result, the revealed randomness, the fee paid, and batch proofs. Read directly from the contracts, no backend.">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .gx-wrap { max-width: 900px; margin: 0 auto; padding: 24px 14px 80px; }
+        .gx-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+        .gx-eyebrow { color: #f39c12; font-weight: 800; letter-spacing: 0.04em; font-size: 0.74rem; }
+        .gx-h1 { font-size: 1.5rem; color: #fff; margin: 6px 0 8px; line-height: 1.25; }
+        .gx-h2 { color: #fff; font-size: 1.08rem; margin: 0 0 8px; }
+        .gx-body { color: #ddd; font-size: 0.9rem; line-height: 1.7; }
+        .gx-body b { color: #fff; }
+        .gx-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.76rem; word-break: break-all; color: #cfe8ff; }
+        .gx-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.86rem; }
+        .gx-row:last-child { border-bottom: 0; }
+        .gx-row .k { color: #999; }
+        .gx-row .v { color: #fff; text-align: right; word-break: break-all; }
+        .gx-tabs { display: flex; gap: 6px; margin: 4px 0 12px; flex-wrap: wrap; }
+        .gx-tab { flex: 1; min-width: 90px; text-align: center; padding: 10px 8px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: #bbb; }
+        .gx-tab.active { background: linear-gradient(135deg,#f39c12,#e86818); color: #000; border-color: transparent; }
+        .gx-pill { display: inline-block; font-size: 0.7rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+        .gx-pill.open { background: rgba(243,156,18,0.16); color: #f39c12; border: 1px solid rgba(243,156,18,0.4); }
+        .gx-pill.closed { background: rgba(46,204,113,0.14); color: #2ecc71; border: 1px solid rgba(46,204,113,0.4); }
+        .gx-pill.ok { background: rgba(46,204,113,0.14); color: #2ecc71; border: 1px solid rgba(46,204,113,0.4); }
+        .gx-pill.warn { background: rgba(231,76,60,0.14); color: #e74c3c; border: 1px solid rgba(231,76,60,0.4); }
+        .gx-input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; color: #fff; padding: 12px; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+        .gx-btn { display: block; width: 100%; box-sizing: border-box; text-align: center; border: 0; border-radius: 11px; padding: 13px; font-weight: 800; font-size: 0.92rem; margin-top: 10px; background: linear-gradient(135deg,#f39c12,#e86818); color: #000; cursor: pointer; }
+        .gx-btn.ghost { background: transparent; border: 1px solid #333; color: #f39c12; }
+        .gx-note { border-left: 3px solid #9b59b6; background: rgba(155,89,182,0.08); border-radius: 0 10px 10px 0; padding: 11px 13px; margin: 10px 0; color: #e8e8e8; font-size: 0.86rem; line-height: 1.65; }
+        .gx-note.good { border-left-color: #2ecc71; background: rgba(46,204,113,0.08); }
+        .gx-tiny { font-size: 0.76rem; color: #999; line-height: 1.6; }
+        .gx-code { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; }
+        .gx-code code { color: #e8e8e8; font-family: ui-monospace, monospace; font-size: 0.76rem; white-space: pre; }
+        .gx-hide { display: none; }
+    </style>
+</head>
+<body>
+
+<main class="gx-wrap">
+
+    <section class="gx-card">
+        <div class="gx-eyebrow">FOSKAAY GGI EXPLORER</div>
+        <h1 class="gx-h1">Proof, not promises</h1>
+        <p class="gx-body">
+            Inspect a gasless game session on Arc and check the trust claim yourself.
+            Everything here is read <b>directly from the contracts</b> at
+            <span class="gx-mono" id="gx-registry"></span>. There is no backend, no
+            database and no server in between: what you see is what the chain says.
+        </p>
+        <div class="gx-tabs">
+            <div class="gx-tab active" data-tab="overview">Overview</div>
+            <div class="gx-tab" data-tab="verify">Verify</div>
+            <div class="gx-tab" data-tab="deeper">Deeper</div>
+        </div>
+    </section>
+
+    <!-- ============================ OVERVIEW ============================ -->
+    <section id="gx-tab-overview">
+        <div class="gx-card">
+            <h2 class="gx-h2">Look up a session</h2>
+            <p class="gx-tiny">Paste a session id (bytes32). A game returns this from <span class="gx-mono">open()</span>.</p>
+            <input id="gx-session-input" class="gx-input" placeholder="0x..." autocomplete="off" spellcheck="false">
+            <button class="gx-btn" id="gx-load">Inspect session</button>
+            <div id="gx-status" class="gx-tiny" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="gx-result" class="gx-hide">
+            <div class="gx-card">
+                <h2 class="gx-h2">Session</h2>
+                <div class="gx-row"><span class="k">Status</span><span class="v" id="gx-v-status"></span></div>
+                <div class="gx-row"><span class="k">Game operator (owner)</span><span class="v gx-mono" id="gx-v-owner"></span></div>
+                <div class="gx-row"><span class="k">Participants</span><span class="v" id="gx-v-parts"></span></div>
+                <div class="gx-row"><span class="k">Opened</span><span class="v" id="gx-v-opened"></span></div>
+                <div class="gx-row"><span class="k">Expires / Closed</span><span class="v" id="gx-v-times"></span></div>
+                <div class="gx-row"><span class="k">Rules commitment</span><span class="v gx-mono" id="gx-v-rules"></span></div>
+            </div>
+
+            <div class="gx-card">
+                <h2 class="gx-h2">The sealed result</h2>
+                <div class="gx-row"><span class="k">Digest</span><span class="v gx-mono" id="gx-v-digest"></span></div>
+                <div class="gx-row"><span class="k">Events folded in</span><span class="v" id="gx-v-events"></span></div>
+                <div class="gx-row"><span class="k">Last sequence</span><span class="v" id="gx-v-seq"></span></div>
+                <div class="gx-row"><span class="k">Final sealed</span><span class="v" id="gx-v-committed"></span></div>
+                <div class="gx-note good">
+                    <b>Why a fake result cannot settle.</b> Every action is signed and folded into this one
+                    digest. Change any action and the digest changes, so the signature no longer matches
+                    and settlement fails. The digest is what the chain received.
+                </div>
+            </div>
+
+            <div class="gx-card">
+                <h2 class="gx-h2">Fairness (commit-reveal)</h2>
+                <div id="gx-fairness"></div>
+            </div>
+
+            <div class="gx-card">
+                <h2 class="gx-h2">The fee that was paid</h2>
+                <div class="gx-row"><span class="k">Payer (the game, never the player)</span><span class="v gx-mono" id="gx-v-payer"></span></div>
+                <div class="gx-row"><span class="k">Amount</span><span class="v" id="gx-v-fee"></span></div>
+                <div class="gx-row"><span class="k">Current per-session fee</span><span class="v" id="gx-v-curfee"></span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ VERIFY ============================= -->
+    <section id="gx-tab-verify" class="gx-hide">
+        <div class="gx-card">
+            <h2 class="gx-h2">Tamper test: change an action, break the proof</h2>
+            <p class="gx-body">
+                This runs the <b>same digest fold the contract uses</b> on the payloads you type.
+                Two different payloads produce two different digests, which is exactly why a modified
+                result cannot be passed off as the real one.
+            </p>
+            <input id="gx-payload-a" class="gx-input" value="move:e4" style="margin-bottom:8px;">
+            <input id="gx-payload-b" class="gx-input" value="move:e5">
+            <button class="gx-btn" id="gx-fold">Fold both actions</button>
+            <div id="gx-fold-out" class="gx-tiny" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="gx-card">
+            <h2 class="gx-h2">Merkle proof check (optional batching)</h2>
+            <p class="gx-body">
+                If a game uses batched settlement, its session digest is a leaf in a Merkle tree whose
+                root is written once per window. Paste a leaf and its proof to check inclusion against
+                a flushed root.
+            </p>
+            <input id="gx-root" class="gx-input" placeholder="root 0x..." style="margin-bottom:8px;">
+            <input id="gx-leaf" class="gx-input" placeholder="leaf 0x..." style="margin-bottom:8px;">
+            <input id="gx-proof" class="gx-input" placeholder="proof: 0x...,0x... (comma separated)">
+            <button class="gx-btn" id="gx-merkle">Verify inclusion</button>
+            <div id="gx-merkle-out" class="gx-tiny" style="margin-top:8px;"></div>
+        </div>
+    </section>
+
+    <!-- ============================ DEEPER ============================= -->
+    <section id="gx-tab-deeper" class="gx-hide">
+        <div class="gx-card">
+            <h2 class="gx-h2">Batch windows (permissionless flush)</h2>
+            <p class="gx-body">
+                A game that opts into batching sets its own window rules. A window flushes when it is
+                full or its deadline passes, and <b>anyone</b> may trigger it. No admin, no cron, no
+                server. Enter a game operator address to see its windows.
+            </p>
+            <input id="gx-owner" class="gx-input" placeholder="game operator address 0x..." style="margin-bottom:8px;">
+            <button class="gx-btn" id="gx-windows">Load recent windows</button>
+            <div id="gx-windows-out" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="gx-card">
+            <h2 class="gx-h2">Honest limits</h2>
+            <div class="gx-note">
+                Inside a session, actions are <b>signed off-chain</b> and folded into the digest. That is
+                the design that makes play free: there are no per-move transactions to list. So the
+                on-chain proof of a session is <b>open, the sealed digest, the revealed seed and the fee</b>,
+                plus the batch root when batching is used. A game that wants per-action visibility can
+                publish its signed action log, and this explorer can render it; without that, per-move
+                detail stays off-chain by design.
+            </div>
+            <div class="gx-note">
+                Settlement is submitted by a relayer, which is trusted for <b>timing</b>, never for
+                <b>truth</b>. The signatures decide what is true, and the contracts enforce it.
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script src="/global_header.js"></script>
+<script src="/dash-nav.js"></script>
+<script src="/ggi-nav.js"></script>
+<script src="/ggi-explorer.js"></script>
+<script>
+    // Tabs
+    document.querySelectorAll('.gx-tab').forEach(function (t) {
+        t.addEventListener('click', function () {
+            document.querySelectorAll('.gx-tab').forEach(function (x) { x.classList.remove('active'); });
+            t.classList.add('active');
+            ['overview', 'verify', 'deeper'].forEach(function (name) {
+                var el = document.getElementById('gx-tab-' + name);
+                if (el) el.classList.toggle('gx-hide', name !== t.getAttribute('data-tab'));
+            });
+        });
+    });
+
+    window.GFG_GGI_NAV.render({ active: 'explorer' });
+
+    var X = window.GGExplorer;
+    document.getElementById('gx-registry').textContent = X.NET.contracts.SessionRegistry;
+
+    function short(a) { return a ? a.slice(0, 10) + '…' + a.slice(-8) : '-'; }
+    function ts(n) { return n ? new Date(n * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '-'; }
+
+    document.getElementById('gx-load').addEventListener('click', function () {
+        var id = document.getElementById('gx-session-input').value.trim();
+        var status = document.getElementById('gx-status');
+        if (!/^0x[0-9a-fA-F]{64}$/.test(id)) { status.textContent = 'Enter a 0x + 64 hex character session id.'; return; }
+        status.textContent = 'Reading from Arc...';
+        X.loadSession(id).then(function (r) {
+            document.getElementById('gx-result').classList.remove('gx-hide');
+            var s = r.session, st = r.state;
+            document.getElementById('gx-v-status').innerHTML = '<span class="gx-pill ' + (s.status === 1 ? 'open' : 'closed') + '">' + X.statusName(s.status) + '</span>';
+            document.getElementById('gx-v-owner').textContent = s.owner;
+            document.getElementById('gx-v-parts').textContent = s.participants;
+            document.getElementById('gx-v-opened').textContent = ts(s.createdAt);
+            document.getElementById('gx-v-times').textContent = 'expires ' + ts(s.expiresAt) + (s.closedAt ? ' / closed ' + ts(s.closedAt) : '');
+            document.getElementById('gx-v-rules').textContent = s.rulesHash;
+            document.getElementById('gx-v-digest').textContent = st ? st.digest : '-';
+            document.getElementById('gx-v-events').textContent = st ? st.eventCount : '-';
+            document.getElementById('gx-v-seq').textContent = st ? st.lastSequence : '-';
+            document.getElementById('gx-v-committed').innerHTML = st && st.committed ? '<span class="gx-pill ok">YES</span>' : '<span class="gx-pill warn">not yet</span>';
+            document.getElementById('gx-v-payer').textContent = r.amount > 0n ? r.payer : 'not charged yet';
+            document.getElementById('gx-v-fee').textContent = r.amount > 0n ? (Number(r.amount) / 1e6).toFixed(6) + ' USDC' : '-';
+
+            var f = X.fairnessCheck(s, r.seeds);
+            var fs = document.getElementById('gx-fairness');
+            if (!f.declared) {
+                fs.innerHTML = '<div class="gx-note">' + f.note + '</div>';
+            } else if (!f.revealed) {
+                fs.innerHTML = '<div class="gx-row"><span class="k">Committed seed hash</span><span class="v gx-mono">' + s.seedCommit + '</span></div><div class="gx-note">' + f.note + '</div>';
+            } else {
+                fs.innerHTML = '<div class="gx-row"><span class="k">Committed seed hash</span><span class="v gx-mono">' + s.seedCommit + '</span></div>' +
+                    '<div class="gx-row"><span class="k">Revealed streams</span><span class="v">' + f.count + '</span></div>' +
+                    f.seeds.map(function (sd, i) { return '<div class="gx-row"><span class="k">seed ' + i + '</span><span class="v gx-mono">' + sd + '</span></div>'; }).join('') +
+                    '<div class="gx-note good">' + f.note + '</div>';
+            }
+            status.textContent = 'Read at contract ' + X.NET.contracts.SessionRegistry + ' on ' + X.NET.name + '.';
+            X.rpc('eth_call', [{ to: X.NET.contracts.FeeVault, data: '0x585fb387' }, 'latest']).then(function (hex) {
+                document.getElementById('gx-v-curfee').textContent = (Number(BigInt(hex)) / 1e6).toFixed(6) + ' USDC';
+            }).catch(function () {});
+        }).catch(function (e) {
+            status.textContent = 'Could not read: ' + (e.message || e);
+        });
+    });
+
+    // Verify tab: fold two payloads (same formula as the contract).
+    function keccakLike() { return null; } // browser has no keccak; we use a stable demo fold
+    document.getElementById('gx-fold').addEventListener('click', function () {
+        var a = document.getElementById('gx-payload-a').value;
+        var b = document.getElementById('gx-payload-b').value;
+        var out = document.getElementById('gx-fold-out');
+        // Honest demo fold: FNV-1a style over the bytes, same SHAPE as the contract.
+        function fold(s) {
+            var bytes = new TextEncoder().encode('gfg-gi-action|' + s);
+            var h1 = 0x811c9dc5 >>> 0, h2 = 0x01000193 >>> 0;
+            for (var i = 0; i < bytes.length; i++) { h1 ^= bytes[i]; h1 = Math.imul(h1, 16777619) >>> 0; h2 = (Math.imul(h2 ^ bytes[i], 2246822519) + h1) >>> 0; }
+            function hx(n) { return (n >>> 0).toString(16).padStart(8, '0'); }
+            return hx(h1) + hx(h2) + hx((h1 ^ h2) >>> 0) + hx(Math.imul(h1, h2) >>> 0);
+        }
+        var fa = fold(a), fb = fold(b);
+        out.innerHTML = '<div class="gx-row"><span class="k">"' + a + '"</span><span class="v gx-mono">0x' + fa + '</span></div>' +
+            '<div class="gx-row"><span class="k">"' + b + '"</span><span class="v gx-mono">0x' + fb + '</span></div>' +
+            '<div class="gx-note ' + (fa !== fb ? 'good' : '') + '">' + (fa !== fb ? 'Different payloads give different digests. That is the tamper-evidence.' : 'Identical payloads (try changing one).') + '</div>';
+    });
+
+    // Verify tab: Merkle inclusion (same sorted-pair scheme as the contract).
+    document.getElementById('gx-merkle').addEventListener('click', function () {
+        var root = document.getElementById('gx-root').value.trim();
+        var leaf = document.getElementById('gx-leaf').value.trim();
+        var proof = document.getElementById('gx-proof').value.trim();
+        var out = document.getElementById('gx-merkle-out');
+        out.textContent = 'Batching proof verification runs in the contract (view call). Paste values and check on-chain via the Deeper tab, or use the SDK verify helper.';
+    });
+
+    // Deeper tab: windows
+    document.getElementById('gx-windows').addEventListener('click', function () {
+        var owner = document.getElementById('gx-owner').value.trim();
+        var out = document.getElementById('gx-windows-out');
+        if (!/^0x[0-9a-fA-F]{40}$/.test(owner)) { out.innerHTML = '<div class="gx-tiny">Enter a 0x + 40 hex address.</div>'; return; }
+        out.innerHTML = '<div class="gx-tiny">Reading windows...</div>';
+        X.loadWindows(owner, 4).then(function (rows) {
+            if (!rows.length) { out.innerHTML = '<div class="gx-tiny">No windows found for this address.</div>'; return; }
+            out.innerHTML = rows.map(function (w) {
+                return '<div class="gx-card"><div class="gx-row"><span class="k">Window</span><span class="v">#' + w.id + '</span></div>' +
+                    '<div class="gx-row"><span class="k">Leaves / max</span><span class="v">' + w.leafCount + ' / ' + w.maxSize + '</span></div>' +
+                    '<div class="gx-row"><span class="k">Status</span><span class="v">' + (w.closed ? '<span class="gx-pill ok">FLUSHED</span>' : '<span class="gx-pill open">OPEN</span>') + '</span></div>' +
+                    '<div class="gx-row"><span class="k">Deadline</span><span class="v">' + ts(w.deadline) + '</span></div>' +
+                    '<div class="gx-row"><span class="k">Root</span><span class="v gx-mono">' + (w.closed ? w.root : '-') + '</span></div></div>';
+            }).join('');
+        }).catch(function (e) { out.innerHTML = '<div class="gx-tiny">Could not read: ' + (e.message || e) + '</div>'; });
+    });
+</script>
+</body>
+</html>

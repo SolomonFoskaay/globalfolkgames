@@ -62,8 +62,10 @@
             <a href="#unopinionated">Built to fit your game</a>
             <a href="#quickstart">Quickstart</a>
             <a href="#get-started">Get started</a>
+            <a href="#demos">Demos</a>
             <a href="#usecases">Use cases</a>
             <a href="#contracts">Contracts</a>
+            <a href="/ggi-explorer/">Explorer</a>
             <a href="#fees">Fees</a>
             <a href="#hardware">What you run</a>
             <a href="#faq">FAQ and fixes</a>
@@ -123,7 +125,7 @@
         </table>
         <div class="ggi-h3">Optional patterns (use them, ignore them, or build your own)</div>
         <ul class="ggi-list">
-            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window. The cadence is yours.</li>
+            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window, for the cheapest tier. <b>You choose the window</b> on-chain: 10 games every 35 minutes, or 1,000 games every 24 hours, or anything in between. Flushing is permissionless (no admin, no server). The trade-off: a result becomes final when the window flushes, so use it only where that is acceptable to your players.</li>
             <li><b>Managed accounts.</b> One account per player with slots for every game and feature.</li>
             <li><b>Verifiers.</b> A per-game referee that settles a disagreement by replaying the actions.</li>
             <li><b>House or relayer as a participant.</b> For games with an AI or house opponent.</li>
@@ -177,13 +179,19 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
         </p>
 
         <div class="ggi-h3"><span class="ggi-pill testnet">TESTNET</span> Arc Testnet (chain id 5042002)</div>
+        <p class="ggi-body">
+            These addresses are <b>permanent</b>. The contracts are upgradeable behind
+            proxies, so improving the rail never changes an address and never moves
+            your data.
+        </p>
         <table class="ggi-table">
             <thead><tr><th>Contract</th><th>Address</th></tr></thead>
             <tbody>
-                <tr><td>SessionRegistry</td><td class="ggi-mono">0x46A34743e8210F5C8C574b7CbEe1C1cb5Ca63bE5</td></tr>
-                <tr><td>SessionState</td><td class="ggi-mono">0xf464d11660bFC091481D2D688FeaD97447f69E43</td></tr>
-                <tr><td>Randomness</td><td class="ggi-mono">0x50CD0A75ca6412f751BEb6E7E4d48da2D5aea6Db</td></tr>
-                <tr><td>FeeVault</td><td class="ggi-mono">0xDf400D629425289229eE563A1460137139FAd6bd</td></tr>
+                <tr><td>SessionRegistry</td><td class="ggi-mono">0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5</td></tr>
+                <tr><td>SessionState</td><td class="ggi-mono">0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e</td></tr>
+                <tr><td>Randomness</td><td class="ggi-mono">0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b</td></tr>
+                <tr><td>FeeVault</td><td class="ggi-mono">0x4cf542791faeb683f878bd3d119683e0C02F9905</td></tr>
+                <tr><td>BatchedSettlement <span class="ggi-pill" style="background:rgba(155,89,182,0.16);color:#9b59b6;border:1px solid rgba(155,89,182,0.4);">OPTIONAL</span></td><td class="ggi-mono">0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4</td></tr>
             </tbody>
         </table>
         <p class="ggi-tiny">
@@ -315,6 +323,70 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         <p class="ggi-tiny">
             The SDK README has the full API reference, every read helper, and the session-key examples.
         </p>
+    </section>
+
+    <section class="ggi-card" id="demos">
+        <h2 class="ggi-h2">Demos</h2>
+        <p class="ggi-body">
+            These demos exist so you can open a genre you already build for and watch gasless play
+            working, instead of taking it on trust. Each one is a real game running on the live
+            contracts, and you can inspect any of its sessions in the
+            <a href="/ggi-explorer/">Explorer</a>.
+        </p>
+
+        <div class="ggi-h3">Demo 1, live: Idle Farm (the cost proof)</div>
+        <p class="ggi-body">
+            <b>Why this one first.</b> Idle games produce the most actions of any genre. If the rail
+            can make an idle farm gasless and cheap, it can make almost anything work. This demo is
+            the clearest answer to the question every dev asks: "what does it actually cost me?"
+        </p>
+
+        <table class="ggi-table">
+            <thead><tr><th>What the player does</th><th>What happens on-chain</th></tr></thead>
+            <tbody>
+                <tr><td>Taps to plant, water, harvest, upgrade</td><td>Nothing. Every action is signed off-chain by a session key and folded into a digest.</td></tr>
+                <tr><td>Opens the game</td><td>One transaction: open a session (you, the sponsor, pay it).</td></tr>
+                <tr><td>Collects a random crop bonus</td><td>Free. The value comes from the seed sealed before play.</td></tr>
+                <tr><td>Finishes the run</td><td>One settlement: close, reveal the seed, seal the result, pay the session fee.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="ggi-h3">What the demo screen shows</div>
+        <ul class="ggi-list">
+            <li>A grid of plots that grow and are harvested, so it looks alive, not like a test page.</li>
+            <li>A live meter: <b>actions this session: N</b>, <b>chain writes: 2</b>, <b>cost so far: $0.0000x</b>. It proves heavy play is free.</li>
+            <li>A random bonus crop, so a visitor sees commit-reveal randomness working.</li>
+            <li>A button to open this exact session in the Explorer, so the trust claim is one tap away.</li>
+        </ul>
+
+        <div class="ggi-h3">The exact rules (the build follows this, no deviation)</div>
+        <ul class="ggi-list">
+            <li><b>Session:</b> 1 participant (single player), ttl 3600 seconds.</li>
+            <li><b>Randomness:</b> 1 stream, committed at open with a seed, revealed at settle.</li>
+            <li><b>Actions:</b> plant, water, harvest, upgrade, each folded into the digest with an increasing sequence number. Payload is the game's own; the rail never reads it.</li>
+            <li><b>Scoring:</b> purely the game's own (coins earned). The rail does not score.</li>
+            <li><b>Settle:</b> at the run's end or on demand, close + reveal + seal + one session fee.</li>
+            <li><b>Fee:</b> read at runtime with the SDK; never hardcoded.</li>
+        </ul>
+
+        <div class="ggi-note">
+            <b>Honest scope of the demo:</b> one player, one session, no accounts and no persistence
+            beyond the session. It is a proof of the rail, not a finished game. Anything beyond this
+            spec goes into a later demo, and this page is updated FIRST whenever the build and the
+            spec need to diverge.
+        </div>
+
+        <div class="ggi-h3">More demos, planned</div>
+        <table class="ggi-table">
+            <thead><tr><th>Demo</th><th>Genre</th><th>What it adds</th></tr></thead>
+            <tbody>
+                <tr><td>Endless runner</td><td>Casual / arcade</td><td>Short sessions, motion, instant fun</td></tr>
+                <tr><td>Arena 1v1</td><td>PvP</td><td>Two participants, an AI seat, per-seat signing</td></tr>
+                <tr><td>Card draw</td><td>Card</td><td>One random stream per player (N streams)</td></tr>
+                <tr><td>Tiny MMO</td><td>MMORPG</td><td>Many participants, persistent world shape</td></tr>
+                <tr><td>Land grid</td><td>Metaverse</td><td>A plot grid, batched settlement at scale</td></tr>
+            </tbody>
+        </table>
     </section>
 
     <section class="ggi-card" id="usecases">

@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {Randomness} from "../src/Randomness.sol";
+import {Deploy} from "./Deploy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface Vm {
     function warp(uint256) external;
@@ -37,8 +39,8 @@ contract RandomnessTest {
     }
 
     function setUp() public {
-        reg = new SessionRegistry(address(this), address(0));
-        rnd = new Randomness(address(reg));
+        reg = Deploy.registry(address(this), address(0));
+        rnd = Deploy.randomness(reg);
     }
 
     // ------------------------------------------------------------- happy path
@@ -200,9 +202,11 @@ contract RandomnessTest {
         rnd.deriveFor(id, 0, 1);
     }
 
-    function testConstructorRejectsZeroRegistry() public {
+    function testInitializeRejectsZeroRegistry() public {
+        Randomness impl = new Randomness();
+        bytes memory init = abi.encodeCall(Randomness.initialize, (address(0)));
         vm.expectRevert();
-        new Randomness(address(0));
+        new ERC1967Proxy(address(impl), init);
     }
 
     // ------------------------------------------------- stream count (N, unopinionated)

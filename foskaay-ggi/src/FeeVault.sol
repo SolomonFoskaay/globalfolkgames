@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+
 /// @dev Minimal ERC-20 surface. Declared at file level (Solidity does not allow
 ///      an interface inside a contract). The standalone project ships with
 ///      `libs = []`, and this is the whole token surface the rail needs.
@@ -13,8 +16,14 @@ interface IERC20 {
 /// @title FeeVault — Foskaay Gasless Games Infrastructure (GGI), CORE contract 4 of 4.
 ///
 /// @notice Collects the small PER-SESSION rail fee and lets the owner withdraw it.
-/// The fee is charged TWICE per session: once at open and once at settle. It is
-/// NEVER per action, so a heavy game costs the same as a light one.
+/// The fee is charged ONCE per session, at settle. It is NEVER per action, so a
+/// heavy game costs the same as a light one.
+///
+/// @dev WHY ONE CHARGE (measured 2026-09-22): an earlier two-stage model charged
+///      at open AND settle and needed a per-session USDC approval. On Arc testnet
+///      that made fee collection about 39% of a whole session's cost. Folding it
+///      into ONE charge at settle cuts the session to fewer transactions, which is
+///      the single biggest cost improvement available without batching.
 ///
 /// @dev WHO PAYS: the game operator (the sponsor/relayer), never the player. That
 ///      is the entire promise of GI: players pay nothing and see no wallet popup.
@@ -55,43 +64,45 @@ interface IERC20 {
 ///     collected amounts always equal what was genuinely charged.
 ///   - Each stage is charged at most once per session, so nothing can be
 ///     double-charged.
-contract FeeVault {
+contract FeeVault is Initializable, UUPSUpgradeable {
     address public owner;        // may configure fees / asset / destination, and withdraw
     address public destination;  // where withdrawals go (the owner's wallet)
     address public feeToken;     // the USDC ERC-20 interface on Arc (set at deploy)
 
-    uint256 public openFee;      // fee charged at open, in token base units
-    uint256 public settleFee;    // fee charged at settle, in token base units
+    /// The whole per-session fee, in token base units, charged ONCE at settle.
+    /// One charge per session keeps the cost of collecting the fee to a single
+    /// transaction (an earlier two-stage open+settle model cost ~39% of a whole
+    /// session in fee transactions alone, measured on Arc testnet).
+    uint256 public sessionFee;
 
-    /// sessionId => stage already charged, recording WHO paid, for the audit trail.
-    mapping(bytes32 => address) public openPaidBy;
-    mapping(bytes32 => address) public settlePaidBy;
-
-    /// sessionId => the settle fee LOCKED at open. The payer sees this price when
-    /// they pay the open fee, and settle charges exactly this amount, so an owner
-    /// fee change can never alter the price of a session already in flight.
-    mapping(bytes32 => uint256) public lockedSettleFee;
+    /// sessionId => who was charged, and exactly how much. The amount is recorded
+    /// so a later fee change can never alter a session already in flight.
+    mapping(bytes32 => address) public paidBy;
+    mapping(bytes32 => uint256) public paidAmount;
 
     /// Accounting: how much of the fee asset is actually withdrawable.
     mapping(address => uint256) public collected; // token => amount
 
-    event FeesConfigured(uint256 openFee, uint256 settleFee);
+    /// Reserved slots so future state variables can be appended without shifting
+    /// any existing slot. DO NOT reorder or remove.
+    uint256[20] private __gap;
+
+    event FeesConfigured(uint256 sessionFee);
     event FeeTokenSet(address token);
     event DestinationSet(address destination);
     event OwnerSet(address owner);
-    event FeePaid(bytes32 indexed sessionId, bool indexed isSettle, address indexed payer, uint256 amount);
+    event FeePaid(bytes32 indexed sessionId, address indexed payer, uint256 amount);
     event Withdrawn(address indexed token, address indexed to, uint256 amount);
 
     error NotOwner();
     error ZeroAddress();
-    error OpenAlreadyCharged();
-    error SettleNotAllowed();
-    error SettleAlreadyCharged();
+    error SessionAlreadyCharged();
     error FeeNotConfigured();
     error TransferFailed();
     error NothingToWithdraw();
 
-    constructor(address owner_, address destination_, address feeToken_) {
+    /// @notice Initialize the proxy with the owner, destination and fee asset.
+    function initialize(address owner_, address destination_, address feeToken_) external initializer {
         if (owner_ == address(0) || destination_ == address(0) || feeToken_ == address(0)) revert ZeroAddress();
         owner = owner_;
         destination = destination_;
@@ -101,6 +112,15 @@ contract FeeVault {
         emit FeeTokenSet(feeToken_);
     }
 
+    /// @dev The implementation contract can never be used directly.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Only the owner may authorize an upgrade. Before mainnet this moves to
+    ///      a timelock or multisig.
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
@@ -108,13 +128,13 @@ contract FeeVault {
 
     // ------------------------------------------------------------- config
 
-    /// @notice Set the per-session fees, in the fee asset's base units (USDC uses
-    ///         6 decimals on Arc). Zero disables that stage's fee. Effects only
-    ///         sessions charged AFTER this call.
-    function setFees(uint256 openFee_, uint256 settleFee_) external onlyOwner {
-        openFee = openFee_;
-        settleFee = settleFee_;
-        emit FeesConfigured(openFee_, settleFee_);
+    /// @notice Set the single per-session fee, in the fee asset's base units
+    ///         (USDC uses 6 decimals on Arc). Zero disables the fee.
+    /// @dev Effects only sessions charged AFTER this call; a session already
+    ///      charged keeps the exact amount recorded in `paidAmount`.
+    function setFee(uint256 sessionFee_) external onlyOwner {
+        sessionFee = sessionFee_;
+        emit FeesConfigured(sessionFee_);
     }
 
     /// @notice Set the fee asset (the USDC ERC-20 interface on Arc). Kept settable
@@ -141,33 +161,20 @@ contract FeeVault {
         emit OwnerSet(owner_);
     }
 
-    // ------------------------------------------------------------- charges
+    // ------------------------------------------------------------- charge
 
-    /// @notice Charge the OPEN fee for a session. Call ONCE per session, by the
+    /// @notice Charge the WHOLE per-session fee, ONCE, at settle. Call by the
     ///         sponsor (the game operator). Players never call this.
-    /// @dev The payer must have approved this vault for at least the fee; the
-    ///      vault pulls the EXACT configured amount and nothing more.
-    function chargeOpen(bytes32 sessionId) external {
-        if (openPaidBy[sessionId] != address(0)) revert OpenAlreadyCharged();
-        uint256 amount = _pull(openFee);
-        openPaidBy[sessionId] = msg.sender;
-        // LOCK the settle price now, so the payer knows up front what settle will
-        // cost and the owner cannot change it mid-session.
-        lockedSettleFee[sessionId] = settleFee;
-        emit FeePaid(sessionId, false, msg.sender, amount);
-    }
-
-    /// @notice Charge the SETTLE fee for a session. Call ONCE per session, at
-    ///         settle. A session that never settles is never charged this fee,
-    ///         which is the agreed abandon behaviour (open fee only).
-    /// @dev Charges the fee LOCKED at open, never the current config, so a fee
-    ///      change between open and settle cannot affect this session.
-    function chargeSettle(bytes32 sessionId) external {
-        if (openPaidBy[sessionId] == address(0)) revert SettleNotAllowed();
-        if (settlePaidBy[sessionId] != address(0)) revert SettleAlreadyCharged();
-        uint256 amount = _pull(lockedSettleFee[sessionId]);
-        settlePaidBy[sessionId] = msg.sender;
-        emit FeePaid(sessionId, true, msg.sender, amount);
+    /// @dev One transaction for the fee keeps cost low: a two-stage model made
+    ///      fee collection ~39% of a session's total Arc cost. The amount charged
+    ///      is recorded, so a later fee change never affects this session.
+    ///      Reverts if the session was already charged.
+    function chargeSession(bytes32 sessionId) external {
+        if (paidBy[sessionId] != address(0)) revert SessionAlreadyCharged();
+        uint256 amount = _pull(sessionFee);
+        paidBy[sessionId] = msg.sender;
+        paidAmount[sessionId] = amount;
+        emit FeePaid(sessionId, msg.sender, amount);
     }
 
     /// @dev Pull the exact configured fee in the fee asset from the caller, and
@@ -193,8 +200,9 @@ contract FeeVault {
         emit Withdrawn(token, destination, amount);
     }
 
-    /// @notice A session's stage state, for the SDK and the audit trail.
-    function paymentOf(bytes32 sessionId) external view returns (address openPayer, address settlePayer) {
-        return (openPaidBy[sessionId], settlePaidBy[sessionId]);
+    /// @notice A session's fee state, for the SDK and the audit trail: who paid
+    ///         and exactly how much (0 if not charged yet).
+    function paymentOf(bytes32 sessionId) external view returns (address payer, uint256 amount) {
+        return (paidBy[sessionId], paidAmount[sessionId]);
     }
 }
