@@ -47,7 +47,16 @@ contract Randomness {
     /// sessionId => whether this session's seed(s) have been revealed.
     mapping(bytes32 => bool) public revealed;
 
+    /// sessionId => how many independent streams this session's game declared.
+    /// Set explicitly by the game (see `declareStreams`) OR inferred from the
+    /// seed set at reveal. This is the UNOPINIONATED count: a dice game uses 1,
+    /// a card game where each player draws their own deck uses one stream per
+    /// player (2, 3, ... up to MAX_STREAMS). The rail never decides the number;
+    /// the game does, and it may be any value it needs.
+    mapping(bytes32 => uint8) public streamCount;
+
     event SeedRevealed(bytes32 indexed sessionId, address indexed by, uint8 streamCount, bytes32 seedHash);
+    event StreamsDeclared(bytes32 indexed sessionId, address indexed by, uint8 streamCount);
 
     error UnknownOrOpenSession();
     error NoRandomnessDeclared();
@@ -56,6 +65,8 @@ contract Randomness {
     error NoSeeds();
     error EmptySeed();
     error TooManyStreams();
+    error CountMismatch();
+    error AlreadyDeclared();
 
     /// Hard cap on streams per session, so reveal stays cheap and bounded.
     uint8 public constant MAX_STREAMS = 16;
@@ -63,6 +74,26 @@ contract Randomness {
     constructor(address registry_) {
         if (registry_ == address(0)) revert UnknownOrOpenSession();
         registry = SessionRegistry(registry_);
+    }
+
+    /// @notice OPTIONAL: declare how many independent random streams this game
+    ///         will reveal, BEFORE play. A dice game declares 1; a card game where
+    ///         each player draws from their own deck declares one per player (2,
+    ///         3, ... up to MAX_STREAMS). The rail never decides the number for
+    ///         the game; the game sets whatever it needs.
+    /// @dev Callable by the session OWNER (the game operator). Once declared, the
+    ///      reveal MUST match that exact count, so the count is locked. A game
+    ///      that does not care may skip this and simply reveal its seeds; the
+    ///      count is then inferred from the reveal. Declaring is opt-in, never
+    ///      required, so the rail stays unopinionated.
+    function declareStreams(bytes32 sessionId, uint8 count) external {
+        SessionRegistry.Session memory s = registry.getSession(sessionId);
+        if (s.status != 1) revert UnknownOrOpenSession(); // 1 = Open
+        if (s.owner != msg.sender) revert UnknownOrOpenSession();
+        if (streamCount[sessionId] != 0) revert AlreadyDeclared();
+        if (count == 0 || count > MAX_STREAMS) revert TooManyStreams();
+        streamCount[sessionId] = count;
+        emit StreamsDeclared(sessionId, msg.sender, count);
     }
 
     /// @notice Reveal the seed(s) for a session. Callable by ANYONE (no authority
@@ -90,6 +121,12 @@ contract Randomness {
         }
         // The revealed set must match the commitment sealed at OPEN.
         if (commitHashOf(seeds) != s.seedCommit) revert SeedMismatch();
+        // If the game declared its stream count up front, the reveal must match
+        // it exactly. Otherwise the count is inferred from the reveal, so a game
+        // that did not care is never forced to declare one.
+        uint8 declared = streamCount[sessionId];
+        if (declared != 0 && declared != uint8(seeds.length)) revert CountMismatch();
+        if (declared == 0) streamCount[sessionId] = uint8(seeds.length);
 
         revealed[sessionId] = true;
         bytes32[] storage store = _seeds[sessionId];
@@ -131,5 +168,12 @@ contract Randomness {
     /// @notice The revealed seeds for a session (empty until revealed).
     function seedsOf(bytes32 sessionId) external view returns (bytes32[] memory) {
         return _seeds[sessionId];
+    }
+
+    /// @notice How many independent streams this session uses (0 until declared
+    ///         or revealed). A verifier reads this to know how many streams to
+    ///         replay.
+    function streamCountOf(bytes32 sessionId) external view returns (uint8) {
+        return streamCount[sessionId];
     }
 }

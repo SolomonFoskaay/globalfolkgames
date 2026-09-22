@@ -243,7 +243,9 @@ contract FeeVaultTest {
         vault.chargeOpen(S1);
     }
 
-    function testSettleUsesCurrentPrice() public {
+    function testSettleUsesLockedOpenPrice() public {
+        // AUDIT FIX (2026-09-21): the settle fee is LOCKED at open, so an owner
+        // fee change between open and settle can never alter this session's price.
         vm.prank(SPONSOR);
         vault.chargeOpen(S1);
         vm.prank(OWNER);
@@ -251,7 +253,8 @@ contract FeeVaultTest {
         uint256 before = usdc.balanceOf(SPONSOR);
         vm.prank(SPONSOR);
         vault.chargeSettle(S1);
-        require(before - usdc.balanceOf(SPONSOR) == SETTLE_FEE * 3, "current settle price");
+        require(before - usdc.balanceOf(SPONSOR) == SETTLE_FEE, "locked settle price, not current");
+        require(vault.lockedSettleFee(S1) == SETTLE_FEE, "lock recorded at open");
     }
 
     function testCannotSetZeroAddresses() public {
