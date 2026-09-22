@@ -204,4 +204,92 @@ contract RandomnessTest {
         vm.expectRevert();
         new Randomness(address(0));
     }
+
+    // ------------------------------------------------- stream count (N, unopinionated)
+
+    function testStreamCountInferredFromReveal() public {
+        // A game that never declares simply reveals N seeds; the count is inferred.
+        bytes32[] memory seeds = new bytes32[](3);
+        seeds[0] = keccak256("deck-a");
+        seeds[1] = keccak256("deck-b");
+        seeds[2] = keccak256("deck-c");
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(OWNER);
+        reg.close(id);
+        rnd.reveal(id, seeds);
+        require(rnd.streamCountOf(id) == 3, "count inferred 3");
+    }
+
+    function testSingleStreamDefault() public {
+        bytes32[] memory seeds = _seed(keccak256("one-dice-stream"));
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(OWNER);
+        reg.close(id);
+        rnd.reveal(id, seeds);
+        require(rnd.streamCountOf(id) == 1, "one stream, dice default");
+    }
+
+    function testGameCanDeclareAnyCount() public {
+        // A card game where each of 5 players draws their own deck.
+        bytes32[] memory seeds = new bytes32[](5);
+        for (uint8 i = 0; i < 5; i++) seeds[i] = keccak256(abi.encodePacked("deck", i));
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(OWNER);
+        rnd.declareStreams(id, 5);
+        require(rnd.streamCountOf(id) == 5, "declared 5");
+        vm.prank(OWNER);
+        reg.close(id);
+        rnd.reveal(id, seeds);
+        require(rnd.seedsOf(id).length == 5, "five streams revealed");
+    }
+
+    function testDeclaredCountMismatchReverts() public {
+        // Declared 3, tries to reveal 1 -> refused.
+        bytes32[] memory one = _seed(keccak256("only-one"));
+        bytes32 id = _openWithSeed(one);
+        vm.prank(OWNER);
+        rnd.declareStreams(id, 3);
+        vm.prank(OWNER);
+        reg.close(id);
+        vm.expectRevert();
+        rnd.reveal(id, one);
+    }
+
+    function testCannotDeclareTwice() public {
+        bytes32[] memory seeds = _seed(keccak256("s"));
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(OWNER);
+        rnd.declareStreams(id, 1);
+        vm.prank(OWNER);
+        vm.expectRevert();
+        rnd.declareStreams(id, 2);
+    }
+
+    function testOnlyOwnerCanDeclare() public {
+        bytes32[] memory seeds = _seed(keccak256("s"));
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(STRANGER);
+        vm.expectRevert();
+        rnd.declareStreams(id, 2);
+    }
+
+    function testCannotDeclareAboveMax() public {
+        bytes32[] memory seeds = _seed(keccak256("s"));
+        bytes32 id = _openWithSeed(seeds);
+        // Compute before expectRevert: a staticcall inside the arg would consume it.
+        uint8 over = rnd.MAX_STREAMS() + 1;
+        vm.prank(OWNER);
+        vm.expectRevert();
+        rnd.declareStreams(id, over);
+    }
+
+    function testCannotDeclareAfterClose() public {
+        bytes32[] memory seeds = _seed(keccak256("s"));
+        bytes32 id = _openWithSeed(seeds);
+        vm.prank(OWNER);
+        reg.close(id);
+        vm.prank(OWNER);
+        vm.expectRevert();
+        rnd.declareStreams(id, 1);
+    }
 }

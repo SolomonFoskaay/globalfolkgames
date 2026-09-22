@@ -67,6 +67,11 @@ contract FeeVault {
     mapping(bytes32 => address) public openPaidBy;
     mapping(bytes32 => address) public settlePaidBy;
 
+    /// sessionId => the settle fee LOCKED at open. The payer sees this price when
+    /// they pay the open fee, and settle charges exactly this amount, so an owner
+    /// fee change can never alter the price of a session already in flight.
+    mapping(bytes32 => uint256) public lockedSettleFee;
+
     /// Accounting: how much of the fee asset is actually withdrawable.
     mapping(address => uint256) public collected; // token => amount
 
@@ -146,16 +151,21 @@ contract FeeVault {
         if (openPaidBy[sessionId] != address(0)) revert OpenAlreadyCharged();
         uint256 amount = _pull(openFee);
         openPaidBy[sessionId] = msg.sender;
+        // LOCK the settle price now, so the payer knows up front what settle will
+        // cost and the owner cannot change it mid-session.
+        lockedSettleFee[sessionId] = settleFee;
         emit FeePaid(sessionId, false, msg.sender, amount);
     }
 
     /// @notice Charge the SETTLE fee for a session. Call ONCE per session, at
     ///         settle. A session that never settles is never charged this fee,
     ///         which is the agreed abandon behaviour (open fee only).
+    /// @dev Charges the fee LOCKED at open, never the current config, so a fee
+    ///      change between open and settle cannot affect this session.
     function chargeSettle(bytes32 sessionId) external {
         if (openPaidBy[sessionId] == address(0)) revert SettleNotAllowed();
         if (settlePaidBy[sessionId] != address(0)) revert SettleAlreadyCharged();
-        uint256 amount = _pull(settleFee);
+        uint256 amount = _pull(lockedSettleFee[sessionId]);
         settlePaidBy[sessionId] = msg.sender;
         emit FeePaid(sessionId, true, msg.sender, amount);
     }
