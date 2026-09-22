@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Generals (PvP demo) | Foskaay GGI</title>
+    <meta name="description" content="A real on-chain strategy game ported to Arc, powered by Foskaay Gasless Games Infrastructure. The board lives on-chain, the player pays nothing.">
+    <meta property="og:title" content="Generals (PvP demo) | Foskaay GGI">
+    <meta property="og:description" content="A real on-chain strategy game on Arc, powered by Foskaay GGI. Your moves are on-chain, your wallet pays nothing.">
+    <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
+    <meta property="og:url" content="https://globalfolkgames.fun/ggi-demos/pvp/generals/">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .gg-wrap { max-width: 980px; margin: 0 auto; padding: 0 0 80px; }
+        .gg-hero {
+            position: relative; overflow: hidden; text-align: center;
+            padding: 26px 16px 22px;
+            background:
+                radial-gradient(900px 260px at 15% -10%, rgba(243,156,18,0.22), transparent 60%),
+                radial-gradient(900px 300px at 88% 0%, rgba(155,89,182,0.24), transparent 60%),
+                linear-gradient(180deg, #101018 0%, #0f0f13 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .gg-eyebrow {
+            display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em;
+            color: #f39c12; border: 1px solid rgba(243,156,18,0.4); background: rgba(243,156,18,0.08);
+            border-radius: 999px; padding: 5px 12px; margin-bottom: 12px;
+        }
+        .gg-h1 { margin: 0 0 8px; font-size: 1.6rem; color: #fff; }
+        .gg-h1 .grad { background: linear-gradient(135deg, #f39c12, #9b59b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .gg-sub { margin: 0 auto; max-width: 620px; color: #b9b9c6; font-size: 0.9rem; line-height: 1.6; }
+
+        .gg-body { padding: 16px 14px 0; }
+
+        .gg-panel {
+            background: linear-gradient(180deg, #191922, #15151c);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 16px; padding: 14px; margin-bottom: 14px;
+        }
+        .gg-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .gg-btn {
+            appearance: none; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+            color: #fff; font-weight: 800; font-size: 0.84rem; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+        }
+        .gg-btn.primary { background: linear-gradient(135deg, #f39c12, #9b59b6); border-color: transparent; }
+        .gg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .gg-btn:active { transform: scale(0.98); }
+
+        .gg-status { color: #dcdce6; font-size: 0.9rem; line-height: 1.5; }
+        .gg-status b { color: #fff; }
+        .gg-muted { color: #8f8fa0; font-size: 0.78rem; line-height: 1.5; word-break: break-all; }
+        .gg-cost { color: #2ecc71; font-weight: 800; }
+
+        .gg-board-host { display: flex; justify-content: center; }
+        .gg-grid { border: 2px solid rgba(255,255,255,0.25); border-radius: 8px; overflow: hidden; background: #0c0c10; }
+        .gg-grid .r { display: flex; flex-wrap: nowrap; }
+        .gg-cell { position: relative; user-select: none; border: 1px solid rgba(255,255,255,0.14); box-sizing: border-box; }
+        .gg-cell img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        .gg-cell .s {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.85); background: rgba(127,127,127,0.28);
+        }
+        .gg-cell.p0 .s { background: rgba(52,110,255,0.42); }
+        .gg-cell.p1 .s { background: rgba(255,70,70,0.42); }
+        .gg-cell.owned { cursor: pointer; }
+        .gg-cell.sel { outline: 3px solid #f39c12; outline-offset: -3px; z-index: 3; }
+        .gg-cell.targetable { outline: 2px dashed rgba(243,156,18,0.85); outline-offset: -2px; z-index: 2; }
+        .gg-legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px; font-size: 0.76rem; color: #b9b9c6; }
+        .gg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+
+        .gg-log { max-height: 150px; overflow-y: auto; margin-top: 8px; }
+        .gg-log div { font-size: 0.75rem; color: #9a9aa8; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.06); }
+        .gg-log b { color: #dcdce6; }
+        .gg-note { color: #9a9aa8; font-size: 0.8rem; line-height: 1.6; }
+        .gg-note a { color: #f39c12; }
+        .gg-err { color: #ff8080; font-size: 0.82rem; }
+    </style>
+</head>
+<body>
+
+<main class="gg-wrap">
+    <section class="gg-hero">
+        <span class="gg-eyebrow">FOSKAAY GGI DEMO</span>
+        <h1 class="gg-h1">Generals, <span class="grad">fully on-chain on Arc</span></h1>
+        <p class="gg-sub">A real strategy game ported to Arc with its own contract. The board lives on-chain, every move is checked by the chain, and your wallet pays nothing. The sponsor covers the tiny USDC gas.</p>
+    </section>
+
+    <div class="gg-body">
+        <div class="gg-panel">
+            <div class="gg-row">
+                <button class="gg-btn primary" id="gg-new">New match</button>
+                <button class="gg-btn" id="gg-tick" disabled>Tick (grow strength)</button>
+                <button class="gg-btn" id="gg-finish" disabled>Finish</button>
+                <button class="gg-btn" id="gg-settle" disabled>Settle session</button>
+                <label class="gg-muted" style="margin-left:auto">Move strength
+                    <select id="gg-pct" class="gg-btn" style="padding:8px 10px">
+                        <option value="100">100%</option>
+                        <option value="75">75%</option>
+                        <option value="50" selected>50%</option>
+                        <option value="25">25%</option>
+                    </select>
+                </label>
+            </div>
+            <div class="gg-status" id="gg-status" style="margin-top:12px">Press New match to open a session and start.</div>
+            <div class="gg-muted" id="gg-ids" style="margin-top:6px"></div>
+            <div class="gg-muted" style="margin-top:6px">Session spend so far: <span class="gg-cost" id="gg-cost">0.000000 USDC</span> (paid by the sponsor, never by you)</div>
+        </div>
+
+        <div class="gg-panel">
+            <div class="gg-board-host"><div id="gg-grid" class="gg-grid"></div></div>
+            <div class="gg-legend">
+                <span><span class="gg-dot" style="background:rgba(52,110,255,0.8)"></span>You (blue)</span>
+                <span><span class="gg-dot" style="background:rgba(255,70,70,0.8)"></span>Opponent (red)</span>
+                <span><span class="gg-dot" style="background:rgba(127,127,127,0.8)"></span>Neutral</span>
+            </div>
+            <p class="gg-note" style="margin-top:10px">Tap one of your blue cells, then tap an adjacent cell to move strength into it. Attacking a red or neutral cell takes it over when your damage beats its strength. Reinforcing your own cell adds the strength.</p>
+        </div>
+
+        <div class="gg-panel">
+            <div class="gg-row" style="justify-content:space-between">
+                <b style="color:#fff;font-size:0.9rem">On-chain activity</b>
+                <span class="gg-muted" id="gg-tx"></span>
+            </div>
+            <div class="gg-log" id="gg-log"></div>
+        </div>
+
+        <div class="gg-panel">
+            <p class="gg-note">
+                <b style="color:#fff">What this proves.</b> The game's board is its OWN contract on Arc, not browser state. Every move calls the contract, and the contract checks the GGI session before it accepts a move. The rail underneath is <a href="/foskaay-ggi-docs/">Foskaay Gasless Games Infrastructure</a>, and you can see every session in the <a href="/ggi-explorer/">GGI Explorer</a>. The game is a port of MagicBlock's open-source Generals sample, with their graphics.
+            </p>
+        </div>
+
+        <div class="gg-panel">
+            <p class="gg-note">
+                <b style="color:#fff">How the cost works, plainly.</b> Arc has no free execution layer, so every move in this demo is a real on-chain transaction. The sponsor (the game operator) pays it, never you. Batching (the optional GGI pattern) folds the final settlement of many matches into one on-chain stamp; it does not remove the per-move writes. A game that keeps its board off-chain during play and settles once pays far less.
+            </p>
+        </div>
+    </div>
+</main>
+
+<script src="/global_header.js"></script>
+<script>
+(function () {
+    var RELAY = '/api/ggi-sponsor';
+    var IMG = {
+        0: '/ggi-assets/generals/GameGridCellField.png',
+        1: '/ggi-assets/generals/GameGridCellCity.png',
+        2: '/ggi-assets/generals/GameGridCellCapital.png',
+        3: '/ggi-assets/generals/GameGridCellMountain.png',
+        4: '/ggi-assets/generals/GameGridCellMountain.png' // forest uses the mountain art
+    };
+    var PLAYER = 0; // the human seat
+    var AI = 1;
+    var COLS = 16, ROWS = 8;
+
+    var el = {
+        newBtn: document.getElementById('gg-new'),
+        tickBtn: document.getElementById('gg-tick'),
+        finishBtn: document.getElementById('gg-finish'),
+        settleBtn: document.getElementById('gg-settle'),
+        pct: document.getElementById('gg-pct'),
+        status: document.getElementById('gg-status'),
+        ids: document.getElementById('gg-ids'),
+        cost: document.getElementById('gg-cost'),
+        grid: document.getElementById('gg-grid'),
+        log: document.getElementById('gg-log'),
+        tx: document.getElementById('gg-tx')
+    };
+
+    var S = {
+        sessionId: null,
+        boardId: null,
+        board: null,
+        selected: null,     // {x,y}
+        busy: false,
+        totalCost: 0,       // USDC (float)
+        finished: false,
+        poll: null,
+        aiPending: false
+    };
+
+    function usdc(x) { return Number(x || 0) / 1e6; }
+    function fmt(x) { return x.toFixed(6) + ' USDC'; }
+    function short(h) { return h ? (h.slice(0, 10) + '...' + h.slice(-6)) : ''; }
+
+    function log(msg, costUsdc6) {
+        var d = document.createElement('div');
+        d.innerHTML = '<b>' + msg + '</b>' + (costUsdc6 != null ? ' <span class="gg-cost">' + fmt(usdc(costUsdc6)) + '</span>' : '');
+        el.log.insertBefore(d, el.log.firstChild);
+        while (el.log.childNodes.length > 60) el.log.removeChild(el.log.lastChild);
+    }
+
+    function addCost(costUsdc6) {
+        S.totalCost += usdc(costUsdc6);
+        el.cost.textContent = fmt(S.totalCost);
+    }
+
+    async function post(action, body) {
+        var res = await fetch(RELAY, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(Object.assign({ action: action }, body || {}))
+        });
+        var json = await res.json();
+        if (!json.ok) throw new Error(json.error || ('relay error ' + res.status));
+        return json;
+    }
+
+    function setBusy(b) {
+        S.busy = b;
+        el.newBtn.disabled = b;
+        el.tickBtn.disabled = b || !S.board || S.board.status !== 2;
+        el.finishBtn.disabled = b || !S.board || S.board.status !== 2;
+        el.settleBtn.disabled = b || !S.sessionId;
+    }
+
+    function statusLine() {
+        if (!S.board) { el.status.textContent = 'Press New match to open a session and start.'; return; }
+        var st = ['Generating', 'Lobby', 'Playing', 'Finished'][S.board.status] || '?';
+        if (S.board.status === 2) {
+            el.status.innerHTML = '<b>Playing.</b> Your turn (blue). Tap your cell, then an adjacent target.';
+        } else if (S.board.status === 3) {
+            el.status.innerHTML = '<b>Finished.</b> Settle the session to seal the result on-chain.';
+        } else {
+            el.status.innerHTML = '<b>' + st + '.</b>';
+        }
+    }
+
+    // ---- rendering (reads the board from chain, owns nothing) ----------------
+    function render() {
+        if (!S.board) { el.grid.innerHTML = ''; return; }
+        var b = S.board;
+        var host = el.grid.parentElement;
+        var availW = Math.min(host.clientWidth || 360, 960);
+        var availH = Math.max(window.innerHeight - 360, 220);
+        var horizCell = Math.min(Math.floor(availW / b.sizeX) - 2, Math.floor(availH / b.sizeY) - 2, 64);
+        var vertCell = Math.min(Math.floor(availW / b.sizeY) - 2, 64);
+        var vertical = vertCell > horizCell;
+        var cell = Math.max(16, vertical ? vertCell : horizCell);
+
+        var order = [];
+        if (vertical) {
+            for (var x = 0; x < b.sizeX; x++) { for (var y = b.sizeY - 1; y >= 0; y--) order.push([x, y]); }
+        } else {
+            for (var yy = 0; yy < b.sizeY; yy++) { for (var xx = 0; xx < b.sizeX; xx++) order.push([xx, yy]); }
+        }
+
+        var html = '';
+        var perRow = vertical ? b.sizeY : b.sizeX;
+        for (var i = 0; i < order.length; i++) {
+            if (i % perRow === 0) html += '<div class="r">';
+            var x = order[i][0], y = order[i][1];
+            var c = b.cells[y * b.sizeX + x];
+            var cls = 'gg-cell';
+            if (c.ownerKind === 1) cls += (c.ownerPlayer === 0 ? ' p0' : ' p1');
+            if (c.ownerKind === 1 && c.ownerPlayer === PLAYER && c.strength > 1 && b.status === 2) cls += ' owned';
+            if (S.selected && S.selected.x === x && S.selected.y === y) cls += ' sel';
+            if (S.selected && isAdjacent(S.selected, x, y)) cls += ' targetable';
+            html += '<div class="' + cls + '" data-x="' + x + '" data-y="' + y + '" style="width:' + cell + 'px;height:' + cell + 'px">' +
+                    '<img src="' + IMG[c.kind] + '" alt="">' +
+                    (c.strength > 0 ? '<div class="s" style="font-size:' + Math.max(10, Math.floor(cell / 3)) + 'px">' + c.strength + '</div>' : '') +
+                    '</div>';
+            if (i % perRow === perRow - 1) html += '</div>';
+        }
+        el.grid.innerHTML = html;
+        el.ids.textContent = 'Board #' + S.boardId + (S.sessionId ? '  |  Session ' + short(S.sessionId) : '');
+        statusLine();
+    }
+
+    function isAdjacent(a, x, y) { return (Math.abs(a.x - x) + Math.abs(a.y - y)) === 1; }
+
+    el.grid.addEventListener('click', function (ev) {
+        var t = ev.target.closest ? ev.target.closest('.gg-cell') : null;
+        if (!t || !S.board || S.board.status !== 2 || S.busy) return;
+        var x = Number(t.dataset.x), y = Number(t.dataset.y);
+        var c = S.board.cells[y * S.board.sizeX + x];
+        if (!S.selected) {
+            if (c.ownerKind === 1 && c.ownerPlayer === PLAYER && c.strength > 1) { S.selected = { x: x, y: y }; render(); }
+            return;
+        }
+        if (S.selected.x === x && S.selected.y === y) { S.selected = null; render(); return; }
+        if (!isAdjacent(S.selected, x, y)) {
+            if (c.ownerKind === 1 && c.ownerPlayer === PLAYER && c.strength > 1) { S.selected = { x: x, y: y }; render(); }
+            return;
+        }
+        sendMove(S.selected.x, S.selected.y, x, y, Number(el.pct.value));
+    });
+
+    // ---- the game contract, through the relay -------------------------------
+    async function refresh() {
+        if (!S.boardId) return;
+        try {
+            var b = await post('gameBoard', { boardId: S.boardId });
+            S.board = b;
+            if (b.status === 3 && !S.finished) { S.finished = true; log('Board finished on-chain'); }
+            render();
+        } catch (e) { /* keep last board */ }
+    }
+
+    async function sendMove(sx, sy, tx, ty, pct) {
+        S.selected = null;
+        setBusy(true);
+        try {
+            var r = await post('game', { op: 'command', boardId: S.boardId, playerIndex: PLAYER, sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, strengthPercent: pct });
+            addCost(r.costUsdc6);
+            log('You moved (' + sx + ',' + sy + ') to (' + tx + ',' + ty + ') on-chain', r.costUsdc6);
+            el.tx.textContent = 'tx ' + short(r.tx);
+            await refresh();
+            if (S.board && S.board.status === 2) scheduleAI();
+        } catch (e) { log('<span class="gg-err">Move failed: ' + e.message + '</span>'); }
+        finally { setBusy(false); }
+    }
+
+    function scheduleAI() {
+        if (S.aiPending) return;
+        S.aiPending = true;
+        setTimeout(async function () {
+            S.aiPending = false;
+            if (!S.board || S.board.status !== 2) return;
+            var m = aiChooseMove();
+            if (!m) return;
+            setBusy(true);
+            try {
+                var r = await post('game', { op: 'command', boardId: S.boardId, playerIndex: AI, sourceX: m.sx, sourceY: m.sy, targetX: m.tx, targetY: m.ty, strengthPercent: 100 });
+                addCost(r.costUsdc6);
+                log('Opponent moved (' + m.sx + ',' + m.sy + ') to (' + m.tx + ',' + m.ty + ') on-chain', r.costUsdc6);
+                el.tx.textContent = 'tx ' + short(r.tx);
+                await refresh();
+            } catch (e) { log('<span class="gg-err">Opponent move failed: ' + e.message + '</span>'); }
+            finally { setBusy(false); }
+        }, 1200);
+    }
+
+    // Simple opponent: prefer an enemy neighbour it can beat, else reinforce, else expand.
+    function aiChooseMove() {
+        var b = S.board;
+        var best = null;
+        for (var y = 0; y < b.sizeY; y++) {
+            for (var x = 0; x < b.sizeX; x++) {
+                var c = b.cells[y * b.sizeX + x];
+                if (c.ownerKind !== 1 || c.ownerPlayer !== AI || c.strength <= 1) continue;
+                var moved = Math.floor((c.strength - 1) * 1.0);
+                var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                for (var d = 0; d < dirs.length; d++) {
+                    var nx = x + dirs[d][0], ny = y + dirs[d][1];
+                    if (nx < 0 || ny < 0 || nx >= b.sizeX || ny >= b.sizeY) continue;
+                    var t = b.cells[ny * b.sizeX + nx];
+                    if (t.kind === 3) continue; // mountain
+                    var score;
+                    if (t.ownerKind === 1 && t.ownerPlayer === AI) score = 1;         // reinforce
+                    else if (t.ownerKind === 1 && t.ownerPlayer === PLAYER) score = moved > t.strength ? 5 : 0; // conquer enemy
+                    else score = 2;                                                   // take neutral
+                    if (!best || score > best.score) best = { score: score, sx: x, sy: y, tx: nx, ty: ny };
+                }
+            }
+        }
+        return best;
+    }
+
+    el.newBtn.addEventListener('click', async function () {
+        setBusy(true);
+        S.selected = null; S.finished = false; S.totalCost = 0; el.cost.textContent = fmt(0); el.log.innerHTML = ''; el.tx.textContent = '';
+        try {
+            var info = await post('sponsorAddress');
+            var open = await post('open', { participants: 2, ttlSecs: 3600 });
+            S.sessionId = open.sessionId;
+            addCost(open.costUsdc6);
+            log('Session opened on-chain', open.costUsdc6);
+
+            var gs = await post('setGameState', { sessionId: S.sessionId });
+            addCost(gs.costUsdc6);
+            log('Game board linked to the session', gs.costUsdc6);
+
+            S.boardId = Math.floor(Date.now() / 1000);
+            var setup = [
+                { op: 'createBoard', boardId: S.boardId, sessionId: S.sessionId, sizeX: COLS, sizeY: ROWS },
+                { op: 'generate', boardId: S.boardId },
+                { op: 'join', boardId: S.boardId, playerIndex: 0 },
+                { op: 'join', boardId: S.boardId, playerIndex: 1 },
+                { op: 'setReady', boardId: S.boardId, playerIndex: 0, ready: true },
+                { op: 'setReady', boardId: S.boardId, playerIndex: 1, ready: true },
+                { op: 'start', boardId: S.boardId }
+            ];
+            for (var i = 0; i < setup.length; i++) {
+                var r = await post('game', setup[i]);
+                addCost(r.costUsdc6);
+                log('game.' + setup[i].op, r.costUsdc6);
+                el.tx.textContent = 'tx ' + short(r.tx);
+            }
+            await refresh();
+            if (!S.poll) S.poll = setInterval(refresh, 4000);
+        } catch (e) { log('<span class="gg-err">Setup failed: ' + e.message + '</span>'); }
+        finally { setBusy(false); }
+    });
+
+    el.tickBtn.addEventListener('click', async function () {
+        setBusy(true);
+        try {
+            var r = await post('game', { op: 'tick', boardId: S.boardId });
+            addCost(r.costUsdc6);
+            log('Tick called (permissionless, grows strength)', r.costUsdc6);
+            el.tx.textContent = 'tx ' + short(r.tx);
+            await refresh();
+        } catch (e) { log('<span class="gg-err">Tick failed: ' + e.message + '</span>'); }
+        finally { setBusy(false); }
+    });
+
+    el.finishBtn.addEventListener('click', async function () {
+        setBusy(true);
+        try {
+            var r = await post('game', { op: 'finish', boardId: S.boardId, playerIndex: PLAYER });
+            addCost(r.costUsdc6);
+            log('Finish checked on-chain (last one standing)', r.costUsdc6);
+            el.tx.textContent = 'tx ' + short(r.tx);
+            await refresh();
+        } catch (e) { log('<span class="gg-err">Finish failed: ' + e.message + '</span>'); }
+        finally { setBusy(false); }
+    });
+
+    el.settleBtn.addEventListener('click', async function () {
+        setBusy(true);
+        try {
+            var digest = '0x' + Array.from({ length: 64 }, function () { return '0123456789abcdef'[Math.floor(Math.random() * 16)]; }).join('');
+            var r = await post('settle', { sessionId: S.sessionId, digest: digest });
+            addCost(r.costUsdc6);
+            log('Session settled (sealed on-chain, fee charged once)', r.costUsdc6);
+            if (r.txs && r.txs.length) el.tx.textContent = 'tx ' + short(r.txs[r.txs.length - 1]);
+            S.sessionId = null;
+            statusLine();
+        } catch (e) { log('<span class="gg-err">Settle failed: ' + e.message + '</span>'); }
+        finally { setBusy(false); }
+    });
+
+    window.addEventListener('resize', function () { if (S.board) render(); });
+    render();
+})();
+</script>
+<script src="/dash-nav.js"></script>
+<script src="/ggi-nav.js"></script>
+<script>
+    window.GFG_GGI_NAV.render({ active: 'demos' });
+</script>
+</body>
+</html>

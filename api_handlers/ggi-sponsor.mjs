@@ -38,11 +38,16 @@ const ADDR = {
   Randomness: '0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b',
   FeeVault: '0x4cf542791faeb683f878bd3d119683e0C02F9905',
   BatchedSettlement: '0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4',
+  // The ported PvP demo's OWN contract (not rail core). Deployed once, plain
+  // (no proxy). Public address; the game's board truth lives here, not in the
+  // browser. See foskaay-ggi/demos/pvp/generals/GeneralsGame.sol.
+  GeneralsGame: '0xD674eD1f118855868b4B002F4A167C953Cc549ca',
 };
 
 const registryAbi = parseAbi([
   'function open(uint8 participantCount, uint64 ttlSecs, bytes32 rulesHash, bytes32 seedCommit) returns (bytes32)',
   'function setAuthority(bytes32 sessionId, uint8 seat, address authority)',
+  'function setGameState(bytes32 sessionId, address stateAccount)',
   'function close(bytes32 sessionId)',
 ]);
 const stateAbi = parseAbi([
@@ -64,6 +69,26 @@ const batchAbi = parseAbi([
   'function flush(address owner, uint256 windowId) returns (bytes32)',
   'function windowCount(address owner) view returns (uint256)',
   'function canFlush(address owner, uint256 windowId) view returns (bool)',
+]);
+
+// The ported game's OWN contract ABI. Kept as data so this relay has no build
+// dependency on the demo. Every function here is authorised on-chain by
+// SessionRegistry.canSign(sessionId, seat, msg.sender), so the sponsor must be a
+// seat authority (the open action sets it). The browser never signs and never
+// pays: it only asks the sponsor to relay these fixed operations.
+const generalsAbi = parseAbi([
+  'function createBoard(uint256 boardId, bytes32 sessionId, uint8 sizeX, uint8 sizeY)',
+  'function generate(uint256 boardId)',
+  'function join(uint256 boardId, uint8 playerIndex)',
+  'function setReady(uint256 boardId, uint8 playerIndex, bool ready)',
+  'function start(uint256 boardId)',
+  'function command(uint256 boardId, uint8 playerIndex, uint8 sourceX, uint8 sourceY, uint8 targetX, uint8 targetY, uint8 strengthPercent)',
+  'function tick(uint256 boardId)',
+  'function finish(uint256 boardId, uint8 playerIndex)',
+  'function boardStatus(uint256 boardId) view returns (uint8)',
+  'function playerOf(uint256 boardId, uint8 i) view returns (bool ready, address authority, uint64 lastActionSlot)',
+  'function cellOf(uint256 boardId, uint8 x, uint8 y) view returns (uint8 kind, uint8 ownerKind, uint8 ownerPlayer, uint8 strength)',
+  'function boardView(uint256 boardId) view returns (uint8 status, uint8 sizeX, uint8 sizeY, (bool ready, address authority, uint64 lastActionSlot)[2] players, (uint8 kind, uint8 ownerKind, uint8 ownerPlayer, uint8 strength)[128] cells, uint64 tickNextSlot, bytes32 sessionId)',
 ]);
 
 const chain = defineChain({
@@ -170,6 +195,51 @@ async function doSetAuthority(body) {
   return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
 }
 
+// Link the game's own board account to the session (the EVM twin of "this account
+// is delegated for this game"). The rail stores the address as an opaque value.
+async function doSetGameState(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'setGameState',
+    args: [body.sessionId, body.stateAccount || ADDR.GeneralsGame], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+// The game's fixed operations, relayed by the sponsor (who is the seat authority,
+// so the game contract's canSign check passes and the player pays nothing). An
+// explicit switch, NEVER arbitrary calldata, so a leaked client cannot make the
+// sponsor call anything other than these known game functions.
+async function doGame(body) {
+  const { account, pub, wallet } = clients();
+  const op = String(body.op || '');
+  let functionName;
+  let args;
+  switch (op) {
+    case 'createBoard': functionName = 'createBoard'; args = [BigInt(body.boardId), body.sessionId, Number(body.sizeX || 16), Number(body.sizeY || 8)]; break;
+    case 'generate': functionName = 'generate'; args = [BigInt(body.boardId)]; break;
+    case 'join': functionName = 'join'; args = [BigInt(body.boardId), Number(body.playerIndex)]; break;
+    case 'setReady': functionName = 'setReady'; args = [BigInt(body.boardId), Number(body.playerIndex), !!body.ready]; break;
+    case 'start': functionName = 'start'; args = [BigInt(body.boardId)]; break;
+    case 'command': functionName = 'command'; args = [BigInt(body.boardId), Number(body.playerIndex), Number(body.sourceX), Number(body.sourceY), Number(body.targetX), Number(body.targetY), Number(body.strengthPercent)]; break;
+    case 'tick': functionName = 'tick'; args = [BigInt(body.boardId)]; break;
+    case 'finish': functionName = 'finish'; args = [BigInt(body.boardId), Number(body.playerIndex)]; break;
+    default: throw new Error('unknown game op: ' + op);
+  }
+  const r = await send(wallet, pub, { address: ADDR.GeneralsGame, abi: generalsAbi, functionName, args, account });
+  return { op, tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+// One-call read of the whole board (no key needed conceptually, but the relay
+// already holds one). Returns a clean JSON shape the browser can render.
+async function doGameBoard(body) {
+  const { pub } = clients();
+  const b = await pub.readContract({ address: ADDR.GeneralsGame, abi: generalsAbi, functionName: 'boardView', args: [BigInt(body.boardId)] });
+  const players = (b[3] || []).map((p) => ({ ready: p[0], authority: p[1], lastActionSlot: Number(p[2]) }));
+  const cells = (b[4] || []).map((c) => ({ kind: Number(c[0]), ownerKind: Number(c[1]), ownerPlayer: Number(c[2]), strength: Number(c[3]) }));
+  return { status: Number(b[0]), sizeX: Number(b[1]), sizeY: Number(b[2]), players, cells, tickNextSlot: Number(b[5]), sessionId: b[6] };
+}
+
 async function doSettle(body) {
   const { account, pub, wallet } = clients();
   const txs = [];
@@ -193,11 +263,12 @@ async function doSettle(body) {
 async function doBatchSubmit(body) {
   const { account, pub, wallet } = clients();
   let costUsdc6 = 0n;
-  // ensure the game's window rules exist (set once). Different devs choose their
-  // own cadence; the demo uses a small window so a flush is quick to see.
+  // Ensure a window config exists (set once, or when the caller asks). A dev
+  // chooses their own cadence; the demo can pass maxSize/windowSecs so a flush is
+  // quick to see (maxSize 1 = every session is immediately flushable).
   try {
     const count = await pub.readContract({ address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'windowCount', args: [account.address] });
-    if (count === 0n) {
+    if (count === 0n || body.setConfig) {
       const r = await send(wallet, pub, { address: ADDR.BatchedSettlement, abi: batchAbi, functionName: 'setWindowConfig', args: [Number(body.maxSize || 4), Number(body.windowSecs || 600)], account });
       costUsdc6 += r.costUsdc6;
     }
@@ -232,12 +303,15 @@ export default async function handler(req, res) {
     switch (body.action) {
       case 'open': out = await doOpen(body); break;
       case 'setAuthority': out = await doSetAuthority(body); break;
+      case 'setGameState': out = await doSetGameState(body); break;
+      case 'game': out = await doGame(body); break;
+      case 'gameBoard': out = await doGameBoard(body); break;
       case 'settle': out = await doSettle(body); break;
       case 'batchSubmit': out = await doBatchSubmit(body); break;
       case 'batchFlush': out = await doBatchFlush(body); break;
       case 'sponsorAddress': {
         const { account } = clients();
-        out = { address: account.address };
+        out = { address: account.address, generalsGame: ADDR.GeneralsGame };
         break;
       }
       default: res.status(400).json({ error: 'unknown action' }); return;

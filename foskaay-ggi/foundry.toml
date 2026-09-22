@@ -10,9 +10,11 @@
 src = "src"
 out = "out"
 test = "test"
-# examples/ holds reference code (e.g. the port proof that a game's own contract
-# can be gated by a GGI session). It compiles and is tested, but it is NOT part of
-# the deployable core/optional set in src/.
+# demos/ holds real games built on the rail (e.g. demos/pvp/generals/). A game's
+# contract is not part of the deployable core/optional set in src/; it compiles
+# and is tested through the standard test/ suite, which imports the game. Foundry
+# has a single test path, so the game lives in its demo folder and its test lives
+# in test/.
 script = "script"
 libs = ["lib"]
 solc_version = "0.8.24"
