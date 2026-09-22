@@ -65,7 +65,6 @@ export default defineConfig({
         competitions: './competitions/index.html',
         games: './games/index.html',
         'ggi-demos': './ggi-demos/index.html',
-        'ggi-demo-idle': './ggi-demos/idle/index.html',
         'ggi-explorer': './ggi-explorer/index.html',
         'foskaay-ggi-docs': './foskaay-ggi-docs/index.html',
         game: './games/game.html',
