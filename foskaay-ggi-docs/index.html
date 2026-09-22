@@ -385,11 +385,12 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 as in their sample. We do not add them to core.</li>
             <li><b>The authorisation hook already exists.</b> <span class="ggi-mono">canSign</span> is
                 the equivalent of delegation authority, and a game contract can use it today.</li>
-            <li><b>The one genuine gap:</b> nothing today ties a specific game account to a session in a
-                discoverable way. The game can pass its own <span class="ggi-mono">sessionId</span> into
-                its contract and check <span class="ggi-mono">canSign</span>, which works, but a reader
-                cannot look up "which game account belongs to this session" from the rail. That is the
-                small addition worth making, and it is what the port will confirm.</li>
+            <li><b>The session-to-game link (added):</b> MagicBlock can tell you which accounts are
+                delegated for a game. GGI now does the same thing in one line: when a game opens a
+                session it can register its own state account address against that session. The rail
+                stores the address as an opaque value, it never learns what it is, and any reader
+                (including the <a href="/ggi-explorer/">Explorer</a>) can look up which game account
+                belongs to a session. This is the closest match to the delegation registry.</li>
             <li><b>The EVM limit, stated plainly:</b> there is no side chain to mutate accounts for free.
                 Where MagicBlock is free in the ER, Foskaay GGI makes the SPONSOR pay per write, and
                 batching reduces the number of writes. We do not pretend otherwise.</li>
