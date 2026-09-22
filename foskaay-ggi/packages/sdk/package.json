@@ -24,7 +24,7 @@
     "viem": "^2.0.0"
   },
   "dependencies": {
-    "@foskaay/ggi-contracts": "^0.1.1"
+    "@foskaay/ggi-contracts": "^0.1.2"
   },
   "publishConfig": {
     "access": "public"
