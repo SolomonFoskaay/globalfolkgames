@@ -219,7 +219,7 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
     <section class="ggi-card" id="fees">
         <h2 class="ggi-h2">Fees</h2>
         <ul class="ggi-list">
-            <li><b>Players pay nothing.</b> Always. The game pays a small fixed fee per session.</li>
+            <li><b>Players pay nothing.</b> Always. The game pays a small fixed fee per session. There is no player-pay option anywhere in the rail: paying is not a mode a dev can switch on, so your players never hit the "top up your wallet first" wall that kills most web3 games.</li>
             <li><b>Charged twice per session:</b> once at open and once at settle. An abandoned session pays only the open fee.</li>
             <li><b>Never per action.</b> A thousand moves and one move cost the same, so heavy games are not punished.</li>
             <li><b>Paid in USDC,</b> a stablecoin, so the price does not swing with a volatile token.</li>
@@ -368,6 +368,41 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
             <li><b>Settle:</b> at the run's end or on demand, close + reveal + seal + one session fee.</li>
             <li><b>Fee:</b> read at runtime with the SDK; never hardcoded.</li>
         </ul>
+
+        <div class="ggi-h3">Two modes you can switch between in the demo</div>
+        <p class="ggi-body">
+            The same game is playable in <b>both</b> settlement modes, so you can compare real numbers
+            on real sessions instead of trusting a claim:
+        </p>
+        <table class="ggi-table">
+            <thead><tr><th>Mode</th><th>What happens</th><th>Best for</th></tr></thead>
+            <tbody>
+                <tr><td><b>Unbatched</b> (default)</td><td>Each session settles on its own: close, reveal, seal, one fee. The result is final immediately.</td><td>Anything that needs an instant per-session result.</td></tr>
+                <tr><td><b>Batched</b></td><td>The session's digest is submitted into a window; the window flushes (full or past deadline) into one Merkle root. Cheaper per game, final when the window flushes.</td><td>Idle and casual where a short delay is fine.</td></tr>
+            </tbody>
+        </table>
+        <p class="ggi-tiny">
+            Switch modes on the demo screen and the live cost meter changes with it. That is the whole
+            point: the same game, two cost tiers, your choice.
+        </p>
+
+        <div class="ggi-h3">Who pays, and how the demo pays</div>
+        <p class="ggi-body">
+            Players pay nothing. The sponsor (the game operator) pays the tiny gas and the per-session
+            fee. In this demo the sponsor is a small serverless function that signs those two
+            transactions on the player's behalf, so the player just taps and plays. It reads the
+            sponsor key and the Arc RPC from the environment; the key never reaches the browser.
+        </p>
+        <div class="ggi-note">
+            <b>Standalone by design.</b> The demo shares the deployment and the sponsor key with the
+            host site for convenience, but it is its own project: it imports nothing from the host
+            game platform and keeps no host state. When the infrastructure moves to its own repo, the
+            demo moves with it unchanged.
+        </div>
+        <p class="ggi-tiny">
+            Environment variables used: <span class="ggi-mono">GFG_Arc_Gasless_Sponsor_Key</span> and
+            <span class="ggi-mono">GFG_Arc_RPC</span> (both already set on the deployment).
+        </p>
 
         <div class="ggi-note">
             <b>Honest scope of the demo:</b> one player, one session, no accounts and no persistence
