@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {SessionState} from "../src/SessionState.sol";
+import {Deploy} from "./Deploy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface Vm {
     function warp(uint256) external;
@@ -27,8 +29,8 @@ contract SessionStateTest {
     uint64 constant TTL = 1 hours;
 
     function setUp() public {
-        reg = new SessionRegistry(address(this), address(0));
-        st = new SessionState(address(reg));
+        reg = Deploy.registry(address(this), address(0));
+        st = Deploy.state(reg);
 
         vm.prank(OWNER);
         bytes32 id = reg.open(2, TTL, 0, 0);
@@ -288,9 +290,11 @@ contract SessionStateTest {
         vm.stopPrank();
     }
 
-    function testConstructorRejectsZeroRegistry() public {
+    function testInitializeRejectsZeroRegistry() public {
+        SessionState impl = new SessionState();
+        bytes memory init = abi.encodeCall(SessionState.initialize, (address(0)));
         vm.expectRevert();
-        new SessionState(address(0));
+        new ERC1967Proxy(address(impl), init);
     }
 
     function testManySeatsCommitIsBounded() public {

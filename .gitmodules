@@ -1,0 +1,3 @@
+[submodule "foskaay-ggi/lib/openzeppelin-contracts"]
+	path = foskaay-ggi/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

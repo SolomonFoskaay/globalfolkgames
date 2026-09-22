@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "./SessionRegistry.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Randomness — Foskaay Gasless Games Infrastructure (GGI), CORE contract 3 of 4.
 ///
@@ -38,8 +40,10 @@ import {SessionRegistry} from "./SessionRegistry.sol";
 ///     drain. This contract is a pure verifier plus a small mapping.
 ///   - `derive` is a pure function, so a verifier can recompute it off-chain at
 ///     zero cost and cross-check on-chain if needed.
-contract Randomness {
-    SessionRegistry public immutable registry;
+contract Randomness is Initializable, UUPSUpgradeable {
+    /// The SessionRegistry this contract checks commitments against. Storage (not
+    /// immutable) so it survives behind a proxy.
+    SessionRegistry public registry;
 
     /// sessionId => the revealed seed(s). Empty until revealed.
     mapping(bytes32 => bytes32[]) private _seeds;
@@ -71,9 +75,24 @@ contract Randomness {
     /// Hard cap on streams per session, so reveal stays cheap and bounded.
     uint8 public constant MAX_STREAMS = 16;
 
-    constructor(address registry_) {
+    /// Reserved slots so future state variables can be appended without shifting
+    /// any existing slot. DO NOT reorder or remove.
+    uint256[20] private __gap;
+
+    /// @notice Initialize the proxy with the registry it checks against.
+    function initialize(address registry_) external initializer {
         if (registry_ == address(0)) revert UnknownOrOpenSession();
         registry = SessionRegistry(registry_);
+    }
+
+    /// @dev The implementation contract can never be used directly.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Only the registry owner (the protocol owner) may authorize an upgrade.
+    function _authorizeUpgrade(address) internal override {
+        if (msg.sender != registry.feeRecipient()) revert UnknownOrOpenSession();
     }
 
     /// @notice OPTIONAL: declare how many independent random streams this game

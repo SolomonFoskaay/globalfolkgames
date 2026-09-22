@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+
 /// @dev Minimal ERC-20 surface. Declared at file level (Solidity does not allow
 ///      an interface inside a contract). The standalone project ships with
 ///      `libs = []`, and this is the whole token surface the rail needs.
@@ -61,7 +64,7 @@ interface IERC20 {
 ///     collected amounts always equal what was genuinely charged.
 ///   - Each stage is charged at most once per session, so nothing can be
 ///     double-charged.
-contract FeeVault {
+contract FeeVault is Initializable, UUPSUpgradeable {
     address public owner;        // may configure fees / asset / destination, and withdraw
     address public destination;  // where withdrawals go (the owner's wallet)
     address public feeToken;     // the USDC ERC-20 interface on Arc (set at deploy)
@@ -72,20 +75,17 @@ contract FeeVault {
     /// session in fee transactions alone, measured on Arc testnet).
     uint256 public sessionFee;
 
-    /// Legacy two-stage values, kept readable for anyone who configured them.
-    /// They are no longer charged; `sessionFee` is the single charge. Setting
-    /// them now reverts so nobody configures a price that is never collected.
-    uint256 public openFee;
-    uint256 public settleFee;
-
-    /// sessionId => the fee amount LOCKED when the session was charged, and who
-    /// paid. Locking means a later fee change can never alter a session already
-    /// in flight, and the payer knows the exact price they paid.
+    /// sessionId => who was charged, and exactly how much. The amount is recorded
+    /// so a later fee change can never alter a session already in flight.
     mapping(bytes32 => address) public paidBy;
     mapping(bytes32 => uint256) public paidAmount;
 
     /// Accounting: how much of the fee asset is actually withdrawable.
     mapping(address => uint256) public collected; // token => amount
+
+    /// Reserved slots so future state variables can be appended without shifting
+    /// any existing slot. DO NOT reorder or remove.
+    uint256[20] private __gap;
 
     event FeesConfigured(uint256 sessionFee);
     event FeeTokenSet(address token);
@@ -101,7 +101,8 @@ contract FeeVault {
     error TransferFailed();
     error NothingToWithdraw();
 
-    constructor(address owner_, address destination_, address feeToken_) {
+    /// @notice Initialize the proxy with the owner, destination and fee asset.
+    function initialize(address owner_, address destination_, address feeToken_) external initializer {
         if (owner_ == address(0) || destination_ == address(0) || feeToken_ == address(0)) revert ZeroAddress();
         owner = owner_;
         destination = destination_;
@@ -110,6 +111,15 @@ contract FeeVault {
         emit DestinationSet(destination_);
         emit FeeTokenSet(feeToken_);
     }
+
+    /// @dev The implementation contract can never be used directly.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Only the owner may authorize an upgrade. Before mainnet this moves to
+    ///      a timelock or multisig.
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();

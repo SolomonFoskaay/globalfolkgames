@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
+import {Deploy} from "./Deploy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// Minimal cheatcode interface (no forge-std dependency, matching the repo style).
 interface Vm {
@@ -29,7 +31,7 @@ contract SessionRegistryTest {
     uint64 constant TTL = 1 hours;
 
     function setUp() public {
-        reg = new SessionRegistry(address(this), address(0)); // this test = fee recipient, no operator
+        reg = Deploy.registry(address(this), address(0)); // this test = fee recipient, no operator
     }
 
     // ------------------------------------------------------------- happy path
@@ -186,7 +188,7 @@ contract SessionRegistryTest {
     // ------------------------------------------------------------ operator
 
     function testOperatorCanForceClose() public {
-        SessionRegistry r2 = new SessionRegistry(address(this), address(0xBEEF));
+        SessionRegistry r2 = Deploy.registry(address(this), address(0xBEEF));
         vm.prank(OWNER);
         bytes32 id = r2.open(2, TTL, 0, 0);
         vm.prank(address(0xBEEF));
@@ -214,9 +216,21 @@ contract SessionRegistryTest {
         require(reg.nonces(OTHER) == 0, "other untouched");
     }
 
-    function testConstructorRejectsZeroFeeRecipient() public {
+    function testInitializeRejectsZeroFeeRecipient() public {
+        // initialize (not a constructor) must refuse a zero fee recipient.
+        SessionRegistry impl = new SessionRegistry();
+        bytes memory init = abi.encodeCall(SessionRegistry.initialize, (address(0), address(0)));
         vm.expectRevert();
-        new SessionRegistry(address(0), address(0));
+        new ERC1967Proxy(address(impl), init);
+    }
+
+    function testCannotInitializeTwice() public {
+        // A proxy can only ever be initialized once (re-init guard).
+        SessionRegistry impl = new SessionRegistry();
+        bytes memory init = abi.encodeCall(SessionRegistry.initialize, (address(this), address(0)));
+        SessionRegistry proxied = SessionRegistry(address(new ERC1967Proxy(address(impl), init)));
+        vm.expectRevert();
+        proxied.initialize(address(this), address(0));
     }
 
     // --------------------------------------------------------- session keys

@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {FeeVault} from "../src/FeeVault.sol";
+import {Deploy} from "./Deploy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface Vm {
     function prank(address) external;
@@ -74,7 +76,7 @@ contract FeeVaultTest {
 
     function setUp() public {
         usdc = new MockUSDC();
-        vault = new FeeVault(OWNER, DEST, address(usdc));
+        vault = Deploy.feeVault(OWNER, DEST, address(usdc));
         vm.prank(OWNER);
         vault.setFee(FEE);
         usdc.mint(SPONSOR, 1_000_000);
@@ -118,7 +120,7 @@ contract FeeVaultTest {
     }
 
     function testNoFeeConfiguredReverts() public {
-        FeeVault fresh = new FeeVault(OWNER, DEST, address(usdc));
+        FeeVault fresh = Deploy.feeVault(OWNER, DEST, address(usdc));
         vm.prank(SPONSOR);
         vm.expectRevert();
         fresh.chargeSession(S1);
@@ -144,7 +146,7 @@ contract FeeVaultTest {
         // This is why the fee asset is a KNOWN deploy-time USDC address, never a
         // player or game choice.
         LyingToken liar = new LyingToken();
-        FeeVault v2 = new FeeVault(OWNER, DEST, address(liar));
+        FeeVault v2 = Deploy.feeVault(OWNER, DEST, address(liar));
         vm.prank(OWNER);
         v2.setFee(FEE);
         vm.prank(SPONSOR);
@@ -232,13 +234,14 @@ contract FeeVaultTest {
         vault.setOwner(address(0));
     }
 
-    function testConstructorRejectsZeroAddresses() public {
+    function testInitializeRejectsZeroAddresses() public {
+        FeeVault impl = new FeeVault();
         vm.expectRevert();
-        new FeeVault(address(0), DEST, address(usdc));
+        new ERC1967Proxy(address(impl), abi.encodeCall(FeeVault.initialize, (address(0), DEST, address(usdc))));
         vm.expectRevert();
-        new FeeVault(OWNER, address(0), address(usdc));
+        new ERC1967Proxy(address(impl), abi.encodeCall(FeeVault.initialize, (OWNER, address(0), address(usdc))));
         vm.expectRevert();
-        new FeeVault(OWNER, DEST, address(0));
+        new ERC1967Proxy(address(impl), abi.encodeCall(FeeVault.initialize, (OWNER, DEST, address(0))));
     }
 
     function testFeeAssetIsUsdcInterface() public {

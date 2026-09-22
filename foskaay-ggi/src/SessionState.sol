@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "./SessionRegistry.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title SessionState — Foskaay Gasless Games Infrastructure (GGI), CORE contract 2 of 4.
 ///
@@ -30,12 +32,18 @@ import {SessionRegistry} from "./SessionRegistry.sol";
 ///     drain. All functions are checks-effects-interactions free of ambiguity.
 ///   - Bounded storage per session (MAX_EVENTS) so a session cannot be used to
 ///     grief the chain with unbounded writes.
-contract SessionState {
+contract SessionState is Initializable, UUPSUpgradeable {
     /// Maximum anchored events per session. Generous for real use, bounded so
     /// storage can never grow without limit.
     uint16 public constant MAX_EVENTS = 512;
 
-    SessionRegistry public immutable registry;
+    /// The SessionRegistry this state contract authorises against. Storage (not
+    /// immutable) so it survives behind a proxy.
+    SessionRegistry public registry;
+
+    /// Reserved slots so future state variables can be appended without shifting
+    /// any existing slot. DO NOT reorder or remove.
+    uint256[20] private __gap;
 
     struct State {
         bytes32 digest;         // rolling digest of everything anchored so far
@@ -69,9 +77,20 @@ contract SessionState {
     error EmptyDigest();
     error EmptyPayload();
 
-    constructor(address registry_) {
+    /// @notice Initialize the proxy with the registry it authorises against.
+    function initialize(address registry_) external initializer {
         if (registry_ == address(0)) revert UnknownOrClosedSession();
         registry = SessionRegistry(registry_);
+    }
+
+    /// @dev The implementation contract can never be used directly.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Only the registry owner (the protocol owner) may authorize an upgrade.
+    function _authorizeUpgrade(address) internal override {
+        if (msg.sender != registry.feeRecipient()) revert NotAuthorisedSigner();
     }
 
     /// @notice Anchor ONE signed event on-chain.
