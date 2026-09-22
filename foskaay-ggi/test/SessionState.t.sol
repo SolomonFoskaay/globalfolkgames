@@ -304,4 +304,28 @@ contract SessionStateTest {
         st.commitDigest(id, keccak256("big"), 1);
         require(st.getState(id).committed, "64-seat commit works");
     }
+
+    // ------------------------------------------------- SDK / client parity
+    // The SDK folds actions OFF-chain with the same formula the contract uses.
+    // If these ever drift, a game's off-chain log would not match the on-chain
+    // digest and settlement would break. This test pins the formula so a drift
+    // is caught the moment it happens.
+
+    function testOffchainFoldMatchesOnchainDigest() public {
+        bytes32 id = _newSession();
+        address[2] memory seats = [P1, P2];
+        bytes32 prev = bytes32(0);
+        uint8[2] memory seatIds = [uint8(0), uint8(1)];
+        uint64[2] memory seqs = [uint64(1), uint64(7)];
+        bytes32[2] memory payloads = [keccak256("move-1"), keccak256("move-2")];
+
+        for (uint256 i = 0; i < 2; i++) {
+            vm.prank(seats[i]);
+            st.recordEvent(id, seatIds[i], seqs[i], payloads[i]);
+            // The SDK's foldDigest() reproduces this EXACT expression:
+            prev = keccak256(abi.encodePacked(prev, seatIds[i], seqs[i], payloads[i]));
+            require(st.digestOf(id) == prev, "off-chain fold must match on-chain digest");
+        }
+        require(st.getState(id).eventCount == 2, "two events");
+    }
 }
