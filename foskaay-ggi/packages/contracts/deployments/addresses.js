@@ -17,11 +17,14 @@ export const addresses = {
     usdc: '0x3600000000000000000000000000000000000000',
     usdcDecimals: 6,
     contracts: {
-      SessionRegistry: '0xf0Ff3e2644daB956549e5455dbBc5af568218c84',
-      SessionState: '0x1e1E7743B635491C9Ba2750910576160A2ED63af',
-      Randomness: '0x73248a55e4Ee7d830f2B08dD52474c2Bf732b5dA',
-      FeeVault: '0x2d045827227198511e9bA7959680380C09d5b6C4',
+      SessionRegistry: '0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5',
+      SessionState: '0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e',
+      Randomness: '0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b',
+      FeeVault: '0x4cf542791faeb683f878bd3d119683e0C02F9905',
+      BatchedSettlement: '0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4',
     },
+    upgradeable: true,
+    pattern: 'UUPS proxies (ERC1967). These addresses are permanent: an upgrade swaps the logic behind them and never moves the address or strands data.',
     deployedAt: '2026-09-22',
   },
   mainnet: {

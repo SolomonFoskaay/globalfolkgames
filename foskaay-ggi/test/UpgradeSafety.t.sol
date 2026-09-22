@@ -78,7 +78,8 @@ contract UpgradeSafetyTest {
     }
 
     function testBatchedUpgradeKeepsWindows() public {
-        BatchedSettlement bs = Deploy.batched(4, 1 hours, address(this));
+        BatchedSettlement bs = Deploy.batched(address(this));
+        bs.setWindowConfig(4, 1 hours);
         bs.submit(bytes32(uint256(1)), keccak256("d"));
         bytes32[] memory before = bs.leavesOf(address(this), 0);
         require(before.length == 1, "leaf before upgrade");

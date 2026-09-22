@@ -50,22 +50,29 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
     struct Window {
         uint64 openedAt;
         uint64 deadline;   // after this, anyone may flush even if not full
-        uint16 leafCount;
+        uint32 leafCount;
+        uint32 maxSize;    // SNAPSHOT of the dev's rule when this window opened, so a
+                           // later config change never alters a window already in
+                           // flight (this is the upgrade/data-safety discipline).
         bool closed;       // true once flushed
         bytes32 root;      // the Merkle root written at flush
     }
 
-    /// Maximum leaves per window. Bounds the flush cost (and thus gas), so a
-    /// flush can never become unbearably expensive. Storage (not immutable) so it
-    /// survives behind a proxy.
-    uint16 public maxSize;
-
-    /// How long a window stays open before anyone may flush it, even if not full.
-    uint32 public windowSecs;
+    /// A game's window rules. EACH DEV chooses their own: 10 games/35 minutes and
+    /// 1,000 games/24 hours are both valid. The rail never imposes one cadence.
+    struct WindowConfig {
+        uint32 maxSize;      // leaves per window (1 = one session per flush)
+        uint32 windowSecs;   // seconds before a flush is allowed even if not full
+        bool set;            // true once the dev configured it
+    }
 
     /// The admin allowed to authorize upgrades. There is NO admin in the flush
     /// path: flushing is permissionless. This address only controls code upgrades.
     address public admin;
+
+    /// owner => their window rules. A dev sets this ONCE (and may change it; the
+    /// new rules apply to the NEXT window, never retroactively to a filled one).
+    mapping(address => WindowConfig) public config;
 
     /// owner => window id => Window.
     mapping(address => mapping(uint256 => Window)) public windows;
@@ -82,8 +89,9 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
     /// any existing slot. DO NOT reorder or remove.
     uint256[20] private __gap;
 
-    event LeafSubmitted(address indexed owner, uint256 indexed windowId, bytes32 indexed sessionId, bytes32 leaf, uint16 leafCount);
-    event WindowFlushed(address indexed owner, uint256 indexed windowId, bytes32 root, uint16 leafCount, address indexed flushedBy);
+    event LeafSubmitted(address indexed owner, uint256 indexed windowId, bytes32 indexed sessionId, bytes32 leaf, uint32 leafCount);
+    event WindowFlushed(address indexed owner, uint256 indexed windowId, bytes32 root, uint32 leafCount, address indexed flushedBy);
+    event WindowConfigSet(address indexed owner, uint32 maxSize, uint32 windowSecs);
 
     error ZeroAddressProvided();
     error SessionAlreadySubmitted();
@@ -91,19 +99,27 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
     error WindowAlreadyFlushed();
     error BadWindowConfig();
     error NotAdmin();
+    error ConfigNotSet();
 
-    /// @notice Initialize the proxy.
-    /// @param maxSize_ leaves per window (1..64). A small cap keeps flush gas low.
-    /// @param windowSecs_ seconds a window stays open before a flush is allowed.
+    /// @notice Initialize the proxy. The dev sets their OWN window rules with
+    ///         `setWindowConfig`; the rail does not impose a cadence.
     /// @param admin_ the address allowed to authorize code upgrades (never
     ///        involved in flushing, which is permissionless).
-    function initialize(uint16 maxSize_, uint32 windowSecs_, address admin_) external initializer {
-        if (maxSize_ == 0 || maxSize_ > 64) revert BadWindowConfig();
-        if (windowSecs_ == 0) revert BadWindowConfig();
+    function initialize(address admin_) external initializer {
         if (admin_ == address(0)) revert ZeroAddressProvided();
-        maxSize = maxSize_;
-        windowSecs = windowSecs_;
         admin = admin_;
+    }
+
+    /// @notice Set YOUR window rules. A dev picks whatever fits their game:
+    ///         a short window for quick finality, a long one for cheaper flushes.
+    ///         Applies to the NEXT window; never changes a window already filled.
+    /// @param maxSize_ leaves per window (1..4096). 1 = flush every session.
+    /// @param windowSecs_ seconds before a flush is allowed even if not full.
+    function setWindowConfig(uint32 maxSize_, uint32 windowSecs_) external {
+        if (maxSize_ == 0 || maxSize_ > 4096) revert BadWindowConfig();
+        if (windowSecs_ == 0) revert BadWindowConfig();
+        config[msg.sender] = WindowConfig({maxSize: maxSize_, windowSecs: windowSecs_, set: true});
+        emit WindowConfigSet(msg.sender, maxSize_, windowSecs_);
     }
 
     /// @dev The implementation contract can never be used directly.
@@ -138,7 +154,7 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
         // If this filled the window, close it now so the next submit (or anyone
         // calling flush) can settle it. We do not flush inside submit to keep the
         // per-submit cost predictable; the next batch action flushes it.
-        if (w.leafCount >= maxSize) {
+        if (w.leafCount >= w.maxSize) {
             w.deadline = uint64(block.timestamp); // eligible to flush immediately
         }
     }
@@ -152,7 +168,7 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
         Window storage w = windows[owner][windowId];
         if (w.closed) revert WindowAlreadyFlushed();
         if (w.leafCount == 0) revert WindowNotClosedYet();
-        bool full = w.leafCount >= maxSize;
+        bool full = w.leafCount >= w.maxSize;
         bool expired = block.timestamp >= w.deadline;
         if (!full && !expired) revert WindowNotClosedYet();
 
@@ -185,7 +201,7 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
     function canFlush(address owner, uint256 windowId) external view returns (bool) {
         Window storage w = windows[owner][windowId];
         if (w.closed || w.leafCount == 0) return false;
-        return w.leafCount >= maxSize || block.timestamp >= w.deadline;
+        return w.leafCount >= w.maxSize || block.timestamp >= w.deadline;
     }
 
     // ------------------------------------------------------------- internal
@@ -206,7 +222,7 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
         // one. (A full window that has not been flushed is settled on next flush;
         // new submissions go to a fresh window so they are never trapped.)
         Window storage w = windows[owner][id];
-        if (w.closed || w.leafCount >= maxSize) {
+        if (w.closed || w.leafCount >= w.maxSize) {
             id = count;
             windowCount[owner] = count + 1;
             _openWindow(owner, id);
@@ -214,9 +230,12 @@ contract BatchedSettlement is Initializable, UUPSUpgradeable {
     }
 
     function _openWindow(address owner, uint256 id) private {
+        WindowConfig memory c = config[owner];
+        if (!c.set) revert ConfigNotSet(); // a dev must set their cadence first
         Window storage w = windows[owner][id];
         w.openedAt = uint64(block.timestamp);
-        w.deadline = uint64(block.timestamp) + windowSecs;
+        w.deadline = uint64(block.timestamp) + c.windowSecs;
+        w.maxSize = c.maxSize;   // snapshot: later config changes do not affect this window
         w.leafCount = 0;
         w.closed = false;
         w.root = bytes32(0);

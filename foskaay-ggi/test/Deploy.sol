@@ -37,9 +37,9 @@ library Deploy {
         return FeeVault(address(new ERC1967Proxy(address(impl), init)));
     }
 
-    function batched(uint16 maxSize, uint32 windowSecs, address admin) internal returns (BatchedSettlement) {
+    function batched(address admin) internal returns (BatchedSettlement) {
         BatchedSettlement impl = new BatchedSettlement();
-        bytes memory init = abi.encodeCall(BatchedSettlement.initialize, (maxSize, windowSecs, admin));
+        bytes memory init = abi.encodeCall(BatchedSettlement.initialize, (admin));
         return BatchedSettlement(address(new ERC1967Proxy(address(impl), init)));
     }
 }

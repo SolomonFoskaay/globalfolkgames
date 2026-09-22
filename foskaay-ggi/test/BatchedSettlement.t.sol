@@ -26,7 +26,10 @@ contract BatchedSettlementTest {
     uint32 constant SECS = 1 hours;
 
     function setUp() public {
-        bs = Deploy.batched(MAX, SECS, address(this));
+        bs = Deploy.batched(address(this));
+        // The dev sets their OWN cadence: 4 leaves per window, 1h deadline.
+        vm.prank(GAME);
+        bs.setWindowConfig(MAX, SECS);
     }
 
     function _submitN(uint256 n) internal {
@@ -146,14 +149,27 @@ contract BatchedSettlementTest {
 
     // ------------------------------------------------------------- config
 
-    function testInitializeRejectsBadConfig() public {
+    function testInitializeRejectsZeroAdmin() public {
         BatchedSettlement impl = new BatchedSettlement();
         vm.expectRevert();
-        new ERC1967Proxy(address(impl), abi.encodeCall(BatchedSettlement.initialize, (0, SECS, address(this))));
+        new ERC1967Proxy(address(impl), abi.encodeCall(BatchedSettlement.initialize, (address(0))));
+    }
+
+    function testRejectsBadWindowConfig() public {
+        // A dev cannot set an impossible cadence (0 size or 0 seconds).
+        vm.prank(GAME);
         vm.expectRevert();
-        new ERC1967Proxy(address(impl), abi.encodeCall(BatchedSettlement.initialize, (65, SECS, address(this))));
+        bs.setWindowConfig(0, SECS);
+        vm.prank(GAME);
         vm.expectRevert();
-        new ERC1967Proxy(address(impl), abi.encodeCall(BatchedSettlement.initialize, (MAX, 0, address(this))));
+        bs.setWindowConfig(MAX, 0);
+    }
+
+    function testCannotSubmitBeforeConfigSet() public {
+        // A game must set its cadence before submitting (the rail does not guess).
+        vm.prank(address(0x9999));
+        vm.expectRevert();
+        bs.submit(bytes32(uint256(1)), keccak256("x"));
     }
 
     function _pair(bytes32 a, bytes32 b) internal pure returns (bytes32) {

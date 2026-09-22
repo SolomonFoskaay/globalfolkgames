@@ -5,6 +5,7 @@ import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {SessionState} from "../src/SessionState.sol";
 import {Randomness} from "../src/Randomness.sol";
 import {FeeVault} from "../src/FeeVault.sol";
+import {BatchedSettlement} from "../src/BatchedSettlement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface VmDeploy {
@@ -31,7 +32,7 @@ contract DeployGI {
 
     function run()
         external
-        returns (address registry, address state, address randomness, address feeVault)
+        returns (address registry, address state, address randomness, address feeVault, address batched)
     {
         vm.startBroadcast();
 
@@ -63,7 +64,16 @@ contract DeployGI {
             abi.encodeCall(FeeVault.initialize, (msg.sender, msg.sender, ARC_USDC))
         ));
 
+        // 5. BatchedSettlement — OPTIONAL pattern. Only the admin is set here; each
+        //    GAME sets its own window rules on-chain (10 games/35min, 1000/24h,
+        //    whatever fits). The rail imposes no cadence.
+        BatchedSettlement bsImpl = new BatchedSettlement();
+        batched = address(new ERC1967Proxy(
+            address(bsImpl),
+            abi.encodeCall(BatchedSettlement.initialize, (msg.sender))
+        ));
+
         vm.stopBroadcast();
-        return (registry, state, randomness, feeVault);
+        return (registry, state, randomness, feeVault, batched);
     }
 }
