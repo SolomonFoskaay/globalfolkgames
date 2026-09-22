@@ -255,6 +255,37 @@ contract GeneralsGame {
         return boards[boardId].status;
     }
 
+    /// @notice The whole board in ONE read (the EVM equivalent of their frontend
+    ///         reading the component directly). The auto-getter for `boards`
+    ///         omits the players and the 128 cells, so a renderer would need 130
+    ///         calls; this returns everything at once. View only, changes nothing.
+    function boardView(uint256 boardId)
+        external
+        view
+        returns (
+            GameStatus status,
+            uint8 sizeX,
+            uint8 sizeY,
+            GamePlayer[2] memory players,
+            GameCell[128] memory cells,
+            uint64 tickNextSlot,
+            bytes32 sessionId
+        )
+    {
+        Board storage b = boards[boardId];
+        status = b.status;
+        sizeX = b.sizeX;
+        sizeY = b.sizeY;
+        tickNextSlot = b.tickNextSlot;
+        sessionId = b.sessionId;
+        for (uint8 i = 0; i < 2; i++) {
+            players[i] = b.players[i];
+        }
+        for (uint256 i = 0; i < 128; i++) {
+            cells[i] = b.cells[i];
+        }
+    }
+
     function playerOf(uint256 boardId, uint8 i) external view returns (GamePlayer memory) {
         return boards[boardId].players[i];
     }

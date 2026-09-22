@@ -1,0 +1,217 @@
+{
+  "measuredAt": "2026-09-22T13:39:16.222Z",
+  "relay": "http://localhost:8787",
+  "sponsor": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
+  "generalsGame": "0xD674eD1f118855868b4B002F4A167C953Cc549ca",
+  "runs": [
+    {
+      "mode": "unbatched",
+      "sessionId": "0x21ea7574d43de9f42e73953f2eb947ae4b38719e6a79571fbb4e3306b6454528",
+      "boardId": 1790084366,
+      "boardStatus": 2,
+      "totalUsdc": 0.098172,
+      "rows": [
+        {
+          "label": "rail.open",
+          "usdc": 0.005455,
+          "tx": "0x51861c01e3b468ec137784ddcd8f68c048f7a8db935b3022b4365b8c3ec3c7aa"
+        },
+        {
+          "label": "rail.setGameState",
+          "usdc": 0.001403,
+          "tx": "0xb9c6bb0306123d70383641cc770d049a9896953f8e2a8d6b31451e50d6c0b350"
+        },
+        {
+          "label": "game.createBoard",
+          "usdc": 0.011935,
+          "tx": "0x9566a8eb15fcb6cf824cacb671224bee49e571b2225f0c989942668c9f009671"
+        },
+        {
+          "label": "game.generate",
+          "usdc": 0.013303,
+          "tx": "0xb52e9670c50f82c3872cf2d7d6d4a396f3048df1ad72d71eac5efdb883f55b26"
+        },
+        {
+          "label": "game.join",
+          "usdc": 0.00164,
+          "tx": "0x7d63d9f3e724113b054a9aa60a6b97734052d0821d1641ee9a8d281ffc3936c9"
+        },
+        {
+          "label": "game.join",
+          "usdc": 0.00164,
+          "tx": "0xb92bfb7a67d860dbe4543e931d2b38dfb3522570eb685144ff61cb247e8a5757"
+        },
+        {
+          "label": "game.setReady",
+          "usdc": 0.001236,
+          "tx": "0x0c3e50ab196ccb604fda0f60919834e27f6c881906f73ab5ccd9b9cea1ca395d"
+        },
+        {
+          "label": "game.setReady",
+          "usdc": 0.001237,
+          "tx": "0xfce44fb7ddd91107c280434fd25dcc85d1e94cd2f7cd1dd8ab22653e7a04c4dc"
+        },
+        {
+          "label": "game.start",
+          "usdc": 0.001311,
+          "tx": "0x8fc67852c4a49b0a8c6c3842bc640a4f3b76b211077419aa422062925048d088"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x693cac65a320702ccffcc9c2d2c088023ac5cc61f30647a3b1be2f8b29770172"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0x3b674b9fd00e54cc95a2adbeaa3fc41b3b59aac55d1446502de55b925036119a"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x8294922b315179dc1ecdfd639ec132705869145f34b07abe3826f5c6d5a10ee1"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0x32a5e997c9416a17adbebbc4952b214c316c1663c2d24854610ec69ff13cadca"
+        },
+        {
+          "label": "game.tick",
+          "usdc": 0.028284,
+          "tx": "0x88301475a2c82dcb3fd37d7e1dcc3bb47b08024bf0ee64d733fbc32d60b5b632"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x61a5778197667dc4ecb1b9bbcaafa95a08e3b428f1b9f3868caaea827436a058"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0x8ad3a7a9bc372d4655925f2e7bbbdfec1fbad4e54d6a4043c02964895b8cbf80"
+        },
+        {
+          "label": "game.finish",
+          "usdc": 0.008639,
+          "tx": "0x3a73ee0d6cffb759d7daec395c61eab232103d5a584c1975ba78db59d589f6d0"
+        },
+        {
+          "label": "rail.settle (close+reveal+seal+fee)",
+          "usdc": 0.009366,
+          "txs": [
+            "0xe80199e6334f5e89451a70c4b41cb417818ec4544dfe0d41ee9cd9efcdfd9ba8",
+            "0xbf87a089e866d4a2a1d8aead483e76cbed275de44b9843df9f1605972bffd066",
+            "0xb4236b3c12d47b6e84ed4f3c1a47ec6c5afa65bf9745dbd4e47c61bae3d30913",
+            "0xed04885ecf3bd2dc23d577bd91e15e26739bc82549091393f6d36a90d3547455"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "batched",
+      "sessionId": "0x26dca8d4abea9e5c5cce96af29dcc5f86ece79ebef057fd7ba480cc65442fa46",
+      "boardId": 1790084414,
+      "boardStatus": 2,
+      "totalUsdc": 0.09349299999999999,
+      "windowId": 0,
+      "rows": [
+        {
+          "label": "rail.open",
+          "usdc": 0.005455,
+          "tx": "0x80c7e4e570b2eda0e4b50b245636f7c187c978b5483d85440f135651ece19056"
+        },
+        {
+          "label": "rail.setGameState",
+          "usdc": 0.001403,
+          "tx": "0xdb0bf0bc96f5703ec7ee28c83003c35948f36f818328bbe3446175f50c13c0ad"
+        },
+        {
+          "label": "game.createBoard",
+          "usdc": 0.011935,
+          "tx": "0xcc0238075ebabcbcff9772994fbad53bbb8921de8ca84cba6bab01455d4951dc"
+        },
+        {
+          "label": "game.generate",
+          "usdc": 0.013303,
+          "tx": "0x3a3a1e2a7236860f525a27cd566a018fd987b2101b959f3296a3e808e8f227ce"
+        },
+        {
+          "label": "game.join",
+          "usdc": 0.00164,
+          "tx": "0x60077f2d6d81bff61d7789cb80d5635b30b5d7109dc04c1382f60f6d9a08df9a"
+        },
+        {
+          "label": "game.join",
+          "usdc": 0.00164,
+          "tx": "0x1c9851ed0c448cb52cb2f10942c5957af660409ab66019f95f6ce58055e7bd13"
+        },
+        {
+          "label": "game.setReady",
+          "usdc": 0.001236,
+          "tx": "0xa68b984a864eb6187b1454b88d6e680f258b987296fbbd2d49a9996442c59158"
+        },
+        {
+          "label": "game.setReady",
+          "usdc": 0.001237,
+          "tx": "0xa570f4d0e2a7c3115c04c5101800f1c6bc908b9b832eebb93a5606fa97c31e1a"
+        },
+        {
+          "label": "game.start",
+          "usdc": 0.001311,
+          "tx": "0xa997ff480f78296875445684d32ef85634b4cc2ff28f3c1259961d7f0e7deed0"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x3fab4ba9df2c47a692edccb3051bda85dde782c90b2146098543a766b1464c12"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0x19929928ffdc0cf276f3f780fb67db6c3ab1a8cbd1e1e67901a1e07f49c4e8a5"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x681bddb377c4345e16cefde7719689a8f18856e25dc1f8475e4c8310722df1d7"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0xf4daf462b17c9f89c4d8c3e77d989456420c505115876008f030f69937549fe6"
+        },
+        {
+          "label": "game.tick",
+          "usdc": 0.028284,
+          "tx": "0xa534612cd156c2e8be2e7484f91cfa57c193fae83c94f00d3202491c3b2a0d09"
+        },
+        {
+          "label": "game.command p0",
+          "usdc": 0.002121,
+          "tx": "0x4c1a9f7539dafa7d68453a42e6d41e9a75262d6b378becc7aa4b40a0b432bc10"
+        },
+        {
+          "label": "game.command p1",
+          "usdc": 0.00212,
+          "tx": "0x003493faa74abc6c4e81c4eb672318c6cc988d347f14d3810deb3382377977af"
+        },
+        {
+          "label": "game.finish",
+          "usdc": 0.008639,
+          "tx": "0xa41fc8998c7110249bbc21ebd63d0218aebfdba22af5850ebfa87fbe8b59bb66"
+        },
+        {
+          "label": "rail.batchSubmit (this match)",
+          "usdc": 0.003049,
+          "tx": "0xcc082c5926ba5478cdcd68548c4f0ee2141a750d5653b573404d1582454fad80"
+        },
+        {
+          "label": "rail.batchFlush (whole window)",
+          "usdc": 0.001638,
+          "tx": "0x52a929a406b8be03de4351da63a692c9de1cfb43cccb6a9f534e2eb5ec092e07"
+        }
+      ]
+    }
+  ]
+}

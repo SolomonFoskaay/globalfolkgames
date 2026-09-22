@@ -75,6 +75,12 @@ contract GeneralsGameTest {
         require(cap.kind == GeneralsGame.GameCellKind.Capital, "capital at (1,1)");
         require(cap.ownerPlayer == 0, "capital owned by P1");
 
+        // One-read board view returns the same board (the renderer's single call).
+        (, uint8 sx, uint8 sy, , GeneralsGame.GameCell[128] memory cells, , bytes32 linked) = game.boardView(BOARD);
+        require(sx == 16 && sy == 8, "boardView size");
+        require(cells[uint256(1) * 16 + 1].kind == GeneralsGame.GameCellKind.Capital, "boardView cell (1,1)");
+        require(linked == sid, "boardView session link");
+
         // Move half of the capital's movable strength into the adjacent field (2,1).
         // moved = (20 - 1) * 50 / 100 = 9, which conquers the empty field.
         vm.prank(P1);
