@@ -53,6 +53,8 @@ const registryAbi = parseAbi([
   'function isLive(bytes32 sessionId) view returns (bool)',
   'function canSign(bytes32 sessionId, uint8 seat, address who) view returns (bool)',
   'function isSessionKeyLive(address key) view returns (bool)',
+  'function setGameState(bytes32 sessionId, address stateAccount)',
+  'function gameStateOf(bytes32 sessionId) view returns (address)',
 ]);
 
 const stateAbi = parseAbi([
@@ -234,6 +236,30 @@ export class GgiClient {
       abi: registryAbi,
       functionName: 'setAuthority',
       args: [sessionId, Number(seat), getAddress(authority)],
+    });
+  }
+
+  /// Register the game's OWN state account (its board) against a session, so a
+  /// reader can look up which game state belongs to this session. The rail stores
+  /// the address as an opaque value and never learns what it is. Optional.
+  /// @param stateAccount the game's board/state contract address
+  async setGameState(sessionId, stateAccount) {
+    this.requireWallet();
+    return this.write({
+      address: this.addresses.SessionRegistry,
+      abi: registryAbi,
+      functionName: 'setGameState',
+      args: [sessionId, getAddress(stateAccount)],
+    });
+  }
+
+  /// The game state account registered for a session (zero if none).
+  async gameStateOf(sessionId) {
+    return this.publicClient.readContract({
+      address: this.addresses.SessionRegistry,
+      abi: registryAbi,
+      functionName: 'gameStateOf',
+      args: [sessionId],
     });
   }
 

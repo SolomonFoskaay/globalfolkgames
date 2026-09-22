@@ -122,10 +122,18 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
     /// Bump ONLY when the storage layout changes, never for a logic-only upgrade.
     uint8 public version;
 
+    /// sessionId => the game's OWN state account for this session (the board).
+    /// The rail stores it as an OPAQUE address: it never learns what it is, or any
+    /// game concept. It exists so a reader can answer "which game state belongs to
+    /// this session?" - the closest match to MagicBlock's delegation registry,
+    /// where you can look up which accounts are delegated for a game. Optional:
+    /// a game that does not care leaves it unset (zero).
+    mapping(bytes32 => address) public gameStateOf;
+
     /// Reserved slots so future state variables can be appended without shifting
     /// any existing slot. Each future variable consumes from the top of this gap.
-    /// DO NOT reorder or remove.
-    uint256[20] private __gap;
+    /// DO NOT reorder or remove. (Shrunk from 20 to 19 when gameStateOf was added.)
+    uint256[19] private __gap;
 
     event SessionOpened(
         bytes32 indexed sessionId,
@@ -140,6 +148,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
     event OperatorSet(address operator);
     event SessionKeyRegistered(address indexed owner, address indexed key, uint64 validUntil, bytes32 scopeHash);
     event SessionKeyRevoked(address indexed owner, address indexed key);
+    event GameStateSet(bytes32 indexed sessionId, address indexed owner, address stateAccount);
 
     error NotOwner();
     error NotOperatorOrOwner();
@@ -243,6 +252,21 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
         if (msg.sender != feeRecipient) revert NotOwner();
         operator = operator_;
         emit OperatorSet(operator_);
+    }
+
+    /// @notice Register the game's OWN state account (its board) against a
+    ///         session, so a reader can look up "which game state belongs to this
+    ///         session?" - the equivalent of MagicBlock's "which accounts are
+    ///         delegated for a game".
+    /// @dev Only the session OWNER (the game operator) may set it, and only while
+    ///      the session is open. The address is OPAQUE: the rail never calls it
+    ///      and never learns any game concept. It is optional; a game that does
+    ///      not need discovery can leave it unset. One state account per session.
+    function setGameState(bytes32 sessionId, address stateAccount) external {
+        Session storage s = _requireOpenOwned(sessionId);
+        if (stateAccount == address(0)) revert ZeroAddress();
+        gameStateOf[sessionId] = stateAccount;
+        emit GameStateSet(sessionId, s.owner, stateAccount);
     }
 
     // ------------------------------------------------------- session keys

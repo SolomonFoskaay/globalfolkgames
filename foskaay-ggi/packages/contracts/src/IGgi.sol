@@ -38,6 +38,8 @@ interface ISessionRegistry {
 
     function getSession(bytes32 sessionId) external view returns (Session memory);
     function authorityOf(bytes32 sessionId, uint8 seat) external view returns (address);
+    function setGameState(bytes32 sessionId, address stateAccount) external;
+    function gameStateOf(bytes32 sessionId) external view returns (address);
     function isLive(bytes32 sessionId) external view returns (bool);
     function canSign(bytes32 sessionId, uint8 seat, address who) external view returns (bool);
     function isSessionKeyLive(address key) external view returns (bool);

@@ -382,4 +382,46 @@ contract SessionRegistryTest {
         require(reg.canSign(id, 0, address(0xAAA2)), "scope B signs");
         require(reg.sessionKeyOf(address(0xAAA1)).scopeHash == bytes32("idle:plots"), "stored verbatim");
     }
+
+    // ------------------------------------------------------- game state link
+
+    function testOwnerCanSetGameState() public {
+        vm.prank(OWNER);
+        bytes32 id = reg.open(2, TTL, 0, 0);
+        vm.prank(OWNER);
+        reg.setGameState(id, address(0x6A3E));
+        require(reg.gameStateOf(id) == address(0x6A3E), "board registered for the session");
+    }
+
+    function testOnlyOwnerCanSetGameState() public {
+        vm.prank(OWNER);
+        bytes32 id = reg.open(2, TTL, 0, 0);
+        vm.prank(OTHER);
+        vm.expectRevert();
+        reg.setGameState(id, address(0x6A3E));
+    }
+
+    function testCannotSetGameStateAfterClose() public {
+        vm.prank(OWNER);
+        bytes32 id = reg.open(2, TTL, 0, 0);
+        vm.prank(OWNER);
+        reg.close(id);
+        vm.prank(OWNER);
+        vm.expectRevert();
+        reg.setGameState(id, address(0x6A3E));
+    }
+
+    function testCannotSetZeroGameState() public {
+        vm.prank(OWNER);
+        bytes32 id = reg.open(2, TTL, 0, 0);
+        vm.prank(OWNER);
+        vm.expectRevert();
+        reg.setGameState(id, address(0));
+    }
+
+    function testGameStateIsOptional() public {
+        vm.prank(OWNER);
+        bytes32 id = reg.open(2, TTL, 0, 0);
+        require(reg.gameStateOf(id) == address(0), "unset by default");
+    }
 }
