@@ -8,11 +8,11 @@
     "DEPRECATED": "Removed or replaced, kept for the record, do not build"
   },
   "current": {
-    "title": "GlobalFolkGames Gasless Infrastructure (GI) - build the core, then the first demo",
+    "title": "Foskaay Gasless Games Infrastructure (GGI) - build the core, then the first demo",
     "updated": "2026-09-21",
     "items": [
       {
-        "t": "(1) GFG GI CORE - 4 unopinionated contracts (the rail)",
+        "t": "(1) Foskaay GGI CORE - 4 unopinionated contracts (the rail)",
         "s": "in_progress"
       },
       {
@@ -25,34 +25,38 @@
       },
       {
         "t": "(1iii) Session keys - silent signer + on-chain scope/expiry token, so players never see a popup",
-        "s": "in_progress"
+        "s": "done"
       },
       {
         "t": "(1iv) Randomness - commit-reveal seed(s), stored as a LIST for future extra streams; hash(seed, counter)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(1v) FeeVault - per-session fee on open and settle; destination = owner wallet; charged on devnet too",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(1vi) Foundry tests for each core contract (local, no chain, no cost)",
-        "s": "pending"
+        "s": "done"
       },
       {
         "t": "(1vii) Live Arc testnet proof: one real session opened, acted on, settled, and verified on-chain",
+        "s": "done"
+      },
+      {
+        "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+        "s": "done"
+      },
+      {
+        "t": "(2) Foskaay GGI SDK - the one-line integration",
         "s": "pending"
       },
       {
-        "t": "(2) GFG GI SDK - the one-line integration",
+        "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
         "s": "pending"
       },
       {
-        "t": "(2i) @globalfolkgames/gi-contracts - Solidity interfaces + deployed addresses per network",
-        "s": "pending"
-      },
-      {
-        "t": "(2ii) @globalfolkgames/gi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
+        "t": "(2ii) @foskaay/ggi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
         "s": "pending"
       },
       {
@@ -60,7 +64,7 @@
         "s": "pending"
       },
       {
-        "t": "(3) FIRST DEMO - prove GFG GI works for a real game",
+        "t": "(3) FIRST DEMO - prove Foskaay GGI works for a real game",
         "s": "pending"
       },
       {
@@ -76,11 +80,11 @@
         "s": "pending"
       },
       {
-        "t": "(3iv) Ship the demo live and playable from /bs-demos/ on a phone",
+        "t": "(3iv) Ship the demo live and playable from /ggi-demos/ on a phone",
         "s": "pending"
       },
       {
-        "t": "(4) Cost proof (the number that sells GFG GI)",
+        "t": "(4) Cost proof (the number that sells Foskaay GGI)",
         "s": "pending"
       },
       {
@@ -112,7 +116,7 @@
         "s": "pending"
       },
       {
-        "t": "(6) GFG itself migrates onto GFG GI (later - after GI is proven)",
+        "t": "(6) GFG itself migrates onto Foskaay GGI (later - after GI is proven)",
         "s": "pending"
       },
       {
@@ -139,11 +143,11 @@
   },
   "history": [
     {
-      "title": "GFG GI build started (SessionRegistry + SessionState in progress)",
+      "title": "Foskaay GGI build started (SessionRegistry + SessionState in progress)",
       "updated": "2026-09-21",
       "items": [
         {
-          "t": "(1) GFG GI CORE - 4 unopinionated contracts (the rail)",
+          "t": "(1) Foskaay GGI CORE - 4 unopinionated contracts (the rail)",
           "s": "in_progress"
         },
         {
@@ -175,15 +179,15 @@
           "s": "pending"
         },
         {
-          "t": "(2) GFG GI SDK - the one-line integration",
+          "t": "(2) Foskaay GGI SDK - the one-line integration",
           "s": "pending"
         },
         {
-          "t": "(2i) @globalfolkgames/gi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
           "s": "pending"
         },
         {
-          "t": "(2ii) @globalfolkgames/gi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
+          "t": "(2ii) @foskaay/ggi-sdk - open/act/dispute/settle wrappers + session-key signing + read helpers",
           "s": "pending"
         },
         {
@@ -191,7 +195,7 @@
           "s": "pending"
         },
         {
-          "t": "(3) FIRST DEMO - prove GFG GI works for a real game",
+          "t": "(3) FIRST DEMO - prove Foskaay GGI works for a real game",
           "s": "pending"
         },
         {
@@ -207,11 +211,11 @@
           "s": "pending"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /bs-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /ggi-demos/ on a phone",
           "s": "pending"
         },
         {
-          "t": "(4) Cost proof (the number that sells GFG GI)",
+          "t": "(4) Cost proof (the number that sells Foskaay GGI)",
           "s": "pending"
         },
         {
@@ -243,7 +247,7 @@
           "s": "pending"
         },
         {
-          "t": "(6) GFG itself migrates onto GFG GI (later - after GI is proven)",
+          "t": "(6) GFG itself migrates onto Foskaay GGI (later - after GI is proven)",
           "s": "pending"
         },
         {
@@ -269,7 +273,7 @@
       ]
     },
     {
-      "title": "RETIRED: GFG-focused master list (arcv2m1-arcv2m18, 206 items) - superseded when focus shifted to building GFG GI first",
+      "title": "RETIRED: GFG-focused master list (arcv2m1-arcv2m18, 206 items) - superseded when focus shifted to building Foskaay GGI first",
       "updated": "2026-09-21",
       "items": [
         {
@@ -985,7 +989,7 @@
           "s": "pending"
         },
         {
-          "t": "(21) GlobalFolkGames BS - STANDALONE SESSION RAIL (owner-approved 2026-09-21; spec docs/globalfolkgames-bs-spec.md)",
+          "t": "(21) Foskaay GGI - STANDALONE SESSION RAIL (owner-approved 2026-09-21; spec docs/foskaay-ggi-spec.md)",
           "s": "in_progress"
         },
         {
@@ -1013,11 +1017,11 @@
           "s": "done"
         },
         {
-          "t": "(21vii) DESIGN APPROVED: ships as packages (@globalfolkgames/bs-sdk + bs-contracts); integrating = install + small adapter + 4 calls, never fork",
+          "t": "(21vii) DESIGN APPROVED: ships as packages (@foskaay/ggi-sdk + ggi-contracts); integrating = install + small adapter + 4 calls, never fork",
           "s": "done"
         },
         {
-          "t": "(21viii) NAMING: full brand everywhere public (GlobalFolkGames BS); short GFG-BS internal only",
+          "t": "(21viii) NAMING: full brand everywhere public (Foskaay GGI); short GFG-BS internal only",
           "s": "done"
         },
         {
@@ -1025,7 +1029,7 @@
           "s": "done"
         },
         {
-          "t": "(21x) STEP 1 DONE: empty globalfolkgames-bs/ skeleton + README + foundry.toml + placeholders (no logic); main build unaffected",
+          "t": "(21x) STEP 1 DONE: empty foskaay-ggi/ skeleton + README + foundry.toml + placeholders (no logic); main build unaffected",
           "s": "done"
         },
         {
@@ -1053,7 +1057,7 @@
           "s": "pending"
         },
         {
-          "t": "(21xvii) DEMO CATALOGUE: globalfolkgames-bs/demos/README.md created - genre popularity table from the live DappRadar top 50 (RPG/idle/PvP/casual lead; board games rare, which is the differentiation). Demos planned: idle-farm, endless-runner, arena-1v1, tiny-mmo, land-grid. Ludo stays the GFG flagship, not the demo.",
+          "t": "(21xvii) DEMO CATALOGUE: foskaay-ggi/demos/README.md created - genre popularity table from the live DappRadar top 50 (RPG/idle/PvP/casual lead; board games rare, which is the differentiation). Demos planned: idle-farm, endless-runner, arena-1v1, tiny-mmo, land-grid. Ludo stays the GFG flagship, not the demo.",
           "s": "done"
         },
         {
@@ -1061,11 +1065,11 @@
           "s": "done"
         },
         {
-          "t": "(21xix) DEMOS SERVED FROM A PATH on the existing domain for now (no DNS/subdomain work while solo); a subdomain only when GlobalFolkGames BS becomes its own repo.",
+          "t": "(21xix) DEMOS SERVED FROM A PATH on the existing domain for now (no DNS/subdomain work while solo); a subdomain only when Foskaay GGI becomes its own repo.",
           "s": "done"
         },
         {
-          "t": "(21xx) SPEC RENAMED: docs/gfg-bs-spec.md -> docs/globalfolkgames-bs-spec.md; npm scope fixed to @globalfolkgames (never @gfg); all stale references updated.",
+          "t": "(21xx) SPEC RENAMED: docs/gfg-bs-spec.md -> docs/foskaay-ggi-spec.md; npm scope fixed to @globalfolkgames (never @gfg); all stale references updated.",
           "s": "done"
         },
         {
@@ -1073,11 +1077,11 @@
           "s": "done"
         },
         {
-          "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /bs-demos/ page created (bs-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
+          "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /ggi-demos/ page created (ggi-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
           "s": "done"
         },
         {
-          "t": "(21xxiii) RENAMED (owner 2026-09-21): product is now GlobalFolkGames Gasless Infrastructure (sells the BENEFIT, not the mechanism). \"Batched Settlement\" demoted to ONE OPTIONAL PATTERN; \"Session Rails\" retired; never call it an ER. npm: @globalfolkgames/gi-sdk + gi-contracts.",
+          "t": "(21xxiii) RENAMED (owner 2026-09-21): product is now Foskaay Gasless Games Infrastructure (sells the BENEFIT, not the mechanism). \"Batched Settlement\" demoted to ONE OPTIONAL PATTERN; \"Session Rails\" retired; never call it an ER. npm: @foskaay/ggi-sdk + gi-contracts.",
           "s": "done"
         },
         {
@@ -1085,11 +1089,11 @@
           "s": "done"
         },
         {
-          "t": "(21xxv) SPEC HOME FIXED (owner 2026-09-21): the authoritative spec now lives in architecture.json module arcv2m18 (staff Architecture V2 page). docs/globalfolkgames-bs-spec.md is the long-form working note only, repo/staff, NOT served and NOT the source of truth (architecture.json wins on disagreement).",
+          "t": "(21xxv) SPEC HOME FIXED (owner 2026-09-21): the authoritative spec now lives in architecture.json module arcv2m18 (staff Architecture V2 page). docs/foskaay-ggi-spec.md is the long-form working note only, repo/staff, NOT served and NOT the source of truth (architecture.json wins on disagreement).",
           "s": "done"
         },
         {
-          "t": "(21xxvi) ADDED to arcv2m18: the \"what is the fast layer\" explanation (how MagicBlock ER works vs how GFG GI does the same EFFECT on Arc with no ER), the honest limits (signed state not a live VM; relayer trusted for timing not truth; we ship our own session reader/explorer), and why a dev might pick GI over ER.",
+          "t": "(21xxvi) ADDED to arcv2m18: the \"what is the fast layer\" explanation (how MagicBlock ER works vs how Foskaay GGI does the same EFFECT on Arc with no ER), the honest limits (signed state not a live VM; relayer trusted for timing not truth; we ship our own session reader/explorer), and why a dev might pick GI over ER.",
           "s": "done"
         },
         {
@@ -1099,7 +1103,7 @@
       ]
     },
     {
-      "title": "Settlement era: GFG-BS co-sign v1 through the rescan (pre-GlobalFolkGames BS)",
+      "title": "Settlement era: GFG-BS co-sign v1 through the rescan (pre-Foskaay GGI)",
       "updated": "2026-09-21",
       "items": [
         {
@@ -1817,9 +1821,9 @@
       ]
     }
   ],
-  "migrationNote": "FOCUS SHIFT (owner 2026-09-21): building GlobalFolkGames Gasless Infrastructure (GI) FIRST, as its own standalone project, because it determines how GFG itself will be rebuilt later. The old GFG-focused list is retired to history. Solana is frozen; Arc is the target.",
+  "migrationNote": "FOCUS SHIFT (owner 2026-09-21): building Foskaay Gasless Games Infrastructure (GGI) FIRST, as its own standalone project, because it determines how GFG itself will be rebuilt later. The old GFG-focused list is retired to history. Solana is frozen; Arc is the target.",
   "testNotes": {
-    "current focus": "Build and prove GlobalFolkGames Gasless Infrastructure (GI): the 4 core contracts, the SDK, the first demo, and a published cost number. Nothing else until GI works.",
-    "what proves GI is done": "(a) a live real session opened, acted on and settled on Arc testnet; (b) a demo playable on a phone at /bs-demos/ with zero gas and zero popups; (c) a published per-session sponsor cost."
+    "current focus": "Build and prove Foskaay Gasless Games Infrastructure (GGI): the 4 core contracts, the SDK, the first demo, and a published cost number. Nothing else until GI works.",
+    "what proves GI is done": "(a) a live real session opened, acted on and settled on Arc testnet; (b) a demo playable on a phone at /ggi-demos/ with zero gas and zero popups; (c) a published per-session sponsor cost."
   }
 }

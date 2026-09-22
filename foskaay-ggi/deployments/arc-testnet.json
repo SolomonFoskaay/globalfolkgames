@@ -1,0 +1,15 @@
+{
+  "network": "Arc Testnet",
+  "chainId": 5042002,
+  "rpc": "https://rpc.testnet.arc.io",
+  "explorer": "https://explorer.testnet.arc.io",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "deployedAt": "2026-09-21T23:39:29.693Z",
+  "deployer": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
+  "contracts": {
+    "SessionRegistry": "0xEDFeF632C550C77Fa3D8A20627493bCca4223cDc",
+    "SessionState": "0x5511Ee66d96009404dE9212FB01Af2a5dbc55B1c",
+    "Randomness": "0x3e5eeFAEf6eb9DA8a2d6b29c9D703fD5D12C7bFC",
+    "FeeVault": "0x77cA640fb38d3841e0eF1F97EC153c09485AC47D"
+  }
+}

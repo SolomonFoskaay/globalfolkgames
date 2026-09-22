@@ -1,4 +1,4 @@
-// scripts/gi-deploy-arc.mjs — deploy the FOUR core GlobalFolkGames Gasless
+// scripts/gi-deploy-arc.mjs — deploy the FOUR core Foskaay Gasless Games
 // Infrastructure contracts to Arc, from their forge artifacts.
 //
 // SECURITY: public values (RPC, USDC address, explorer) come from
@@ -50,9 +50,9 @@ const PLAN = [
 ];
 
 function artifact(name) {
-  const p = new URL(`../globalfolkgames-bs/out/${name}.sol/${name}.json`, import.meta.url);
+  const p = new URL(`../foskaay-ggi/out/${name}.sol/${name}.json`, import.meta.url);
   const j = JSON.parse(readFileSync(p, 'utf8'));
-  if (!j.bytecode || j.bytecode.object === '0x') throw new Error('no bytecode for ' + name + ' (run forge build in globalfolkgames-bs)');
+  if (!j.bytecode || j.bytecode.object === '0x') throw new Error('no bytecode for ' + name + ' (run forge build in foskaay-ggi)');
   return { abi: j.abi, bytecode: j.bytecode.object };
 }
 
@@ -100,7 +100,7 @@ async function usdcBalance(addr) {
   // Persist the public addresses so the proof driver (and the app later) can use
   // them. Addresses are public data, safe to commit; only the key is a secret.
   const here = dirname(fileURLToPath(import.meta.url));
-  const outDir = join(here, '..', 'globalfolkgames-bs', 'deployments');
+  const outDir = join(here, '..', 'foskaay-ggi', 'deployments');
   mkdirSync(outDir, { recursive: true });
   const record = {
     network: cfg.name,
@@ -113,7 +113,7 @@ async function usdcBalance(addr) {
     contracts: Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.address])),
   };
   writeFileSync(join(outDir, 'arc-testnet.json'), JSON.stringify(record, null, 2) + '\n');
-  console.log('addresses written: globalfolkgames-bs/deployments/arc-testnet.json');
+  console.log('addresses written: foskaay-ggi/deployments/arc-testnet.json');
   console.log('');
 
   const total = before - lastBalance;

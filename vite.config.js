@@ -64,7 +64,7 @@ export default defineConfig({
         agm: './agm/index.html',
         competitions: './competitions/index.html',
         games: './games/index.html',
-        'bs-demos': './bs-demos/index.html',
+        'ggi-demos': './ggi-demos/index.html',
         game: './games/game.html',
         countries: './countries/index.html',
         about: './about/index.html',
