@@ -1,0 +1,21 @@
+{
+  "measuredAt": "2026-09-23T00:55:29.727Z",
+  "mode": "midchain-unbatched",
+  "sessionId": "0xe0d09e3cf9014a349b7d169aa69a9beb55b655cc8e648148f289c09b5c5555da",
+  "startHash": "0x4d7f907065cb8e3103f7d4a8dc872e904f8463d0a0f047ad0834a5a473be230c",
+  "finalHash": "0x8dfc332f7c15b4f0162dd9ff59c60981828ed798d61c283e561e1ee5a7486c31",
+  "moveCount": 12,
+  "verified": true,
+  "terminal": {
+    "finished": false,
+    "winner": 255
+  },
+  "cost": {
+    "open": 0.004948,
+    "setGameState": 0.001404,
+    "settle": 0.005854,
+    "total": 0.012206,
+    "gamesPerDollar": 81
+  },
+  "compareOnChainBoardPerMatch": 0.098172
+}

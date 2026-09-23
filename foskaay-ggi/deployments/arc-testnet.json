@@ -12,9 +12,11 @@
     "Randomness": "0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b",
     "FeeVault": "0x4cf542791faeb683f878bd3d119683e0C02F9905",
     "BatchedSettlement": "0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4",
-    "GeneralsGame": "0xD674eD1f118855868b4B002F4A167C953Cc549ca"
+    "GeneralsGame": "0xD674eD1f118855868b4B002F4A167C953Cc549ca",
+    "GeneralsMidchain": "0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2"
   },
   "upgradeable": true,
   "pattern": "UUPS proxy (ERC1967). Proxy addresses are permanent.",
-  "generalsGameDeployedAt": "2026-09-22T13:32:42.512Z"
+  "generalsGameDeployedAt": "2026-09-22T13:32:42.512Z",
+  "generalsMidchainDeployedAt": "2026-09-23T00:46:12.066Z"
 }

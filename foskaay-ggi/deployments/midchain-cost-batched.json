@@ -1,0 +1,17 @@
+{
+  "measuredAt": "2026-09-23T00:54:27.367Z",
+  "mode": "midchain-batched",
+  "matches": 3,
+  "moveCount": 12,
+  "verified": true,
+  "cost": {
+    "opens": 0.014844,
+    "setGameState": 0.0042120000000000005,
+    "batchSubmit": 0.008579999999999999,
+    "batchFlush": 0.001729,
+    "total": 0.029365000000000002,
+    "perMatch": 0.009788333333333335,
+    "gamesPerDollar": 102
+  },
+  "compareOnChainBoardPerMatch": 0.098172
+}

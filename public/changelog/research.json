@@ -638,6 +638,30 @@
             "This is not a new module. architecture.json module arcv2m18 already promises free work inside a session: nothing is written to the chain during play, cost appears on OPEN and SETTLE only. The cores simply do not deliver that yet. The port exposed the gap; the midchain is how we close it.",
             "Next step: build the midchain as a prototype on the Generals demo. Keep the board on-chain as the source of truth, move gameplay into signed eth_call moves with one handover and one settle, then measure the real cost against the current about 10 games per 1 USD. No core contract change is needed for the prototype: SessionRegistry (open/close/session keys), SessionState (commitDigest/sealFinal) and FeeVault already cover the on-chain endpoints. The midchain lives in the game's own contract (pure rules) plus the client/SDK (signing and hash chain), so we keep the 4 core + 1 optional structure."
           ]
+        },
+        {
+          "heading": "7. Measured result (Arc testnet, 2026-09-22)",
+          "paragraphs": [
+            "The midchain prototype is built and measured. GeneralsMidchain is a pure rules engine (no storage); the client runs applyMove via eth_call and hash-chains the states; only session open, the game-state link and settle touch the chain. Every move is free for the player AND the sponsor, and the verifier replay PASSED (the signed move log replays to the same final hash)."
+          ],
+          "table": {
+            "headers": [
+              "Mode",
+              "On-chain txs per match",
+              "Cost per match",
+              "Games per 1 USD"
+            ],
+            "rows": [
+              ["On-chain board port (before)", "about 15", "0.098172 USDC", "about 10"],
+              ["Midchain unbatched", "3 (open, setGameState, settle)", "0.012206 USDC", "about 81"],
+              ["Midchain batched (3 matches per window)", "opens + 1 window flush", "0.009788 USDC", "about 102"]
+            ]
+          },
+          "bullets": [
+            "The midchain removes the per-move cost completely (the big win): the on-chain-board port spent most of its 0.098 on per-move command, tick and generate transactions, and all of that is now free eth_call plus a signature.",
+            "The remaining cost is the CORE's storage writes at open and settle, not the moves. The v5 target of about 1000 games per 1 USD needs an event-only handover/settle in the core (no SSTORE on the happy path) and/or larger batches. That is a future core change, kept separate so the 4 core + 1 optional stays stable for now.",
+            "GeneralsMidchain deployed on Arc testnet: 0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2. Files: foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol, test/GeneralsMidchain.t.sol, scripts/ggi-midchain-match.mjs, deployments/midchain-cost.json and midchain-cost-batched.json."
+          ]
         }
       ]
     }
