@@ -394,7 +394,16 @@ Never call it an "ER". Spec lives in `architecture.json` module `arcv2m18`; the
 long-form note is `docs/foskaay-ggi-spec.md`; the public docs page is
 `/foskaay-ggi/docs/`.
 
-- **CORE = exactly 4 unopinionated contracts:** SessionRegistry, SessionState,
+**BEFORE designing ANY game (or game demo) on Foskaay GGI, read the docs section
+"Designing a game for Foskaay GGI" (`foskaay-ggi/docs/index.html#designing`) and
+the rule `.opencode/rules/foskaay-ggi-game-design.md`.** It is the owner's live
+MagicBlock ER lesson: optimise account count (one game account + one player
+account, never one per game/feature), keep the board as compact bytes (never
+graphics on-chain), credit points inside the room at game end, run nothing outside
+the session window, and keep the frontend display-only. It is the difference
+between a fraction of a cent per match and fifty times more.
+
+- **CORE = exactly 2 unopinionated contracts:** SessionRegistry, FeeVault,
   Randomness, FeeVault. BatchedSettlement is an OPTIONAL separate contract, never
   core. Optional patterns are OFFERED, never enforced: Batched Settlement,
   Managed Accounts (PlayerCore-style), Verifiers, House/relayer-as-participant.

@@ -1,10 +1,11 @@
 // public/foskaay-ggi-explorer.js
-// Reads-only Foskaay GGI explorer helpers. NO writes, NO keys, NO backend: every value on
-// the explorer comes from the Arc contracts + RPC directly, which is the point
-// (a dev or a grant reviewer can verify the claim without trusting us).
+// Reads-only Foskaay GGI explorer helpers. NO writes, NO keys, NO backend: every
+// value on the explorer comes from the Arc contracts + RPC directly, which is the
+// point (a dev or a grant reviewer can verify the claim without trusting us).
 //
-// It reads the SAME address list the npm package publishes, so the explorer and
-// the SDK can never disagree about which contracts are live.
+// The clean 2-contract core has NO on-chain session storage. A session is proven
+// by its EVENTS: Handover (connect) and Settled (result), both on SessionRegistry,
+// plus the fee state on FeeVault. This file reads those events with eth_getLogs.
 (function () {
     'use strict';
 
@@ -15,16 +16,27 @@
         explorer: 'https://explorer.testnet.arc.io',
         usdc: '0x3600000000000000000000000000000000000000',
         contracts: {
-            SessionRegistry: '0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5',
-            SessionState: '0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e',
-            Randomness: '0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b',
-            FeeVault: '0x4cf542791faeb683f878bd3d119683e0C02F9905',
-            BatchedSettlement: '0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4'
+            SessionRegistry: '0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE',
+            FeeVault: '0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39'
         }
     };
 
-    // Minimal JSON-RPC over fetch. We avoid a web3 dependency on this page so it
-    // loads fast on a phone and has no build step.
+    // Event topic0 hashes (keccak of the event signature). Recomputed with
+    // `cast keccak "<signature>"`. If an event signature ever changes, recompute.
+    var TOPIC = {
+        Handover: '0xc69c4b768b98598156326b0b2d4e43b9003425598e82882635dbf28e4fcf3cf6',
+        Settled: '0x12e9909fa20d454f1d832410840022a48385ad716d10570278d043c3a15b6595'
+    };
+
+    // Precomputed view selectors, pinned so the page needs no crypto library.
+    var SELECTORS = {
+        'paid(bytes32)': '0xadd89bb2',
+        'fee()': '0xddca3f43',
+        'collected()': '0x84bcefd4',
+        'destination()': '0xb269681d',
+        'midchainDigest(bytes32,bytes32)': '0x00918792'
+    };
+
     function rpc(method, params) {
         return fetch(NET.rpc, {
             method: 'POST',
@@ -36,178 +48,127 @@
         });
     }
 
-    // ---- ABI encoding (tiny, no dependency) -----------------------------------
-    function hex32(hexNo0x) { return hexNo0x.padStart(64, '0'); }
-    function addr32(a) { return hex32(a.toLowerCase().replace(/^0x/, '')); }
-
-    function selector(sig) {
-        // keccak256 via the browser is not available; we hardcode the selectors we
-        // use (computed once) so the page needs no crypto library.
-        return SELECTORS[sig];
-    }
-
-    // Precomputed selectors for the view functions this explorer calls. Computed
-    // with `cast sig "<signature>"` and pinned here so the page needs no crypto
-    // library. If a signature ever changes, these MUST be recomputed together.
-    var SELECTORS = {
-        'getSession(bytes32)': '0x39b240bd',
-        'getState(bytes32)': '0x09648a9d',
-        'seedsOf(bytes32)': '0x385b1f3b',
-        'revealed(bytes32)': '0x0b927b32',
-        'streamCountOf(bytes32)': '0x2cfb2519',
-        'sessionFee()': '0x585fb387',
-        'feeToken()': '0x647846a5',
-        'paymentOf(bytes32)': '0xf25a0a89',
-        'windows(address,uint256)': '0x53f1c57d',
-        'windowCount(address)': '0xb74fe6e8',
-        'leavesOf(address,uint256)': '0x07cd4bb5',
-        'config(address)': '0x0e68ec95',
-        'canFlush(address,uint256)': '0x0e89fab1',
-        'feeRecipient()': '0x46904840',
-        'registry()': '0x7b103999',
-        'owner()': '0x8da5cb5b',
-        'admin()': '0xf851a440'
-    };
-
     function ethCall(to, data) {
-        return rpc('eth_call', [{ to: to, data: data }, 'latest']).then(function (res) {
-            return res;
-        });
+        return rpc('eth_call', [{ to: to, data: data }, 'latest']);
     }
 
     function callView(to, sig, argsData) {
-        return ethCall(to, selector(sig) + (argsData || '')).then(function (hex) {
-            return hex;
-        });
+        return ethCall(to, SELECTORS[sig] + (argsData || ''));
     }
 
-    // ---- Decoders -------------------------------------------------------------
-    function word(hex, i) { return hex.slice(2 + i * 64, 2 + (i + 1) * 64); }
-    function addrOf(w) { return '0x' + w.slice(24); }
-    function numOf(w) { return BigInt('0x' + w); }
-    function boolOf(w) { return BigInt('0x' + w) !== 0n; }
-    function bytes32Of(w) { return '0x' + w; }
+    function getLogs(address, topic0, sessionId) {
+        return rpc('eth_getLogs', [{
+            address: address,
+            topics: [topic0, sessionId],
+            fromBlock: '0x0',
+            toBlock: 'latest'
+        }]);
+    }
 
-    // SessionRegistry.Session: owner, status, participantCount, createdAt,
-    // expiresAt, closedAt, rulesHash, seedCommit (8 words, static struct).
-    function decodeSession(hex) {
-        if (!hex || hex === '0x' || hex.length < 2 + 8 * 64) return null;
+    // ---- tiny ABI decoding (no dependency) ------------------------------------
+    function w(data, i) { return data.slice(2 + i * 64, 2 + (i + 1) * 64); }
+    function addrFromWord(hexWord) { return '0x' + hexWord.slice(24); }
+    function addrFromTopic(topic) { return '0x' + topic.slice(26); }
+    function bytes32FromWord(hexWord) { return '0x' + hexWord; }
+    function numFromWord(hexWord) { return BigInt('0x' + hexWord); }
+    function boolFromHex(hex) { return hex && hex !== '0x' && BigInt(hex) !== 0n; }
+
+    // Non-indexed Handover data: startHash, seedCommit, players[], sessionKeys[], randomCount
+    function decodeHandover(data) {
+        if (!data || data.length < 2 + 5 * 64) return null;
         return {
-            owner: addrOf(word(hex, 0)),
-            status: Number(numOf(word(hex, 1))), // 0 none, 1 open, 2 closed
-            participants: Number(numOf(word(hex, 2))),
-            createdAt: Number(numOf(word(hex, 3))),
-            expiresAt: Number(numOf(word(hex, 4))),
-            closedAt: Number(numOf(word(hex, 5))),
-            rulesHash: bytes32Of(word(hex, 6)),
-            seedCommit: bytes32Of(word(hex, 7))
+            startHash: bytes32FromWord(w(data, 0)),
+            seedCommit: bytes32FromWord(w(data, 1)),
+            players: readAddrArray(data, Number(numFromWord(w(data, 2)))),
+            sessionKeys: readAddrArray(data, Number(numFromWord(w(data, 3)))),
+            randomCount: Number(numFromWord(w(data, 4)))
         };
     }
 
-    // SessionState.State: digest, eventCount, lastSequence, lastPayloadHash, committed
-    function decodeState(hex) {
-        if (!hex || hex === '0x' || hex.length < 2 + 5 * 64) return null;
+    // Non-indexed Settled data: finalHash, seedReveal
+    function decodeSettled(data) {
+        if (!data || data.length < 2 + 2 * 64) return null;
         return {
-            digest: bytes32Of(word(hex, 0)),
-            eventCount: Number(numOf(word(hex, 1))),
-            lastSequence: numOf(word(hex, 2)).toString(),
-            lastPayloadHash: bytes32Of(word(hex, 3)),
-            committed: boolOf(word(hex, 4))
+            finalHash: bytes32FromWord(w(data, 0)),
+            seedReveal: bytes32FromWord(w(data, 1))
         };
+    }
+
+    // Dynamic address[] at a byte offset from the start of `data`.
+    function readAddrArray(data, byteOffset) {
+        var out = [];
+        try {
+            var len = Number(numFromWord(data.slice(2 + byteOffset * 2, 2 + byteOffset * 2 + 64)));
+            for (var i = 0; i < len; i++) {
+                var start = 2 + (byteOffset + 32 + i * 32) * 2 + 24;
+                out.push('0x' + data.slice(start, start + 40));
+            }
+        } catch (e) { /* soft */ }
+        return out;
     }
 
     // ---- Public API -----------------------------------------------------------
-    function statusName(s) { return s === 1 ? 'OPEN' : (s === 2 ? 'CLOSED' : 'UNKNOWN'); }
-
     function loadSession(sessionId) {
         var C = NET.contracts;
         var idArg = sessionId.replace(/^0x/, '');
         return Promise.all([
-            callView(C.SessionRegistry, 'getSession(bytes32)', idArg).then(decodeSession),
-            callView(C.SessionState, 'getState(bytes32)', idArg).then(decodeState),
-            callView(C.Randomness, 'revealed(bytes32)', idArg).then(boolOf).catch(function () { return false; }),
-            callView(C.Randomness, 'seedsOf(bytes32)', idArg).catch(function () { return '0x'; }),
-            callView(C.FeeVault, 'paymentOf(bytes32)', idArg).catch(function () { return '0x'; })
+            getLogs(C.SessionRegistry, TOPIC.Handover, sessionId).catch(function () { return []; }),
+            getLogs(C.SessionRegistry, TOPIC.Settled, sessionId).catch(function () { return []; }),
+            callView(C.FeeVault, 'paid(bytes32)', idArg).catch(function () { return '0x'; }),
+            callView(C.FeeVault, 'fee()').catch(function () { return '0x'; }),
+            callView(C.FeeVault, 'collected()').catch(function () { return '0x'; }),
+            callView(C.FeeVault, 'destination()').catch(function () { return '0x'; })
         ]).then(function (r) {
-            var sess = r[0], st = r[1], revealed = r[2], seedsHex = r[3], payHex = r[4];
-            var seeds = [];
-            try {
-                // dynamic bytes32[]: offset, length, items
-                if (seedsHex && seedsHex.length > 2 && seedsHex !== '0x') {
-                    var len = Number(numOf(word(seedsHex, 1)));
-                    for (var i = 0; i < len; i++) seeds.push(bytes32Of(word(seedsHex, 2 + i)));
-                }
-            } catch (e) { /* soft */ }
-            var payer = '0x0000000000000000000000000000000000000000', amount = 0n;
-            try {
-                if (payHex && payHex.length >= 2 + 2 * 64) { payer = addrOf(word(payHex, 0)); amount = numOf(word(payHex, 1)); }
-            } catch (e) { /* soft */ }
-            return { sessionId: sessionId, session: sess, state: st, revealed: revealed, seeds: seeds, payer: payer, amount: amount };
+            var hLog = r[0][0], sLog = r[1][0];
+            var handover = null, settled = null;
+            if (hLog) {
+                var d = decodeHandover(hLog.data) || {};
+                handover = {
+                    gameLogic: hLog.topics[2] ? addrFromTopic(hLog.topics[2]) : null,
+                    payer: hLog.topics[3] ? addrFromTopic(hLog.topics[3]) : null,
+                    startHash: d.startHash, seedCommit: d.seedCommit,
+                    players: d.players || [], sessionKeys: d.sessionKeys || [],
+                    randomCount: d.randomCount || 0,
+                    block: Number(BigInt(hLog.blockNumber)),
+                    tx: hLog.transactionHash
+                };
+            }
+            if (sLog) {
+                var sd = decodeSettled(sLog.data) || {};
+                settled = {
+                    finalHash: sd.finalHash, seedReveal: sd.seedReveal,
+                    payer: sLog.topics[2] ? addrFromTopic(sLog.topics[2]) : null,
+                    block: Number(BigInt(sLog.blockNumber)),
+                    tx: sLog.transactionHash
+                };
+            }
+            return {
+                sessionId: sessionId,
+                connected: Boolean(handover),
+                handover: handover,
+                settled: settled,
+                paid: boolFromHex(r[2]),
+                fee: numFromWord(r[3] || '0x0'),
+                collected: numFromWord(r[4] || '0x0'),
+                destination: r[5] && r[5] !== '0x' ? addrFromWord(r[5].slice(2)) : null
+            };
         });
     }
 
-    // Verify the revealed seed(s) against the committed seedCommit, and recompute
-    // derive(seed, counter) so a reviewer can see the fairness proof, not trust it.
-    function fairnessCheck(session, seeds) {
-        if (!session || !session.seedCommit || session.seedCommit === '0x' + '0'.repeat(64)) {
-            return { declared: false, note: 'This session declared no randomness.' };
-        }
-        if (!seeds || seeds.length === 0) {
-            return { declared: true, revealed: false, note: 'Commitment sealed; seed not revealed yet (revealed at settle).' };
-        }
-        // The commit hash is keccak256(abi.encodePacked("gfg-gi-seed", len, seeds)).
-        // Browser keccak is unavailable without a library, so we show the raw
-        // material and let the on-chain `revealed` flag be the contract's verdict,
-        // plus we expose the data for anyone to re-check in their own tool.
-        return {
-            declared: true,
-            revealed: true,
-            count: seeds.length,
-            seeds: seeds,
-            note: 'Seed revealed on-chain and accepted by the Randomness contract (it only accepts a seed set whose hash matches the commitment sealed at open).'
-        };
-    }
-
-    // Batch windows for a game operator.
-    function loadWindows(owner, upTo) {
-        var C = NET.contracts;
-        var n = upTo || 3;
-        var jobs = [];
-        for (var i = 0; i < n; i++) {
-            (function (id) {
-                jobs.push(
-                    callView(C.BatchedSettlement, 'windows(address,uint256)', addr32(owner) + hex32(id.toString(16)))
-                        .then(function (hex) {
-                            if (!hex || hex.length < 2 + 5 * 64) return null;
-                            return {
-                                id: id,
-                                openedAt: Number(numOf(word(hex, 0))),
-                                deadline: Number(numOf(word(hex, 1))),
-                                leafCount: Number(numOf(word(hex, 2))),
-                                maxSize: Number(numOf(word(hex, 3))),
-                                closed: boolOf(word(hex, 4)),
-                                root: bytes32Of(word(hex, 5))
-                            };
-                        })
-                        .catch(function () { return null; })
-                );
-            })(i);
-        }
-        return Promise.all(jobs).then(function (rows) {
-            return rows.filter(Boolean);
-        });
+    // The exact digest the players sign. Pure read; costs nothing.
+    function midchainDigest(sessionId, finalHash) {
+        var args = sessionId.replace(/^0x/, '') + finalHash.replace(/^0x/, '');
+        return callView(NET.contracts.SessionRegistry, 'midchainDigest(bytes32,bytes32)', args);
     }
 
     window.GGExplorer = {
         NET: NET,
+        TOPIC: TOPIC,
         rpc: rpc,
+        callView: callView,
         loadSession: loadSession,
-        decodeSession: decodeSession,
-        decodeState: decodeState,
-        fairnessCheck: fairnessCheck,
-        loadWindows: loadWindows,
-        statusName: statusName,
-        addr32: addr32,
-        hex32: hex32
+        midchainDigest: midchainDigest,
+        decodeHandover: decodeHandover,
+        decodeSettled: decodeSettled
     };
 })();

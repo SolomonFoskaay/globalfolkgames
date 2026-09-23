@@ -106,6 +106,82 @@
         </div>
     </section>
 
+    <section class="ggi-card" id="designing">
+        <h2 class="ggi-h2">Designing a game for Foskaay GGI (read this before you design your contract)</h2>
+        <p class="ggi-body">
+            This is the most important page for a game dev (and for any AI agent helping one). Foskaay GGI
+            is a <b>transport, not a ledger and not a policy</b>. It takes the accounts your game already
+            owns, moves them off the base chain into the free room, lets everything happen there for
+            nothing, and commits them back. It does not create your game, your players, your points or your
+            rules. Your contracts own all of that, permanently, on the base chain.
+        </p>
+        <div class="ggi-note">
+            <b>The one sentence to remember.</b> Design your game so that the accounts it needs during a
+            match are as <b>few</b> as possible, because every account you lift into the room is paid for,
+            and everything that happens inside the room, including crediting points, must run there or the
+            sponsor pays per action again.
+        </div>
+
+        <div class="ggi-h3">1. Optimise first: the fewer accounts, the cheaper it is</div>
+        <p class="ggi-body">
+            Each account you delegate into a session is a separate lift and a separate commit. If you make
+            one account per game, or one account per feature, that count grows forever. A real example of
+            the trap: a player with a dice account, a points account, a global points account, a lives
+            account, a result account, a premium account and a player account is <b>six or seven lifts for
+            one player</b>. Add a second game and it becomes seven or eight. At 50 games it is
+            unmaintainable and the fees multiply.
+        </p>
+        <ul class="ggi-list">
+            <li><b>One game account, not one per game.</b> Every game is a module or a bucket inside a single account. Adding game number 50 costs nothing extra.</li>
+            <li><b>One player account, not one per game or feature.</b> Points, lives, records and per-game buckets live in ONE player account. 50 games still lift the same account once.</li>
+            <li><b>Points live in the player account, which is lifted with the match.</b> Then crediting a point is a free write inside the room, exactly like a move.</li>
+            <li><b>The board is data, not graphics.</b> Store the board as compact bytes (positions, counts, status). Never put images or SVGs on-chain. Graphics belong in the browser, which only displays what the chain already says.</li>
+        </ul>
+        <div class="ggi-callout">
+            <b>The payoff, stated plainly.</b> A design with one game account and one player account
+            delegates <b>two accounts</b> for any number of games, instead of six to eight per player. That
+            is a 50 to 75 percent cut in lifting and commit cost, and it is the single biggest optimisation
+            available to you. We are happy if you choose to lift ten accounts; we will not stop you. But the
+            smart design is one game plus one player.
+        </div>
+
+        <div class="ggi-h3">2. My live experience on MagicBlock's Ephemeral Rollup (why this page exists)</div>
+        <p class="ggi-body">
+            I built on MagicBlock's ER as a beginner and learned this the hard way. I first created a
+            separate account for the game, for points, for subscriptions, for lives and for the player. To
+            play, I had to delegate six accounts at once, and I did not understand that as a beginner. When
+            I added a second game (chess) it forced another game account, so it became seven. The cost went
+            up every time, and I could feel it growing. At 50 games it would have been impossible to
+            maintain. The fix was to consolidate: one player account that holds points for every game in
+            buckets, and one game account that every game is a module inside. Adding a game became additive,
+            not a new account. That is why this page asks you to think about account count before you write
+            a line of Solidity.
+        </p>
+
+        <div class="ggi-h3">3. The fix, in the shape of the design we recommend</div>
+        <ul class="ggi-list">
+            <li><b>Your game contract</b> holds the rules and the match: seats, board bytes, turn, turn timer, dice, computer logic, win condition.</li>
+            <li><b>Your player contract</b> holds everything permanent about a player: points (with a game tag or bucket), lifetime, wins. It is lifted with the match so points can be credited inside the room, at the moment a game ends, not when the session closes.</li>
+            <li><b>The rail</b> is our two contracts. You connect a session (the fee is paid there), play everything for free inside, and settle. Unbatched means one match per session; batched means one session covers many matches, so credits keep accumulating inside the room and everything commits back when the session closes.</li>
+        </ul>
+
+        <div class="ggi-h3">4. The rules that keep it cheap and fully on-chain</div>
+        <ul class="ggi-list">
+            <li><b>Nothing runs before the session is live.</b> No move, dice, timer, computer turn or point credit happens until the connect is confirmed (the account is lifted and the fee paid).</li>
+            <li><b>Nothing runs after the session is gone.</b> Undelegating loses the free room, so the game waits for the next session rather than paying base-chain fees.</li>
+            <li><b>Everything happens inside the room.</b> Moves, dice, turn timers, computer moves, lives and points are all writes inside the free room. If you reach for the base chain to credit a point, you pay for it, and the sponsor starts losing the saving the whole design exists to create.</li>
+            <li><b>The credit happens at game end, inside the room.</b> A point is credited the moment that game finishes, not at session settlement, because a batched session stays open across many games.</li>
+            <li><b>The frontend only displays.</b> No game state in the browser, no local storage. The contract is the only source of truth.</li>
+        </ul>
+
+        <div class="ggi-note good">
+            <b>Before you design any game demo on Foskaay GGI</b> (your own, or GlobalFolkGames' own), read
+            this section first. It is the difference between a game that costs a fraction of a cent per
+            match and one that quietly costs fifty times more, and it is the mindset an outside developer
+            should bring: cheap to lift, free to play inside, one clean commit home.
+        </div>
+    </section>
+
     <section class="ggi-card" id="unopinionated">
         <h2 class="ggi-h2">Built to fit your game, never the other way round</h2>
         <p class="ggi-body">
@@ -113,22 +189,18 @@
             your game. It does not care how many players you have, how your data is laid out, or how
             often you settle.
         </p>
-        <div class="ggi-h3">The core (everything you need to ship)</div>
+        <div class="ggi-h3">The core (everything you need to ship): two contracts</div>
         <table class="ggi-table">
             <thead><tr><th>Contract</th><th>What it does</th></tr></thead>
             <tbody>
-                <tr><td><b>SessionRegistry</b></td><td>Open and close a session; set who may act for each participant; register session keys with scope and expiry.</td></tr>
-                <tr><td><b>SessionState</b></td><td>Accept signed actions: an opaque payload, a sequence number and a running digest.</td></tr>
-                <tr><td><b>Randomness</b></td><td>Commit-reveal random seeds for the games that ask. One stream by default, or as many as your game needs.</td></tr>
-                <tr><td><b>FeeVault</b></td><td>Collect the per-session fee and send it to a destination you choose.</td></tr>
+                <tr><td><b>SessionRegistry</b></td><td>Connect a session (the fee is paid here), settle the result, and give free pure randomness to the games that ask.</td></tr>
+                <tr><td><b>FeeVault</b></td><td>Hold the per-session fee. Only the registry can deposit; you withdraw to a destination you choose.</td></tr>
             </tbody>
         </table>
-        <div class="ggi-h3">Optional patterns (use them, ignore them, or build your own)</div>
+        <div class="ggi-h3">Batching and randomness are built in</div>
         <ul class="ggi-list">
-            <li><b>Batched settlement.</b> Fold many settlements into one Merkle root per window, for the cheapest tier. <b>You choose the window</b> on-chain: 10 games every 35 minutes, or 1,000 games every 24 hours, or anything in between. Flushing is permissionless (no admin, no server). The trade-off: a result becomes final when the window flushes, so use it only where that is acceptable to your players.</li>
-            <li><b>Managed accounts.</b> One account per player with slots for every game and feature.</li>
-            <li><b>Verifiers.</b> A per-game referee that settles a disagreement by replaying the actions.</li>
-            <li><b>House or relayer as a participant.</b> For games with an AI or house opponent.</li>
+            <li><b>Batching needs no contract.</b> One connect and one settle can cover MANY games in a session: the settle carries a single Merkle root over them. That is the cheapest tier, and it is a choice on your side, never a separate thing to deploy.</li>
+            <li><b>Randomness is free.</b> The registry exposes pure <span class="ggi-mono">random</span> and <span class="ggi-mono">randomN</span>, read through eth_call at no cost, so dice and card games pay nothing extra and need no randomness contract.</li>
         </ul>
         <div class="ggi-callout">
             A developer who wants a separate account per player, per feature, and a commit on every turn
@@ -140,31 +212,37 @@
     <section class="ggi-card" id="quickstart">
         <h2 class="ggi-h2">Quickstart</h2>
         <p class="ggi-body">
-            Integrating is three things: install a package, write a small adapter for your game, and call
-            four functions. There is no fork and no contract to copy.
+            Integrating is three things: install a package, write a small adapter for your game, and
+            connect, sign and settle. There is no fork and no contract to copy.
         </p>
         <div class="ggi-code"><code>npm install @foskaay/ggi-sdk</code></div>
         <ol class="ggi-list">
             <li><b>Install</b> <span class="ggi-mono">@foskaay/ggi-sdk</span> (and <span class="ggi-mono">@foskaay/ggi-contracts-sdk</span> if your own contract calls the rail directly).</li>
-            <li><b>Write a small adapter</b> that turns your game's state into the opaque payload. This is the only game-specific code, and it lives in your game.</li>
-            <li><b>Call four functions:</b> open, act, settle, and (optionally) dispute.</li>
+            <li><b>Write a small adapter</b> that turns your game's state into a hash. This is the only game-specific code, and it lives in your game.</li>
+            <li><b>Connect, sign, settle:</b> one connect transaction (the fee is paid there), free signed moves during play, one settle at the end.</li>
         </ol>
         <div class="ggi-code"><code>// Pseudo-code: the shape of an integration
-const ggi = new GgiClient({ network: 'arc-testnet' });
+const ggi = new GgiClient({ network: 'testnet', walletClient });
 
-// 1. open a session for this match (one transaction)
-const sessionId = await ggi.open({
-  participants: 2,
-  ttlSecs: 3600,
-  rulesHash: hashOf(myGameRules),
-  seedCommit: optionalCommit,
+// 1. connect a session for this match (one transaction; the fee is paid here)
+await ggi.handover({
+  sessionId,
+  gameLogic: myGameAddress,
+  startHash: hashOf(myStartState),
+  seedCommit: optionalSeedCommit,
+  players: [p0, p1],
+  sessionKeys: [k0, k1],
+  randomCount: 1,
 });
 
-// 2. record actions during play: free, signed, no popup
-await ggi.act(sessionId, { seat: 0, sequence: 1, payload: myMove });
+// 2. play: every move is free, signed with a session key
+const sig = await ggi.signMove(key, sessionId, finalHash);
 
 // 3. settle once at the end (one transaction)
-await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</code></div>
+await ggi.settle({
+  sessionId, finalHash, seedReveal,
+  sigs: [sig0, sig1], signers: [p0, p1],
+});</code></div>
         <p class="ggi-tiny">
             Full API reference and the adapter example ship with the SDK README. This page is the
             overview; the package docs go deeper.
@@ -284,7 +362,7 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
         <h2 class="ggi-h2">What you run</h2>
         <p class="ggi-body">
             <b>Nothing extra.</b> There is no validator, no RPC node and no rollup to operate. You
-            deploy your own game as usual and call the four core contracts. The rail handles the room;
+            deploy your own game as usual; the rail handles the room;
             your game owns its economy.
         </p>
         <div class="ggi-callout good">
@@ -328,20 +406,23 @@ const ggi = new GgiClient({
   return { from: move.from, to: move.to, die: move.die };
 }</code></div>
 
-        <div class="ggi-h3">4. Wire the four calls</div>
-        <div class="ggi-code"><code>// OPEN once per session (one transaction)
-const { sessionId } = await ggi.open({
-  participants: 2,
-  ttlSecs: 3600,
-  seeds: [mySeed],           // only if your game needs randomness
+        <div class="ggi-h3">4. Connect, sign, settle</div>
+        <div class="ggi-code"><code>// CONNECT once per session (one transaction; the fee is paid here)
+await ggi.handover({
+  sessionId,
+  gameLogic: myGameAddress,
+  startHash: hashOf(myStartState),
+  seedCommit: mySeedCommit,      // only if your game needs randomness
+  players: [p0, p1],
+  sessionKeys: [k0, k1],
+  randomCount: 1,
 });
 
-// ACT during play: free, signed, no popup, no chain write
-let state = { sessionId, digest: ZERO_DIGEST, eventCount: 0 };
-state = ggi.act(state, { seat: 0, sequence: 1, payload: toPayload(myMove) }).state;
+// PLAY for free: run your pure rules, hash the state, sign it silently
+const sig = await ggi.signMove(key, sessionId, finalHash);
 
-// SETTLE once at the end (one transaction)
-await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></div>
+// SETTLE once at the end (one transaction; every player signs)
+await ggi.settle({ sessionId, finalHash, seedReveal, sigs, signers });</code></div>
 
         <div class="ggi-callout good">
             <b>That is the whole integration.</b> No fork, no contract to copy, no infrastructure to run.
@@ -395,11 +476,11 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 <tr><td><span class="ggi-mono">Game</span> component (the shared board, one account)</td><td>The game's OWN contract storage (e.g. <span class="ggi-mono">Game</span> struct in a Solidity contract). Not rail core.</td><td>Game builds it</td></tr>
                 <tr><td><span class="ggi-mono">GamePlayer</span> (seat inside the board)</td><td>A seat struct inside the game contract (authority + score).</td><td>Game builds it</td></tr>
                 <tr><td>Systems <span class="ggi-mono">join / start / command / tick / finish</span></td><td>Solidity functions on the game contract with the SAME rules, validated on-chain.</td><td>Game builds it</td></tr>
-                <tr><td>Delegate account to the ER</td><td>Open a Foskaay GGI <b>session</b> and register the game account against it.</td><td>Rail: session exists; the game-account link is the small piece to add</td></tr>
-                <tr><td>Free execute inside the ER</td><td>Player-signed actions submitted by the sponsor. Arc has no free execution, so the SPONSOR pays each write; batching cuts the count.</td><td>Rail: sponsor relay + batching (honest EVM limit)</td></tr>
-                <tr><td>Authorise a signer (delegation authority)</td><td><span class="ggi-mono">SessionRegistry.canSign(sessionId, seat, who)</span> - the game contract checks it before every move.</td><td>Rail: present and proven</td></tr>
-                <tr><td>ERC VRF</td><td><span class="ggi-mono">Randomness</span> commit-reveal, N streams.</td><td>Rail: present</td></tr>
-                <tr><td>Commit / undelegate</td><td>Foskaay GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
+                <tr><td>Delegate account to the ER</td><td>Connect a session: <span class="ggi-mono">ggi.handover(...)</span>. The connect event carries the game link, so no separate link transaction is needed.</td><td>Rail: present</td></tr>
+                <tr><td>Free execute inside the ER</td><td>Moves run off the base chain through the Foskaay GGI Midchain: signed by the session key and tied by a hash chain, free. Only connect and settle are transactions.</td><td>Rail: present</td></tr>
+                <tr><td>Authorise a signer (delegation authority)</td><td>The players sign the final hash; the registry verifies every signature (OpenZeppelin <span class="ggi-mono">ECDSA.recover</span>) before it settles.</td><td>Rail: present and proven</td></tr>
+                <tr><td>ERC VRF</td><td>Free pure <span class="ggi-mono">random</span> / <span class="ggi-mono">randomN</span> on the registry (eth_call), so dice and cards cost nothing extra.</td><td>Rail: present</td></tr>
+                <tr><td>Commit / undelegate</td><td>Foskaay GGI <b>settle</b> (verify signatures, reveal seed) and, for batching, one settle carrying a session Merkle root.</td><td>Rail: present</td></tr>
                 <tr><td>Session + commit fees</td><td><span class="ggi-mono">FeeVault</span> per-session fee.</td><td>Rail: present</td></tr>
                 <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/foskaay-ggi/explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
                 <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts-sdk</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
@@ -410,8 +491,9 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         <ul class="ggi-list">
             <li><b>Board and player accounts are NOT rail core.</b> They are the game's contract, exactly
                 as in their sample. We do not add them to core.</li>
-            <li><b>The authorisation hook already exists.</b> <span class="ggi-mono">canSign</span> is
-                the equivalent of delegation authority, and a game contract can use it today.</li>
+            <li><b>The authorisation hook is the signature check.</b> The registry verifies every player's
+                signature (OpenZeppelin <span class="ggi-mono">ECDSA.recover</span>) over the final hash, so
+                a tampered result cannot settle. That is the equivalent of delegation authority.</li>
             <li><b>The session-to-game link (added):</b> MagicBlock can tell you which accounts are
                 delegated for a game. Foskaay GGI now does the same thing in one line: when a game opens a
                 session it can register its own state account address against that session. The rail
@@ -441,18 +523,15 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         <table class="ggi-table">
             <thead><tr><th>Step</th><th>MagicBlock (their code)</th><th>Foskaay GGI (our port)</th></tr></thead>
             <tbody>
-                <tr><td>Create the board</td><td><span class="ggi-mono">AddEntity</span> + <span class="ggi-mono">InitializeComponent(Game)</span> with <span class="ggi-mono">status=Generate</span></td><td>Deploy/initialize the game's own <span class="ggi-mono">Game</span> contract account. No Foskaay GGI call yet.</td></tr>
-                <tr><td>Make it live</td><td><span class="ggi-mono">createDelegateInstruction</span> (delegate the component to the ER)</td><td>Sponsor opens a session: <span class="ggi-mono">ggi.open({ participants: 2, ttlSecs, seeds })</span>, then <span class="ggi-mono">ggi.setGameState(sessionId, boardAddress)</span>. Same idea: the board is now owned by a live session.</td></tr>
-                <tr><td>Generate the map</td><td>system <span class="ggi-mono">generate</span></td><td>Game contract function <span class="ggi-mono">generate()</span>, gated by <span class="ggi-mono">registry.canSign(sessionId, seat, caller)</span>.</td></tr>
-                <tr><td>Lobby</td><td><span class="ggi-mono">status = Lobby</span></td><td>Same field, same meaning.</td></tr>
-                <tr><td>Join</td><td>system <span class="ggi-mono">join</span> sets <span class="ggi-mono">players[i].authority</span></td><td>Game function <span class="ggi-mono">join(seat)</span>; the sponsor sets the seat authority once: <span class="ggi-mono">ggi.setAuthority(sessionId, seat, playerAddress)</span>, so the chain knows who may play that seat.</td></tr>
-                <tr><td>Ready</td><td><span class="ggi-mono">players[i].ready = true</span></td><td>Same field.</td></tr>
-                <tr><td>Start</td><td>system <span class="ggi-mono">start</span> sets <span class="ggi-mono">status = Playing</span></td><td>Same, gated by <span class="ggi-mono">canSign</span>.</td></tr>
-                <tr><td>The move</td><td>system <span class="ggi-mono">command</span> (adjacency, ownership, strength, invade math)</td><td>Game function <span class="ggi-mono">command(...)</span> with the SAME rules, gated by <span class="ggi-mono">canSign</span>. In unbatched mode the sponsor anchors it on-chain per action; in batched mode it rolls into a window.</td></tr>
-                <tr><td>The clock</td><td>system <span class="ggi-mono">tick</span> (strength grows over time)</td><td>Game function <span class="ggi-mono">tick()</span>, PERMISSIONLESS (anyone may call it), or a batched periodic write. Never a cron server.</td></tr>
-                <tr><td>Finish</td><td>system <span class="ggi-mono">finish</span> sets <span class="ggi-mono">status = Finished</span></td><td>Game function <span class="ggi-mono">finish()</span>, then Foskaay GGI settles: <span class="ggi-mono">ggi.settle(sessionId, { digest, seeds })</span> seals the result, reveals the seed and charges the one session fee.</td></tr>
-                <tr><td>Settle / commit back</td><td>commit + undelegate</td><td><span class="ggi-mono">ggi.settle(...)</span> for one match, or the optional <span class="ggi-mono">BatchedSettlement</span> window for many.</td></tr>
-                <tr><td>Read the game</td><td>subscribe to the component on the ER, decode</td><td>Read the game's board account from Arc (or decode the session's anchored actions). The frontend only renders; it owns nothing.</td></tr>
+                <tr><td>Create the board</td><td><span class="ggi-mono">AddEntity</span> + <span class="ggi-mono">InitializeComponent(Game)</span> with <span class="ggi-mono">status=Generate</span></td><td>The game's own contract holds its rules. In the free path those rules are pure functions, run off-chain.</td></tr>
+                <tr><td>Make it live</td><td><span class="ggi-mono">createDelegateInstruction</span> (delegate the component to the ER)</td><td>Sponsor connects a session: <span class="ggi-mono">ggi.handover({...})</span>. The fee is paid here and the connect event carries the game link, so no separate link transaction.</td></tr>
+                <tr><td>Generate the map</td><td>system <span class="ggi-mono">generate</span></td><td>The game's own rules, run free through the Foskaay GGI Midchain (eth_call).</td></tr>
+                <tr><td>Lobby, Join, Ready, Start</td><td>systems <span class="ggi-mono">join</span> / <span class="ggi-mono">start</span>, <span class="ggi-mono">players[i].ready</span></td><td>Part of the game's own rules, and part of the signed move log. No per-step rail call.</td></tr>
+                <tr><td>The move</td><td>system <span class="ggi-mono">command</span> (adjacency, ownership, strength, invade math)</td><td>The game's pure <span class="ggi-mono">applyMove</span> run via eth_call; each move is signed with the session key and tied by a hash chain. Free for the player and the sponsor.</td></tr>
+                <tr><td>The clock</td><td>system <span class="ggi-mono">tick</span> (strength grows over time)</td><td>Free as part of the session, or a permissionless on-chain call if the game wants it. Never a cron server.</td></tr>
+                <tr><td>Finish</td><td>system <span class="ggi-mono">finish</span> sets <span class="ggi-mono">status = Finished</span></td><td>The game's own terminal check.</td></tr>
+                <tr><td>Settle / commit back</td><td>commit + undelegate</td><td><span class="ggi-mono">ggi.settle({ sessionId, finalHash, seedReveal, sigs, signers })</span>: the registry verifies the players' signatures and emits the result. Batching = one settle carrying a session Merkle root.</td></tr>
+                <tr><td>Read the game</td><td>subscribe to the component on the ER, decode</td><td>Read the connect + settle events from Arc, and replay the signed move log. The frontend only renders; it owns nothing.</td></tr>
             </tbody>
         </table>
 
@@ -466,11 +545,11 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         </ul>
 
         <div class="ggi-note good">
-            <b>Why this port is the right test.</b> If the game contract can hold the board, check
-            <span class="ggi-mono">canSign</span> for every move, and settle through Foskaay GGI with real
-            measured unbatched and batched costs, then Foskaay GGI is proven as the Arc equivalent of the rail
-            their sample uses. Anything the port cannot express is a real gap we fix in core, optional,
-            or the packages, and we will know exactly where.
+            <b>Why this port is the right test.</b> If the game's pure rules drive free signed moves, the
+            registry verifies the players' signatures at settle, and the whole thing settles through
+            Foskaay GGI with real measured costs, then Foskaay GGI is proven as the Arc equivalent of the
+            rail their sample uses. Anything the port cannot express is a real gap we fix in core or the
+            packages, and we will know exactly where.
         </div>
     </section>
 
