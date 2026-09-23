@@ -7,16 +7,9 @@
   "deployedAt": "2026-09-22T04:06:51.469Z",
   "deployer": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
   "contracts": {
-    "SessionRegistry": "0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5",
-    "SessionState": "0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e",
-    "Randomness": "0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b",
-    "FeeVault": "0x4cf542791faeb683f878bd3d119683e0C02F9905",
-    "BatchedSettlement": "0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4",
-    "GeneralsGame": "0xD674eD1f118855868b4B002F4A167C953Cc549ca",
-    "GeneralsMidchain": "0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2",
-    "EventOnlyCore": "0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c",
-    "EventMidchainCore": "0x197DE9813bd8cF668C8C26455329C629EE9Fc63e",
-    "SessionRegistryImplementation": "0x05D492C0Cc4e890131c163b302Ab20B56542D2B2"
+    "SessionRegistry": "0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE",
+    "FeeVault": "0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39",
+    "GeneralsMidchain": "0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2"
   },
   "upgradeable": true,
   "pattern": "UUPS proxy (ERC1967). Proxy addresses are permanent.",
@@ -25,5 +18,11 @@
   "eventOnlyCoreDeployedAt": "2026-09-23T01:23:59.970Z",
   "eventMidchainCoreDeployedAt": "2026-09-23T01:51:59.396Z",
   "registryUpgradedAt": "2026-09-23T03:59:50.272Z",
-  "registryUpgradeNote": "Event-based Foskaay GGI Midchain functions added (additive, no storage change). Proxy unchanged."
+  "registryUpgradeNote": "Event-based Foskaay GGI Midchain functions added (additive, no storage change). Proxy unchanged.",
+  "cleanCoreDeployedAt": "2026-09-23T06:59:41.464Z",
+  "coreNote": "CLEAN 2-contract core (SessionRegistry + FeeVault), UUPS proxies, wired. Old 4+1 proxies abandoned (no real data). Fee 0.001 native USDC/session.",
+  "implementations": {
+    "SessionRegistry": "0x3cE48a010B17ef038E45F43e5f4cAef6358aA049",
+    "FeeVault": "0x13800e1dd0319622a1Ac4Dc2D4896F3DcabA58fc"
+  }
 }

@@ -2,92 +2,63 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
-import {Randomness} from "../src/Randomness.sol";
 import {FeeVault} from "../src/FeeVault.sol";
-import {BatchedSettlement} from "../src/BatchedSettlement.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Deploy} from "./Deploy.sol";
 
 interface Vm {
+    function deal(address, uint256) external;
     function prank(address) external;
     function expectRevert() external;
 }
 
-/// UPGRADE SAFETY: the property that matters most before mainnet. An upgrade must
-/// never strand or corrupt existing data, and only the owner may upgrade.
-///
-/// This is the test that would have caught the "redeploy = new address" mistake at
-/// design time: it proves the ADDRESS stays and DATA survives an upgrade.
+/// Upgrade safety for the two core contracts: an upgrade keeps the proxy address
+/// and preserves live data, and only the owner can authorize it.
 contract UpgradeSafetyTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    address constant OWNER = address(0xA11CE);
-    address constant STRANGER = address(0xBAD0);
+    uint256 constant FEE = 1e15;
+    bytes32 constant SID = keccak256("s1");
 
     function testRegistryUpgradeKeepsAddressAndData() public {
-        SessionRegistry reg = Deploy.registry(address(this), address(0));
-        address proxyAddr = address(reg);
+        (SessionRegistry reg, FeeVault vault) = Deploy.core(address(this), address(0xD357), FEE);
+        address before = address(reg);
+        address vaultBefore = reg.feeVault();
 
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, 1 hours, bytes32("rules"), 0);
-        vm.prank(OWNER);
-        reg.setAuthority(id, 0, OWNER);
+        SessionRegistry impl = new SessionRegistry();
+        reg.upgradeToAndCall(address(impl), "");
 
-        SessionRegistry impl2 = new SessionRegistry();
-        reg.upgradeToAndCall(address(impl2), "");
+        require(address(reg) == before, "address kept");
+        require(reg.feeVault() == vaultBefore, "feeVault data kept");
+        require(address(vault) != address(0), "vault still wired");
+    }
 
-        require(address(reg) == proxyAddr, "proxy address must never change");
-        require(reg.getSession(id).owner == OWNER, "session survived the upgrade");
-        require(reg.authorityOf(id, 0) == OWNER, "authority survived the upgrade");
-        require(reg.isLive(id), "session still live after upgrade");
+    function testFeeVaultUpgradeKeepsAddressAndData() public {
+        (SessionRegistry reg, FeeVault vault) = Deploy.core(address(this), address(0xD357), FEE);
+        vm.deal(address(reg), 100 ether);
+        address[] memory players = new address[](1);
+        players[0] = address(0x1);
+        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), bytes32("seed"), players, players, 0);
+
+        address before = address(vault);
+        uint256 feeBefore = vault.fee();
+        address destBefore = vault.destination();
+        uint256 collectedBefore = vault.collected();
+
+        FeeVault impl = new FeeVault();
+        vault.upgradeToAndCall(address(impl), "");
+
+        require(address(vault) == before, "address kept");
+        require(vault.fee() == feeBefore, "fee kept");
+        require(vault.destination() == destBefore, "destination kept");
+        require(vault.collected() == collectedBefore, "collected kept");
+        require(vault.paid(SID), "paid record kept");
     }
 
     function testOnlyOwnerCanUpgrade() public {
+        (SessionRegistry reg, ) = Deploy.core(address(this), address(0xD357), FEE);
         SessionRegistry impl = new SessionRegistry();
-        bytes memory init = abi.encodeCall(SessionRegistry.initialize, (OWNER, address(0)));
-        SessionRegistry reg = SessionRegistry(address(new ERC1967Proxy(address(impl), init)));
-
-        SessionRegistry impl2 = new SessionRegistry();
-        vm.prank(STRANGER);
+        vm.prank(address(0xBAD));
         vm.expectRevert();
-        reg.upgradeToAndCall(address(impl2), "");
-    }
-
-    function testFeeVaultUpgradeKeepsCollectedData() public {
-        FeeVault vault = Deploy.feeVault(OWNER, OWNER, address(0x1234));
-        vm.prank(OWNER);
-        vault.setFee(1234);
-
-        FeeVault impl2 = new FeeVault();
-        vm.prank(OWNER);
-        vault.upgradeToAndCall(address(impl2), "");
-
-        require(vault.sessionFee() == 1234, "fee config survived the upgrade");
-        require(vault.owner() == OWNER, "owner survived the upgrade");
-    }
-
-    function testRandomnessUpgradeKeepsRegistryLink() public {
-        SessionRegistry reg = Deploy.registry(address(this), address(0));
-        Randomness rnd = Deploy.randomness(reg);
-        require(address(rnd.registry()) == address(reg), "registry wired");
-
-        Randomness impl2 = new Randomness();
-        rnd.upgradeToAndCall(address(impl2), "");
-
-        require(address(rnd.registry()) == address(reg), "registry link survived the upgrade");
-    }
-
-    function testBatchedUpgradeKeepsWindows() public {
-        BatchedSettlement bs = Deploy.batched(address(this));
-        bs.setWindowConfig(4, 1 hours);
-        bs.submit(bytes32(uint256(1)), keccak256("d"));
-        bytes32[] memory before = bs.leavesOf(address(this), 0);
-        require(before.length == 1, "leaf before upgrade");
-
-        BatchedSettlement impl2 = new BatchedSettlement();
-        bs.upgradeToAndCall(address(impl2), "");
-
-        bytes32[] memory afterUp = bs.leavesOf(address(this), 0);
-        require(afterUp.length == 1 && afterUp[0] == before[0], "leaf survived the upgrade");
+        reg.upgradeToAndCall(address(impl), "");
     }
 }

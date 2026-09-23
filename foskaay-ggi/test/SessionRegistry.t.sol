@@ -2,426 +2,134 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
+import {FeeVault} from "../src/FeeVault.sol";
 import {Deploy} from "./Deploy.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// Minimal cheatcode interface (no forge-std dependency, matching the repo style).
 interface Vm {
-    function warp(uint256) external;
+    function deal(address, uint256) external;
     function prank(address) external;
-    function startPrank(address) external;
-    function stopPrank() external;
     function expectRevert() external;
     function expectRevert(bytes4) external;
+    function sign(uint256, bytes32) external pure returns (uint8 v, bytes32 r, bytes32 s);
+    function addr(uint256) external pure returns (address);
 }
 
-/// Security + behaviour tests for SessionRegistry (Foskaay GGI core contract 1 of 4).
-///
-/// These tests exist because OTHER PROJECTS will depend on this rail. Anything
-/// that could let a third party grief, hijack, replay or act-as-another is a
-/// bug that would make GI the weak link, so each of those is asserted here.
+/// The clean core: connect (fee enforced), free randomness, settle (signatures
+/// verified with OpenZeppelin ECDSA). Storage-based paths are gone.
 contract SessionRegistryTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
+    uint256 constant FEE = 1e15; // 0.001 native USDC (18 decimals)
+    uint256 constant PK0 = 0xA11CE;
+    uint256 constant PK1 = 0xB0B;
+    bytes32 constant SID = keccak256("session-1");
+
     SessionRegistry reg;
-    address constant OWNER = address(0xA11CE);      // a game operator
-    address constant OTHER = address(0xB0B);        // an unrelated third party
-    address constant RELAYER = address(0x5E1A);
-    address constant KEY = address(0x5E55107);
-    uint64 constant TTL = 1 hours;
+    FeeVault vault;
+    address p0;
+    address p1;
 
     function setUp() public {
-        reg = Deploy.registry(address(this), address(0)); // this test = fee recipient, no operator
+        (reg, vault) = Deploy.core(address(this), address(0xBEEF), FEE);
+        vm.deal(address(this), 100 ether);
+        p0 = vm.addr(PK0);
+        p1 = vm.addr(PK1);
     }
 
-    // ------------------------------------------------------------- happy path
-
-    function testOpenCreatesLiveSession() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(4, TTL, bytes32("rules"), 0);
-
-        SessionRegistry.Session memory s = reg.getSession(id);
-        require(s.owner == OWNER, "owner");
-        require(s.status == 1, "open");
-        require(s.participantCount == 4, "seats");
-        require(s.expiresAt == block.timestamp + TTL, "expiry");
-        require(reg.isLive(id), "live");
+    function _players() internal view returns (address[] memory a) {
+        a = new address[](2);
+        a[0] = p0;
+        a[1] = p1;
     }
 
-    function testIdsAreUniquePerOpen() public {
-        vm.prank(OWNER);
-        bytes32 a = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        bytes32 b = reg.open(2, TTL, 0, 0);
-        require(a != b, "ids must differ");
+    function _connect() internal {
+        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
     }
 
-    function testSetAuthorityAndCanSign() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.setAuthority(id, 0, RELAYER);
-
-        require(reg.canSign(id, 0, RELAYER), "relayer may sign seat 0");
-        require(!reg.canSign(id, 1, RELAYER), "but not seat 1");
-        require(!reg.canSign(id, 0, OTHER), "stranger may not sign");
+    function _sigs(bytes32 digest) internal pure returns (bytes[] memory sigs) {
+        sigs = new bytes[](2);
+        (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(PK0, digest);
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(PK1, digest);
+        sigs[0] = abi.encodePacked(r0, s0, v0);
+        sigs[1] = abi.encodePacked(r1, s1, v1);
     }
 
-    function testSameAuthorityCanCoverSeveralSeats() public {
-        // The rail does not care if one key runs several seats (house/AI seats).
-        vm.prank(OWNER);
-        bytes32 id = reg.open(4, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.setAuthority(id, 1, RELAYER);
-        vm.prank(OWNER);
-        reg.setAuthority(id, 2, RELAYER);
-        require(reg.canSign(id, 1, RELAYER) && reg.canSign(id, 2, RELAYER), "both seats");
+    function testHandoverRequiresTheExactFee() public {
+        vm.expectRevert(FeeVault.BadFee.selector);
+        reg.handover{value: FEE - 1}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
+
+        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
+        require(vault.paid(SID), "session recorded as paid");
+        require(vault.collected() == FEE, "fee collected");
     }
 
-    // ------------------------------------------------------- access control
+    function testSettleRefusedWhenNotPaid() public {
+        bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
+        vm.expectRevert(SessionRegistry.FeeNotPaid.selector);
+        reg.settle(SID, bytes32("final"), bytes32("seed"), _sigs(digest), _players());
+    }
 
-    function testOnlyOwnerCanSetAuthority() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OTHER);
+    function testSettleVerifiesSignatures() public {
+        _connect();
+        bytes32 finalHash = bytes32("final");
+        bytes32 digest = reg.midchainDigest(SID, finalHash);
+        reg.settle(SID, finalHash, bytes32("seed"), _sigs(digest), _players());
+    }
+
+    function testSettleRejectsForgedSignature() public {
+        _connect();
+        bytes32 finalHash = bytes32("final");
+        bytes32 digest = reg.midchainDigest(SID, finalHash);
+        bytes[] memory sigs = new bytes[](2);
+        (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(0xDEAD, digest); // stranger
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(PK1, digest);
+        sigs[0] = abi.encodePacked(r0, s0, v0);
+        sigs[1] = abi.encodePacked(r1, s1, v1);
         vm.expectRevert();
-        reg.setAuthority(id, 0, OTHER);
+        reg.settle(SID, finalHash, bytes32("seed"), sigs, _players());
     }
 
-    function testOnlyOwnerOrOperatorCanClose() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OTHER);
+    function testSettleRejectsWrongFinalHash() public {
+        _connect();
+        bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
         vm.expectRevert();
-        reg.close(id);
+        reg.settle(SID, bytes32("other"), bytes32("seed"), _sigs(digest), _players());
     }
 
-    function testOwnerCanClose() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.close(id);
-        require(!reg.isLive(id), "closed is not live");
-        require(reg.getSession(id).closedAt != 0, "closedAt set");
+    function testRandomnessIsFreePureAndDeterministic() public view {
+        bytes32 a = reg.random(bytes32("seed"), 1);
+        bytes32 b = reg.random(bytes32("seed"), 1);
+        require(a == b, "same input, same output");
+        require(a != reg.random(bytes32("seed"), 2), "counter changes the seed");
+        bytes32[] memory ns = reg.randomN(bytes32("seed"), 1, 3);
+        require(ns.length == 3 && ns[0] != ns[1] && ns[1] != ns[2], "N distinct seeds");
     }
 
-    // ------------------------------------------------------------- replay/DoS
-
-    function testCannotReopenAClosedId() public {
-        // Closing is one-way; the id stays closed forever (replay protection).
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.close(id);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.close(id);
-    }
-
-    function testCannotSetAuthorityAfterClose() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.close(id);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setAuthority(id, 0, RELAYER);
-    }
-
-    function testCannotActAfterExpiry() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.warp(block.timestamp + TTL + 1);
-        require(!reg.isLive(id), "expired is not live");
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setAuthority(id, 0, RELAYER);
-    }
-
-    function testCannotActOnUnknownSession() public {
-        require(!reg.isLive(bytes32("nope")), "unknown not live");
-        require(!reg.canSign(bytes32("nope"), 0, OWNER), "unknown cannot sign");
-    }
-
-    // ------------------------------------------------------------- validation
-
-    function testRejectsZeroParticipants() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.open(0, TTL, 0, 0);
-    }
-
-    function testRejectsTooManyParticipants() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.open(65, TTL, 0, 0);
-    }
-
-    function testRejectsZeroTtl() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.open(2, 0, 0, 0);
-    }
-
-    function testRejectsTtlAboveCap() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.open(2, 7 days + 1, 0, 0);
-    }
-
-    function testRejectsSeatOutOfRange() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setAuthority(id, 2, RELAYER); // seats are 0..1 for a 2-seat session
-    }
-
-    function testRejectsZeroAuthority() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setAuthority(id, 0, address(0));
-    }
-
-    // ------------------------------------------------------------ operator
-
-    function testOperatorCanForceClose() public {
-        SessionRegistry r2 = Deploy.registry(address(this), address(0xBEEF));
-        vm.prank(OWNER);
-        bytes32 id = r2.open(2, TTL, 0, 0);
-        vm.prank(address(0xBEEF));
-        r2.close(id);
-        require(!r2.isLive(id), "operator closed");
-    }
-
-    function testOperatorDisabledByDefault() public {
-        // With operator == 0 only the owner can close, so ANY non-owner reverts.
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OTHER);
-        vm.expectRevert();
-        reg.close(id);
-    }
-
-    // ------------------------------------------------------------- nonces
-
-    function testNoncesAdvancePerOwner() public {
-        vm.prank(OWNER);
-        reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.open(2, TTL, 0, 0);
-        require(reg.nonces(OWNER) == 2, "owner nonce");
-        require(reg.nonces(OTHER) == 0, "other untouched");
-    }
-
-    function testInitializeRejectsZeroFeeRecipient() public {
-        // initialize (not a constructor) must refuse a zero fee recipient.
-        SessionRegistry impl = new SessionRegistry();
-        bytes memory init = abi.encodeCall(SessionRegistry.initialize, (address(0), address(0)));
-        vm.expectRevert();
-        new ERC1967Proxy(address(impl), init);
-    }
-
-    function testCannotInitializeTwice() public {
-        // A proxy can only ever be initialized once (re-init guard).
-        SessionRegistry impl = new SessionRegistry();
-        bytes memory init = abi.encodeCall(SessionRegistry.initialize, (address(this), address(0)));
-        SessionRegistry proxied = SessionRegistry(address(new ERC1967Proxy(address(impl), init)));
-        vm.expectRevert();
-        proxied.initialize(address(this), address(0));
-    }
-
-    // --------------------------------------------------------- session keys
-    // A session key is an ephemeral signer the player registers once, so play
-    // never pops a wallet. The on-chain half records scope + expiry, matching
-    // MagicBlock's two-component model. These tests are the security proof.
-
-    uint64 constant KEY_TTL = 1 hours;
-
-    function _liveKeySession() internal returns (bytes32 id) {
-        vm.prank(OWNER);
-        id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.setAuthority(id, 0, OWNER); // this owner plays seat 0 themselves
-    }
-
-    function testRegisterAndUseSessionKey() public {
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, bytes32("scope:ludo"));
-        require(reg.isSessionKeyLive(KEY), "key live");
-        require(reg.canSign(id, 0, KEY), "key signs owner's seat");
-    }
-
-    function testKeyInheritsOnlyItsOwnersSeats() public {
-        // OWNER holds seat 0; OTHER holds seat 1. OWNER's key must not reach seat 1.
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.setAuthority(id, 1, OTHER);
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        require(reg.canSign(id, 0, KEY), "owner seat ok");
-        require(!reg.canSign(id, 1, KEY), "cannot sign another owner's seat");
-    }
-
-    function testStrangerKeyCannotSign() public {
-        bytes32 id = _liveKeySession();
-        // A key registered by OTHER is no use for OWNER's seat.
-        vm.prank(OTHER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        require(!reg.canSign(id, 0, KEY), "stranger key rejected");
-    }
-
-    function testRevokedKeyCannotSign() public {
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.prank(OWNER);
-        reg.revokeSessionKey(KEY);
-        require(!reg.isSessionKeyLive(KEY), "revoked is not live");
-        require(!reg.canSign(id, 0, KEY), "revoked key rejected");
-    }
-
-    function testExpiredKeyCannotSign() public {
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.warp(uint64(block.timestamp) + KEY_TTL + 1);
-        require(!reg.isSessionKeyLive(KEY), "expired is not live");
-        require(!reg.canSign(id, 0, KEY), "expired key rejected");
-    }
-
-    function testOnlyOwnerCanRevokeOwnKey() public {
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.prank(OTHER);
-        vm.expectRevert();
-        reg.revokeSessionKey(KEY);
-    }
-
-    function testCannotRevokeTwice() public {
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.prank(OWNER);
-        reg.revokeSessionKey(KEY);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.revokeSessionKey(KEY);
-    }
-
-    function testCannotRegisterKeyWithPastExpiry() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.registerSessionKey(KEY, uint64(block.timestamp), 0);
-    }
-
-    function testCannotRegisterZeroKey() public {
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.registerSessionKey(address(0), uint64(block.timestamp) + KEY_TTL, 0);
-    }
-
-    function testLiveKeyCannotBeStolenByReRegistration() public {
-        // A key that is live and owned by OWNER cannot be re-registered by OTHER
-        // to make it act for OTHER's seats.
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.setAuthority(id, 1, OTHER);
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.prank(OTHER);
-        vm.expectRevert();
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        require(!reg.canSign(id, 1, KEY), "still not OTHER's seat");
-    }
-
-    function testOwnerCanRotateKeyAfterRevocation() public {
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        vm.prank(OWNER);
-        reg.revokeSessionKey(KEY);
-        // Re-register the same address under the same owner: allowed.
-        vm.prank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + 2 hours, bytes32("scope:2"));
-        require(reg.isSessionKeyLive(KEY), "rotated key live");
-        require(reg.sessionKeyOf(KEY).scopeHash == bytes32("scope:2"), "new scope");
-    }
-
-    function testKeyRegistrationIsCapped() public {
-        uint8 cap = reg.MAX_SESSION_KEYS();
-        vm.startPrank(OWNER);
-        for (uint160 i = 0; i < cap; i++) {
-            reg.registerSessionKey(address(0x1000 + i), uint64(block.timestamp) + KEY_TTL, 0);
+    function testHandoverManyChargesPerSession() public {
+        bytes32[] memory ids = new bytes32[](3);
+        bytes32[] memory starts = new bytes32[](3);
+        bytes32[] memory seeds = new bytes32[](3);
+        address[][] memory players = new address[][](3);
+        for (uint256 i = 0; i < 3; i++) {
+            ids[i] = keccak256(abi.encodePacked("s", i));
+            starts[i] = keccak256(abi.encodePacked("start", i));
+            seeds[i] = keccak256(abi.encodePacked("seed", i));
+            players[i] = _players();
         }
-        vm.expectRevert();
-        reg.registerSessionKey(address(0x9999), uint64(block.timestamp) + KEY_TTL, 0);
-        vm.stopPrank();
+        vm.expectRevert(FeeVault.BadFee.selector);
+        reg.handoverMany{value: FEE * 2}(ids, address(0x1234), starts, seeds, players, players, 1);
+
+        reg.handoverMany{value: FEE * 3}(ids, address(0x1234), starts, seeds, players, players, 1);
+        require(vault.paid(ids[0]) && vault.paid(ids[1]) && vault.paid(ids[2]), "all paid");
+        require(vault.collected() == FEE * 3, "collected 3 fees");
     }
 
-    function testKeysOfIsEnumerableForRevocation() public {
-        vm.startPrank(OWNER);
-        reg.registerSessionKey(KEY, uint64(block.timestamp) + KEY_TTL, 0);
-        reg.registerSessionKey(address(0x7777), uint64(block.timestamp) + KEY_TTL, 0);
-        vm.stopPrank();
-        address[] memory keys = reg.keysOf(OWNER);
-        require(keys.length == 2, "two keys");
-        require(keys[0] == KEY && keys[1] == address(0x7777), "order preserved");
-    }
-
-    function testScopeIsOpaqueToTheRail() public {
-        // The rail stores the scope hash and never interprets it: two keys with
-        // totally different scopes behave identically.
-        bytes32 id = _liveKeySession();
-        vm.prank(OWNER);
-        reg.registerSessionKey(address(0xAAA1), uint64(block.timestamp) + KEY_TTL, bytes32("idle:plots"));
-        vm.prank(OWNER);
-        reg.registerSessionKey(address(0xAAA2), uint64(block.timestamp) + KEY_TTL, bytes32("mmo:galaxy"));
-        require(reg.canSign(id, 0, address(0xAAA1)), "scope A signs");
-        require(reg.canSign(id, 0, address(0xAAA2)), "scope B signs");
-        require(reg.sessionKeyOf(address(0xAAA1)).scopeHash == bytes32("idle:plots"), "stored verbatim");
-    }
-
-    // ------------------------------------------------------- game state link
-
-    function testOwnerCanSetGameState() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.setGameState(id, address(0x6A3E));
-        require(reg.gameStateOf(id) == address(0x6A3E), "board registered for the session");
-    }
-
-    function testOnlyOwnerCanSetGameState() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OTHER);
-        vm.expectRevert();
-        reg.setGameState(id, address(0x6A3E));
-    }
-
-    function testCannotSetGameStateAfterClose() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        reg.close(id);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setGameState(id, address(0x6A3E));
-    }
-
-    function testCannotSetZeroGameState() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        vm.prank(OWNER);
-        vm.expectRevert();
-        reg.setGameState(id, address(0));
-    }
-
-    function testGameStateIsOptional() public {
-        vm.prank(OWNER);
-        bytes32 id = reg.open(2, TTL, 0, 0);
-        require(reg.gameStateOf(id) == address(0), "unset by default");
+    function testUpgradeKeepsAddressAndData() public {
+        address before = address(reg);
+        address vaultBefore = reg.feeVault();
+        SessionRegistry impl = new SessionRegistry();
+        reg.upgradeToAndCall(address(impl), "");
+        require(address(reg) == before, "proxy address unchanged");
+        require(reg.feeVault() == vaultBefore, "feeVault preserved");
     }
 }
