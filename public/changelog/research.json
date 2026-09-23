@@ -692,6 +692,27 @@
             "What has to change: CORE (no new address) add event-based handover/handoverMany/settle/settleMany to the existing core via a UUPS logic upgrade (same proxy, append-only storage) plus a nullifier mapping (sessionId => settled) to stop double settlement; storage-based sessions stay as they are, nothing merged, no data moved. SDK (republish, no chain change) add handover/handoverMany/settle/settleMany/signMove/verifyMidchain helpers. BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched.",
             "EventMidchainCore deployed on Arc testnet: 0x197DE9813bd8cF668C8C26455329C629EE9Fc63e. Files: foskaay-ggi/prototypes/EventMidchainCore.sol, test/EventMidchainCore.t.sol, scripts/foskaay-ggi-deploy-eventmidchain.mjs, foskaay-ggi-eventmidchain-match.mjs, foskaay-ggi-eventmidchain-batch.mjs, deployments/eventmidchain-cost.json and eventmidchain-batch-cost.json."
           ]
+        },
+        {
+          "heading": "9. PER-SESSION anchoring measured (Tier 3, the ridiculously cheap one)",
+          "paragraphs": [
+            "The section 8 test anchored PER GAME (N handovers + N settles + 2N signatures), so it floors at about 1,400 games per 1 USD. This section measures the other design: anchor the SESSION, not each game. ONE handover for the whole session, play N games for free on the midchain, then ONE settle carrying a single Merkle root over all N final hashes and just 2 signatures. On-chain work is O(1), so per game = cost / N and keeps dropping."
+          ],
+          "table": {
+            "headers": ["Games in one session", "Handover", "Settle", "Total", "Per game", "Games per 1 USD"],
+            "rows": [
+              ["3", "0.000782", "0.000929", "0.001711", "0.000570", "1,753"],
+              ["5", "0.000782", "0.000930", "0.001712", "0.000342", "2,920"],
+              ["10", "0.000782", "0.000930", "0.001712", "0.000171", "5,841"],
+              ["100", "0.000782", "0.000930", "0.001712", "0.000017", "58,411"]
+            ]
+          },
+          "bullets": [
+            "The handover and the settle stay FLAT no matter how many games are inside. Arc only sees two transactions and the games share them, so the more games per session the cheaper per game, without limit. This is exactly the v5 'open once, free inside, settle once' model.",
+            "Why per-game batching floors but per-session does not: per-game anchoring puts each game's payload and its 2 signatures on-chain (measured about 28,000 gas per game, irreducible), so it converges to about 0.0007 USDC per game. Per-session anchoring puts ONE root on-chain, so it converges to zero per game.",
+            "All three tiers are optional: (1) per-game on-chain board about 10 games/$1; (2) per-game event midchain about 1,400 games/$1; (3) per-session midchain 58,000+ games/$1. Tier 3 is the headline.",
+            "BUILT INTO CORE (owner-approved 2026-09-23): event-based handover/handoverMany/settle/settleMany/midchainDigest added to the EXISTING SessionRegistry proxy by a UUPS logic upgrade (same address 0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5, new implementation 0x05D492C0Cc4e890131c163b302Ab20B56542D2B2). Additive only: no storage change, no migration; data verified identical after. No nullifier (owner decision). SDK helpers added, versions bumped to 0.1.5. 155/155 forge tests pass."
+          ]
         }
       ]
     }
