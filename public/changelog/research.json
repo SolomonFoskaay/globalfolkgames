@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-18",
+  "updated": "2026-09-22",
   "note": "Staff-only research library. These are PRE-architecture explorations: things being researched BEFORE they become modules in architecture.json. Read on mobile, re-check later, and use as guidance when adopting a direction (for example the Arc migration). Adding a new research entry is a decision: the agent asks first. Before a new module is added to (or an existing one is updated in) architecture.json, check here for pending research that is relevant. This file is client-served for the staff page; it holds business research, never secrets or unfixed security detail.",
   "statusLegend": {
     "researching": "Open research, not yet decided",
@@ -456,6 +456,187 @@
           ],
           "paragraphs": [
             "One-line pitch it unlocks: Pokemon cards, except you cannot buy them, you have to beat people at real games to earn them, and they can never be faked."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ggi-midchain",
+      "title": "Foskaay GGI midchain: free play with no per-move transaction (the missing EVM layer)",
+      "status": "researching",
+      "updated": "2026-09-22",
+      "summary": "The Generals port proved the rail works but exposed a gap: every move was its own Arc transaction, so a match cost about 10 games per 1 USD instead of the promised about 1000. The v5 build guide already names the fix: a midchain where moves are signed and hash-chained off-chain and executed by eth_call for free, with only two real transactions per match (handover and settle). This entry records the finding, the EVM tools Arc gives us that we have not used yet, and the three-layer model (on-chain truth, midchain free play, off-chain render only).",
+      "decision": "ADOPTED for the arcv2m18 build (owner approved 2026-09-22). Build a midchain prototype on the Generals demo, measure the real cost, then wire the SDK and frontend. No core contract change needed for the prototype: the existing 4 core + 1 optional contracts already cover the on-chain endpoints.",
+      "sections": [
+        {
+          "heading": "1. The missing link, in one sentence",
+          "paragraphs": [
+            "The v5 build guide already describes a midchain where moves are signed and hash-chained off-chain and executed by eth_call for free, with only two real transactions per match (handover and settle). The current GGI cores have the session and the settlement, but not this free midchain. So the Generals port fell back to writing every move as its own Arc transaction, which is why it cost about 10 games per 1 USD instead of the promised about 1000.",
+            "Arc's own docs confirm what we get to use: Arc targets the Osaka hard fork, so EIP-7702, EIP-1153 and deterministic instant finality are all available. EIP-4844 blobs are NOT supported (type-3 transactions are rejected). That shapes the design below."
+          ]
+        },
+        {
+          "heading": "2. The EVM tools Arc gives us that we have not used yet",
+          "table": {
+            "headers": [
+              "Tech",
+              "What it is (plain)",
+              "Used now?",
+              "What it unlocks"
+            ],
+            "rows": [
+              [
+                "eth_call free execution",
+                "Ask a contract to run a function without sending a transaction. Costs nothing.",
+                "Only for reads",
+                "The midchain: run the game's applyMove rules for free, no tx per move"
+              ],
+              [
+                "EIP-712 typed signatures",
+                "A wallet signs structured data; the contract recovers who signed",
+                "Partly (session keys)",
+                "One popup to authorise a session key, then silent move signatures"
+              ],
+              [
+                "keccak256 hash chain",
+                "Each move's hash includes the previous hash",
+                "No",
+                "Tamper-evident move history, one final hash to settle"
+              ],
+              [
+                "Events over storage + eth_getLogs",
+                "Emit logs instead of writing storage slots",
+                "Partly",
+                "Cheap on-chain handover/settle, the about 1 USD per 1000 target"
+              ],
+              [
+                "EIP-1153 transient storage",
+                "Cheap scratch memory that clears after the tx",
+                "No",
+                "Cheaper settle verification"
+              ],
+              [
+                "EIP-7702 set-code",
+                "An ordinary wallet can act as a smart account",
+                "No",
+                "Session-key accounts and sponsored ops, no new wallet for the player"
+              ],
+              [
+                "ERC-4337 paymaster",
+                "A contract pays the user's gas",
+                "No",
+                "Sponsor pays user ops (moot once moves are free)"
+              ],
+              [
+                "Deterministic instant finality",
+                "A transaction is final the moment it is included",
+                "No",
+                "Settle is instant, one confirmation"
+              ],
+              [
+                "EIP-4844 blobs",
+                "Cheap bulk data",
+                "N/A",
+                "Not available on Arc, so not part of the plan"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "3. Comparison: MagicBlock ER vs current GGI vs GGI + midchain",
+          "table": {
+            "headers": [
+              "Question",
+              "MagicBlock ER (Solana)",
+              "Current Foskaay GGI (built)",
+              "Foskaay GGI + midchain"
+            ],
+            "rows": [
+              [
+                "Where a move runs",
+                "Inside MagicBlock's ER validator",
+                "On Arc, as its own transaction",
+                "In the midchain: eth_call runs the game's pure rules, free"
+              ],
+              [
+                "Player pays per move",
+                "Nothing",
+                "Nothing",
+                "Nothing"
+              ],
+              [
+                "Sponsor pays per move",
+                "Nothing",
+                "about 0.0021 USDC",
+                "Nothing"
+              ],
+              [
+                "Sponsor pays per match",
+                "delegate + undelegate",
+                "every move + settle",
+                "2 transactions only: handover + settle"
+              ],
+              [
+                "On-chain footprint",
+                "base account + ER state",
+                "every move",
+                "start hash, final hash, session, 2 events"
+              ],
+              [
+                "What a public explorer sees",
+                "base txs only (ER invisible)",
+                "every move",
+                "2 txs only (midchain invisible)"
+              ],
+              [
+                "Tamper protection",
+                "validator executes, base verifies on commit",
+                "the chain runs the rules",
+                "EIP-712 signatures + hash chain, chain verifies on settle/dispute"
+              ],
+              [
+                "Infrastructure to run",
+                "a validator network",
+                "only a sponsor key",
+                "only a sponsor key + an untrusted cache"
+              ],
+              [
+                "Source of truth",
+                "Solana base + ER proof",
+                "the game contract",
+                "on-chain start/final + the verifiable signed move chain"
+              ],
+              [
+                "Rough games per 1 USD",
+                "their own pricing",
+                "about 10",
+                "target about 1000"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "4. What this achieves (the three layers)",
+          "bullets": [
+            "On-chain (truth): the contract stores the session, the start hash and the final hash, and settles. Nothing can settle unless the signatures and the hash chain are valid. This is the MagicBlock base-chain role.",
+            "Midchain (free play): every move is a signed, hash-chained message run through the game's pure rules via eth_call. Free for the player AND free for the sponsor, exactly like the ER's free execution. All the game concepts survive because the payload is opaque: players, seats, moves, rewards, lives, timer, points are just data the game's rules read and write.",
+            "Off-chain (render only): the frontend draws the board; Vercel holds the sponsor key and submits only the handover and settle transactions. Neither owns the truth."
+          ]
+        },
+        {
+          "heading": "5. Honest limits (so we do not overpromise)",
+          "bullets": [
+            "The chain does not see moves live, only the two endpoints. A third party can still verify by replaying the signed moves. Mid-session reads come from the relay cache, which is untrusted.",
+            "Settle needs the players' final signatures. If a player vanishes, we need a timeout or forfeit rule (MagicBlock has turn clocks; we would need the same).",
+            "The game's rules must be expressible as a deterministic pure function for the dispute path (no external calls).",
+            "PREVRANDAO is always 0 on Arc, so randomness must come from the commit-reveal seed plus the hash chain, never the block."
+          ]
+        },
+        {
+          "heading": "6. Conclusion and next step",
+          "paragraphs": [
+            "This is not a new module. architecture.json module arcv2m18 already promises free work inside a session: nothing is written to the chain during play, cost appears on OPEN and SETTLE only. The cores simply do not deliver that yet. The port exposed the gap; the midchain is how we close it.",
+            "Next step: build the midchain as a prototype on the Generals demo. Keep the board on-chain as the source of truth, move gameplay into signed eth_call moves with one handover and one settle, then measure the real cost against the current about 10 games per 1 USD. No core contract change is needed for the prototype: SessionRegistry (open/close/session keys), SessionState (commitDigest/sealFinal) and FeeVault already cover the on-chain endpoints. The midchain lives in the game's own contract (pure rules) plus the client/SDK (signing and hash chain), so we keep the 4 core + 1 optional structure."
           ]
         }
       ]
