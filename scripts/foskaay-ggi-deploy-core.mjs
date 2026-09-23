@@ -73,7 +73,11 @@ async function deploy(name, args = []) {
   if (getAddress(regVault) !== vault.address || getAddress(vaultReg) !== reg.address) throw new Error('wiring mismatch');
 
   const after = await bal(me);
-  console.log('deploy gas usdc:', formatUnits(before - after, 6), '\n');
+  console.log('=== COST SUMMARY (for mainnet prep) ===');
+  console.log('  balance before :', formatUnits(before, 6), 'USDC');
+  console.log('  balance after  :', formatUnits(after, 6), 'USDC');
+  console.log('  deploy cost    :', formatUnits(before - after, 6), 'USDC');
+  console.log('');
 
   rec.contracts = {
     SessionRegistry: reg.address,

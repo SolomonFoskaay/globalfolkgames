@@ -38,7 +38,7 @@ contract FoskaayGGIDemoGamesTest {
     }
 
     function _create() internal {
-        games.createMatch(REF, SID, LUDO, _players(), _computer(), 2, bytes32("seed"));
+        games.createMatch(REF, SID, LUDO, _players(), _computer(), 2, 0, bytes32("seed"));
     }
 
     function testDiceIsOnChainAndDeterministic() public {
@@ -77,11 +77,12 @@ contract FoskaayGGIDemoGamesTest {
 
     function testMoveAndHomeAndWinCreditsPoints() public {
         _create();
-        // seat 0 takes all four tokens home: release with 6, then walk to 57.
-        // (The contract requires an exact count into home.)
+        // A seat finishes when all FOUR tokens are home. In 2-seat Ludo the match
+        // ends the moment that 1st place is decided, so bring seat 0's four
+        // tokens home and the match finishes on the fourth.
+        // Track when the match ends so we never move a finished match.
         for (uint8 t = 0; t < 4; t++) {
             games.move(REF, 0, t, 6);        // yard -> 0
-            // walk forward in legal chunks; ensure 57 reached exactly.
             int16 pos = 0;
             while (pos < 57) {
                 uint8 step = 6;
@@ -93,6 +94,7 @@ contract FoskaayGGIDemoGamesTest {
         }
         (uint8 status, , uint8 winner, ) = games.matchStatus(REF);
         require(status == 2 && winner == 0, "match finished, seat 0 won");
+        require(games.crownedSeat(REF) == 0, "on-chain crown on seat 0");
         (uint64 lifetime, uint64 spendable) = player.pointsOf(HUMAN, LUDO);
         require(lifetime == 100 && spendable == 100, "winner credited 100 inside the room");
         (uint32 wins, uint32 played) = player.recordOf(HUMAN, LUDO);
@@ -117,6 +119,25 @@ contract FoskaayGGIDemoGamesTest {
         // Seat 0 lands on seat 1's token: capture sends it back to the yard.
         games.captureAt(REF, 0, 0);
         require(games.tokenOf(REF, 1, 0) == -1, "captured token returned to the yard");
+    }
+
+    function testOpponentWinGetsNoPoints() public {
+        // The opponent (seat 1) wins: real result, but ZERO points. Only the
+        // logged-in user's seat (seat 0) can ever be credited.
+        _create();
+        games.pass(REF); // seat 0 -> seat 1
+        for (uint8 t = 0; t < 4; t++) {
+            games.move(REF, 1, t, 6);
+            int16 pos = 0;
+            while (pos < 57) { uint8 step = 6; if (pos + int16(uint16(step)) > 57) step = uint8(uint16(57 - pos)); games.move(REF, 1, t, step); pos += int16(uint16(step)); }
+        }
+        (uint8 status, , uint8 winner, ) = games.matchStatus(REF);
+        require(status == 2 && winner == 1, "seat 1 won");
+        (uint64 oppLifetime, uint64 oppSpendable) = player.pointsOf(SPONSOR, LUDO);
+        require(oppLifetime == 0 && oppSpendable == 0, "opponent winner credited zero");
+        (uint64 userLifetime, ) = player.pointsOf(HUMAN, LUDO);
+        require(userLifetime == 0, "user was not credited");
+        require(games.crownedSeat(REF) == 1, "crown is on-chain on seat 1");
     }
 
     function testTimeoutIsPermissionless() public {
