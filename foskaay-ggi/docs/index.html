@@ -182,6 +182,61 @@
         </div>
     </section>
 
+    <section class="ggi-card" id="upgradeable">
+        <h2 class="ggi-h2">Should your game contract be upgradeable?</h2>
+        <p class="ggi-body">
+            Short answer: <b>yes, for a game, almost always.</b> A game is never finished on day one. You
+            will want to lower or raise points, add a subscription, add lives, add in-game assets, fix a
+            balance, or add a new mode. On a normal contract, every one of those means deploying a new
+            contract at a new address and migrating players, which breaks every existing game, every saved
+            match and every link. An upgradeable contract keeps the <b>same address</b> and lets you
+            change the logic behind it, so existing games and addresses never break.
+        </p>
+
+        <div class="ggi-h3">The two shapes</div>
+        <table class="ggi-table">
+            <thead><tr><th>Shape</th><th>What it means</th><th>Best for</th></tr></thead>
+            <tbody>
+                <tr><td><b>Immutable contract</b></td><td>Deploy once, the code can never change. A fix means a new address.</td><td>One-off, finished, tiny contracts. A fair lottery. A proof of concept you will throw away.</td></tr>
+                <tr><td><b>Upgradeable (UUPS proxy)</b></td><td>The address is permanent. You can ship new logic behind it without moving the address or touching players' data.</td><td>Game contracts, points, player accounts, anything you will add to over time. This is what Foskaay GGI's own core uses.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="ggi-h3">Pros of making your game upgradeable</div>
+        <ul class="ggi-list">
+            <li><b>Add features forever, at the same address.</b> Add a subscription, lives, in-game assets, a new mode or a whole new game. Nothing you already shipped breaks.</li>
+            <li><b>Fix mistakes without a migration.</b> A wrong point value or a bad rule can be corrected in an upgrade instead of a new deploy and a player data move.</li>
+            <li><b>Players keep their data.</b> Points, records and balances live in the same storage behind the same address, so an upgrade does not touch them.</li>
+            <li><b>Your links and integrations stay valid.</b> Anything that points at your game address keeps working, which matters a lot once other contracts or a frontend depend on it.</li>
+            <li><b>It is the standard for this kind of app.</b> Foskaay GGI's own core is upgradeable, so building the same way keeps you consistent with the rail.</li>
+        </ul>
+
+        <div class="ggi-h3">Cons, stated honestly</div>
+        <ul class="ggi-list">
+            <li><b>There is an admin, and that is a trust question.</b> Whoever can upgrade can change the rules. For a demo or a platform that is fine, but say so plainly, and for anything holding real money move the upgrade authority to a timelock or a multisig.</li>
+            <li><b>You must follow the storage rules.</b> Never reorder or remove a stored variable; add new ones in the reserved gap. Break this and live data reads as garbage. The rule is in the storage-safety note below.</li>
+            <li><b>Initializers instead of constructors.</b> Behind a proxy the constructor does not run, so a field default like <code>turnSeconds = 30</code> silently stays zero. Set every default inside <code>initialize()</code>.</li>
+            <li><b>A little extra gas and code.</b> The proxy adds one hop and the implementation is a separate contract. It is small, and it is the price of never breaking an address.</li>
+        </ul>
+
+        <div class="ggi-h3">The storage safety rules (non negotiable)</div>
+        <ul class="ggi-list">
+            <li><b>Append only.</b> New variables go at the top of the reserved <code>__gap</code>, and the gap shrinks by exactly the same number of slots. Never reorder, rename or remove an existing variable.</li>
+            <li><b>Initialize, never construct.</b> All defaults and setup go in <code>initialize()</code>, which runs once through the proxy. The implementation itself is locked with <code>_disableInitializers()</code> so it can never be used directly.</li>
+            <li><b>Guard the upgrade.</b> Restrict <code>_authorizeUpgrade</code> to your owner, and move it to a timelock or multisig before real value is involved.</li>
+            <li><b>Test the upgrade.</b> Ship a test that upgrades and proves the address is kept, the storage reading is intact, and only the owner can upgrade.</li>
+        </ul>
+
+        <div class="ggi-note good">
+            <b>What we did.</b> Both of our demo contracts (<code>FoskaayGGIDemoGames</code>, which holds
+            Ludo today and any demo game tomorrow, and <code>FoskaayGGIDemoPlayer</code>, which holds
+            everything about a player across every demo game) are UUPS upgradeable, OpenZeppelin only, with
+            an append-only storage gap and an owner-only upgrade. You can add a game, a subscription, lives
+            or assets later without ever redeploying or breaking the address your players and your frontend
+            already use.
+        </div>
+    </section>
+
     <section class="ggi-card" id="unopinionated">
         <h2 class="ggi-h2">Built to fit your game, never the other way round</h2>
         <p class="ggi-body">
