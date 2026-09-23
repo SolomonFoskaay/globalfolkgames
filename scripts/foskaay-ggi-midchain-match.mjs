@@ -1,4 +1,4 @@
-// scripts/ggi-midchain-match.mjs — play the midchain Generals match on Arc testnet.
+// scripts/foskaay-ggi-midchain-match.mjs — play the midchain Generals match on Arc testnet.
 //
 // THE POINT: every move runs through a PURE function via eth_call (free) and is
 // signed + hash-chained off-chain. Only the session endpoints touch the chain.
@@ -13,7 +13,7 @@
 // It reads the public RPC directly for eth_call (no key needed) and uses the
 // sponsor relay only for the on-chain writes, exactly like a browser would.
 //
-// Usage:  node scripts/ggi-midchain-match.mjs [unbatched|batched] [moveCount] [matches]
+// Usage:  node scripts/foskaay-ggi-midchain-match.mjs [unbatched|batched] [moveCount] [matches]
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -26,14 +26,14 @@ const rec = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'deployments
 const RPC = process.env.GFG_Arc_RPC || rec.rpc;
 const MID = rec.contracts.GeneralsMidchain;
 const REGISTRY = rec.contracts.SessionRegistry;
-if (!MID) throw new Error('GeneralsMidchain address missing; run scripts/ggi-deploy-midchain.mjs first');
+if (!MID) throw new Error('GeneralsMidchain address missing; run scripts/foskaay-ggi-deploy-midchain.mjs first');
 
 const artifact = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'out', 'GeneralsMidchain.sol', 'GeneralsMidchain.json'), 'utf8'));
 const chain = defineChain({ id: rec.chainId, name: rec.name, nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
 const pub = createPublicClient({ chain, transport: http(RPC) });
 
 async function post(action, body = {}) {
-  const res = await fetch(RELAY + '/api/ggi-sponsor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, ...body }) });
+  const res = await fetch(RELAY + '/api/foskaay-ggi-sponsor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, ...body }) });
   const json = await res.json();
   if (!json.ok) throw new Error(action + ' failed: ' + (json.error || res.status));
   return json;

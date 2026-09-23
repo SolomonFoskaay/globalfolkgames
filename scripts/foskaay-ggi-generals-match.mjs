@@ -1,4 +1,4 @@
-// scripts/ggi-generals-match.mjs — play the ported Generals game on Arc testnet
+// scripts/foskaay-ggi-generals-match.mjs — play the ported Generals game on Arc testnet
 // through the Foskaay GGI sponsor relay, in BOTH settlement modes, and measure the REAL
 // USDC cost of each (never estimated).
 //
@@ -8,9 +8,9 @@
 // player paying nothing.
 //
 // Usage:
-//   node scripts/ggi-generals-match.mjs            # both modes
-//   node scripts/ggi-generals-match.mjs unbatched
-//   node scripts/ggi-generals-match.mjs batched
+//   node scripts/foskaay-ggi-generals-match.mjs            # both modes
+//   node scripts/foskaay-ggi-generals-match.mjs unbatched
+//   node scripts/foskaay-ggi-generals-match.mjs batched
 import { randomBytes } from 'crypto';
 import { writeFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -21,7 +21,7 @@ const RELAY = process.env.GGI_RELAY || 'http://localhost:8787';
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function post(action, body = {}) {
-  const res = await fetch(RELAY + '/api/ggi-sponsor', {
+  const res = await fetch(RELAY + '/api/foskaay-ggi-sponsor', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action, ...body }),

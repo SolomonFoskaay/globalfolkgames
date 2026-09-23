@@ -65,7 +65,7 @@
             <a href="#demos">Demos</a>
             <a href="#usecases">Use cases</a>
             <a href="#contracts">Contracts</a>
-            <a href="/ggi-explorer/">Explorer</a>
+            <a href="/foskaay-ggi-explorer/">Explorer</a>
             <a href="#fees">Fees</a>
             <a href="#hardware">What you run</a>
             <a href="#faq">FAQ and fixes</a>
@@ -374,7 +374,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 <tr><td>ERC VRF</td><td><span class="ggi-mono">Randomness</span> commit-reveal, N streams.</td><td>Rail: present</td></tr>
                 <tr><td>Commit / undelegate</td><td>Foskaay GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
                 <tr><td>Session + commit fees</td><td><span class="ggi-mono">FeeVault</span> per-session fee.</td><td>Rail: present</td></tr>
-                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
+                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/foskaay-ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
                 <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
             </tbody>
         </table>
@@ -389,7 +389,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 delegated for a game. Foskaay GGI now does the same thing in one line: when a game opens a
                 session it can register its own state account address against that session. The rail
                 stores the address as an opaque value, it never learns what it is, and any reader
-                (including the <a href="/ggi-explorer/">Explorer</a>) can look up which game account
+                (including the <a href="/foskaay-ggi-explorer/">Explorer</a>) can look up which game account
                 belongs to a session. This is the closest match to the delegation registry.</li>
             <li><b>The EVM limit, stated plainly:</b> there is no side chain to mutate accounts for free.
                 Where MagicBlock is free in the ER, Foskaay GGI makes the SPONSOR pay per write, and
@@ -528,7 +528,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
 
 <script src="/global_header.js"></script>
 <script src="/dash-nav.js"></script>
-<script src="/ggi-nav.js"></script>
+<script src="/foskaay-ggi-nav.js"></script>
 <script>
     window.GFG_GGI_NAV.render({ active: 'docs' });
 </script>

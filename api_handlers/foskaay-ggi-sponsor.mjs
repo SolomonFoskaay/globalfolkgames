@@ -1,4 +1,4 @@
-// api_handlers/ggi-sponsor.mjs
+// api_handlers/foskaay-ggi-sponsor.mjs
 //
 // Foskaay GGI SPONSOR RELAY — Foskaay Gasless Games Infrastructure.
 //

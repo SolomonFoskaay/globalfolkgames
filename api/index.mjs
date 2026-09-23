@@ -30,7 +30,7 @@ import communityStats from '../api_handlers/community-stats.mjs';
 import multiplayer from '../api_handlers/multiplayer.mjs';
 import chess from '../api_handlers/chess.mjs';
 import arcRelay from '../api_handlers/arc-relay.mjs';
-import ggiSponsor from '../api_handlers/ggi-sponsor.mjs';
+import ggiSponsor from '../api_handlers/foskaay-ggi-sponsor.mjs';
 
 const routes = {
   '/api/competitions': competitions,
@@ -40,7 +40,7 @@ const routes = {
   '/api/multiplayer': multiplayer,
   '/api/chess': chess,
   '/api/arc': arcRelay,
-  '/api/ggi-sponsor': ggiSponsor,
+  '/api/foskaay-ggi-sponsor': ggiSponsor,
   '/api/agm': agm,
   '/api/agm/balances': agm,
   '/api/verify-and-credit': verifyAndCredit,

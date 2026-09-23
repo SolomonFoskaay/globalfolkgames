@@ -1,4 +1,4 @@
-// scripts/ggi-eventonly-match.mjs — measure the EVENT-ONLY handover/settle floor.
+// scripts/foskaay-ggi-eventmidchain-match.mjs — measure the EVENT-BASED MIDCHAIN handover/settle floor.
 //
 // The midchain made moves free; the remaining cost is the core's storage writes at
 // open and settle. This script tests the v5 "event-driven cheap gas" pattern: a
@@ -12,7 +12,7 @@
 // SECURITY: the sponsor key comes from ~/.config/gfg/arc-sponsor.json and is
 // NEVER printed, logged, or committed.
 //
-// Usage:  node scripts/ggi-eventonly-match.mjs [moveCount]
+// Usage:  node scripts/foskaay-ggi-eventmidchain-match.mjs [moveCount]
 import { readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';
@@ -67,7 +67,7 @@ function buildMoveLog(n) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('Foskaay GGI EVENT-ONLY match -> Arc testnet');
+  console.log('Foskaay GGI EVENT-BASED MIDCHAIN match -> Arc testnet');
   console.log('rpc           :', RPC);
   console.log('EventMidchainCore :', EOC);
   console.log('players       :', p0.address, p1.address);
@@ -84,14 +84,14 @@ function buildMoveLog(n) {
   }
   const finalHash = prevHash;
 
-  // 2. EVENT-ONLY handover: one tx, emit only.
+  // 2. EVENT-BASED MIDCHAIN handover: one tx, emit only.
   const sessionId = keccak256(encodeAbiParameters(parseAbiParameters('address,uint256'), [me, BigInt(Date.now())]));
   const handover = await send({
     address: EOC, abi: eocArtifact.abi, functionName: 'handover',
     args: [sessionId, MID, startHash, [p0.address, p1.address], [p0.address, p1.address], 0], account,
   });
 
-  // 3. EVENT-ONLY settle: verify both signatures on-chain, then emit only.
+  // 3. EVENT-BASED MIDCHAIN settle: verify both signatures on-chain, then emit only.
   const digest = await pub.readContract({ address: EOC, abi: eocArtifact.abi, functionName: 'settleDigest', args: [sessionId, finalHash] });
   const sig0 = await p0.sign({ hash: digest });
   const sig1 = await p1.sign({ hash: digest });
@@ -102,7 +102,7 @@ function buildMoveLog(n) {
 
   const total = usdc(handover.costUsdc6) + usdc(settle.costUsdc6);
   console.log('');
-  console.log('moves in midchain (free):', moves.length, '  on-chain txs: 1 handover + 1 settle (event-only)');
+  console.log('moves in midchain (free):', moves.length, '  on-chain txs: 1 handover + 1 settle (event-based midchain)');
   console.log('start hash :', startHash);
   console.log('final hash :', finalHash);
   console.log('');
@@ -113,10 +113,10 @@ function buildMoveLog(n) {
   console.log('COMPARE: core-based midchain unbatched 0.012206 USDC/match (about 81 games per 1 USD).');
 
   writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventmidchain-cost.json'), JSON.stringify({
-    measuredAt: new Date().toISOString(), mode: 'eventonly', moveCount: moves.length, sessionId, startHash, finalHash,
+    measuredAt: new Date().toISOString(), mode: 'eventmidchain', moveCount: moves.length, sessionId, startHash, finalHash,
     cost: { handover: usdc(handover.costUsdc6), settle: usdc(settle.costUsdc6), total, gamesPerDollar: total > 0 ? Math.floor(1 / total) : null },
     gas: { handover: handover.gasUsed.toString(), settle: settle.gasUsed.toString() },
     compareCoreMidchainPerMatch: 0.012206,
   }, null, 2) + '\n');
   console.log('written: foskaay-ggi/deployments/eventmidchain-cost.json');
-})().catch((e) => { console.error('event-only match failed:', e.shortMessage || e.message || e); process.exit(1); });
+})().catch((e) => { console.error('event-based midchain match failed:', e.shortMessage || e.message || e); process.exit(1); });

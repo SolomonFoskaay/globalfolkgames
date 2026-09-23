@@ -31,7 +31,7 @@ import { addWin, addEntry, hasEntry } from './competitions-wins.mjs';
 import { PLAN_LADDER, AFFILIATE_RATE } from './plans-config.mjs';
 import { verifyAndCredit as verifyAndCreditVerifier } from '../api_handlers/verify-and-credit.mjs';
 import arcRelay from '../api_handlers/arc-relay.mjs';
-import ggiSponsor from '../api_handlers/ggi-sponsor.mjs';
+import ggiSponsor from '../api_handlers/foskaay-ggi-sponsor.mjs';
 import './load-env.mjs';
 
 const PORT = process.env.RELAY_PORT || 8787;
@@ -325,7 +325,7 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
-  if (req.method === 'POST' && req.url === '/api/ggi-sponsor') {
+  if (req.method === 'POST' && req.url === '/api/foskaay-ggi-sponsor') {
     let body = '';
     for await (const chunk of req) body += chunk;
     const reqShim = { method: 'POST', body, headers: req.headers || {} };

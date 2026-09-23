@@ -1,4 +1,4 @@
-// scripts/ggi-deploy-generals.mjs — deploy the ported GeneralsGame to Arc testnet.
+// scripts/foskaay-ggi-deploy-generals.mjs — deploy the ported GeneralsGame to Arc testnet.
 //
 // WHAT THIS IS: GeneralsGame is the GAME's own contract (the ported MagicBlock
 // solana-generals board). It is NOT rail core and it is NOT behind a proxy: it is
@@ -10,7 +10,7 @@
 // NEVER printed, logged, or committed. Public values come from
 // foskaay-ggi/deployments/arc-testnet.json. On Arc the gas token is USDC.
 //
-// Usage:  node scripts/ggi-deploy-generals.mjs
+// Usage:  node scripts/foskaay-ggi-deploy-generals.mjs
 import { readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';

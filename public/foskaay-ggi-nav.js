@@ -1,4 +1,4 @@
-// ggi-nav.js
+// foskaay-ggi-nav.js
 // Shared LEFT navigation rail for EVERY Foskaay GGI page (demos + docs).
 //
 // WHY: the Foskaay GGI section has its own pages (demos, docs, get started, FAQ)
@@ -14,8 +14,8 @@
 
 (function () {
     var PAGES = [
-        { key: 'demos', label: '🎮 Demos', href: '/ggi-demos/' },
-        { key: 'explorer', label: '🔎 Explorer', href: '/ggi-explorer/' },
+        { key: 'demos', label: '🎮 Demos', href: '/foskaay-ggi-demos/' },
+        { key: 'explorer', label: '🔎 Explorer', href: '/foskaay-ggi-explorer/' },
         { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi-docs/' },
         { key: 'get-started', label: '🚀 Get started', href: '/foskaay-ggi-docs/#get-started' },
         { key: 'faq', label: '❓ FAQ and fixes', href: '/foskaay-ggi-docs/#faq' }
