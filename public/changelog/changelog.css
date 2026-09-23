@@ -510,3 +510,11 @@
     font-size: 0.82rem;
 }
 .ov-uf-planned td { opacity: 0.5; }
+
+/* Research-style tables, reused by the architecture module pages so a module
+   can carry the same mobile-scrollable tables as the Research library. */
+.research-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 10px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; }
+.research-table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 0.8rem; }
+.research-table th, .research-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+.research-table th { color: #f87818; font-weight: 800; white-space: nowrap; }
+.research-table tr:last-child td { border-bottom: none; }

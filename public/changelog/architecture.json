@@ -875,7 +875,63 @@
         "FEES + COST (owner 2026-09-22): GGI charges a small FIXED fee PER SESSION, never per action, so a heavy game costs the same as a light one. Two stages: once at OPEN and once at SETTLE (an abandoned session pays only the open fee). The fee is charged in USDC (Arc's native asset and gas token) via the ERC-20 interface; the fee amount is CONFIG on FeeVault (one setFees call, no redeploy) and the SDK READS it at runtime so no number is ever hardcoded. The settle price is LOCKED at open, so an owner fee change can never alter a session already in flight. The fee lands in the FeeVault and only its owner can withdraw it to a configurable destination (for mainnet: a separate cold owner wallet, not the hot relayer). MEASURED ON ARC TESTNET: 4 core contracts total deploy 0.079359 USDC; a realistic batched session is about 0.00002 USDC of Arc gas. COMPARISON (honest, at a standard $100/SOL): MagicBlock's model bills a delegation session (0.0003 SOL) plus each commit (0.0001 SOL), so a match with one session + two commits is 0.0005 SOL = about $0.05. On Arc the same shape costs about $0.00002 of Arc gas plus GGI's own per-session fee (placeholder 0.0015 USDC, owner-set), i.e. roughly $0.0015 all-in, and it is priced in a stablecoin rather than a volatile token. MagicBlock is a leader in gasless gaming on Solana and GGI does not claim to replace it: GGI delivers the same EFFECT on EVM/Arc (where ER cannot run), with no validator, RPC or rollup node to operate, so a dev measures true mainnet economics on testnet instead of guessing. PRICING IS NOT FINAL: the per-session fee is the owner's decision and is intentionally left open so the SDK ships zero hardcoded price.",
         "DEPLOYMENT + UPGRADEABILITY (owner 2026-09-22): the rail is UPGRADEABLE via UUPS proxies (ERC1967, OpenZeppelin). The PROXY addresses are PERMANENT, so improving the logic never moves an address and never strands an open session or any data - this is the lesson from the publishing-first test, where a fresh deploy would have orphaned everything. ARC TESTNET (chain 5042002) proxy addresses: SessionRegistry 0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5, SessionState 0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e, Randomness 0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b, FeeVault 0x4cf542791faeb683f878bd3d119683e0C02F9905, BatchedSettlement (optional) 0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4. MAINNET addresses appear in the same shape once deployed; mainnet does NOT start until testnet is battle-tested. The public docs page (/foskaay-ggi-docs/) and the npm packages (@foskaay/ggi-contracts) carry the same address list.",
         "UPGRADE SAFETY RULE (hard, locked 2026-09-22; ANY agent touching these contracts MUST obey): (1) STORAGE IS APPEND-ONLY - never reorder, rename or remove a state variable, including the uint256[20] __gap and the version marker; new variables consume from the top of the gap and the gap shrinks by the same number of slots, because a reorder reads live data as garbage. (2) Initialization goes through initialize() (re-init guarded); the implementation contract is _disableInitializers() so it can never be used directly; logic-only upgrades must NOT bump version, layout changes MUST. (3) ALWAYS run the upgrade-safety tests (foskaay-ggi/test/UpgradeSafety.t.sol prove the address is kept and data is preserved) and the full suite before any deploy. (4) AFTER every upgrade, REPORT to the owner: proxy address unchanged, open sessions and data checked to still read correctly, the tx, and the new logic version/summary. (5) Upgrade authority is the owner now; it must move to a timelock or multisig BEFORE mainnet, because a single key that can silently repoint the logic is a trust risk on a rail other devs build on. (6) A game dev who wants real immutability can deploy their own instance; the shared rail stays upgradeable so a bug can be fixed for everyone.",
-        "BATCHING IS DEV-CONFIGURED, NEVER IMPOSED (owner 2026-09-22): BatchedSettlement is a SEPARATE OPTIONAL contract, NOT part of the 4-contract core. A game calls setWindowConfig(maxSize, windowSecs) and picks its OWN cadence (e.g. 10 games/35min, or 1,000 games/24h); the rail imposes none. Each window SNAPSHOTS its rules at open, so a later config change never alters a window already in flight. Flush is PERMISSIONLESS: a window can be flushed when it is full OR its deadline has passed, by ANYONE, with no admin, no cron, no server and no manual button (EVM cannot self-trigger, so permissionless-and-rule-driven is the most trustless shape possible). Trade-off, stated honestly to devs: a result becomes final when the window flushes, so batching suits idle/casual where that is acceptable, and does NOT suit anything needing an immediate per-session on-chain settlement."
+        "MIDCHAIN FINDING (owner approved 2026-09-22): the Generals port exposed that the current cores do not deliver this module's own promise of free work inside a session. Every move was a separate Arc transaction, so a match cost about 10 games per 1 USD instead of about 1000. The missing piece is the MIDCHAIN: moves signed with EIP-712 and hash-chained off-chain, executed for free via eth_call on the game's own pure rules, with only two on-chain transactions per match (handover + settle). See the Findings and tables below, the Research library entry ggi-midchain, and foskaay-ggi/foskaay-ggi-build-guide-v5.md section 9.",
+        "EVM TECH ARC INHERITS THAT WE HAD NOT USED (owner 2026-09-22): Arc is Osaka baseline, so EIP-7702 (set-code), EIP-1153 (transient storage) and deterministic instant finality are available; EIP-4844 blob transactions are REJECTED. The key primitive is eth_call free execution (run pure game rules without a transaction), plus EIP-712 signatures and a keccak256 hash chain. Together they are the EVM equivalent of MagicBlock's free ER execution.",
+        "CORE IMPACT (owner 2026-09-22): the midchain needs NO core contract change. The existing 4 core + 1 optional structure stands: SessionRegistry (open/close/session keys/canSign), SessionState (commitDigest/sealFinal), Randomness (commit-reveal seed) and FeeVault (per-session fee) already cover the on-chain endpoints. The midchain lives in the GAME's own contract (pure getInitialState/applyMove/isTerminal) plus the client/SDK (EIP-712 signing + hash chain) plus an untrusted relay cache. Keep 4 core + 1 optional; do not merge."
+      ],
+      "sections": [
+        {
+          "heading": "The EVM tools Arc gives us that we have not used yet",
+          "table": {
+            "headers": ["Tech", "What it is (plain)", "Used now?", "What it unlocks"],
+            "rows": [
+              ["eth_call free execution", "Run a contract function without sending a transaction. Costs nothing.", "Only for reads", "The midchain: run the game's applyMove rules for free, no tx per move"],
+              ["EIP-712 typed signatures", "A wallet signs structured data; the contract recovers who signed", "Partly (session keys)", "One popup to authorise a session key, then silent move signatures"],
+              ["keccak256 hash chain", "Each move's hash includes the previous hash", "No", "Tamper-evident move history, one final hash to settle"],
+              ["Events over storage + eth_getLogs", "Emit logs instead of writing storage slots", "Partly", "Cheap on-chain handover/settle, the about 1 USD per 1000 target"],
+              ["EIP-1153 transient storage", "Cheap scratch memory that clears after the tx", "No", "Cheaper settle verification"],
+              ["EIP-7702 set-code", "An ordinary wallet can act as a smart account", "No", "Session-key accounts and sponsored ops, no new wallet for the player"],
+              ["ERC-4337 paymaster", "A contract pays the user's gas", "No", "Sponsor pays user ops (moot once moves are free)"],
+              ["Deterministic instant finality", "A transaction is final the moment it is included", "No", "Settle is instant, one confirmation"],
+              ["EIP-4844 blobs", "Cheap bulk data", "N/A", "Not available on Arc, so not part of the plan"]
+            ]
+          }
+        },
+        {
+          "heading": "Comparison: MagicBlock ER vs current GGI vs GGI + midchain",
+          "table": {
+            "headers": ["Question", "MagicBlock ER (Solana)", "Current Foskaay GGI (built)", "Foskaay GGI + midchain"],
+            "rows": [
+              ["Where a move runs", "Inside MagicBlock's ER validator", "On Arc, as its own transaction", "In the midchain: eth_call runs the game's pure rules, free"],
+              ["Player pays per move", "Nothing", "Nothing", "Nothing"],
+              ["Sponsor pays per move", "Nothing", "about 0.0021 USDC", "Nothing"],
+              ["Sponsor pays per match", "delegate + undelegate", "every move + settle", "2 transactions only: handover + settle"],
+              ["On-chain footprint", "base account + ER state", "every move", "start hash, final hash, session, 2 events"],
+              ["What a public explorer sees", "base txs only (ER invisible)", "every move", "2 txs only (midchain invisible)"],
+              ["Tamper protection", "validator executes, base verifies on commit", "the chain runs the rules", "EIP-712 signatures + hash chain, chain verifies on settle/dispute"],
+              ["Infrastructure to run", "a validator network", "only a sponsor key", "only a sponsor key + an untrusted cache"],
+              ["Source of truth", "Solana base + ER proof", "the game contract", "on-chain start/final + the verifiable signed move chain"],
+              ["Rough games per 1 USD", "their own pricing", "about 10", "target about 1000"]
+            ]
+          }
+        },
+        {
+          "heading": "The three layers this achieves",
+          "bullets": [
+            "On-chain (truth): the contract stores the session, the start hash and the final hash, and settles. Nothing can settle unless the signatures and the hash chain are valid.",
+            "Midchain (free play): every move is a signed, hash-chained message run through the game's pure rules via eth_call. Free for the player AND free for the sponsor. Players, seats, moves, rewards, lives, timer and points all survive here as opaque data the game's rules read and write.",
+            "Off-chain (render only): the frontend draws the board; Vercel holds the sponsor key and submits only the handover and settle transactions. Neither owns the truth."
+          ]
+        },
+        {
+          "heading": "Honest limits",
+          "bullets": [
+            "The chain does not see moves live, only the two endpoints. A third party can verify by replaying the signed moves; mid-session reads come from the untrusted relay cache.",
+            "Settle needs the players' final signatures. If a player vanishes we need a timeout or forfeit rule (MagicBlock has turn clocks; we would need the same).",
+            "The game's rules must be a deterministic pure function for the dispute path (no external calls).",
+            "PREVRANDAO is always 0 on Arc, so randomness comes from the commit-reveal seed plus the hash chain, never the block."
+          ]
+        }
       ]
     }
   ],

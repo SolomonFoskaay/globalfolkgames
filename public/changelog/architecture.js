@@ -61,6 +61,31 @@
     return `<div class="entry-details"><h4>Dev notes</h4><ul>${items.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
   }
 
+  // Optional structured sections for a module (same shape as the Research
+  // library): heading + paragraphs + bullets + a mobile-scrollable table. Used
+  // where a module needs tables for clarity (e.g. arcv2m18 findings).
+  function tableHtml(t) {
+    if (!t || !Array.isArray(t.headers) || !t.headers.length) return '';
+    const head = t.headers.map((h) => `<th>${esc(h)}</th>`).join('');
+    const body = (t.rows || []).map((row) =>
+      `<tr>${(row || []).map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+    return `<div class="research-table-wrap"><table class="research-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  function sectionsHtml(sections) {
+    if (!Array.isArray(sections) || !sections.length) return '';
+    const body = sections.map((s) => {
+      let html = `<h4 class="research-h4">${esc(s.heading)}</h4>`;
+      (s.paragraphs || []).forEach((p) => { html += `<p class="research-p">${esc(p)}</p>`; });
+      if (Array.isArray(s.bullets) && s.bullets.length) {
+        html += `<ul class="research-list">${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
+      }
+      html += tableHtml(s.table);
+      return html;
+    }).join('');
+    return `<div class="arch-block"><h3 class="arch-block-title">Findings and tables</h3><div class="research-body">${body}</div></div>`;
+  }
+
   function contractSection(contract, label, icon) {
     if (!contract || !contract.items || !contract.items.length) return '';
     const statusNote = contract.status
@@ -244,6 +269,7 @@
           ${detailsHtml(m.details)}
         </article>
       </div>
+      ${sectionsHtml(m.sections)}
       ${Array.isArray(m.games) && m.games.length ? renderGamePicker(m) : ''}
       ${renderRules(cache.rules)}
       ${renderOrder(cache.implementationOrder)}
