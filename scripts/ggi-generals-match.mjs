@@ -1,5 +1,5 @@
 // scripts/ggi-generals-match.mjs — play the ported Generals game on Arc testnet
-// through the GGI sponsor relay, in BOTH settlement modes, and measure the REAL
+// through the Foskaay GGI sponsor relay, in BOTH settlement modes, and measure the REAL
 // USDC cost of each (never estimated).
 //
 // This is the outsider path: it only speaks HTTP to the sponsor relay, exactly
@@ -142,7 +142,7 @@ function printRows(rows, total, title) {
 (async () => {
   const which = (process.argv[2] || 'both').toLowerCase();
   const me = await post('sponsorAddress');
-  console.log('GGI Generals live match -> Arc testnet');
+  console.log('Foskaay GGI Generals live match -> Arc testnet');
   console.log('relay:', RELAY);
   console.log('sponsor (public):', me.address);
   console.log('GeneralsGame:', me.generalsGame);

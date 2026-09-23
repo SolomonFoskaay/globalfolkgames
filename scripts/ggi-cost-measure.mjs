@@ -1,4 +1,4 @@
-// scripts/ggi-cost-measure.mjs — measure the REAL Arc cost of a GGI game session.
+// scripts/ggi-cost-measure.mjs — measure the REAL Arc cost of a Foskaay GGI game session.
 //
 // WHY: the whole pitch is "cheaper than per-action, $1 = 500-1000 games". That
 // number must be measured on-chain, never assumed. This runs a realistic session
@@ -75,7 +75,7 @@ async function measure(label, req, rows) {
 (async () => {
   const me = getAddress(account.address);
   const start = await usdcBalance();
-  console.log('GGI LIVE COST MEASUREMENT -> Arc Testnet');
+  console.log('Foskaay GGI LIVE COST MEASUREMENT -> Arc Testnet');
   console.log('sponsor (public):', me);
   console.log('balance start:', formatUnits(start, 6), 'USDC');
   console.log('');

@@ -61,7 +61,7 @@ function buildMoveLog(gameIdx, moveCount) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('GGI EVENT-BASED MIDCHAIN batch -> Arc testnet');
+  console.log('Foskaay GGI EVENT-BASED MIDCHAIN batch -> Arc testnet');
   console.log('rpc              :', RPC);
   console.log('EventMidchainCore:', EMC);
   console.log('players          :', p0.address, p1.address);

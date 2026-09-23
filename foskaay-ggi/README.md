@@ -1,4 +1,4 @@
-# Foskaay Gasless Games Infrastructure (GGI) (standalone project)
+# Foskaay Gasless Games Infrastructure (Foskaay GGI) (standalone project)
 
 **Status: CORE IN PROGRESS. Three of four core contracts built and tested**
 (`SessionRegistry`, `SessionState`, `Randomness`). Nothing is deployed, and
@@ -11,7 +11,7 @@ The authoritative spec is `public/changelog/architecture.json` module `arcv2m18`
 
 ## What this is (one paragraph)
 
-Foskaay Gasless Games Infrastructure (GGI) is a **room** you open on-chain, do everything inside for
+Foskaay Gasless Games Infrastructure (Foskaay GGI) is a **room** you open on-chain, do everything inside for
 free, and settle back to the chain once. It is the Arc (Circle EVM) equivalent of MagicBlock's
 Ephemeral Rollup: free execution inside a session, one small on-chain cost to open and one to settle.
 It is a **standalone project** on purpose: any game can plug into it, and GlobalFolkGames is only its

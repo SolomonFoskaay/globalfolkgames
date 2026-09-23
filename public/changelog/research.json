@@ -471,7 +471,7 @@
         {
           "heading": "1. The missing link, in one sentence",
           "paragraphs": [
-            "The v5 build guide already describes a midchain where moves are signed and hash-chained off-chain and executed by eth_call for free, with only two real transactions per match (handover and settle). The current GGI cores have the session and the settlement, but not this free midchain. So the Generals port fell back to writing every move as its own Arc transaction, which is why it cost about 10 games per 1 USD instead of the promised about 1000.",
+            "The v5 build guide already describes a midchain where moves are signed and hash-chained off-chain and executed by eth_call for free, with only two real transactions per match (handover and settle). The current Foskaay GGI cores have the session and the settlement, but not this free midchain. So the Generals port fell back to writing every move as its own Arc transaction, which is why it cost about 10 games per 1 USD instead of the promised about 1000.",
             "Arc's own docs confirm what we get to use: Arc targets the Osaka hard fork, so EIP-7702, EIP-1153 and deterministic instant finality are all available. EIP-4844 blobs are NOT supported (type-3 transactions are rejected). That shapes the design below."
           ]
         },
@@ -543,7 +543,7 @@
           }
         },
         {
-          "heading": "3. Comparison: MagicBlock ER vs current GGI vs GGI + midchain",
+          "heading": "3. Comparison: MagicBlock ER vs current Foskaay GGI vs Foskaay GGI + midchain",
           "table": {
             "headers": [
               "Question",
@@ -667,27 +667,27 @@
           "heading": "8. The event-based MIDCHAIN, batched (owner-approved test, 2026-09-23)",
           "paragraphs": [
             "This is still the MIDCHAIN. Midchain means anything that is neither fully on the base chain nor offchain: play happens off the base chain but is cryptographically tied to it. The event-based form uses an EVENT instead of STORAGE (the storage-based form is the current core). The earlier EventOnlyCore prototype was renamed EventMidchainCore so the name matches the idea.",
-            "The link is solved naturally. In the storage-based core a session lives in SessionRegistry storage, so tying the game's board to it needed setGameState as a THIRD transaction. The event-based midchain puts the link INSIDE the Handover event (sessionId, gameLogic, startHash, players, sessionKeys), so the session and the game are bound in the same event and the same transaction: 2 transactions per game, not 3. The GGI explorer reads Handover and Settled with eth_getLogs and can index by gameLogic or sessionId directly. The start and final hashes are on-chain, the final hash is signed by the players and checked on-chain with ecrecover, and the move log replays through the game's pure rules to that final hash. So it is tamper-proof, tied to the on-chain, and provable by anyone."
+            "The link is solved naturally. In the storage-based core a session lives in SessionRegistry storage, so tying the game's board to it needed setGameState as a THIRD transaction. The event-based midchain puts the link INSIDE the Handover event (sessionId, gameLogic, startHash, players, sessionKeys), so the session and the game are bound in the same event and the same transaction: 2 transactions per game, not 3. The Foskaay GGI explorer reads Handover and Settled with eth_getLogs and can index by gameLogic or sessionId directly. The start and final hashes are on-chain, the final hash is signed by the players and checked on-chain with ecrecover, and the move log replays through the game's pure rules to that final hash. So it is tamper-proof, tied to the on-chain, and provable by anyone."
           ],
           "table": {
             "headers": ["Approach", "What happens", "Txs per game", "Cost per game", "Games per 1 USD"],
             "rows": [
-              ["Direct to on-chain, no GGI", "Every move is its own transaction", "about 15", "0.098172 USDC", "about 10"],
-              ["GGI storage midchain, unbatched", "open + link + settle per game", "3", "0.012206 USDC", "about 81"],
-              ["GGI storage midchain, batched 3", "3 games, one window flush", "3 + flush/3", "0.009788 USDC", "about 102"],
-              ["GGI storage midchain, batched 5", "5 games, one window flush", "3 + flush/5", "0.009328 USDC", "about 107"],
-              ["GGI storage midchain, batched 10", "10 games, one window flush", "3 + flush/10", "0.008981 USDC", "about 111"],
-              ["GGI storage midchain, batched 100 (extrapolated)", "per-game open still dominates", "3 + flush/100", "about 0.0088 USDC", "about 113"],
-              ["GGI event midchain, unbatched", "handover + settle per game (link in the event)", "2", "0.001712 USDC", "about 584"],
-              ["GGI event midchain, batched 3", "one handoverMany + one settleMany", "2/3", "0.001098 USDC", "about 910"],
-              ["GGI event midchain, batched 5", "one handoverMany + one settleMany", "2/5", "0.000939 USDC", "about 1,064"],
-              ["GGI event midchain, batched 10", "one handoverMany + one settleMany", "2/10", "0.000820 USDC", "about 1,219"],
-              ["GGI event midchain, batched 100", "one handoverMany + one settleMany", "2/100", "0.000713 USDC", "about 1,403"]
+              ["Direct to on-chain, no Foskaay GGI", "Every move is its own transaction (most games run 60 to 100+ moves)", "about 100", "about 0.2444 USDC", "about 4"],
+              ["Foskaay GGI storage midchain, unbatched", "open + link + settle per game", "3", "0.012206 USDC", "about 81"],
+              ["Foskaay GGI storage midchain, batched 3", "3 games, one window flush", "3 + flush/3", "0.009788 USDC", "about 102"],
+              ["Foskaay GGI storage midchain, batched 5", "5 games, one window flush", "3 + flush/5", "0.009328 USDC", "about 107"],
+              ["Foskaay GGI storage midchain, batched 10", "10 games, one window flush", "3 + flush/10", "0.008981 USDC", "about 111"],
+              ["Foskaay GGI storage midchain, batched 100 (extrapolated)", "per-game open still dominates", "3 + flush/100", "about 0.0088 USDC", "about 113"],
+              ["Foskaay GGI event midchain, unbatched", "handover + settle per game (link in the event)", "2", "0.001712 USDC", "about 584"],
+              ["Foskaay GGI event midchain, batched 3", "one handoverMany + one settleMany", "2/3", "0.001098 USDC", "about 910"],
+              ["Foskaay GGI event midchain, batched 5", "one handoverMany + one settleMany", "2/5", "0.000939 USDC", "about 1,064"],
+              ["Foskaay GGI event midchain, batched 10", "one handoverMany + one settleMany", "2/10", "0.000820 USDC", "about 1,219"],
+              ["Foskaay GGI event midchain, batched 100", "one handoverMany + one settleMany", "2/100", "0.000713 USDC", "about 1,403"]
             ]
           },
           "bullets": [
             "The storage-based midchain cannot escape the per-game open cost (SSTORE), so batching it barely helps (102 to 113 games per 1 USD). The event-based midchain removes that wall, so batching helps a lot: it crosses the v5 target of 1 USD per 1,000 games at just 5 games per batch, and reaches about 1,400 games per 1 USD at 100 per batch.",
-            "UNBATCHED means each game's handover and settle go to Arc as they happen (2 transactions), so the result is on-chain immediately. BATCHED means many games share ONE transaction (one handoverMany carries many handovers, one settleMany carries many settlements), which is cheaper because the 21k base fee is shared. The trade-off is that a game's on-chain event lands when the batch transaction lands, so the DEV picks the cadence. It is not a gameplay delay: moves are already signed and free, and the GGI explorer can show the game from the signed move log immediately.",
+            "UNBATCHED means each game's handover and settle go to Arc as they happen (2 transactions), so the result is on-chain immediately. BATCHED means many games share ONE transaction (one handoverMany carries many handovers, one settleMany carries many settlements), which is cheaper because the 21k base fee is shared. The trade-off is that a game's on-chain event lands when the batch transaction lands, so the DEV picks the cadence. It is not a gameplay delay: moves are already signed and free, and the Foskaay GGI explorer can show the game from the signed move log immediately.",
             "In a batched session each game still emits its OWN Handover and Settled event inside the batch transaction, so the explorer can show every game individually. A user does not have to trust that it will go onchain: the events are on-chain and the proof is the replay. The only thing they wait for is the batch transaction.",
             "What has to change: CORE (no new address) add event-based handover/handoverMany/settle/settleMany to the existing core via a UUPS logic upgrade (same proxy, append-only storage) plus a nullifier mapping (sessionId => settled) to stop double settlement; storage-based sessions stay as they are, nothing merged, no data moved. SDK (republish, no chain change) add handover/handoverMany/settle/settleMany/signMove/verifyMidchain helpers. BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched.",
             "EventMidchainCore deployed on Arc testnet: 0x197DE9813bd8cF668C8C26455329C629EE9Fc63e. Files: foskaay-ggi/prototypes/EventMidchainCore.sol, test/EventMidchainCore.t.sol, scripts/ggi-deploy-eventmidchain.mjs, ggi-eventmidchain-match.mjs, ggi-eventmidchain-batch.mjs, deployments/eventmidchain-cost.json and eventmidchain-batch-cost.json."

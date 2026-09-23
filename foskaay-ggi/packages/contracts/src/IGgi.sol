@@ -1,4 +1,4 @@
-// @foskaay/ggi-contracts — Solidity interfaces for Foskaay Gasless Games Infrastructure (GGI).
+// @foskaay/ggi-contracts — Solidity interfaces for Foskaay Gasless Games Infrastructure (Foskaay GGI).
 //
 // These are the FOUR core contracts. Copy them into your own contract, or import
 // this package, and call them directly. Nothing here is opinionated: no account

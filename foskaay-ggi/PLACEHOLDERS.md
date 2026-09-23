@@ -1,4 +1,4 @@
-Foskaay Gasless Games Infrastructure (GGI) — build map
+Foskaay Gasless Games Infrastructure (Foskaay GGI) — build map
 
 CORE is 4 unopinionated contracts and NOTHING else. No optional pattern is core.
 

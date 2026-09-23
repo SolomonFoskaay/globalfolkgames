@@ -8,7 +8,7 @@ pragma solidity ^0.8.24;
 /// thing: a PURE function can be run with `eth_call` for free. So the board does
 /// not live in storage during play. It lives in a pure struct, the client
 /// hash-chains every state, and only the START hash and FINAL hash ever touch the
-/// chain (through a GGI session open + settle). That is two transactions per
+/// chain (through a Foskaay GGI session open + settle). That is two transactions per
 /// match, with every move free for the player AND the sponsor.
 ///
 /// @dev This contract holds NO state and has NO owner and NO access control: it is
@@ -80,7 +80,7 @@ contract GeneralsMidchain {
     }
 
     /// @notice Apply one move and return the NEW state. Pure, so it runs for free
-    ///         via eth_call. `seeds` is part of the GGI game interface (a game may
+    ///         via eth_call. `seeds` is part of the Foskaay GGI game interface (a game may
     ///         need randomness); Generals needs none, so it is ignored.
     function applyMove(State memory s, Move memory m, bytes32[] memory /* seeds */)
         public

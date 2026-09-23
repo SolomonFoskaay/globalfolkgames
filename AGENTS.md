@@ -383,7 +383,7 @@ token) on the **`osv1Arc`** branch. Solana is frozen on `osv1` as the fallback.
   (`/changelog/research.html`); the build phases belong to arcv2m16, and
   architecture.json changes need the owner's explicit approval.
 
-### Foskaay Gasless Games Infrastructure (GGI, arcv2m18)
+### Foskaay Gasless Games Infrastructure (Foskaay GGI, arcv2m18)
 
 The rail OTHER game devs adopt to make games gasless on Arc. It is a STANDALONE
 project (`foskaay-ggi/`, its own Foundry project, its own deploy, moving to its

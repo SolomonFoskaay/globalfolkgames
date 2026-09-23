@@ -67,7 +67,7 @@ function buildMoveLog(n) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('GGI EVENT-ONLY match -> Arc testnet');
+  console.log('Foskaay GGI EVENT-ONLY match -> Arc testnet');
   console.log('rpc           :', RPC);
   console.log('EventMidchainCore :', EOC);
   console.log('players       :', p0.address, p1.address);

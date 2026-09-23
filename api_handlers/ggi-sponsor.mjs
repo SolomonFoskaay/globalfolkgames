@@ -1,16 +1,16 @@
 // api_handlers/ggi-sponsor.mjs
 //
-// GGI SPONSOR RELAY — Foskaay Gasless Games Infrastructure.
+// Foskaay GGI SPONSOR RELAY — Foskaay Gasless Games Infrastructure.
 //
-// WHAT THIS IS: the tiny serverless relay that pays the gas for a GGI session so
+// WHAT THIS IS: the tiny serverless relay that pays the gas for a Foskaay GGI session so
 // the PLAYER NEVER PAYS and never sees a wallet popup. It signs two kinds of
 // transaction with the game operator's sponsor key:
 //   1. session lifecycle: SessionRegistry.open / close
 //   2. settlement: SessionState (commit/seal), Randomness reveal, FeeVault charge
 //   3. optional batching: BatchedSettlement.submit / flush
 //
-// IT IS GGI-LOGIC ONLY. It imports nothing from the host game platform and keeps
-// no host state. When GGI moves to its own repo, this file moves with it.
+// IT IS Foskaay GGI-LOGIC ONLY. It imports nothing from the host game platform and keeps
+// no host state. When Foskaay GGI moves to its own repo, this file moves with it.
 //
 // SECURITY: the sponsor key is read from the environment and NEVER returned to the
 // client. This endpoint only performs the fixed operations below; it is not a
@@ -30,7 +30,7 @@ const SPONSOR_KEY = process.env.GFG_Arc_Gasless_Sponsor_Key || '';
 const CHAIN_ID = 5042002;
 const USDC = '0x3600000000000000000000000000000000000000';
 
-// The deployed GGI contracts (proxy addresses; permanent). Kept here as data so
+// The deployed Foskaay GGI contracts (proxy addresses; permanent). Kept here as data so
 // this handler has no build dependency on the packages.
 const ADDR = {
   SessionRegistry: '0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5',

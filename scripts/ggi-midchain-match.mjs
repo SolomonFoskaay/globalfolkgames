@@ -111,7 +111,7 @@ async function playMatch(p0, p1, moveCount) {
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
 
-  console.log('GGI MIDCHAIN match -> Arc testnet   mode:', mode);
+  console.log('Foskaay GGI MIDCHAIN match -> Arc testnet   mode:', mode);
   console.log('rpc             :', RPC);
   console.log('GeneralsMidchain:', MID);
   console.log('players (public):', p0.address, p1.address);
