@@ -1,0 +1,19 @@
+{
+  "measuredAt": "2026-09-23T01:24:27.393Z",
+  "mode": "eventonly",
+  "moveCount": 12,
+  "sessionId": "0x7bb45f145534a1f462245e1b05cec8dca81cab214c6aca1e63cad91b1dcda167",
+  "startHash": "0x4d7f907065cb8e3103f7d4a8dc872e904f8463d0a0f047ad0834a5a473be230c",
+  "finalHash": "0x8dfc332f7c15b4f0162dd9ff59c60981828ed798d61c283e561e1ee5a7486c31",
+  "cost": {
+    "handover": 0.00078,
+    "settle": 0.000929,
+    "total": 0.001709,
+    "gamesPerDollar": 585
+  },
+  "gas": {
+    "handover": "31234",
+    "settle": "37160"
+  },
+  "compareCoreMidchainPerMatch": 0.012206
+}

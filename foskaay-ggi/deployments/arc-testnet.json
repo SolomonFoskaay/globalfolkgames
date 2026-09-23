@@ -13,10 +13,12 @@
     "FeeVault": "0x4cf542791faeb683f878bd3d119683e0C02F9905",
     "BatchedSettlement": "0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4",
     "GeneralsGame": "0xD674eD1f118855868b4B002F4A167C953Cc549ca",
-    "GeneralsMidchain": "0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2"
+    "GeneralsMidchain": "0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2",
+    "EventOnlyCore": "0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c"
   },
   "upgradeable": true,
   "pattern": "UUPS proxy (ERC1967). Proxy addresses are permanent.",
   "generalsGameDeployedAt": "2026-09-22T13:32:42.512Z",
-  "generalsMidchainDeployedAt": "2026-09-23T00:46:12.066Z"
+  "generalsMidchainDeployedAt": "2026-09-23T00:46:12.066Z",
+  "eventOnlyCoreDeployedAt": "2026-09-23T01:23:59.970Z"
 }
