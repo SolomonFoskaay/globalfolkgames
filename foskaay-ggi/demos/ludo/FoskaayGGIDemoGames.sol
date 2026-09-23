@@ -37,6 +37,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         address player;     // the seat's owner (a Dynamic embedded wallet)
         bool isComputer;    // computer seats are the same rules, chosen by the AI
         bool finished;      // true once all 4 tokens are home
+        bool crowned;       // ON-CHAIN crown: the contract decides who wears it
         uint8 tokensHome;   // count of tokens that reached 57
         Token[4] tokens;
     }
@@ -52,8 +53,11 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint64 turnEndsAt;  // turn timer deadline (unix seconds)
         uint8 status;       // 0 = created, 1 = playing, 2 = finished
         uint8 winner;       // seat index, 255 = none
+        uint8 userSeat;     // the LOGGED-IN user's seat (only it can be credited)
+        uint8 finishCount;  // how many seats have finished (1st, 2nd, 3rd, 4th)
         bool initialized;
         Seat[4] seats;
+        uint8[4] finishOrder;  // seat indices in finish order (0 = 1st place)
     }
 
     /// matchRef => match. The matchRef is the on-chain handle a session points at.
@@ -76,7 +80,10 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     event MoveApplied(uint64 indexed matchRef, uint8 seat, uint8 tokenIndex, int16 fromStep, int16 toStep);
     event TokenCaptured(uint64 indexed matchRef, uint8 bySeat, uint8 opponentSeat);
     event TurnPassed(uint64 indexed matchRef, uint8 nextSeat);
-    event ResultCredited(uint64 indexed matchRef, uint8 winnerSeat, address winner, bytes32 gameTag, uint64 points);
+    /// @notice A seat finished a place (place 1..seatCount). The contract records
+    ///         it and decides the crown; the frontend only draws it.
+    event SeatFinished(uint64 indexed matchRef, uint8 seat, uint8 place, bool crowned);
+    event ResultCredited(uint64 indexed matchRef, uint8 seat, address player, bytes32 gameTag, uint64 points, uint8 place);
     event MatchFinished(uint64 indexed matchRef, uint8 winner);
 
     error NotPlayerAccount();
@@ -129,9 +136,11 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         address[4] calldata players,
         bool[4] calldata isComputer,
         uint8 seatCount,
+        uint8 userSeat,
         bytes32 seedCommit
     ) external {
         if (seatCount != 2 && seatCount != 4) revert BadSeat();
+        if (userSeat >= seatCount) revert BadSeat();
         Match storage m = _matches[matchRef];
         if (m.initialized) revert BadStatus();
         m.sessionId = sessionId;
@@ -142,6 +151,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         m.winner = 255;
         m.turn = 0;
         m.moveCount = 0;
+        m.userSeat = userSeat;
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
         m.initialized = true;
         for (uint8 s = 0; s < seatCount; s++) {
@@ -214,9 +224,11 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         emit MoveApplied(matchRef, seat, tokenIndex, fromStep, tk.stepsWalked);
 
-        // Win check: all four tokens home.
-        if (m.seats[seat].tokensHome == 4) {
-            _finish(matchRef, m, seat);
+        // A seat finishes when all four tokens are home. Record its place and,
+        // if it is the user's seat, credit points BY POSITION. The crown is set
+        // here, on-chain, for the 1st-place seat.
+        if (m.seats[seat].tokensHome == 4 && !m.seats[seat].finished) {
+            _recordFinish(matchRef, m, seat);
         }
     }
 
@@ -271,25 +283,63 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
     // --------------------------------------------------------------- the finish
 
-    /// @dev End the match, credit points to the winner inside the room (a free
-    ///      write), and record the result. Points are credited at MATCH end, not
-    ///      at session settlement, so a batched session still credits per game.
-    function _finish(uint64 matchRef, Match storage m, uint8 winnerSeat) private {
-        m.status = 2;
-        m.winner = winnerSeat;
-        m.seats[winnerSeat].finished = true;
-        address winner = m.seats[winnerSeat].player;
+    /// @dev Record a seat's finishing place, decide the crown, and credit the
+    ///      logged-in user BY POSITION. This is where a Ludo match earns points.
+    ///
+    ///      SCORING (owner, this demo's own table; it does NOT use M3/M4):
+    ///        4 seats: 1st 100, 2nd 50, 3rd 25, 4th 0
+    ///        2 seats: 1st 100, 2nd 0
+    ///      ONLY the logged-in user's seat can be credited. An opponent seat still
+    ///      finishes and is recorded (it wins its place), but it earns 0 points,
+    ///      because opponent seats share the sponsor account and a computer needs
+    ///      no points.
+    ///
+    ///      THE CROWN IS ON-CHAIN: the 1st-place seat's `crowned` flag is set by
+    ///      this contract. The frontend only draws the crown image where the
+    ///      contract says it sits.
+    ///
+    ///      Points are credited inside the room at the moment the place is won,
+    ///      not at session settlement, so a batched session still credits per
+    ///      game.
+    function _recordFinish(uint64 matchRef, Match storage m, uint8 seat) private {
+        m.seats[seat].finished = true;
+        uint8 place = m.finishCount + 1;          // 1-based place
+        m.finishOrder[m.finishCount] = seat;
+        m.finishCount = place;
 
-        uint64 points = m.seatCount == 2 ? 100 : 100; // 4-player uses identity order elsewhere
-        IFoskaayGGIDemoPlayer(playerAccount).credit(winner, m.gameTag, points, 1, matchRef);
-        IFoskaayGGIDemoPlayer(playerAccount).recordResult(winner, m.gameTag, true, matchRef);
-        for (uint8 s = 0; s < m.seatCount; s++) {
-            if (s == winnerSeat) continue;
-            IFoskaayGGIDemoPlayer(playerAccount).recordResult(m.seats[s].player, m.gameTag, false, matchRef);
+        bool crowned = (place == 1);
+        if (crowned) {
+            m.winner = seat;
+            m.seats[seat].crowned = true;
         }
+        emit SeatFinished(matchRef, seat, place, crowned);
 
-        emit ResultCredited(matchRef, winnerSeat, winner, m.gameTag, points);
-        emit MatchFinished(matchRef, winnerSeat);
+        // Credit ONLY the logged-in user's seat, and only by its own place.
+        uint64 points = 0;
+        uint8 reason = 0;
+        if (seat == m.userSeat) {
+            if (place == 1) { points = 100; reason = 1; }
+            else if (place == 2) { points = m.seatCount == 4 ? 50 : 0; reason = 2; }
+            else if (place == 3) { points = m.seatCount == 4 ? 25 : 0; reason = 3; }
+            // place 4 is always 0
+            if (points > 0) {
+                IFoskaayGGIDemoPlayer(playerAccount).credit(m.seats[seat].player, m.gameTag, points, reason, matchRef);
+            }
+            IFoskaayGGIDemoPlayer(playerAccount).recordResult(m.seats[seat].player, m.gameTag, place == 1, matchRef);
+        } else {
+            // Opponent: truthful result, zero points.
+            IFoskaayGGIDemoPlayer(playerAccount).recordResult(m.seats[seat].player, m.gameTag, place == 1, matchRef);
+        }
+        emit ResultCredited(matchRef, seat, m.seats[seat].player, m.gameTag, points, place);
+
+        // The match ends in 2-seat Ludo the moment 1st is decided (ludo-lab
+        // auto-ends), and in 4-seat Ludo once the top three places are decided
+        // (the last seat earns 0 anyway, so there is nothing left to play for).
+        uint8 placesToDecide = m.seatCount == 2 ? 1 : 3;
+        if (m.finishCount >= placesToDecide) {
+            m.status = 2;
+            emit MatchFinished(matchRef, m.winner);
+        }
     }
 
     // ---------------------------------------------------------------- helpers
@@ -321,6 +371,18 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     function seatOf(uint64 matchRef, uint8 seat) external view returns (address player, bool isComputer, uint8 tokensHome) {
         Match storage m = _matches[matchRef];
         return (m.seats[seat].player, m.seats[seat].isComputer, m.seats[seat].tokensHome);
+    }
+
+    /// @notice The on-chain crown: the seat the contract crowned (255 = none yet).
+    function crownedSeat(uint64 matchRef) external view returns (uint8) {
+        Match storage m = _matches[matchRef];
+        return m.finishCount > 0 ? m.finishOrder[0] : 255;
+    }
+
+    /// @notice The finish order so far (seat indices, 1st place first).
+    function finishOrderOf(uint64 matchRef) external view returns (uint8[4] memory order, uint8 count) {
+        Match storage m = _matches[matchRef];
+        return (m.finishOrder, m.finishCount);
     }
 
     function tokenOf(uint64 matchRef, uint8 seat, uint8 tokenIndex) external view returns (int16 stepsWalked) {
