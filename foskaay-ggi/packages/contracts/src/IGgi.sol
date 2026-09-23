@@ -1,121 +1,106 @@
 // @foskaay/ggi-contracts-sdk — Solidity interfaces for Foskaay Gasless Games Infrastructure (Foskaay GGI).
 //
-// These are the FOUR core contracts. Copy them into your own contract, or import
-// this package, and call them directly. Nothing here is opinionated: no account
-// layout, no commit cadence, no game concept.
+// Foskaay GGI is TWO core contracts. Import this package (or copy these
+// interfaces) and call them directly. Nothing here is opinionated: no account
+// layout, no commit cadence, no game concept. The rail never learns your game.
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// CORE 1: open/close a session; participant authorities; session keys (scope + expiry).
+/// CORE 1: the room. Connect a session (paying the fee), settle the result, and
+/// get free pure randomness. Every move inside runs off-chain for free.
 interface ISessionRegistry {
-    struct Session {
-        address owner;
-        uint8 status; // 0 = None, 1 = Open, 2 = Closed
-        uint8 participantCount;
-        uint64 createdAt;
-        uint64 expiresAt;
-        uint64 closedAt;
-        bytes32 rulesHash;
-        bytes32 seedCommit;
-    }
-
-    struct SessionKey {
-        address owner;
-        uint64 validUntil;
-        bytes32 scopeHash;
-        bool revoked;
-    }
-
-    function open(uint8 participantCount, uint64 ttlSecs, bytes32 rulesHash, bytes32 seedCommit)
-        external
-        returns (bytes32 sessionId);
-
-    function setAuthority(bytes32 sessionId, uint8 seat, address authority) external;
-    function close(bytes32 sessionId) external;
-    function registerSessionKey(address key, uint64 validUntil, bytes32 scopeHash) external;
-    function revokeSessionKey(address key) external;
-
-    function getSession(bytes32 sessionId) external view returns (Session memory);
-    function authorityOf(bytes32 sessionId, uint8 seat) external view returns (address);
-    function setGameState(bytes32 sessionId, address stateAccount) external;
-    function gameStateOf(bytes32 sessionId) external view returns (address);
-    function isLive(bytes32 sessionId) external view returns (bool);
-    function canSign(bytes32 sessionId, uint8 seat, address who) external view returns (bool);
-    function isSessionKeyLive(address key) external view returns (bool);
-    function sessionKeyOf(address key) external view returns (SessionKey memory);
-
-    // Event-based Foskaay GGI Midchain (cheap anchor). Additive; the storage paths above are unchanged.
+    /// Connect a session. `msg.value` must equal the FeeVault fee; it is forwarded
+    /// to the FeeVault in this same transaction, so a session cannot start unpaid.
     function handover(
         bytes32 sessionId,
         address gameLogic,
         bytes32 startHash,
+        bytes32 seedCommit,
         address[] calldata players,
         address[] calldata sessionKeys,
         uint16 randomCount
-    ) external;
+    ) external payable;
+
+    /// Connect MANY sessions in one transaction (msg.value = fee x count).
     function handoverMany(
         bytes32[] calldata sessionIds,
         address gameLogic,
         bytes32[] calldata startHashes,
+        bytes32[] calldata seedCommits,
         address[][] calldata players,
         address[][] calldata sessionKeys,
         uint16 randomCount
+    ) external payable;
+
+    /// Settle ONE session: every declared signer must have signed
+    /// (sessionId, finalHash). `finalHash` may be one game's final hash or a
+    /// whole session's Merkle root. Refused unless the session was paid.
+    function settle(
+        bytes32 sessionId,
+        bytes32 finalHash,
+        bytes32 seedReveal,
+        bytes[] calldata sigs,
+        address[] calldata signers
     ) external;
-    function settle(bytes32 sessionId, bytes32 finalHash, bytes[] calldata sigs, address[] calldata signers) external;
+
+    /// Settle MANY sessions in one transaction.
     function settleMany(
         bytes32[] calldata sessionIds,
         bytes32[] calldata finalHashes,
+        bytes32[] calldata seedReveals,
         bytes[][] calldata sigs,
         address[][] calldata signers
     ) external;
+
+    /// The exact digest a participant signs to authorise a settlement. Bound to
+    /// this contract and chain, so a signature cannot be replayed elsewhere.
     function midchainDigest(bytes32 sessionId, bytes32 finalHash) external view returns (bytes32);
-}
 
-/// CORE 2: accept signed session events (opaque payload + sequence + digest).
-interface ISessionState {
-    struct State {
-        bytes32 digest;
-        uint16 eventCount;
-        uint64 lastSequence;
-        bytes32 lastPayloadHash;
-        bool committed;
-    }
+    /// FREE randomness: keccak(seed, counter), computed via eth_call at no cost.
+    function random(bytes32 seed, uint256 counter) external pure returns (bytes32);
 
-    function recordEvent(bytes32 sessionId, uint8 seat, uint64 sequence, bytes32 payloadHash) external;
-    function commitDigest(bytes32 sessionId, bytes32 digest, uint16 eventCount) external;
-    function sealFinal(bytes32 sessionId, bytes32 digest) external;
+    /// FREE randomness: N seeds in one call.
+    function randomN(bytes32 seed, uint256 counter, uint256 count) external pure returns (bytes32[] memory);
 
-    function getState(bytes32 sessionId) external view returns (State memory);
-    function digestOf(bytes32 sessionId) external view returns (bytes32);
-    function finalDigest(bytes32 sessionId) external view returns (bytes32);
-}
+    /// The FeeVault this registry forwards the fee to.
+    function feeVault() external view returns (address);
 
-/// CORE 3: commit-reveal seed(s); derive hash(seed, counter). Used only if a game asks.
-interface IRandomness {
-    function declareStreams(bytes32 sessionId, uint8 count) external;
-    function reveal(bytes32 sessionId, bytes32[] calldata seeds) external;
-
-    function commitHashOf(bytes32[] calldata seeds) external pure returns (bytes32);
-    function derive(bytes32 seed, uint64 counter) external pure returns (bytes32);
-    function deriveFor(bytes32 sessionId, uint8 stream, uint64 counter) external view returns (bytes32);
-    function seedsOf(bytes32 sessionId) external view returns (bytes32[] memory);
-    function revealed(bytes32 sessionId) external view returns (bool);
-    function streamCountOf(bytes32 sessionId) external view returns (uint8);
-}
-
-/// CORE 4: per-session fee collection; configurable destination.
-interface IFeeVault {
-    function chargeOpen(bytes32 sessionId) external;
-    function chargeSettle(bytes32 sessionId) external;
-    function withdraw(address token) external;
-
-    function openFee() external view returns (uint256);
-    function settleFee() external view returns (uint256);
-    function feeToken() external view returns (address);
+    /// The upgrade/config owner.
     function owner() external view returns (address);
+}
+
+/// CORE 2: the cashier. Holds the per-session fee and lets the owner withdraw it.
+/// ONLY the SessionRegistry can record a payment, so the fee cannot be bypassed.
+interface IFeeVault {
+    /// Record one paid session. Only the SessionRegistry may call it; msg.value
+    /// must equal the fee. Normally reached through SessionRegistry.handover.
+    function deposit(bytes32 sessionId) external payable;
+
+    /// Record MANY paid sessions in one call (msg.value = fee x count).
+    function depositMany(bytes32[] calldata sessionIds) external payable;
+
+    /// Withdraw all collected native USDC to the destination (owner only).
+    function withdraw() external;
+
+    /// The per-session fee, in native USDC base units (18 decimals on Arc).
+    function fee() external view returns (uint256);
+
+    /// Whether a session was paid at connect.
+    function paid(bytes32 sessionId) external view returns (bool);
+
+    /// Same as `paid`, named for readability.
+    function paymentOf(bytes32 sessionId) external view returns (bool);
+
+    /// The only contract allowed to record a payment (the SessionRegistry).
+    function sessionRegistry() external view returns (address);
+
+    /// Native USDC collected and withdrawable.
+    function collected() external view returns (uint256);
+
+    /// Where withdrawals go.
     function destination() external view returns (address);
-    function collected(address token) external view returns (uint256);
-    function lockedSettleFee(bytes32 sessionId) external view returns (uint256);
-    function paymentOf(bytes32 sessionId) external view returns (address openPayer, address settlePayer);
+
+    /// The config owner.
+    function owner() external view returns (address);
 }

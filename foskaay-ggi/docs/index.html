@@ -174,27 +174,25 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
     <section class="ggi-card" id="contracts">
         <h2 class="ggi-h2">Contracts</h2>
         <p class="ggi-body">
-            The same four core contracts are deployed per network. The addresses below are public and
-            safe to use in your app.
+            Foskaay GGI is <b>two core contracts</b>, deployed per network. The addresses below are
+            public and safe to use in your app.
         </p>
 
         <div class="ggi-h3"><span class="ggi-pill testnet">TESTNET</span> Arc Testnet (chain id 5042002)</div>
         <p class="ggi-body">
-            These addresses are <b>permanent</b>. The contracts are upgradeable behind
-            proxies, so improving the rail never changes an address and never moves
-            your data.
+            These addresses are <b>permanent</b>. The contracts are upgradeable behind UUPS proxies, so
+            improving the rail never changes an address and never moves your data.
         </p>
         <table class="ggi-table">
-            <thead><tr><th>Contract</th><th>Address</th></tr></thead>
+            <thead><tr><th>Contract</th><th>Responsibility</th><th>Address</th></tr></thead>
             <tbody>
-                <tr><td>SessionRegistry</td><td class="ggi-mono">0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5</td></tr>
-                <tr><td>SessionState</td><td class="ggi-mono">0x34945e897Ec9a5CC4ab41d78c8ABe3B5034C5c8e</td></tr>
-                <tr><td>Randomness</td><td class="ggi-mono">0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b</td></tr>
-                <tr><td>FeeVault</td><td class="ggi-mono">0x4cf542791faeb683f878bd3d119683e0C02F9905</td></tr>
-                <tr><td>BatchedSettlement <span class="ggi-pill" style="background:rgba(155,89,182,0.16);color:#9b59b6;border:1px solid rgba(155,89,182,0.4);">OPTIONAL</span></td><td class="ggi-mono">0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4</td></tr>
+                <tr><td>SessionRegistry</td><td>Connect a session (paying the fee), settle the result, free randomness</td><td class="ggi-mono">0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE</td></tr>
+                <tr><td>FeeVault</td><td>The per-session fee; only the registry can deposit; owner withdraws</td><td class="ggi-mono">0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39</td></tr>
             </tbody>
         </table>
         <p class="ggi-tiny">
+            Fee <span class="ggi-mono">0.001 native USDC</span> per session, charged at connect and
+            required before a session can settle. &nbsp;|&nbsp;
             RPC <span class="ggi-mono">https://rpc.testnet.arc.io</span> &nbsp;|&nbsp;
             Explorer <span class="ggi-mono">https://explorer.testnet.arc.io</span> &nbsp;|&nbsp;
             USDC <span class="ggi-mono">0x3600000000000000000000000000000000000000</span>
@@ -205,8 +203,6 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
             <thead><tr><th>Contract</th><th>Address</th></tr></thead>
             <tbody>
                 <tr><td>SessionRegistry</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
-                <tr><td>SessionState</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
-                <tr><td>Randomness</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
                 <tr><td>FeeVault</td><td class="ggi-mono">Not deployed yet (testnet first)</td></tr>
             </tbody>
         </table>
@@ -215,6 +211,7 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
             the SDK hardcodes these, so switching networks is one setting.
         </p>
     </section>
+
 
     <section class="ggi-card" id="fees">
         <h2 class="ggi-h2">Fees</h2>
