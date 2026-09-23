@@ -66,7 +66,7 @@ Always `git fetch origin` before comparing to main (local main is stale).
 - **arcv2m17 is a DIFFERENT, discarded design (GFG-BS).** Never merge it with
   arcv2m18. Never rename arcv2m17's `GFG-BS` references.
 - Folder: `foskaay-ggi/` (its own Foundry project). Docs page: `/foskaay-ggi-docs/`.
-  Explorer: `/ggi-explorer/`. Demos homepage: `/ggi-demos/`.
+  Explorer: `/foskaay-ggi-explorer/`. Demos homepage: `/foskaay-ggi-demos/`.
 
 ### Why it exists / the EVM vs SVM truth
 
@@ -138,14 +138,14 @@ Always `git fetch origin` before comparing to main (local main is stale).
   `createSessionKey`/`signAction`/`actSigned`/`verifyAction`, read helpers,
   `setGameState`/`gameStateOf`, `fees()` reads the fee at runtime), plus a ready
   browser bundle at `dist/ggi-sdk.browser.js` (`window.GgiSdk`).
-- Publish flow (beginner guide: `docs/ggi-npm-publishing-guide.md`): bump both,
+- Publish flow (beginner guide: `docs/foskaay-ggi-npm-publishing-guide.md`): bump both,
   regenerate the browser bundle, `npm pack`, publish contracts FIRST then sdk,
   poll the registry for propagation, then CLEAN INSTALL in a temp folder to prove
   a stranger can install. `@foskaay/ggi-sdk` must depend on the matching
   `@foskaay/ggi-contracts` version.
 
 ### Sponsor relay (serverless, sponsor pays, players never do)
-- `api_handlers/ggi-sponsor.mjs`, route `/api/ggi-sponsor` registered in
+- `api_handlers/foskaay-ggi-sponsor.mjs`, route `/api/foskaay-ggi-sponsor` registered in
   `api/index.mjs` (single serverless function rule) and mirrored in
   `scripts/relay-server.mjs` for local dev.
 - Env: `GFG_Arc_Gasless_Sponsor_Key` + `GFG_Arc_RPC`.
@@ -156,7 +156,7 @@ Always `git fetch origin` before comparing to main (local main is stale).
   from the receipt) so the UI can show true spend. **Never hardcode cost estimates.**
 - Found by the outsider test: a session opened WITHOUT `setAuthority` can never
   settle (`sealFinal` needs a seat authority). The relay sets authorities at open.
-- Game contract addresses live in `api_handlers/ggi-sponsor.mjs` `ADDR` (data, no
+- Game contract addresses live in `api_handlers/foskaay-ggi-sponsor.mjs` `ADDR` (data, no
   build dependency) and in `foskaay-ggi/deployments/arc-testnet.json`.
 
 ### Cost (MEASURED, never claimed)
@@ -173,8 +173,8 @@ Always `git fetch origin` before comparing to main (local main is stale).
   v5 target of $1/1,000 at just 5 games per batch.
 - Recorded in `foskaay-ggi/deployments/`: `generals-cost.json`, `midchain-cost.json`,
   `midchain-cost-batched.json`, `eventmidchain-cost.json`, `eventmidchain-batch-cost.json`.
-- Re-measure with `node scripts/ggi-midchain-match.mjs`,
-  `node scripts/ggi-eventmidchain-match.mjs`, `node scripts/ggi-eventmidchain-batch.mjs`.
+- Re-measure with `node scripts/foskaay-ggi-midchain-match.mjs`,
+  `node scripts/foskaay-ggi-eventmidchain-match.mjs`, `node scripts/foskaay-ggi-eventmidchain-batch.mjs`.
 
 ---
 
@@ -220,9 +220,9 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   start/command/tick/finish`, every action gated by `canSign`, `tick` permissionless,
   `boardView` one-call read. Rules copied exactly. Deployed to Arc testnet.
 - **PvP demo page** `ggi-demos/pvp/generals/index.html`: MagicBlock's own graphics
-  (`public/ggi-assets/generals/`), reads the board from chain via the relay
+  (`public/foskaay-ggi-assets/generals/`), reads the board from chain via the relay
   `gameBoard`, sends moves via the relay `game` action, no localStorage, no player
-  gas. Linked from the PvP card on `/ggi-demos/`. Vite input added.
+  gas. Linked from the PvP card on `/foskaay-ggi-demos/`. Vite input added.
 - **The midchain finding** recorded in `foskaay-ggi/foskaay-ggi-build-guide-v5.md`
   section 9, the Research library entry `ggi-midchain`, and `arcv2m18`.
 - **`GeneralsMidchain.sol`** (pure rules engine, no storage) + `GeneralsMidchain.t.sol`
@@ -259,10 +259,10 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 - Tests (Foundry has ONE test path, so tests live in `test/`):
   `test/GeneralsGame.t.sol`, `test/GeneralsMidchain.t.sol`, `test/EventMidchainCore.t.sol`
 - Demo page: `ggi-demos/pvp/generals/index.html`; graphics in
-  `public/ggi-assets/generals/`; Vite input `ggi-demos-pvp-generals`.
-- Scripts: `scripts/ggi-deploy-generals.mjs`, `ggi-generals-match.mjs`,
-  `ggi-deploy-midchain.mjs`, `ggi-midchain-match.mjs`, `ggi-deploy-eventmidchain.mjs`,
-  `ggi-eventmidchain-match.mjs`, `ggi-eventmidchain-batch.mjs`.
+  `public/foskaay-ggi-assets/generals/`; Vite input `foskaay-ggi-demos-pvp-generals`.
+- Scripts: `scripts/foskaay-ggi-deploy-generals.mjs`, `foskaay-ggi-generals-match.mjs`,
+  `foskaay-ggi-deploy-midchain.mjs`, `foskaay-ggi-midchain-match.mjs`, `foskaay-ggi-deploy-eventmidchain.mjs`,
+  `foskaay-ggi-eventmidchain-match.mjs`, `foskaay-ggi-eventmidchain-batch.mjs`.
 - Owner rule: **no `examples/` folder.** Games live under their genre
   (`demos/<genre>/`); rail prototypes live in `foskaay-ggi/prototypes/`.
 
@@ -340,10 +340,10 @@ the demo.
 export PATH="$HOME/.foundry/bin:$PATH"        # foundry not on PATH
 cd /home/foskaay/globalfolkgames/foskaay-ggi && forge test   # 148 passing expected
 cd /home/foskaay/globalfolkgames && npm run build            # must be green
-node scripts/ggi-midchain-match.mjs unbatched                # storage midchain, needs local relay
-node scripts/ggi-eventmidchain-match.mjs                     # event-based midchain, uses local key
-node scripts/ggi-eventmidchain-batch.mjs                     # event-based midchain batched 3/5/10/100
-node scripts/ggi-cost-measure.mjs            # re-measure Arc cost
+node scripts/foskaay-ggi-midchain-match.mjs unbatched                # storage midchain, needs local relay
+node scripts/foskaay-ggi-eventmidchain-match.mjs                     # event-based midchain, uses local key
+node scripts/foskaay-ggi-eventmidchain-batch.mjs                     # event-based midchain batched 3/5/10/100
+node scripts/foskaay-ggi-cost-measure.mjs            # re-measure Arc cost
 node scripts/gi-deploy-arc.mjs               # deploy core proxies (uses local key)
 ```
 

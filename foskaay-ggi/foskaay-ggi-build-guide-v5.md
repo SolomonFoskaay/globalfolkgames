@@ -359,7 +359,7 @@ What this tells us:
 
 - The midchain removes the per-move cost completely (the big win): the on-chain-board port spent most of its 0.098 on per-move `command`, `tick` and `generate` transactions, and all of that is now free `eth_call` plus a signature.
 - The remaining cost is the CORE's storage writes at open and settle, not the moves. The v5 target of about 1000 games per 1 USD needs an event-only handover/settle in the core (no SSTORE on the happy path, events for `eth_getLogs`) and/or larger batches. That is a future core change, kept separate so the 4 core + 1 optional stays stable for now.
-- Files: `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`, `foskaay-ggi/test/GeneralsMidchain.t.sol`, `scripts/ggi-midchain-match.mjs`, `foskaay-ggi/deployments/midchain-cost.json` and `midchain-cost-batched.json`.
+- Files: `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`, `foskaay-ggi/test/GeneralsMidchain.t.sol`, `scripts/foskaay-ggi-midchain-match.mjs`, `foskaay-ggi/deployments/midchain-cost.json` and `midchain-cost-batched.json`.
 - `GeneralsMidchain` deployed on Arc testnet: `0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2`.
 
 ### 9.8 Event-only handover/settle TESTED (Arc testnet, 2026-09-22)
@@ -383,7 +383,7 @@ What this proves and what it costs:
 - The trade-off is honest and must be designed for: with no storage there is no on-chain `isLive`, no authority map and no replay guard, so the truth is the emitted event plus the signatures. A shipping core would keep a tiny amount of state (or a nullifier) to prevent replay, which adds a little gas but far less than the current full session struct.
 - To make this the default for Foskaay GGI, the change is a NEW event-only handover/settle contract (or a UUPS logic upgrade of the core), plus the SDK gaining `handover`/`settle`/`signMove` helpers. That is a decision for the owner once the batched event-only number is measured.
 
-Files: `foskaay-ggi/prototypes/EventOnlyCore.sol`, `foskaay-ggi/test/EventOnlyCore.t.sol`, `scripts/ggi-eventonly-match.mjs`, `foskaay-ggi/deployments/eventonly-cost.json`. `EventOnlyCore` deployed on Arc testnet: `0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c`. 147/147 forge tests pass.
+Files: the first version, since renamed to `EventMidchainCore` (`foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/foskaay-ggi-eventmidchain-match.mjs`). The first contract was deployed at `0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c`. 147/147 forge tests pass.
 
 ### 9.9 The event-based MIDCHAIN, batched (owner-approved test, 2026-09-23)
 
@@ -437,4 +437,4 @@ Read it plainly:
 - SDK (republish, no chain change): add `handover` / `handoverMany` / `settle` / `settleMany` / `signMove` / `verifyMidchain` helpers and the event-based ABIs. Bump `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
 - BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched; the rail never forces a cadence.
 
-Files: `foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/ggi-deploy-eventmidchain.mjs`, `scripts/ggi-eventmidchain-match.mjs`, `scripts/ggi-eventmidchain-batch.mjs`, `foskaay-ggi/deployments/eventmidchain-cost.json` and `eventmidchain-batch-cost.json`. `EventMidchainCore` deployed on Arc testnet: `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`. 148/148 forge tests pass.
+Files: `foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/foskaay-ggi-deploy-eventmidchain.mjs`, `scripts/foskaay-ggi-eventmidchain-match.mjs`, `scripts/foskaay-ggi-eventmidchain-batch.mjs`, `foskaay-ggi/deployments/eventmidchain-cost.json` and `eventmidchain-batch-cost.json`. `EventMidchainCore` deployed on Arc testnet: `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`. 148/148 forge tests pass.

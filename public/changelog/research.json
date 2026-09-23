@@ -660,7 +660,7 @@
           "bullets": [
             "The midchain removes the per-move cost completely (the big win): the on-chain-board port spent most of its 0.098 on per-move command, tick and generate transactions, and all of that is now free eth_call plus a signature.",
             "The remaining cost is the CORE's storage writes at open and settle, not the moves. The v5 target of about 1000 games per 1 USD needs an event-only handover/settle in the core (no SSTORE on the happy path) and/or larger batches. That is a future core change, kept separate so the 4 core + 1 optional stays stable for now.",
-            "GeneralsMidchain deployed on Arc testnet: 0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2. Files: foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol, test/GeneralsMidchain.t.sol, scripts/ggi-midchain-match.mjs, deployments/midchain-cost.json and midchain-cost-batched.json."
+            "GeneralsMidchain deployed on Arc testnet: 0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2. Files: foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol, test/GeneralsMidchain.t.sol, scripts/foskaay-ggi-midchain-match.mjs, deployments/midchain-cost.json and midchain-cost-batched.json."
           ]
         },
         {
@@ -690,7 +690,7 @@
             "UNBATCHED means each game's handover and settle go to Arc as they happen (2 transactions), so the result is on-chain immediately. BATCHED means many games share ONE transaction (one handoverMany carries many handovers, one settleMany carries many settlements), which is cheaper because the 21k base fee is shared. The trade-off is that a game's on-chain event lands when the batch transaction lands, so the DEV picks the cadence. It is not a gameplay delay: moves are already signed and free, and the Foskaay GGI explorer can show the game from the signed move log immediately.",
             "In a batched session each game still emits its OWN Handover and Settled event inside the batch transaction, so the explorer can show every game individually. A user does not have to trust that it will go onchain: the events are on-chain and the proof is the replay. The only thing they wait for is the batch transaction.",
             "What has to change: CORE (no new address) add event-based handover/handoverMany/settle/settleMany to the existing core via a UUPS logic upgrade (same proxy, append-only storage) plus a nullifier mapping (sessionId => settled) to stop double settlement; storage-based sessions stay as they are, nothing merged, no data moved. SDK (republish, no chain change) add handover/handoverMany/settle/settleMany/signMove/verifyMidchain helpers. BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched.",
-            "EventMidchainCore deployed on Arc testnet: 0x197DE9813bd8cF668C8C26455329C629EE9Fc63e. Files: foskaay-ggi/prototypes/EventMidchainCore.sol, test/EventMidchainCore.t.sol, scripts/ggi-deploy-eventmidchain.mjs, ggi-eventmidchain-match.mjs, ggi-eventmidchain-batch.mjs, deployments/eventmidchain-cost.json and eventmidchain-batch-cost.json."
+            "EventMidchainCore deployed on Arc testnet: 0x197DE9813bd8cF668C8C26455329C629EE9Fc63e. Files: foskaay-ggi/prototypes/EventMidchainCore.sol, test/EventMidchainCore.t.sol, scripts/foskaay-ggi-deploy-eventmidchain.mjs, foskaay-ggi-eventmidchain-match.mjs, foskaay-ggi-eventmidchain-batch.mjs, deployments/eventmidchain-cost.json and eventmidchain-batch-cost.json."
           ]
         }
       ]

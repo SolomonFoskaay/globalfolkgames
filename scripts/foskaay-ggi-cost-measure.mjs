@@ -1,4 +1,4 @@
-// scripts/ggi-cost-measure.mjs — measure the REAL Arc cost of a Foskaay GGI game session.
+// scripts/foskaay-ggi-cost-measure.mjs — measure the REAL Arc cost of a Foskaay GGI game session.
 //
 // WHY: the whole pitch is "cheaper than per-action, $1 = 500-1000 games". That
 // number must be measured on-chain, never assumed. This runs a realistic session
@@ -7,7 +7,7 @@
 // It reads the deployer key from ~/.config/gfg/arc-sponsor.json and never prints
 // it. Addresses come from the published @foskaay/ggi-contracts data.
 //
-// Usage:  node scripts/ggi-cost-measure.mjs
+// Usage:  node scripts/foskaay-ggi-cost-measure.mjs
 import { readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';

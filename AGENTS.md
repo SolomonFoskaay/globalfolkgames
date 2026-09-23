@@ -433,7 +433,7 @@ long-form note is `docs/foskaay-ggi-spec.md`; the public docs page is
   npm; the SDK reads the per-session fee at runtime, never hardcoded.
 - **Cost (measured, never claimed):** ~63 games/$1 unbatched on Arc testnet;
   batching is the path to hundreds-to-thousands. Always re-measure with
-  `node scripts/ggi-cost-measure.mjs` and update the recorded numbers.
+  `node scripts/foskaay-ggi-cost-measure.mjs` and update the recorded numbers.
 
 ## Core architecture (current)
 

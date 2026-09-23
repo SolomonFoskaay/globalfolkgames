@@ -1,4 +1,4 @@
-// scripts/ggi-eventmidchain-batch.mjs — measure the EVENT-BASED MIDCHAIN, batched.
+// scripts/foskaay-ggi-eventmidchain-batch.mjs — measure the EVENT-BASED MIDCHAIN, batched.
 //
 // The event-based midchain binds the session and the game in ONE Handover event
 // (no separate link tx), and its batch functions hand over / settle MANY games in
@@ -10,7 +10,7 @@
 // SECURITY: the sponsor key comes from ~/.config/gfg/arc-sponsor.json and is
 // NEVER printed, logged, or committed.
 //
-// Usage:  node scripts/ggi-eventmidchain-batch.mjs [moveCount]
+// Usage:  node scripts/foskaay-ggi-eventmidchain-batch.mjs [moveCount]
 import { readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';
