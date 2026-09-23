@@ -36,22 +36,22 @@ const bal = (a) => pub.readContract({ address: USDC, abi: erc20Abi, functionName
 (async () => {
   const me = getAddress(account.address);
   const before = await bal(me);
-  console.log('EventOnlyCore deploy -> Arc Testnet');
+  console.log('EventMidchainCore deploy -> Arc Testnet');
   console.log('deployer/sponsor (public):', me, '\n');
-  const { abi, bytecode } = artifact('EventOnlyCore');
+  const { abi, bytecode } = artifact('EventMidchainCore');
   const hash = await wallet.deployContract({ abi, bytecode, args: [] });
   const rc = await pub.waitForTransactionReceipt({ hash });
   if (rc.status !== 'success') throw new Error('deploy reverted: ' + hash);
   const address = getAddress(rc.contractAddress);
   const after = await bal(me);
-  console.log('EventOnlyCore');
+  console.log('EventMidchainCore');
   console.log('  address :', address);
   console.log('  tx      :', hash);
   console.log('  explorer:', rec.explorer + '/tx/' + hash);
   console.log('  gas usdc:', formatUnits(before - after, 6), '\n');
   if (!rec.contracts || !rec.contracts.SessionRegistry) throw new Error('arc-testnet.json shape unexpected; refusing to write');
-  rec.contracts.EventOnlyCore = address;
-  rec.eventOnlyCoreDeployedAt = new Date().toISOString();
+  rec.contracts.EventMidchainCore = address;
+  rec.eventMidchainCoreDeployedAt = new Date().toISOString();
   writeFileSync(recPath, JSON.stringify(rec, null, 2) + '\n');
-  console.log('address written: foskaay-ggi/deployments/arc-testnet.json (contracts.EventOnlyCore)');
+  console.log('address written: foskaay-ggi/deployments/arc-testnet.json (contracts.EventMidchainCore)');
 })().catch((e) => { console.error('deploy failed:', e.shortMessage || e.message || e); process.exit(1); });

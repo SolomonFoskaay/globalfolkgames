@@ -161,14 +161,17 @@ Always `git fetch origin` before comparing to main (local main is stale).
 
 ### Cost (MEASURED, never claimed)
 - On-chain-board port (GeneralsGame): 0.098172 USDC/match, about 10 games/$1.
-- Core-based midchain unbatched: 0.012206 USDC/match, about 81 games/$1.
-- Core-based midchain batched (3/window): 0.009788 USDC/match, about 102 games/$1.
-- Event-only handover + settle prototype (unbatched): 0.001709 USDC/match, about
-  585 games/$1 (handover 0.000780, settle 0.000929). The path to the v5 target.
-- Recorded in `foskaay-ggi/deployments/generals-cost.json`,
-  `midchain-cost.json`, `midchain-cost-batched.json`, `eventonly-cost.json`.
-- Re-measure with `node scripts/ggi-midchain-match.mjs` and
-  `node scripts/ggi-eventonly-match.mjs`.
+- Storage midchain unbatched: 0.012206 USDC/match, about 81 games/$1.
+- Storage midchain batched: about 0.0090 to 0.0098 USDC/match, about 102 to 113
+  games/$1 (flat under batching because each game still pays a per-game SSTORE open).
+- Event-based midchain unbatched: 0.001712 USDC/match, about 584 games/$1.
+- Event-based midchain batched: 3 = 0.001098 (about 910), 5 = 0.000939 (about 1,064),
+  10 = 0.000820 (about 1,219), 100 = 0.000713 (about 1,403) games/$1. Crosses the
+  v5 target of $1/1,000 at just 5 games per batch.
+- Recorded in `foskaay-ggi/deployments/`: `generals-cost.json`, `midchain-cost.json`,
+  `midchain-cost-batched.json`, `eventmidchain-cost.json`, `eventmidchain-batch-cost.json`.
+- Re-measure with `node scripts/ggi-midchain-match.mjs`,
+  `node scripts/ggi-eventmidchain-match.mjs`, `node scripts/ggi-eventmidchain-batch.mjs`.
 
 ---
 
@@ -223,10 +226,18 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   (5 tests). Moves run free via `eth_call`, signed with EIP-712 and hash-chained;
   only session open + settle touch the chain. Verifier replay PASS. Measured:
   0.012206 USDC/match unbatched (about 81 games/$1), 0.009788 batched (about 102).
-- **`EventOnlyCore.sol`** (event-only handover/settle prototype, no storage) +
-  `EventOnlyCore.t.sol` (4 tests). Measured: 0.001709 USDC/match (about 585 games/$1).
-- **147/147 forge tests pass.** Commits: `7c6b967`, `5513e92`, `888faa8`, `b015d15`,
-  `44796dc`, `8802b85` (plus this handoff update).
+- **`EventMidchainCore.sol`** (the EVENT-BASED MIDCHAIN, no storage) +
+  `EventMidchainCore.t.sol` (5 tests). It is still the MIDCHAIN (neither fully on
+  base nor offchain; event-based, not offchain). The game link is INSIDE the
+  `Handover` event, so no separate `setGameState` tx (2 txs per game, not 3), and
+  the GGI explorer indexes it from `eth_getLogs`. It adds `handoverMany`/
+  `settleMany` so MANY games share ONE transaction. Measured per game: unbatched
+  0.001712 USDC (about 584 games/$1); batched 3 = 0.001098 (about 910); batched 5 =
+  0.000939 (about 1,064); batched 10 = 0.000820 (about 1,219); batched 100 =
+  0.000713 (about 1,403). Deployed `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`.
+  (The earlier `EventOnlyCore` at `0xB323...` was the first version, renamed.)
+- **148/148 forge tests pass.** Commits: `7c6b967`, `5513e92`, `888faa8`, `b015d15`,
+  `44796dc`, `8802b85`, `36d5095` (plus this handoff update).
 
 ### The midchain (the key idea, do not lose it)
 - On-chain (truth): the session, the start hash and the final hash. Only 2 or 3 txs.
@@ -241,30 +252,47 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 ### WHERE THE FILES ARE NOW (verified on disk)
 - Game (on-chain board): `foskaay-ggi/demos/pvp/generals/GeneralsGame.sol`
 - Game (midchain pure rules): `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`
-- Event-only prototype: `foskaay-ggi/prototypes/EventOnlyCore.sol`
+- Event-based midchain prototype: `foskaay-ggi/prototypes/EventMidchainCore.sol`
 - Tests (Foundry has ONE test path, so tests live in `test/`):
-  `test/GeneralsGame.t.sol`, `test/GeneralsMidchain.t.sol`, `test/EventOnlyCore.t.sol`
+  `test/GeneralsGame.t.sol`, `test/GeneralsMidchain.t.sol`, `test/EventMidchainCore.t.sol`
 - Demo page: `ggi-demos/pvp/generals/index.html`; graphics in
   `public/ggi-assets/generals/`; Vite input `ggi-demos-pvp-generals`.
 - Scripts: `scripts/ggi-deploy-generals.mjs`, `ggi-generals-match.mjs`,
-  `ggi-deploy-midchain.mjs`, `ggi-midchain-match.mjs`, `ggi-deploy-eventonly.mjs`,
-  `ggi-eventonly-match.mjs`.
+  `ggi-deploy-midchain.mjs`, `ggi-midchain-match.mjs`, `ggi-deploy-eventmidchain.mjs`,
+  `ggi-eventmidchain-match.mjs`, `ggi-eventmidchain-batch.mjs`.
 - Owner rule: **no `examples/` folder.** Games live under their genre
   (`demos/<genre>/`); rail prototypes live in `foskaay-ggi/prototypes/`.
 
 ### IMMEDIATE NEXT STEPS (in order)
-1. **Owner decision pending:** whether to test the BATCHED event-only variant
-   (`handoverMany`/`settleMany`, many sessions in one tx). Unbatched event-only is
-   already 585 games/$1; batching should reach the v5 target of about 1000 games/$1.
-2. **Then decide what goes into core:** event-only handover/settle needs a NEW
-   contract (or a UUPS logic upgrade) plus replay protection (a nullifier), and the
-   SDK needs `handover`/`settle`/`signMove` helpers. Do NOT change core without the
-   owner's explicit approval; record it in `architecture.json` first.
-3. **Wire the midchain into the SDK + frontend** so the demo page plays the free
-   midchain instead of the per-move board (frontend reads only, sponsor pays).
-4. Update the docs page (`foskaay-ggi-docs/index.html`) and republish the packages
+1. **Owner decision pending:** whether to build the event-based midchain into the
+   CORE and SDK. The proposal (NOT built, needs explicit approval + an
+   `architecture.json` update first):
+   - CORE (NO new address): add `handover`/`handoverMany`/`settle`/`settleMany` to
+     the EXISTING core via a UUPS logic upgrade (same proxy address, append-only
+     storage). The ONE new state is a nullifier mapping (sessionId => settled) so a
+     session cannot settle twice; it consumes from `__gap`. Storage-based sessions
+     stay as they are, nothing merged, no data moves.
+   - SDK (republish, no chain change): add `handover`/`handoverMany`/`settle`/
+     `settleMany`/`signMove`/`verifyMidchain` helpers.
+   - BATCHING STAYS OPTIONAL: the dev chooses unbatched (instant on-chain per game)
+     or batched (cheaper; the event lands with the batch).
+2. **Wire the midchain into the SDK + frontend** so the demo page plays the free
+   midchain (event-based) instead of the per-move board. Frontend reads only.
+3. Update the docs page (`foskaay-ggi-docs/index.html`) and republish the packages
    if the SDK/contracts change.
-5. Keep `architecture.json` `arcv2m18`, the Research entry, and this handoff in sync.
+4. Keep `architecture.json` `arcv2m18`, the Research entry, and this handoff in sync.
+
+### THE LINK / EXPLORER ANSWER (why the event-based midchain is fully provable)
+- Storage-based core: the session lives in `SessionRegistry` storage, so tying the
+  game to the session needed a separate `setGameState` tx (3 txs per game).
+- Event-based midchain: the `Handover` event carries `sessionId`, `gameLogic`,
+  `startHash`, `players`, `sessionKeys`. The link is IN the event, same tx (2 txs).
+  The GGI explorer reads `Handover` + `Settled` via `eth_getLogs`, replays the
+  signed move log through the game's pure rules, checks it hashes to the on-chain
+  final hash and that each signature recovers to the declared player. So the
+  midchain is tamper-proof, tied to the on-chain, and provable by anyone. In a
+  batch, each game still emits its OWN events inside the batch tx, so the explorer
+  shows every game individually.
 
 ### OUTSTANDING / UNTRACKED
 - `foskaay-ggi/foskaay-ggi-build-guide-v5.md` (now committed per owner 2026-09-22).
@@ -307,10 +335,11 @@ the demo.
 
 ```bash
 export PATH="$HOME/.foundry/bin:$PATH"        # foundry not on PATH
-cd /home/foskaay/globalfolkgames/foskaay-ggi && forge test   # 147 passing expected
+cd /home/foskaay/globalfolkgames/foskaay-ggi && forge test   # 148 passing expected
 cd /home/foskaay/globalfolkgames && npm run build            # must be green
-node scripts/ggi-midchain-match.mjs unbatched                # midchain, needs local relay
-node scripts/ggi-eventonly-match.mjs                         # event-only floor, uses local key
+node scripts/ggi-midchain-match.mjs unbatched                # storage midchain, needs local relay
+node scripts/ggi-eventmidchain-match.mjs                     # event-based midchain, uses local key
+node scripts/ggi-eventmidchain-batch.mjs                     # event-based midchain batched 3/5/10/100
 node scripts/ggi-cost-measure.mjs            # re-measure Arc cost
 node scripts/gi-deploy-arc.mjs               # deploy core proxies (uses local key)
 ```

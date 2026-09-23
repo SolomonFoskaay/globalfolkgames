@@ -26,11 +26,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const rec = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'arc-testnet.json'), 'utf8'));
 const RPC = process.env.GFG_Arc_RPC || rec.rpc;
 const MID = rec.contracts.GeneralsMidchain;
-const EOC = rec.contracts.EventOnlyCore;
-if (!MID || !EOC) throw new Error('missing GeneralsMidchain or EventOnlyCore; run the deploy scripts first');
+const EOC = rec.contracts.EventMidchainCore;
+if (!MID || !EOC) throw new Error('missing GeneralsMidchain or EventMidchainCore; run the deploy scripts first');
 
 const midArtifact = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'out', 'GeneralsMidchain.sol', 'GeneralsMidchain.json'), 'utf8'));
-const eocArtifact = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'out', 'EventOnlyCore.sol', 'EventOnlyCore.json'), 'utf8'));
+const eocArtifact = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'out', 'EventMidchainCore.sol', 'EventMidchainCore.json'), 'utf8'));
 
 const account = accountFor(JSON.parse(readFileSync(join(homedir(), '.config', 'gfg', 'arc-sponsor.json'), 'utf8')).key);
 const chain = defineChain({ id: rec.chainId, name: rec.name, nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
@@ -69,7 +69,7 @@ function buildMoveLog(n) {
   const p1 = privateKeyToAccount(generatePrivateKey());
   console.log('GGI EVENT-ONLY match -> Arc testnet');
   console.log('rpc           :', RPC);
-  console.log('EventOnlyCore :', EOC);
+  console.log('EventMidchainCore :', EOC);
   console.log('players       :', p0.address, p1.address);
 
   // 1. Play the midchain moves for free (pure eth_call + signatures).
@@ -112,11 +112,11 @@ function buildMoveLog(n) {
   console.log('');
   console.log('COMPARE: core-based midchain unbatched 0.012206 USDC/match (about 81 games per 1 USD).');
 
-  writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventonly-cost.json'), JSON.stringify({
+  writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventmidchain-cost.json'), JSON.stringify({
     measuredAt: new Date().toISOString(), mode: 'eventonly', moveCount: moves.length, sessionId, startHash, finalHash,
     cost: { handover: usdc(handover.costUsdc6), settle: usdc(settle.costUsdc6), total, gamesPerDollar: total > 0 ? Math.floor(1 / total) : null },
     gas: { handover: handover.gasUsed.toString(), settle: settle.gasUsed.toString() },
     compareCoreMidchainPerMatch: 0.012206,
   }, null, 2) + '\n');
-  console.log('written: foskaay-ggi/deployments/eventonly-cost.json');
+  console.log('written: foskaay-ggi/deployments/eventmidchain-cost.json');
 })().catch((e) => { console.error('event-only match failed:', e.shortMessage || e.message || e); process.exit(1); });
