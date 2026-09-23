@@ -168,11 +168,18 @@ Always `git fetch origin` before comparing to main (local main is stale).
 - Storage midchain batched: about 0.0090 to 0.0098 USDC/match, about 102 to 113
   games/$1 (flat under batching because each game still pays a per-game SSTORE open).
 - Event-based midchain unbatched: 0.001712 USDC/match, about 584 games/$1.
-- Event-based midchain batched: 3 = 0.001098 (about 910), 5 = 0.000939 (about 1,064),
-  10 = 0.000820 (about 1,219), 100 = 0.000713 (about 1,403) games/$1. Crosses the
-  v5 target of $1/1,000 at just 5 games per batch.
+- Event-based midchain batched (PER GAME, 3/5/10/100): 0.001098/0.000939/0.000820/0.000713
+  USDC per game, about 910/1064/1219/1403 games/$1. This anchors EACH game (N handovers
+  + N settles + 2N signatures), so it FLOORS at about 1,400 games/$1.
+- Event-based midchain PER SESSION (Tier 3, one handover + one settle carrying a Merkle
+  root over N games + 2 signatures): both txs stay FLAT (handover 0.000782, settle
+  0.000930) no matter how many games, so per game = 0.001712/N: N=3 = 1,753, N=5 = 2,920,
+  N=10 = 5,841, N=100 = **58,411 games/$1**. This is the headline tier. Why per-game
+  floors but per-session does not: per-game puts each game's payload + 2 signatures
+  on-chain (about 28,000 gas/game irreducible); per-session puts ONE root on-chain.
 - Recorded in `foskaay-ggi/deployments/`: `generals-cost.json`, `midchain-cost.json`,
-  `midchain-cost-batched.json`, `eventmidchain-cost.json`, `eventmidchain-batch-cost.json`.
+  `midchain-cost-batched.json`, `eventmidchain-cost.json`, `eventmidchain-batch-cost.json`,
+  `eventmidchain-session-cost.json`.
 - Re-measure with `node scripts/foskaay-ggi-midchain-match.mjs`,
   `node scripts/foskaay-ggi-eventmidchain-match.mjs`, `node scripts/foskaay-ggi-eventmidchain-batch.mjs`.
 
@@ -267,23 +274,19 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   (`demos/<genre>/`); rail prototypes live in `foskaay-ggi/prototypes/`.
 
 ### IMMEDIATE NEXT STEPS (in order)
-1. **Owner decision pending:** whether to build the event-based midchain into the
-   CORE and SDK. The proposal (NOT built, needs explicit approval + an
-   `architecture.json` update first):
-   - CORE (NO new address): add `handover`/`handoverMany`/`settle`/`settleMany` to
-     the EXISTING core via a UUPS logic upgrade (same proxy address, append-only
-     storage). The ONE new state is a nullifier mapping (sessionId => settled) so a
-     session cannot settle twice; it consumes from `__gap`. Storage-based sessions
-     stay as they are, nothing merged, no data moves.
-   - SDK (republish, no chain change): add `handover`/`handoverMany`/`settle`/
-     `settleMany`/`signMove`/`verifyMidchain` helpers.
-   - BATCHING STAYS OPTIONAL: the dev chooses unbatched (instant on-chain per game)
-     or batched (cheaper; the event lands with the batch).
-2. **Wire the midchain into the SDK + frontend** so the demo page plays the free
-   midchain (event-based) instead of the per-move board. Frontend reads only.
-3. Update the docs page (`foskaay-ggi-docs/index.html`) and republish the packages
-   if the SDK/contracts change.
-4. Keep `architecture.json` `arcv2m18`, the Research entry, and this handoff in sync.
+1. **DONE (owner-approved 2026-09-23):** event-based midchain added to the CORE by a
+   UUPS logic upgrade (SessionRegistry proxy SAME address `0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5`,
+   new implementation `0x05D492C0Cc4e890131c163b302Ab20B56542D2B2`). Additive only (no
+   storage change, no migration); data verified identical. No nullifier. SDK helpers
+   added, versions bumped to 0.1.5. 155/155 forge tests pass.
+2. **REMAINING:** regenerate the SDK browser bundle (`packages/sdk/dist/ggi-sdk.browser.js`)
+   and republish `@foskaay/ggi-contracts` then `@foskaay/ggi-sdk` 0.1.5 (needs the npm
+   token; ask the owner first). Then update the docs page.
+3. **Wire the midchain into the SDK + frontend** so the demo page plays the free
+   midchain (Tier 2 or Tier 3) instead of the per-move board. Frontend reads only.
+4. **Put the three-tier pitch** in the Foskaay GGI folder and the docs page (owner will
+   approve placement after the clarity). Tier 3 (per-session, 58,000+ games/$1) leads.
+5. Keep `architecture.json` `arcv2m18`, the Research entry, and this handoff in sync.
 
 ### THE LINK / EXPLORER ANSWER (why the event-based midchain is fully provable)
 - Storage-based core: the session lives in `SessionRegistry` storage, so tying the

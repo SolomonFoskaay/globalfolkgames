@@ -438,3 +438,30 @@ Read it plainly:
 - BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched; the rail never forces a cadence.
 
 Files: `foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/foskaay-ggi-deploy-eventmidchain.mjs`, `scripts/foskaay-ggi-eventmidchain-match.mjs`, `scripts/foskaay-ggi-eventmidchain-batch.mjs`, `foskaay-ggi/deployments/eventmidchain-cost.json` and `eventmidchain-batch-cost.json`. `EventMidchainCore` deployed on Arc testnet: `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`. 148/148 forge tests pass.
+
+### 9.10 PER-SESSION anchoring measured (the ridiculously cheap tier)
+
+The 9.9 batch test anchored PER GAME (N handovers + N settles + 2N signatures), so it floors at about 1,400 games/$1. This section measures the OTHER design: anchor the SESSION, not each game. ONE handover for the whole session, play N games for free on the midchain, then ONE settle carrying a single Merkle root over all N final hashes and just 2 signatures. On-chain work is O(1), so per game = cost / N and keeps dropping.
+
+| Games in one session | Handover | Settle | Total | Per game | Games per 1 USD |
+| --- | --- | --- | --- | --- | --- |
+| 3 | 0.000782 | 0.000929 | 0.001711 | 0.000570 | 1,753 |
+| 5 | 0.000782 | 0.000930 | 0.001712 | 0.000342 | 2,920 |
+| 10 | 0.000782 | 0.000930 | 0.001712 | 0.000171 | 5,841 |
+| 100 | 0.000782 | 0.000930 | 0.001712 | 0.000017 | **58,411** |
+
+The handover and the settle stay FLAT no matter how many games are inside. That is the point: Arc only sees two transactions, and the games share them. The more games per session, the cheaper per game, without limit.
+
+Why per-game batching (9.9) floors but per-session does not: per-game anchoring puts each game's payload and its 2 signatures on-chain (measured about 28,000 gas per game, irreducible), so it converges to about 0.0007 USDC per game. Per-session anchoring puts ONE root on-chain, so it converges to zero per game. Both are optional; a dev picks the tier.
+
+### 9.11 Event-based midchain added to the CORE (owner-approved, 2026-09-23)
+
+The event-based midchain functions are now in the live core, additively:
+- `SessionRegistry` proxy (SAME address) `0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5` upgraded to implementation `0x05D492C0Cc4e890131c163b302Ab20B56542D2B2`.
+- New functions: `handover`, `handoverMany`, `settle`, `settleMany`, `midchainDigest`. New events: `Handover`, `MidchainSettled`.
+- ADDITIVE ONLY: no storage change, no gap change, no version bump, no migration. Verified after the upgrade: `feeRecipient`, `operator`, `version`, `nonces`, `gameStateOf` all identical, and `midchainDigest` answers on the proxy.
+- No nullifier (owner decision): the settle digest is deterministic and every settle needs valid player signatures, so a replay only re-emits an identical event and a different result is impossible. Keeping it stateless is what makes it cheap.
+- Tests: `foskaay-ggi/test/SessionRegistryMidchain.t.sol` (7 tests). 155/155 forge tests pass.
+- SDK helpers added (`handover`, `handoverMany`, `settleMidchain`, `settleMidchainMany`, `midchainDigest`, `signMidchain`, `verifyMidchain`) in `@foskaay/ggi-sdk`, versions bumped to 0.1.5. Republish + browser-bundle regeneration is the remaining step.
+
+The three tiers, all optional, for the pitch: (1) per-game on-chain board about 10 games/$1; (2) per-game event midchain floor about 1,400 games/$1; (3) per-session midchain 58,000+ games/$1. Tier 3 is the headline: open once, everything inside is free, settle once.

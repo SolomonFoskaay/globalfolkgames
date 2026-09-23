@@ -44,6 +44,32 @@ interface ISessionRegistry {
     function canSign(bytes32 sessionId, uint8 seat, address who) external view returns (bool);
     function isSessionKeyLive(address key) external view returns (bool);
     function sessionKeyOf(address key) external view returns (SessionKey memory);
+
+    // Event-based midchain (cheap anchor). Additive; the storage paths above are unchanged.
+    function handover(
+        bytes32 sessionId,
+        address gameLogic,
+        bytes32 startHash,
+        address[] calldata players,
+        address[] calldata sessionKeys,
+        uint16 randomCount
+    ) external;
+    function handoverMany(
+        bytes32[] calldata sessionIds,
+        address gameLogic,
+        bytes32[] calldata startHashes,
+        address[][] calldata players,
+        address[][] calldata sessionKeys,
+        uint16 randomCount
+    ) external;
+    function settle(bytes32 sessionId, bytes32 finalHash, bytes[] calldata sigs, address[] calldata signers) external;
+    function settleMany(
+        bytes32[] calldata sessionIds,
+        bytes32[] calldata finalHashes,
+        bytes[][] calldata sigs,
+        address[][] calldata signers
+    ) external;
+    function midchainDigest(bytes32 sessionId, bytes32 finalHash) external view returns (bytes32);
 }
 
 /// CORE 2: accept signed session events (opaque payload + sequence + digest).

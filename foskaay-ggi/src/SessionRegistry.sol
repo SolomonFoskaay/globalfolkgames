@@ -149,6 +149,20 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
     event SessionKeyRegistered(address indexed owner, address indexed key, uint64 validUntil, bytes32 scopeHash);
     event SessionKeyRevoked(address indexed owner, address indexed key);
     event GameStateSet(bytes32 indexed sessionId, address indexed owner, address stateAccount);
+    /// EVENT-BASED MIDCHAIN (optional, cheap anchor): the handover event carries
+    /// the session + the game link, so no separate link transaction is needed.
+    event Handover(
+        bytes32 indexed sessionId,
+        address indexed gameLogic,
+        bytes32 startHash,
+        address[] players,
+        address[] sessionKeys,
+        uint16 randomCount,
+        address indexed payer
+    );
+    /// EVENT-BASED MIDCHAIN settlement: the final hash (or a session Merkle root)
+    /// plus who paid. No stored session is required.
+    event MidchainSettled(bytes32 indexed sessionId, bytes32 finalHash, address indexed payer);
 
     error NotOwner();
     error NotOperatorOrOwner();
@@ -163,6 +177,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
     error TooManySessionKeys();
     error AlreadyRevoked();
     error KeyOwnedByAnother();
+    error BadSignature();
 
     /// @notice Initialize the proxy. Replaces the old constructor (a proxy never
     ///         runs the implementation's constructor).
@@ -322,6 +337,101 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
         if (sk.revoked) revert AlreadyRevoked();
         sk.revoked = true;
         emit SessionKeyRevoked(msg.sender, key);
+    }
+
+    // --------------------------------------- event-based midchain (cheap anchor)
+
+    /// @notice EVENT-BASED handover: emit the session + the game link instead of
+    ///         writing a stored session. Cheaper than `open` + `setGameState`
+    ///         because it is one event, and the link travels with it, so the
+    ///         Foskaay GGI explorer can index it from eth_getLogs.
+    /// @dev Purely additive. This does NOT create a stored session, so the
+    ///      storage-based paths (`open`/`setAuthority`/`sealFinal`) are unchanged.
+    function handover(
+        bytes32 sessionId,
+        address gameLogic,
+        bytes32 startHash,
+        address[] calldata players,
+        address[] calldata sessionKeys,
+        uint16 randomCount
+    ) external {
+        if (players.length == 0 || players.length != sessionKeys.length) revert BadParticipantCount();
+        emit Handover(sessionId, gameLogic, startHash, players, sessionKeys, randomCount, msg.sender);
+    }
+
+    /// @notice Emit MANY event-based handovers in ONE transaction. The per-game
+    ///         cost drops because the transaction base fee is shared.
+    function handoverMany(
+        bytes32[] calldata sessionIds,
+        address gameLogic,
+        bytes32[] calldata startHashes,
+        address[][] calldata players,
+        address[][] calldata sessionKeys,
+        uint16 randomCount
+    ) external {
+        uint256 n = sessionIds.length;
+        if (n == 0 || n != startHashes.length || n != players.length || n != sessionKeys.length) revert BadParticipantCount();
+        for (uint256 i = 0; i < n; i++) {
+            if (players[i].length == 0 || players[i].length != sessionKeys[i].length) revert BadParticipantCount();
+            emit Handover(sessionIds[i], gameLogic, startHashes[i], players[i], sessionKeys[i], randomCount, msg.sender);
+        }
+    }
+
+    /// @notice EVENT-BASED settlement: verify that every declared signer signed
+    ///         (sessionId, finalHash), then emit. `finalHash` may be a single
+    ///         game's final hash OR a whole session's Merkle root.
+    /// @dev No stored session and no nullifier are needed: the digest is
+    ///      deterministic and every settle must carry valid player signatures, so
+    ///      a replay only re-emits an IDENTICAL event (harmless) and a different
+    ///      result is impossible without those signatures. Keeping this stateless
+    ///      is what makes it cheap.
+    function settle(
+        bytes32 sessionId,
+        bytes32 finalHash,
+        bytes[] calldata sigs,
+        address[] calldata signers
+    ) external {
+        _settleOne(sessionId, finalHash, sigs, signers);
+    }
+
+    /// @notice EVENT-BASED settlement of MANY sessions in ONE transaction.
+    function settleMany(
+        bytes32[] calldata sessionIds,
+        bytes32[] calldata finalHashes,
+        bytes[][] calldata sigs,
+        address[][] calldata signers
+    ) external {
+        uint256 n = sessionIds.length;
+        if (n == 0 || n != finalHashes.length || n != sigs.length || n != signers.length) revert BadParticipantCount();
+        for (uint256 i = 0; i < n; i++) {
+            _settleOne(sessionIds[i], finalHashes[i], sigs[i], signers[i]);
+        }
+    }
+
+    /// @notice The digest a participant signs to authorise an event-based
+    ///         settlement. Exposed so a client never has to guess the encoding.
+    function midchainDigest(bytes32 sessionId, bytes32 finalHash) public view returns (bytes32) {
+        return keccak256(abi.encodePacked("FoskaayGGI", block.chainid, sessionId, finalHash));
+    }
+
+    function _settleOne(bytes32 sessionId, bytes32 finalHash, bytes[] calldata sigs, address[] calldata signers) private {
+        uint256 n = signers.length;
+        if (n == 0 || n != sigs.length) revert BadParticipantCount();
+        bytes32 digest = midchainDigest(sessionId, finalHash);
+        for (uint256 i = 0; i < n; i++) {
+            (bytes32 r, bytes32 s, uint8 v) = _splitSig(sigs[i]);
+            if (ecrecover(digest, v, r, s) != signers[i]) revert BadSignature();
+        }
+        emit MidchainSettled(sessionId, finalHash, msg.sender);
+    }
+
+    function _splitSig(bytes calldata sig) private pure returns (bytes32 r, bytes32 s, uint8 v) {
+        if (sig.length != 65) revert BadSignature();
+        assembly {
+            r := calldataload(sig.offset)
+            s := calldataload(add(sig.offset, 32))
+            v := byte(0, calldataload(add(sig.offset, 64)))
+        }
     }
 
     // ---------------------------------------------------------------- reads

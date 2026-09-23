@@ -28,6 +28,7 @@ import {
   encodePacked,
   getAddress,
   recoverMessageAddress,
+  recoverAddress,
 } from 'viem';
 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -55,6 +56,12 @@ const registryAbi = parseAbi([
   'function isSessionKeyLive(address key) view returns (bool)',
   'function setGameState(bytes32 sessionId, address stateAccount)',
   'function gameStateOf(bytes32 sessionId) view returns (address)',
+  // Event-based midchain (cheap anchor). Additive; storage-based paths above are unchanged.
+  'function handover(bytes32 sessionId, address gameLogic, bytes32 startHash, address[] players, address[] sessionKeys, uint16 randomCount)',
+  'function handoverMany(bytes32[] sessionIds, address gameLogic, bytes32[] startHashes, address[][] players, address[][] sessionKeys, uint16 randomCount)',
+  'function settle(bytes32 sessionId, bytes32 finalHash, bytes[] sigs, address[] signers)',
+  'function settleMany(bytes32[] sessionIds, bytes32[] finalHashes, bytes[][] sigs, address[][] signers)',
+  'function midchainDigest(bytes32 sessionId, bytes32 finalHash) view returns (bytes32)',
 ]);
 
 const stateAbi = parseAbi([
@@ -535,6 +542,74 @@ export class GgiClient {
   async verifyAction(signThis, signature, expectedKeyAddress) {
     const got = await recoverMessageAddress({ message: signThis, signature });
     return got.toLowerCase() === getAddress(expectedKeyAddress).toLowerCase();
+  }
+
+  // ------------------------------------------------- event-based midchain
+  // The cheap anchor: the handover event carries the session + the game link
+  // (no separate link tx), and settle verifies the players' signatures on-chain.
+  // Every move inside is free; only the handover and settle are transactions.
+
+  /// Emit ONE event-based handover. `cfg` = { sessionId, gameLogic, startHash,
+  /// players[], sessionKeys[], randomCount }. Returns the tx hash.
+  async handover(cfg = {}) {
+    this.requireWallet();
+    return this.write({
+      address: this.addresses.SessionRegistry, abi: registryAbi, functionName: 'handover',
+      args: [cfg.sessionId, cfg.gameLogic, cfg.startHash, cfg.players, cfg.sessionKeys, cfg.randomCount || 0],
+    });
+  }
+
+  /// Emit MANY event-based handovers in ONE transaction. `cfg` = { sessionIds[],
+  /// gameLogic, startHashes[], players[][], sessionKeys[][], randomCount }.
+  async handoverMany(cfg = {}) {
+    this.requireWallet();
+    return this.write({
+      address: this.addresses.SessionRegistry, abi: registryAbi, functionName: 'handoverMany',
+      args: [cfg.sessionIds, cfg.gameLogic, cfg.startHashes, cfg.players, cfg.sessionKeys, cfg.randomCount || 0],
+    });
+  }
+
+  /// The digest a participant signs to authorise an event-based settlement.
+  async midchainDigest(sessionId, finalHash) {
+    return this.publicClient.readContract({
+      address: this.addresses.SessionRegistry, abi: registryAbi, functionName: 'midchainDigest', args: [sessionId, finalHash],
+    });
+  }
+
+  /// Sign the event-based settlement digest with a session key (silent).
+  async signMidchain(key, sessionId, finalHash) {
+    const pk = typeof key === 'string' ? key : key && key.privateKey;
+    if (!pk) throw new Error('Foskaay GGI: signMidchain needs a session key from createSessionKey().');
+    const digest = await this.midchainDigest(sessionId, finalHash);
+    return privateKeyToAccount(pk).sign({ hash: digest });
+  }
+
+  /// Verify an event-based settlement signature recovers to the signer.
+  async verifyMidchain(sessionId, finalHash, signature, expectedSigner) {
+    const digest = await this.midchainDigest(sessionId, finalHash);
+    const got = await recoverAddress({ hash: digest, signature });
+    return got.toLowerCase() === getAddress(expectedSigner).toLowerCase();
+  }
+
+  /// EVENT-BASED settlement of ONE session. `cfg` = { sessionId, finalHash,
+  /// sigs[], signers[] }. `finalHash` may be one game's final hash or a whole
+  /// session's Merkle root.
+  async settleMidchain(cfg = {}) {
+    this.requireWallet();
+    return this.write({
+      address: this.addresses.SessionRegistry, abi: registryAbi, functionName: 'settle',
+      args: [cfg.sessionId, cfg.finalHash, cfg.sigs, cfg.signers],
+    });
+  }
+
+  /// EVENT-BASED settlement of MANY sessions in ONE transaction. `cfg` = {
+  /// sessionIds[], finalHashes[], sigs[][], signers[][] }.
+  async settleMidchainMany(cfg = {}) {
+    this.requireWallet();
+    return this.write({
+      address: this.addresses.SessionRegistry, abi: registryAbi, functionName: 'settleMany',
+      args: [cfg.sessionIds, cfg.finalHashes, cfg.sigs, cfg.signers],
+    });
   }
 }
 
