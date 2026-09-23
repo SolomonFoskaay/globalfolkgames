@@ -7,7 +7,7 @@
     <meta property="og:title" content="Foskaay Gasless Games Infrastructure (Foskaay GGI) Docs">
     <meta property="og:description" content="Add gasless play to any on-chain game: open a session, do everything inside for free, settle once. Players never pay gas and never see a wallet popup. Four small contracts, no infrastructure to run.">
     <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
-    <meta property="og:url" content="https://globalfolkgames.fun/foskaay-ggi-docs/">
+    <meta property="og:url" content="https://globalfolkgames.fun/foskaay-ggi/docs/">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Foskaay Gasless Games Infrastructure (Foskaay GGI) Docs">
@@ -65,7 +65,7 @@
             <a href="#demos">Demos</a>
             <a href="#usecases">Use cases</a>
             <a href="#contracts">Contracts</a>
-            <a href="/foskaay-ggi-explorer/">Explorer</a>
+            <a href="/foskaay-ggi/explorer/">Explorer</a>
             <a href="#fees">Fees</a>
             <a href="#hardware">What you run</a>
             <a href="#faq">FAQ and fixes</a>
@@ -145,7 +145,7 @@
         </p>
         <div class="ggi-code"><code>npm install @foskaay/ggi-sdk</code></div>
         <ol class="ggi-list">
-            <li><b>Install</b> <span class="ggi-mono">@foskaay/ggi-sdk</span> (and <span class="ggi-mono">@foskaay/ggi-contracts</span> if your own contract calls the rail directly).</li>
+            <li><b>Install</b> <span class="ggi-mono">@foskaay/ggi-sdk</span> (and <span class="ggi-mono">@foskaay/ggi-contracts-sdk</span> if your own contract calls the rail directly).</li>
             <li><b>Write a small adapter</b> that turns your game's state into the opaque payload. This is the only game-specific code, and it lives in your game.</li>
             <li><b>Call four functions:</b> open, act, settle, and (optionally) dispute.</li>
         </ol>
@@ -251,6 +251,44 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
             Exact numbers depend on your usage and on-chain gas. The point is the shape: a fixed cost per
             session, in a stablecoin, with nothing to run.
         </p>
+
+        <div class="ggi-h3">Measured cost: Foskaay GGI Midchain vs direct on-chain</div>
+        <p class="ggi-body">
+            These are real measurements on Arc testnet (about 25 Gwei), not estimates. The first row is
+            what a normal game pays with no Foskaay GGI at all: every move is its own transaction. Most
+            games run 60 to 100+ moves, so this row uses 100 moves. The Foskaay GGI Midchain is a section
+            of Foskaay Gasless Games Infrastructure: it keeps every move off the base chain (free) and
+            anchors the game with one handover and one settle. "Batched" means many games share one
+            transaction; "per session" means one handover and one settle cover ALL the games inside that
+            session, which is the cheapest shape.
+        </p>
+        <div class="research-table-wrap">
+        <table class="ggi-table">
+            <thead><tr><th>Approach</th><th>What happens</th><th>Txs per game</th><th>Cost per game</th><th>Games per $1</th></tr></thead>
+            <tbody>
+                <tr><td>Direct to on-chain, no Foskaay GGI</td><td>Every move is its own transaction (most games run 60 to 100+ moves)</td><td>about 100</td><td>about 0.2444 USDC</td><td>about 4</td></tr>
+                <tr><td>Foskaay GGI storage midchain, unbatched</td><td>open + link + settle per game</td><td>3</td><td>0.012206 USDC</td><td>about 81</td></tr>
+                <tr><td>Foskaay GGI storage midchain, batched 3</td><td>3 games, one window flush</td><td>3 + flush/3</td><td>0.009788 USDC</td><td>about 102</td></tr>
+                <tr><td>Foskaay GGI storage midchain, batched 5</td><td>5 games, one window flush</td><td>3 + flush/5</td><td>0.009328 USDC</td><td>about 107</td></tr>
+                <tr><td>Foskaay GGI storage midchain, batched 10</td><td>10 games, one window flush</td><td>3 + flush/10</td><td>0.008981 USDC</td><td>about 111</td></tr>
+                <tr><td>Foskaay GGI storage midchain, batched 100 (extrapolated)</td><td>per-game open still dominates</td><td>3 + flush/100</td><td>about 0.0088 USDC</td><td>about 113</td></tr>
+                <tr><td>Foskaay GGI Midchain, unbatched</td><td>handover + settle per game (the link is inside the event)</td><td>2</td><td>0.001712 USDC</td><td>about 584</td></tr>
+                <tr><td>Foskaay GGI Midchain, batched 3</td><td>one handoverMany + one settleMany (every game anchored)</td><td>2/3</td><td>0.001098 USDC</td><td>about 910</td></tr>
+                <tr><td>Foskaay GGI Midchain, batched 5</td><td>one handoverMany + one settleMany</td><td>2/5</td><td>0.000939 USDC</td><td>about 1,064</td></tr>
+                <tr><td>Foskaay GGI Midchain, batched 10</td><td>one handoverMany + one settleMany</td><td>2/10</td><td>0.000820 USDC</td><td>about 1,219</td></tr>
+                <tr><td>Foskaay GGI Midchain, batched 100</td><td>one handoverMany + one settleMany</td><td>2/100</td><td>0.000713 USDC</td><td>about 1,403</td></tr>
+                <tr><td>Foskaay GGI Midchain, PER SESSION 3</td><td>one handover + one settle for all 3 games (Merkle root, 2 signatures)</td><td>2/3</td><td>0.000570 USDC</td><td>about 1,753</td></tr>
+                <tr><td>Foskaay GGI Midchain, PER SESSION 5</td><td>one handover + one settle for all 5 games</td><td>2/5</td><td>0.000342 USDC</td><td>about 2,920</td></tr>
+                <tr><td>Foskaay GGI Midchain, PER SESSION 10</td><td>one handover + one settle for all 10 games</td><td>2/10</td><td>0.000171 USDC</td><td>about 5,841</td></tr>
+                <tr><td>Foskaay GGI Midchain, PER SESSION 100</td><td>one handover + one settle for all 100 games</td><td>2/100</td><td>0.000017 USDC</td><td>about 58,411</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <ul class="ggi-list">
+            <li><b>Unbatched vs batched.</b> Unbatched sends each game's handover and settle as they happen, so the result is on-chain immediately. Batched puts many games in ONE transaction, which is cheaper because the transaction base fee is shared; a game's on-chain event lands when the batch transaction lands, and the dev picks that cadence. It is not a gameplay delay: moves are already signed and free, and the Foskaay GGI explorer can show the game from the signed log immediately.</li>
+            <li><b>Why per-game batching stops at about 1,400 games/$1.</b> There is no hidden fee: that is pure Arc gas. When you anchor every game, each game still carries its own payload and its own 2 player signatures (about 28,000 gas, which cannot be shared). Batching only shares the small transaction base fee, so the per-game cost settles at about 0.0007 USDC.</li>
+            <li><b>Why per-session keeps dropping.</b> Anchor the SESSION instead: one handover and one settle cover all the games inside, carrying a single Merkle root and just 2 signatures. The two transactions stay flat no matter how many games, so the more games per session the cheaper per game, without limit. That is the headline: open once, everything inside is free, settle once.</li>
+        </ul>
     </section>
 
     <section class="ggi-card" id="hardware">
@@ -280,7 +318,7 @@ await ggi.settle(sessionId, { digest: myFinalDigest, seeds: [revealedSeed] });</
         <div class="ggi-code"><code>npm install @foskaay/ggi-sdk viem</code></div>
         <p class="ggi-tiny">
             <span class="ggi-mono">@foskaay/ggi-sdk</span> is the client. Add
-            <span class="ggi-mono">@foskaay/ggi-contracts</span> only if your own contract calls the rail
+            <span class="ggi-mono">@foskaay/ggi-contracts-sdk</span> only if your own contract calls the rail
             directly.
         </p>
 
@@ -374,8 +412,8 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 <tr><td>ERC VRF</td><td><span class="ggi-mono">Randomness</span> commit-reveal, N streams.</td><td>Rail: present</td></tr>
                 <tr><td>Commit / undelegate</td><td>Foskaay GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
                 <tr><td>Session + commit fees</td><td><span class="ggi-mono">FeeVault</span> per-session fee.</td><td>Rail: present</td></tr>
-                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/foskaay-ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
-                <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
+                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/foskaay-ggi/explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
+                <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts-sdk</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
             </tbody>
         </table>
 
@@ -389,7 +427,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 delegated for a game. Foskaay GGI now does the same thing in one line: when a game opens a
                 session it can register its own state account address against that session. The rail
                 stores the address as an opaque value, it never learns what it is, and any reader
-                (including the <a href="/foskaay-ggi-explorer/">Explorer</a>) can look up which game account
+                (including the <a href="/foskaay-ggi/explorer/">Explorer</a>) can look up which game account
                 belongs to a session. This is the closest match to the delegation registry.</li>
             <li><b>The EVM limit, stated plainly:</b> there is no side chain to mutate accounts for free.
                 Where MagicBlock is free in the ER, Foskaay GGI makes the SPONSOR pay per write, and

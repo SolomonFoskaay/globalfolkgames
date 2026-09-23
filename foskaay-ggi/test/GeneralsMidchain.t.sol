@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {GeneralsMidchain} from "../demos/pvp/generals/GeneralsMidchain.sol";
 
-/// PROOF of the midchain: the game's rules are a PURE function, so the same move
+/// PROOF of the Foskaay GGI Midchain: the game's rules are a PURE function, so the same move
 /// log always produces the same final hash. That is what lets play run for free
 /// via eth_call and only the start/final hashes touch the chain.
 contract GeneralsMidchainTest {

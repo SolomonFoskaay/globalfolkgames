@@ -62,17 +62,17 @@ Always `git fetch origin` before comparing to main (local main is stale).
   user, not its purpose. It will become its own repo.
 - **Naming:** full name "Foskaay Gasless Games Infrastructure"; short form
   "Foskaay GGI" ("Foskaay" is NEVER shortened). Never call it an "ER". npm scope
-  `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
+  `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts-sdk`.
 - **arcv2m17 is a DIFFERENT, discarded design (GFG-BS).** Never merge it with
   arcv2m18. Never rename arcv2m17's `GFG-BS` references.
-- Folder: `foskaay-ggi/` (its own Foundry project). Docs page: `/foskaay-ggi-docs/`.
-  Explorer: `/foskaay-ggi-explorer/`. Demos homepage: `/foskaay-ggi-demos/`.
+- Folder: `foskaay-ggi/` (its own Foundry project). Docs page: `/foskaay-ggi/docs/`.
+  Explorer: `/foskaay-ggi/explorer/`. Demos homepage: `/foskaay-ggi/demos/`.
 
 ### Why it exists / the EVM vs SVM truth
 
 - MagicBlock (SVM) delegates an account into an ER and mutates it FOR FREE.
 - **Arc has no ER and no free execution layer.** But EVM gives the next best thing:
-  a PURE function runs for free via `eth_call`. That is the **midchain** (see
+  a PURE function runs for free via `eth_call`. That is the **Foskaay GGI Midchain** (see
   section 3): moves are signed and hash-chained off-chain and executed for free;
   only the session endpoints touch the chain. So "gasless" here means (a) the
   PLAYER never pays, and (b) the SPONSOR pays only for a couple of transactions per
@@ -133,7 +133,7 @@ Always `git fetch origin` before comparing to main (local main is stale).
   (gitignored); SCRUB them locally after deploy (defense in depth).
 
 ### npm packages (published)
-- `@foskaay/ggi-contracts` **0.1.4** — `IGgi.sol` interfaces + addresses.
+- `@foskaay/ggi-contracts-sdk` **0.1.4** — `IGgi.sol` interfaces + addresses.
 - `@foskaay/ggi-sdk` **0.1.4** — `GgiClient` (open/act/settle/dispute,
   `createSessionKey`/`signAction`/`actSigned`/`verifyAction`, read helpers,
   `setGameState`/`gameStateOf`, `fees()` reads the fee at runtime), plus a ready
@@ -142,7 +142,7 @@ Always `git fetch origin` before comparing to main (local main is stale).
   regenerate the browser bundle, `npm pack`, publish contracts FIRST then sdk,
   poll the registry for propagation, then CLEAN INSTALL in a temp folder to prove
   a stranger can install. `@foskaay/ggi-sdk` must depend on the matching
-  `@foskaay/ggi-contracts` version.
+  `@foskaay/ggi-contracts-sdk` version.
 
 ### Sponsor relay (serverless, sponsor pays, players never do)
 - `api_handlers/foskaay-ggi-sponsor.mjs`, route `/api/foskaay-ggi-sponsor` registered in
@@ -164,14 +164,14 @@ Always `git fetch origin` before comparing to main (local main is stale).
   about 4 games/$1. Derived from the measured 0.00212 USDC per move plus about
   0.032 USDC setup (the board port's short-match total was 0.098172). Most games
   run 60 to 100+ moves, so this is the realistic direct cost.
-- Storage midchain unbatched: 0.012206 USDC/match, about 81 games/$1.
-- Storage midchain batched: about 0.0090 to 0.0098 USDC/match, about 102 to 113
+- Storage Foskaay GGI Midchain unbatched: 0.012206 USDC/match, about 81 games/$1.
+- Storage Foskaay GGI Midchain batched: about 0.0090 to 0.0098 USDC/match, about 102 to 113
   games/$1 (flat under batching because each game still pays a per-game SSTORE open).
-- Event-based midchain unbatched: 0.001712 USDC/match, about 584 games/$1.
-- Event-based midchain batched (PER GAME, 3/5/10/100): 0.001098/0.000939/0.000820/0.000713
+- Event-based Foskaay GGI Midchain unbatched: 0.001712 USDC/match, about 584 games/$1.
+- Event-based Foskaay GGI Midchain batched (PER GAME, 3/5/10/100): 0.001098/0.000939/0.000820/0.000713
   USDC per game, about 910/1064/1219/1403 games/$1. This anchors EACH game (N handovers
   + N settles + 2N signatures), so it FLOORS at about 1,400 games/$1.
-- Event-based midchain PER SESSION (Tier 3, one handover + one settle carrying a Merkle
+- Event-based Foskaay GGI Midchain PER SESSION (Tier 3, one handover + one settle carrying a Merkle
   root over N games + 2 signatures): both txs stay FLAT (handover 0.000782, settle
   0.000930) no matter how many games, so per game = 0.001712/N: N=3 = 1,753, N=5 = 2,920,
   N=10 = 5,841, N=100 = **58,411 games/$1**. This is the headline tier. Why per-game
@@ -211,7 +211,7 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   when damage exceeds strength; tick growth **Capital +1/5s, City +1/10s,
   Field +1/60s**, `TICKS_PER_SECOND = 20`.
 - Their client: `@magicblock-labs/bolt-sdk` (contract side) +
-  `ephemeral-rollups-sdk` (client). Ours: `@foskaay/ggi-contracts` + `@foskaay/ggi-sdk`.
+  `ephemeral-rollups-sdk` (client). Ours: `@foskaay/ggi-contracts-sdk` + `@foskaay/ggi-sdk`.
 - Their frontend assets are open-source and COPYABLE (their graphics: PNGs like
   `GameGridCellCity.png`, `GameGridCellField.png`, `GameGridCellMountain.png`,
   `GameGridCellCapital.png` under `frontend/src/components/game/grid/`). Use them
@@ -229,15 +229,15 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 - **PvP demo page** `ggi-demos/pvp/generals/index.html`: MagicBlock's own graphics
   (`public/foskaay-ggi-assets/generals/`), reads the board from chain via the relay
   `gameBoard`, sends moves via the relay `game` action, no localStorage, no player
-  gas. Linked from the PvP card on `/foskaay-ggi-demos/`. Vite input added.
-- **The midchain finding** recorded in `foskaay-ggi/foskaay-ggi-build-guide-v5.md`
-  section 9, the Research library entry `ggi-midchain`, and `arcv2m18`.
+  gas. Linked from the PvP card on `/foskaay-ggi/demos/`. Vite input added.
+- **The Foskaay GGI Midchain finding** recorded in `foskaay-ggi/foskaay-ggi-build-guide-v5.md`
+  section 9, the Research library entry `ggi-Foskaay GGI Midchain`, and `arcv2m18`.
 - **`GeneralsMidchain.sol`** (pure rules engine, no storage) + `GeneralsMidchain.t.sol`
   (5 tests). Moves run free via `eth_call`, signed with EIP-712 and hash-chained;
   only session open + settle touch the chain. Verifier replay PASS. Measured:
   0.012206 USDC/match unbatched (about 81 games/$1), 0.009788 batched (about 102).
-- **`EventMidchainCore.sol`** (the EVENT-BASED MIDCHAIN, no storage) +
-  `EventMidchainCore.t.sol` (5 tests). It is still the MIDCHAIN (neither fully on
+- **`EventMidchainCore.sol`** (the EVENT-BASED Foskaay GGI Midchain, no storage) +
+  `EventMidchainCore.t.sol` (5 tests). It is still the Foskaay GGI Midchain (neither fully on
   base nor offchain; event-based, not offchain). The game link is INSIDE the
   `Handover` event, so no separate `setGameState` tx (2 txs per game, not 3), and
   the Foskaay GGI explorer indexes it from `eth_getLogs`. It adds `handoverMany`/
@@ -249,9 +249,9 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 - **148/148 forge tests pass.** Commits: `7c6b967`, `5513e92`, `888faa8`, `b015d15`,
   `44796dc`, `8802b85`, `36d5095` (plus this handoff update).
 
-### The midchain (the key idea, do not lose it)
+### The Foskaay GGI Midchain (the key idea, do not lose it)
 - On-chain (truth): the session, the start hash and the final hash. Only 2 or 3 txs.
-- Midchain (free play): every move is a signed, hash-chained message run through the
+- Foskaay GGI Midchain (free play): every move is a signed, hash-chained message run through the
   game's PURE rules with `eth_call`. Free for the player AND the sponsor.
 - Off-chain (render only): the frontend draws; Vercel holds the sponsor key to send
   the open and settle. Neither owns the truth.
@@ -261,42 +261,42 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 
 ### WHERE THE FILES ARE NOW (verified on disk)
 - Game (on-chain board): `foskaay-ggi/demos/pvp/generals/GeneralsGame.sol`
-- Game (midchain pure rules): `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`
-- Event-based midchain prototype: `foskaay-ggi/prototypes/EventMidchainCore.sol`
+- Game (Foskaay GGI Midchain pure rules): `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`
+- Event-based Foskaay GGI Midchain prototype: `foskaay-ggi/prototypes/EventMidchainCore.sol`
 - Tests (Foundry has ONE test path, so tests live in `test/`):
   `test/GeneralsGame.t.sol`, `test/GeneralsMidchain.t.sol`, `test/EventMidchainCore.t.sol`
 - Demo page: `ggi-demos/pvp/generals/index.html`; graphics in
   `public/foskaay-ggi-assets/generals/`; Vite input `foskaay-ggi-demos-pvp-generals`.
 - Scripts: `scripts/foskaay-ggi-deploy-generals.mjs`, `foskaay-ggi-generals-match.mjs`,
-  `foskaay-ggi-deploy-midchain.mjs`, `foskaay-ggi-midchain-match.mjs`, `foskaay-ggi-deploy-eventmidchain.mjs`,
+  `foskaay-ggi-deploy-Foskaay GGI Midchain.mjs`, `foskaay-ggi-midchain-match.mjs`, `foskaay-ggi-deploy-eventmidchain.mjs`,
   `foskaay-ggi-eventmidchain-match.mjs`, `foskaay-ggi-eventmidchain-batch.mjs`.
 - Owner rule: **no `examples/` folder.** Games live under their genre
   (`demos/<genre>/`); rail prototypes live in `foskaay-ggi/prototypes/`.
 
 ### IMMEDIATE NEXT STEPS (in order)
-1. **DONE (owner-approved 2026-09-23):** event-based midchain added to the CORE by a
+1. **DONE (owner-approved 2026-09-23):** event-based Foskaay GGI Midchain added to the CORE by a
    UUPS logic upgrade (SessionRegistry proxy SAME address `0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5`,
    new implementation `0x05D492C0Cc4e890131c163b302Ab20B56542D2B2`). Additive only (no
    storage change, no migration); data verified identical. No nullifier. SDK helpers
    added, versions bumped to 0.1.5. 155/155 forge tests pass.
 2. **REMAINING:** regenerate the SDK browser bundle (`packages/sdk/dist/ggi-sdk.browser.js`)
-   and republish `@foskaay/ggi-contracts` then `@foskaay/ggi-sdk` 0.1.5 (needs the npm
+   and republish `@foskaay/ggi-contracts-sdk` then `@foskaay/ggi-sdk` 0.1.5 (needs the npm
    token; ask the owner first). Then update the docs page.
-3. **Wire the midchain into the SDK + frontend** so the demo page plays the free
-   midchain (Tier 2 or Tier 3) instead of the per-move board. Frontend reads only.
+3. **Wire the Foskaay GGI Midchain into the SDK + frontend** so the demo page plays the free
+   Foskaay GGI Midchain (Tier 2 or Tier 3) instead of the per-move board. Frontend reads only.
 4. **Put the three-tier pitch** in the Foskaay GGI folder and the docs page (owner will
    approve placement after the clarity). Tier 3 (per-session, 58,000+ games/$1) leads.
 5. Keep `architecture.json` `arcv2m18`, the Research entry, and this handoff in sync.
 
-### THE LINK / EXPLORER ANSWER (why the event-based midchain is fully provable)
+### THE LINK / EXPLORER ANSWER (why the event-based Foskaay GGI Midchain is fully provable)
 - Storage-based core: the session lives in `SessionRegistry` storage, so tying the
   game to the session needed a separate `setGameState` tx (3 txs per game).
-- Event-based midchain: the `Handover` event carries `sessionId`, `gameLogic`,
+- Event-based Foskaay GGI Midchain: the `Handover` event carries `sessionId`, `gameLogic`,
   `startHash`, `players`, `sessionKeys`. The link is IN the event, same tx (2 txs).
   The Foskaay GGI explorer reads `Handover` + `Settled` via `eth_getLogs`, replays the
   signed move log through the game's pure rules, checks it hashes to the on-chain
   final hash and that each signature recovers to the declared player. So the
-  midchain is tamper-proof, tied to the on-chain, and provable by anyone. In a
+  Foskaay GGI Midchain is tamper-proof, tied to the on-chain, and provable by anyone. In a
   batch, each game still emits its OWN events inside the batch tx, so the explorer
   shows every game individually.
 
@@ -343,9 +343,9 @@ the demo.
 export PATH="$HOME/.foundry/bin:$PATH"        # foundry not on PATH
 cd /home/foskaay/globalfolkgames/foskaay-ggi && forge test   # 148 passing expected
 cd /home/foskaay/globalfolkgames && npm run build            # must be green
-node scripts/foskaay-ggi-midchain-match.mjs unbatched                # storage midchain, needs local relay
-node scripts/foskaay-ggi-eventmidchain-match.mjs                     # event-based midchain, uses local key
-node scripts/foskaay-ggi-eventmidchain-batch.mjs                     # event-based midchain batched 3/5/10/100
+node scripts/foskaay-ggi-midchain-match.mjs unbatched                # storage Foskaay GGI Midchain, needs local relay
+node scripts/foskaay-ggi-eventmidchain-match.mjs                     # event-based Foskaay GGI Midchain, uses local key
+node scripts/foskaay-ggi-eventmidchain-batch.mjs                     # event-based Foskaay GGI Midchain batched 3/5/10/100
 node scripts/foskaay-ggi-cost-measure.mjs            # re-measure Arc cost
 node scripts/gi-deploy-arc.mjs               # deploy core proxies (uses local key)
 ```

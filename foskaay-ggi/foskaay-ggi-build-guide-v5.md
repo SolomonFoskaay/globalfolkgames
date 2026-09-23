@@ -19,7 +19,7 @@ MagicBlock needs dedicated validators to run custom SVM runtime for 10ms latency
 
 On EVM Arc we don't have custom runtime, but we have cheaper primitives that replace validators:
 - `EIP-712` + `ecrecover` = signature is the validator. If a move is signed by authorized session key, it's valid.
-- `keccak256` hash chain = `H_n = keccak(H_{n-1}, move, randomSeeds)` - if any move tampered, finalHash breaks and settle reverts. This is the midchain that is neither fully onchain nor web2 offchain - it's cryptographically tied to onchain handover.
+- `keccak256` hash chain = `H_n = keccak(H_{n-1}, move, randomSeeds)` - if any move tampered, finalHash breaks and settle reverts. This is the Foskaay GGI Midchain that is neither fully onchain nor web2 offchain - it's cryptographically tied to onchain handover.
 - Pure functions for randomness = `random(prevHash, nonce)` via `eth_call` - free, no gas, lives in core contract.
 
 So Foskaay GGI equivalent on Arc:
@@ -32,7 +32,7 @@ Sponsor = game dev wallet in Vercel env holding `SPONSOR_PRIVATE_KEY` - pays onl
 **Why we chose this tech:**
 - No L2/L3/L4, no external RPC, no paymaster service, no validator network - solo dev can build with only smart contracts + Foundry
 - `EIP-712 SessionAuth` - one popup to authorize ephemeral key, then ephemeral key signs everything silently via `ethers.Wallet.createRandom()` in memory
-- Hash chain + dual sig final = tamper-proof midchain, not web2 backend. If frontend tampers, opponent refuses to sign finalHash and settle reverts.
+- Hash chain + dual sig final = tamper-proof Foskaay GGI Midchain, not web2 backend. If frontend tampers, opponent refuses to sign finalHash and settle reverts.
 - Generic randomness via `keccak256(prevHash, nonce, i)` - gives N random seeds for dice, cards, loot, shuffle - game agnostic, not dice-specific
 - Event-driven cheap gas - at Arc floor 20 Gwei, 21k gas = 0.00042 USDC, 65k gas ERC20 = 0.0013 USDC. To hit $1/1000 = $0.001 per game total, we must use events not SSTORE.
 
@@ -40,11 +40,11 @@ Sponsor = game dev wallet in Vercel env holding `SPONSOR_PRIVATE_KEY` - pays onl
 
 ### 0.1 How Explorer Indexing Works and Why Normal Arc Explorer Sees Nothing
 
-Normal Arc explorer (like `explorer.arc.io`) only sees onchain txs. Our midchain 200 moves are NOT onchain txs - they are signed offchain messages stored in Vercel relay memory / Upstash. So normal explorer sees only 2 txs: handover + settlement. It cannot see individual moves, points, cards, dice.
+Normal Arc explorer (like `explorer.arc.io`) only sees onchain txs. Our Foskaay GGI Midchain 200 moves are NOT onchain txs - they are signed offchain messages stored in Vercel relay memory / Upstash. So normal explorer sees only 2 txs: handover + settlement. It cannot see individual moves, points, cards, dice.
 
 That's intentional, same as MagicBlock ER explorer vs Solana base explorer.
 
-**FoskaayGGIExplorer - our own explorer** indexes midchain:
+**FoskaayGGIExplorer - our own explorer** indexes Foskaay GGI Midchain:
 
 How it indexes:
 1. Reads `FoskaayGGIHandover` event from Arc RPC `eth_getLogs` - gets sessionId, startHash, players, sessionKeys, gameLogic address, dev address
@@ -89,7 +89,7 @@ Target: Unbatched optimized = $1/1000, batched optimized = $0.30-$0.40/1000. Tha
 
 1. **EIP-712 SessionAuth:** `domain = {name: "Foskaay GGI", chainId: 5042, verifyingContract: FoskaayGGICore}`. Message `SessionAuth { sessionId, player, sessionKey, expiry }`. Player signs once with their real wallet (Metamask, Dynamic, etc - wallet agnostic). SDK gets `authSig`. After that, `ephemeralKey` (in-memory `ethers.Wallet`) signs all moves silently. No popup, no localStorage.
 
-2. **Hash Chain Midchain:** `prevHash = startHash`, `newHash = keccak(prevHash, move.data, randomSeeds)`. Each moveSig = `sign(ephemeral, {sessionId, nonce, prevHash, newHash})`. FinalHash = last newHash. If any move tampered, chain breaks, `settle` with dual sigs fails because opponent won't sign broken finalHash.
+2. **Hash Chain Foskaay GGI Midchain:** `prevHash = startHash`, `newHash = keccak(prevHash, move.data, randomSeeds)`. Each moveSig = `sign(ephemeral, {sessionId, nonce, prevHash, newHash})`. FinalHash = last newHash. If any move tampered, chain breaks, `settle` with dual sigs fails because opponent won't sign broken finalHash.
 
 3. **Generic Randomness:** Core pure `random(prevHash, nonce)` and `randomN(prevHash, nonce, count)` returns `bytes32` seed(s). Dev derives: dice = seed % 6 +1, card = seed % 52, shuffle = Fisher-Yates using seeds. Frontend calls via `eth_call` - free, shows animation while waiting, value from chain not JS. No duplicate logic.
 
@@ -105,7 +105,7 @@ ONE contract: **FoskaayGGICore**
 
 Deployed once by you on Arc. This is the business. It does 4 jobs only:
 
-1. **Session handover** - Takes a game session from dev's game contract and puts it into gasless midchain
+1. **Session handover** - Takes a game session from dev's game contract and puts it into gasless Foskaay GGI Midchain
 2. **Fee collection** - Charges 0.001 USDC per session = $1/1000 unbatched
 3. **Free randomness** - Provides generic random seed(s) via pure function, usable for dice, cards, shuffle, loot
 4. **Verification** - Checks hash chain + silent session signatures. Reverts if tampered.
@@ -241,7 +241,7 @@ await foskaayGGICore.handover({
 }) // Sponsor pays gas + 0.001 USDC fee, player pays 0
 ```
 
-3. Midchain - 200 moves, 0 gas:
+3. Foskaay GGI Midchain - 200 moves, 0 gas:
 ```js
 // Each move:
 const seeds = await foskaayGGICore.randomN(prevHash, nonce, 2) // eth_call, free, 2 random values needed for this game
@@ -275,7 +275,7 @@ Wallet agnostic: SDK takes `playerAddress` as string, doesn't require specific w
 
 Tabs: Who Pays (sponsor + fee), Session (players array length flexible, sessionKeys), Randomness (how many seeds requested per move, values), Moves (hash chain verification), Proof (green if chain valid).
 
-Data source: `eth_getLogs` for Handover/Settled + Vercel relay cache for midchain moves. Relay is untrusted.
+Data source: `eth_getLogs` for Handover/Settled + Vercel relay cache for Foskaay GGI Midchain moves. Relay is untrusted.
 
 ### 8. Demo - Check The Generals (PvP, not Ludo)
 
@@ -287,13 +287,13 @@ Build steps: Foundry only, no thirdweb, no localStorage.
 
 ---
 
-## 9. AGENT FINDINGS (2026-09-22) - the missing midchain, in plain words
+## 9. AGENT FINDINGS (2026-09-22) - the missing Foskaay GGI Midchain, in plain words
 
 This section is appended below the original v5 guide and does not change anything above it. It records what the Generals port exposed and what we must add.
 
 ### 9.1 The missing link, in one sentence
 
-The v5 guide already describes it: **a "midchain" where moves are signed and hash-chained off-chain and executed by `eth_call` for free, with only two real transactions per match (handover and settle).** The current Foskaay GGI cores have the session and the settlement, but not this free midchain. So the Generals port fell back to writing every move as its own Arc transaction, which is why it cost about 10 games/$1 instead of the promised about 1000.
+The v5 guide already describes it: **a "Foskaay GGI Midchain" where moves are signed and hash-chained off-chain and executed by `eth_call` for free, with only two real transactions per match (handover and settle).** The current Foskaay GGI cores have the session and the settlement, but not this free Foskaay GGI Midchain. So the Generals port fell back to writing every move as its own Arc transaction, which is why it cost about 10 games/$1 instead of the promised about 1000.
 
 Arc's own docs confirm what we get to use: Arc targets the **Osaka** hard fork, so **EIP-7702, EIP-1153 and deterministic instant finality** are all available. **EIP-4844 blobs are NOT** (type-3 transactions are rejected). That matters for the design below.
 
@@ -301,7 +301,7 @@ Arc's own docs confirm what we get to use: Arc targets the **Osaka** hard fork, 
 
 | Tech | What it is (plain) | Used now? | What it unlocks |
 | --- | --- | --- | --- |
-| `eth_call` free execution | Ask a contract to run a function without sending a transaction. Costs nothing. | Only for reads | The midchain: run the game's `applyMove` rules for free, no tx per move |
+| `eth_call` free execution | Ask a contract to run a function without sending a transaction. Costs nothing. | Only for reads | The Foskaay GGI Midchain: run the game's `applyMove` rules for free, no tx per move |
 | EIP-712 typed signatures | A wallet signs structured data; the contract recovers who signed | Partly (session keys) | One popup to authorise a session key, then silent move signatures |
 | keccak256 hash chain | Each move's hash includes the previous hash | No | Tamper-evident move history, one final hash to settle |
 | Events over storage + `eth_getLogs` | Emit logs instead of writing storage slots | Partly | Cheap on-chain handover/settle, the about $1/1000 target |
@@ -311,16 +311,16 @@ Arc's own docs confirm what we get to use: Arc targets the **Osaka** hard fork, 
 | Deterministic instant finality | A transaction is final the moment it is included | No | Settle is instant, one confirmation |
 | EIP-4844 blobs | Cheap bulk data | N/A | **Not available on Arc**, so not part of the plan |
 
-### 9.3 Comparison: MagicBlock ER vs current Foskaay GGI vs Foskaay GGI + midchain
+### 9.3 Comparison: MagicBlock ER vs current Foskaay GGI vs Foskaay GGI + Foskaay GGI Midchain
 
-| Question | MagicBlock ER (Solana) | Current Foskaay GGI (what we built) | Foskaay GGI + midchain (the missing tech) |
+| Question | MagicBlock ER (Solana) | Current Foskaay GGI (what we built) | Foskaay GGI + Foskaay GGI Midchain (the missing tech) |
 | --- | --- | --- | --- |
-| Where a move runs | Inside MagicBlock's ER validator | On Arc, as its own transaction | In the midchain: `eth_call` runs the game's pure rules, free |
+| Where a move runs | Inside MagicBlock's ER validator | On Arc, as its own transaction | In the Foskaay GGI Midchain: `eth_call` runs the game's pure rules, free |
 | Player pays per move | Nothing | Nothing | Nothing |
 | Sponsor pays per move | Nothing | about 0.0021 USDC | Nothing |
 | Sponsor pays per match | delegate + undelegate | every move + settle | **2 transactions only: handover + settle** |
 | On-chain footprint | base account + ER state | every move | start hash, final hash, session, 2 events |
-| What a public explorer sees | base txs only (ER invisible) | every move | 2 txs only (midchain invisible) |
+| What a public explorer sees | base txs only (ER invisible) | every move | 2 txs only (Foskaay GGI Midchain invisible) |
 | Tamper protection | validator executes, base verifies on commit | the chain runs the rules | EIP-712 signatures + hash chain, chain verifies on settle/dispute |
 | Infrastructure to run | a validator network | only a sponsor key | only a sponsor key + an untrusted cache |
 | Source of truth | Solana base + ER proof | the game contract | on-chain start/final + the verifiable signed move chain |
@@ -329,7 +329,7 @@ Arc's own docs confirm what we get to use: Arc targets the **Osaka** hard fork, 
 ### 9.4 What this achieves (the three layers)
 
 - **On-chain (truth):** the contract stores the session, the start hash and the final hash, and settles. Nothing can settle unless the signatures and the hash chain are valid. This is the MagicBlock "base chain" role.
-- **Midchain (free play):** every move is a signed, hash-chained message run through the game's pure rules via `eth_call`. Free for the player **and** free for the sponsor, exactly like the ER's free execution. All the game concepts survive here because the payload is opaque: players, seats, moves, rewards, lives, timer, points are just data the game's rules read and write.
+- **Foskaay GGI Midchain (free play):** every move is a signed, hash-chained message run through the game's pure rules via `eth_call`. Free for the player **and** free for the sponsor, exactly like the ER's free execution. All the game concepts survive here because the payload is opaque: players, seats, moves, rewards, lives, timer, points are just data the game's rules read and write.
 - **Off-chain (render only):** the frontend draws the board; Vercel holds the sponsor key and submits only the handover and settle transactions. Neither owns the truth.
 
 ### 9.5 Honest limits (so we do not overpromise)
@@ -341,23 +341,23 @@ Arc's own docs confirm what we get to use: Arc targets the **Osaka** hard fork, 
 
 ### 9.6 Conclusion and next step
 
-This is **not a new module**. `architecture.json` module `arcv2m18` already promises "FREE work inside a session: nothing is written to the chain during play, cost appears on OPEN and SETTLE only." The cores simply do not deliver that yet. The port exposed the gap; the midchain is how we close it.
+This is **not a new module**. `architecture.json` module `arcv2m18` already promises "FREE work inside a session: nothing is written to the chain during play, cost appears on OPEN and SETTLE only." The cores simply do not deliver that yet. The port exposed the gap; the Foskaay GGI Midchain is how we close it.
 
-Next step: build the midchain as a prototype on the Generals demo. Keep the board on-chain as the source of truth, move gameplay into signed `eth_call` moves with one handover and one settle, then measure the real cost against the current about 10 games/$1. No core contract change is needed for the prototype: the existing SessionRegistry (open/close/session keys), SessionState (`commitDigest`/`sealFinal`) and FeeVault already cover the on-chain endpoints. The midchain lives in the game's own contract (pure rules) plus the client/SDK (signing and hash chain), so we keep the 4 core + 1 optional structure.
+Next step: build the Foskaay GGI Midchain as a prototype on the Generals demo. Keep the board on-chain as the source of truth, move gameplay into signed `eth_call` moves with one handover and one settle, then measure the real cost against the current about 10 games/$1. No core contract change is needed for the prototype: the existing SessionRegistry (open/close/session keys), SessionState (`commitDigest`/`sealFinal`) and FeeVault already cover the on-chain endpoints. The Foskaay GGI Midchain lives in the game's own contract (pure rules) plus the client/SDK (signing and hash chain), so we keep the 4 core + 1 optional structure.
 
 ### 9.7 Measured result (Arc testnet, 2026-09-22)
 
-The midchain prototype is built and measured. `GeneralsMidchain` is a PURE rules engine (no storage); the client runs `applyMove` via `eth_call` and hash-chains the states; only session open, the game-state link and settle touch the chain. Every move is free for the player AND the sponsor, and the verifier replay PASSED (the signed move log replays to the same final hash).
+The Foskaay GGI Midchain prototype is built and measured. `GeneralsMidchain` is a PURE rules engine (no storage); the client runs `applyMove` via `eth_call` and hash-chains the states; only session open, the game-state link and settle touch the chain. Every move is free for the player AND the sponsor, and the verifier replay PASSED (the signed move log replays to the same final hash).
 
 | Mode | On-chain txs per match | Cost per match | Games per 1 USD |
 | --- | --- | --- | --- |
 | On-chain board port (before) | about 15 | 0.098172 USDC | about 10 |
-| Midchain unbatched | 3 (open, setGameState, settle) | 0.012206 USDC | about 81 |
-| Midchain batched (3 matches per window) | opens + 1 window flush | 0.009788 USDC | about 102 |
+| Foskaay GGI Midchain unbatched | 3 (open, setGameState, settle) | 0.012206 USDC | about 81 |
+| Foskaay GGI Midchain batched (3 matches per window) | opens + 1 window flush | 0.009788 USDC | about 102 |
 
 What this tells us:
 
-- The midchain removes the per-move cost completely (the big win): the on-chain-board port spent most of its 0.098 on per-move `command`, `tick` and `generate` transactions, and all of that is now free `eth_call` plus a signature.
+- The Foskaay GGI Midchain removes the per-move cost completely (the big win): the on-chain-board port spent most of its 0.098 on per-move `command`, `tick` and `generate` transactions, and all of that is now free `eth_call` plus a signature.
 - The remaining cost is the CORE's storage writes at open and settle, not the moves. The v5 target of about 1000 games per 1 USD needs an event-only handover/settle in the core (no SSTORE on the happy path, events for `eth_getLogs`) and/or larger batches. That is a future core change, kept separate so the 4 core + 1 optional stays stable for now.
 - Files: `foskaay-ggi/demos/pvp/generals/GeneralsMidchain.sol`, `foskaay-ggi/test/GeneralsMidchain.t.sol`, `scripts/foskaay-ggi-midchain-match.mjs`, `foskaay-ggi/deployments/midchain-cost.json` and `midchain-cost-batched.json`.
 - `GeneralsMidchain` deployed on Arc testnet: `0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2`.
@@ -366,16 +366,16 @@ What this tells us:
 
 Section 9.7 showed the remaining cost is the CORE's storage writes at open and settle, not the moves. This section tests the v5 "event-driven cheap gas" answer: a prototype contract (`EventOnlyCore`) that EMITS a log instead of writing storage, and verifies the players' signatures at settle with `ecrecover`. It is a measurement prototype, NOT core, and it is not meant to ship as-is (no on-chain session state, no replay guard).
 
-The moves are identical to the midchain test (free `eth_call` + signatures). Only the two endpoints change. Measured:
+The moves are identical to the Foskaay GGI Midchain test (free `eth_call` + signatures). Only the two endpoints change. Measured:
 
 | Approach | On-chain txs per match | Cost per match | Games per 1 USD |
 | --- | --- | --- | --- |
 | On-chain board port | about 15 | 0.098172 USDC | about 10 |
-| Core-based midchain (unbatched) | 3 | 0.012206 USDC | about 81 |
-| Core-based midchain (batched, 3/window) | opens + 1 flush | 0.009788 USDC | about 102 |
+| Core-based Foskaay GGI Midchain (unbatched) | 3 | 0.012206 USDC | about 81 |
+| Core-based Foskaay GGI Midchain (batched, 3/window) | opens + 1 flush | 0.009788 USDC | about 102 |
 | **Event-only handover + settle (unbatched)** | **2** | **0.001709 USDC** | **about 585** |
 
-Event-only detail: handover 0.000780 USDC (31,234 gas), settle 0.000929 USDC (37,160 gas). That is about 7x cheaper than the core-based midchain and about 57x cheaper than the on-chain board port.
+Event-only detail: handover 0.000780 USDC (31,234 gas), settle 0.000929 USDC (37,160 gas). That is about 7x cheaper than the core-based Foskaay GGI Midchain and about 57x cheaper than the on-chain board port.
 
 What this proves and what it costs:
 
@@ -385,39 +385,39 @@ What this proves and what it costs:
 
 Files: the first version, since renamed to `EventMidchainCore` (`foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/foskaay-ggi-eventmidchain-match.mjs`). The first contract was deployed at `0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c`. 147/147 forge tests pass.
 
-### 9.9 The event-based MIDCHAIN, batched (owner-approved test, 2026-09-23)
+### 9.9 The event-based Foskaay GGI Midchain, batched (owner-approved test, 2026-09-23)
 
-NAMING: this is still the MIDCHAIN. "Midchain" means anything that is neither fully on the base chain nor offchain: play happens off the base chain but is cryptographically tied to it. The event-based form uses an EVENT instead of STORAGE. It is NOT "offchain". (The earlier `EventOnlyCore` prototype was renamed to `EventMidchainCore` so the name matches the idea.)
+NAMING: this is still the Foskaay GGI Midchain. "Foskaay GGI Midchain" means anything that is neither fully on the base chain nor offchain: play happens off the base chain but is cryptographically tied to it. The event-based form uses an EVENT instead of STORAGE. It is NOT "offchain". (The earlier `EventOnlyCore` prototype was renamed to `EventMidchainCore` so the name matches the idea.)
 
 #### The link is solved naturally (no third transaction)
 
-In the storage-based core, a session lives in `SessionRegistry` storage, so to tie the game's board to the session we called `setGameState` as a THIRD transaction. The event-based midchain puts the link INSIDE the `Handover` event: it carries `sessionId`, `gameLogic` (the game's own contract), `startHash`, `players` and `sessionKeys`. So:
+In the storage-based core, a session lives in `SessionRegistry` storage, so to tie the game's board to the session we called `setGameState` as a THIRD transaction. The event-based Foskaay GGI Midchain puts the link INSIDE the `Handover` event: it carries `sessionId`, `gameLogic` (the game's own contract), `startHash`, `players` and `sessionKeys`. So:
 - the session and the game are bound in the SAME event and the SAME transaction, no separate link tx (2 txs per game, not 3);
 - the Foskaay GGI explorer reads `Handover` and `Settled` with `eth_getLogs` and can index by `gameLogic` or `sessionId` directly;
-- the start hash and the final hash are on-chain in those events, the final hash is signed by the players and checked on-chain with `ecrecover`, and the move log replays through the game's pure rules to that final hash. So the midchain is tamper-proof, tied to the on-chain, and provable by anyone, not "trust me bro".
+- the start hash and the final hash are on-chain in those events, the final hash is signed by the players and checked on-chain with `ecrecover`, and the move log replays through the game's pure rules to that final hash. So the Foskaay GGI Midchain is tamper-proof, tied to the on-chain, and provable by anyone, not "trust me bro".
 
 #### The cost ladder (measured on Arc testnet, 2026-09-23)
 
-This is the pitch table: normal direct-to-onchain, then the storage-based midchain, then the event-based midchain, batched at 3, 5, 10 and 100 games per session.
+This is the pitch table: normal direct-to-onchain, then the storage-based Foskaay GGI Midchain, then the event-based Foskaay GGI Midchain, batched at 3, 5, 10 and 100 games per session.
 
 | Approach | What happens | Txs per game | Cost per game | Games per 1 USD |
 | --- | --- | --- | --- | --- |
 | Direct to on-chain, no Foskaay GGI | Every move is its own transaction (most games run 60 to 100+ moves) | about 100 | about 0.2444 USDC | about 4 |
-| Foskaay GGI storage-based midchain, unbatched | open + link + settle per game | 3 | 0.012206 USDC | about 81 |
-| Foskaay GGI storage-based midchain, batched 3 | 3 games, one window flush | 3 + flush/3 | 0.009788 USDC | about 102 |
-| Foskaay GGI storage-based midchain, batched 5 | 5 games, one window flush | 3 + flush/5 | 0.009328 USDC | about 107 |
-| Foskaay GGI storage-based midchain, batched 10 | 10 games, one window flush | 3 + flush/10 | 0.008981 USDC | about 111 |
-| Foskaay GGI storage-based midchain, batched 100 (extrapolated) | per-game open still dominates | 3 + flush/100 | about 0.0088 USDC | about 113 |
-| Foskaay GGI event-based midchain, unbatched | handover + settle per game (link in the event) | 2 | 0.001712 USDC | about 584 |
-| Foskaay GGI event-based midchain, batched 3 | one handoverMany + one settleMany | 2/3 | 0.001098 USDC | about 910 |
-| Foskaay GGI event-based midchain, batched 5 | one handoverMany + one settleMany | 2/5 | 0.000939 USDC | about 1,064 |
-| Foskaay GGI event-based midchain, batched 10 | one handoverMany + one settleMany | 2/10 | 0.000820 USDC | about 1,219 |
-| Foskaay GGI event-based midchain, batched 100 | one handoverMany + one settleMany | 2/100 | 0.000713 USDC | about 1,403 |
+| Foskaay GGI storage-based Foskaay GGI Midchain, unbatched | open + link + settle per game | 3 | 0.012206 USDC | about 81 |
+| Foskaay GGI storage-based Foskaay GGI Midchain, batched 3 | 3 games, one window flush | 3 + flush/3 | 0.009788 USDC | about 102 |
+| Foskaay GGI storage-based Foskaay GGI Midchain, batched 5 | 5 games, one window flush | 3 + flush/5 | 0.009328 USDC | about 107 |
+| Foskaay GGI storage-based Foskaay GGI Midchain, batched 10 | 10 games, one window flush | 3 + flush/10 | 0.008981 USDC | about 111 |
+| Foskaay GGI storage-based Foskaay GGI Midchain, batched 100 (extrapolated) | per-game open still dominates | 3 + flush/100 | about 0.0088 USDC | about 113 |
+| Foskaay GGI event-based Foskaay GGI Midchain, unbatched | handover + settle per game (link in the event) | 2 | 0.001712 USDC | about 584 |
+| Foskaay GGI event-based Foskaay GGI Midchain, batched 3 | one handoverMany + one settleMany | 2/3 | 0.001098 USDC | about 910 |
+| Foskaay GGI event-based Foskaay GGI Midchain, batched 5 | one handoverMany + one settleMany | 2/5 | 0.000939 USDC | about 1,064 |
+| Foskaay GGI event-based Foskaay GGI Midchain, batched 10 | one handoverMany + one settleMany | 2/10 | 0.000820 USDC | about 1,219 |
+| Foskaay GGI event-based Foskaay GGI Midchain, batched 100 | one handoverMany + one settleMany | 2/100 | 0.000713 USDC | about 1,403 |
 
 Read it plainly:
-- The direct-to-onchain row uses 100 moves because most games run 60 to 100+ moves. At the measured 0.00212 USDC per move plus about 0.032 USDC of board setup, that is about 0.2444 USDC per game, about 4 games per 1 USD. The Foskaay GGI midchain cost does NOT change with move count, because every move is free, so 100 moves cost the same as 12. That is the saving: about 0.2444 USDC per game direct, versus 0.0017 to 0.0007 USDC on the Foskaay GGI midchain.
-- The storage-based midchain cannot escape the per-game open cost (SSTORE), so batching it barely helps (102 to 113 games per 1 USD).
-- The event-based midchain removes that wall, so batching helps a lot. It crosses the v5 target of $1 per 1,000 games at just 5 games per batch, and reaches about 1,400 games per 1 USD at 100 per batch.
+- The direct-to-onchain row uses 100 moves because most games run 60 to 100+ moves. At the measured 0.00212 USDC per move plus about 0.032 USDC of board setup, that is about 0.2444 USDC per game, about 4 games per 1 USD. The Foskaay GGI Midchain cost does NOT change with move count, because every move is free, so 100 moves cost the same as 12. That is the saving: about 0.2444 USDC per game direct, versus 0.0017 to 0.0007 USDC on the Foskaay GGI Midchain.
+- The storage-based Foskaay GGI Midchain cannot escape the per-game open cost (SSTORE), so batching it barely helps (102 to 113 games per 1 USD).
+- The event-based Foskaay GGI Midchain removes that wall, so batching helps a lot. It crosses the v5 target of $1 per 1,000 games at just 5 games per batch, and reaches about 1,400 games per 1 USD at 100 per batch.
 
 #### Unbatched vs batched, in plain words
 
@@ -428,20 +428,20 @@ Read it plainly:
 #### What the Foskaay GGI explorer shows, batched or not
 
 - It reads `Handover` and `Settled` from Arc with `eth_getLogs`, and the signed move log from the relay cache (untrusted).
-- It replays the moves through the game's pure rules and checks they hash to the on-chain final hash, and that each signature recovers to the declared player. Green means the midchain is valid.
+- It replays the moves through the game's pure rules and checks they hash to the on-chain final hash, and that each signature recovers to the declared player. Green means the Foskaay GGI Midchain is valid.
 - In a batched session, each game still emits its OWN `Handover` and `Settled` event inside the batch transaction, so the explorer can show every game individually. A user does not need to trust that it "will go onchain": the events are on-chain, and the proof is the replay. The only thing they wait for is the batch transaction itself.
 
 #### What has to change in the core and the SDKs (proposal, not built)
 
 - CORE (no new address): add the event-based `handover` / `handoverMany` / `settle` / `settleMany` to the EXISTING core via a UUPS logic upgrade (same proxy address, append-only storage). The ONE new piece of state is a nullifier mapping (sessionId => settled) so a session cannot settle twice; it consumes from the `__gap`. Storage-based sessions stay as they are, so nothing is merged and no existing data moves. This needs the owner's explicit approval and an `architecture.json` update first.
-- SDK (republish, no chain change): add `handover` / `handoverMany` / `settle` / `settleMany` / `signMove` / `verifyMidchain` helpers and the event-based ABIs. Bump `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
+- SDK (republish, no chain change): add `handover` / `handoverMany` / `settle` / `settleMany` / `signMove` / `verifyMidchain` helpers and the event-based ABIs. Bump `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts-sdk`.
 - BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched; the rail never forces a cadence.
 
 Files: `foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/foskaay-ggi-deploy-eventmidchain.mjs`, `scripts/foskaay-ggi-eventmidchain-match.mjs`, `scripts/foskaay-ggi-eventmidchain-batch.mjs`, `foskaay-ggi/deployments/eventmidchain-cost.json` and `eventmidchain-batch-cost.json`. `EventMidchainCore` deployed on Arc testnet: `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`. 148/148 forge tests pass.
 
 ### 9.10 PER-SESSION anchoring measured (the ridiculously cheap tier)
 
-The 9.9 batch test anchored PER GAME (N handovers + N settles + 2N signatures), so it floors at about 1,400 games/$1. This section measures the OTHER design: anchor the SESSION, not each game. ONE handover for the whole session, play N games for free on the midchain, then ONE settle carrying a single Merkle root over all N final hashes and just 2 signatures. On-chain work is O(1), so per game = cost / N and keeps dropping.
+The 9.9 batch test anchored PER GAME (N handovers + N settles + 2N signatures), so it floors at about 1,400 games/$1. This section measures the OTHER design: anchor the SESSION, not each game. ONE handover for the whole session, play N games for free on the Foskaay GGI Midchain, then ONE settle carrying a single Merkle root over all N final hashes and just 2 signatures. On-chain work is O(1), so per game = cost / N and keeps dropping.
 
 | Games in one session | Handover | Settle | Total | Per game | Games per 1 USD |
 | --- | --- | --- | --- | --- | --- |
@@ -454,9 +454,9 @@ The handover and the settle stay FLAT no matter how many games are inside. That 
 
 Why per-game batching (9.9) floors but per-session does not: per-game anchoring puts each game's payload and its 2 signatures on-chain (measured about 28,000 gas per game, irreducible), so it converges to about 0.0007 USDC per game. Per-session anchoring puts ONE root on-chain, so it converges to zero per game. Both are optional; a dev picks the tier.
 
-### 9.11 Event-based midchain added to the CORE (owner-approved, 2026-09-23)
+### 9.11 Event-based Foskaay GGI Midchain added to the CORE (owner-approved, 2026-09-23)
 
-The event-based midchain functions are now in the live core, additively:
+The event-based Foskaay GGI Midchain functions are now in the live core, additively:
 - `SessionRegistry` proxy (SAME address) `0x5165809149Be8A72c72EedBa6a13d57014Ba1bE5` upgraded to implementation `0x05D492C0Cc4e890131c163b302Ab20B56542D2B2`.
 - New functions: `handover`, `handoverMany`, `settle`, `settleMany`, `midchainDigest`. New events: `Handover`, `MidchainSettled`.
 - ADDITIVE ONLY: no storage change, no gap change, no version bump, no migration. Verified after the upgrade: `feeRecipient`, `operator`, `version`, `nonces`, `gameStateOf` all identical, and `midchainDigest` answers on the proxy.
@@ -464,4 +464,4 @@ The event-based midchain functions are now in the live core, additively:
 - Tests: `foskaay-ggi/test/SessionRegistryMidchain.t.sol` (7 tests). 155/155 forge tests pass.
 - SDK helpers added (`handover`, `handoverMany`, `settleMidchain`, `settleMidchainMany`, `midchainDigest`, `signMidchain`, `verifyMidchain`) in `@foskaay/ggi-sdk`, versions bumped to 0.1.5. Republish + browser-bundle regeneration is the remaining step.
 
-The three tiers, all optional, for the pitch: (1) per-game on-chain board about 10 games/$1; (2) per-game event midchain floor about 1,400 games/$1; (3) per-session midchain 58,000+ games/$1. Tier 3 is the headline: open once, everything inside is free, settle once.
+The three tiers, all optional, for the pitch: (1) per-game on-chain board about 10 games/$1; (2) per-game event Foskaay GGI Midchain floor about 1,400 games/$1; (3) per-session Foskaay GGI Midchain 58,000+ games/$1. Tier 3 is the headline: open once, everything inside is free, settle once.

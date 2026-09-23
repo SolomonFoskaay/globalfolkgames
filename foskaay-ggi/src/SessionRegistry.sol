@@ -149,7 +149,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
     event SessionKeyRegistered(address indexed owner, address indexed key, uint64 validUntil, bytes32 scopeHash);
     event SessionKeyRevoked(address indexed owner, address indexed key);
     event GameStateSet(bytes32 indexed sessionId, address indexed owner, address stateAccount);
-    /// EVENT-BASED MIDCHAIN (optional, cheap anchor): the handover event carries
+    /// EVENT-BASED Foskaay GGI Midchain (optional, cheap anchor): the handover event carries
     /// the session + the game link, so no separate link transaction is needed.
     event Handover(
         bytes32 indexed sessionId,
@@ -160,7 +160,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
         uint16 randomCount,
         address indexed payer
     );
-    /// EVENT-BASED MIDCHAIN settlement: the final hash (or a session Merkle root)
+    /// EVENT-BASED Foskaay GGI Midchain settlement: the final hash (or a session Merkle root)
     /// plus who paid. No stored session is required.
     event MidchainSettled(bytes32 indexed sessionId, bytes32 finalHash, address indexed payer);
 
@@ -339,7 +339,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable {
         emit SessionKeyRevoked(msg.sender, key);
     }
 
-    // --------------------------------------- event-based midchain (cheap anchor)
+    // --------------------------------------- event-based Foskaay GGI Midchain (cheap anchor)
 
     /// @notice EVENT-BASED handover: emit the session + the game link instead of
     ///         writing a stored session. Cheaper than `open` + `setGameState`

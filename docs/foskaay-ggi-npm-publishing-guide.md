@@ -7,7 +7,7 @@ published one. Follow it in order.
 There are two packages:
 
 - `@foskaay/ggi-sdk` (the client, in `foskaay-ggi/packages/sdk`)
-- `@foskaay/ggi-contracts` (interfaces + addresses, in `foskaay-ggi/packages/contracts`)
+- `@foskaay/ggi-contracts-sdk` (interfaces + addresses, in `foskaay-ggi/packages/contracts`)
 
 ---
 
@@ -38,7 +38,7 @@ npm whoami
 
 ```bash
 npm view @foskaay/ggi-sdk
-npm view @foskaay/ggi-contracts
+npm view @foskaay/ggi-contracts-sdk
 ```
 
 If both say something like `404 Not Found`, the names are free. If a package
@@ -113,8 +113,8 @@ Never trust the publish; test the install in a clean folder:
 ```bash
 mkdir /tmp/ggi-check && cd /tmp/ggi-check
 npm init -y
-npm install @foskaay/ggi-sdk @foskaay/ggi-contracts viem
-node -e "const {testnet} = require('@foskaay/ggi-contracts'); console.log(testnet.contracts.SessionRegistry)"
+npm install @foskaay/ggi-sdk @foskaay/ggi-contracts-sdk viem
+node -e "const {testnet} = require('@foskaay/ggi-contracts-sdk'); console.log(testnet.contracts.SessionRegistry)"
 ```
 
 If that prints the address, the package is genuinely installable. If it fails,

@@ -1,4 +1,4 @@
-// @foskaay/ggi-contracts — Solidity interfaces for Foskaay Gasless Games Infrastructure (Foskaay GGI).
+// @foskaay/ggi-contracts-sdk — Solidity interfaces for Foskaay Gasless Games Infrastructure (Foskaay GGI).
 //
 // These are the FOUR core contracts. Copy them into your own contract, or import
 // this package, and call them directly. Nothing here is opinionated: no account
@@ -45,7 +45,7 @@ interface ISessionRegistry {
     function isSessionKeyLive(address key) external view returns (bool);
     function sessionKeyOf(address key) external view returns (SessionKey memory);
 
-    // Event-based midchain (cheap anchor). Additive; the storage paths above are unchanged.
+    // Event-based Foskaay GGI Midchain (cheap anchor). Additive; the storage paths above are unchanged.
     function handover(
         bytes32 sessionId,
         address gameLogic,

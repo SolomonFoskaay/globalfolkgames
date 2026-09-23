@@ -8,7 +8,7 @@ one-line integration. Installing it is the whole setup; there is no fork and no
 contract to copy.
 
 - Overview and contract addresses: **/foskaay-ggi-docs**
-- Network details ship in `@foskaay/ggi-contracts`
+- Network details ship in `@foskaay/ggi-contracts-sdk`
 
 ---
 

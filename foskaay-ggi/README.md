@@ -40,7 +40,7 @@ it has already gone wrong.
 
 The full brand name is used everywhere a stranger can see it: **Foskaay Gasless Games
 Infrastructure**. The short form **Foskaay GGI** is used only in internal docs after the full name has
-appeared. Packages are `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
+appeared. Packages are `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts-sdk`.
 
 Never call this an "ER": MagicBlock's ER is an SVM runtime, this is a session/channel layer on EVM.
 
@@ -66,7 +66,7 @@ globalfolkgames-bs/
   test/                      Foundry tests
   packages/
     sdk/                     @foskaay/ggi-sdk — the one-line integration
-    contracts/               @foskaay/ggi-contracts — interfaces + deployed addresses
+    contracts/               @foskaay/ggi-contracts-sdk — interfaces + deployed addresses
 ```
 
 `BatchWindow.sol` and `ParticipantAccount.sol` are **NOT** core and are **not** part of this

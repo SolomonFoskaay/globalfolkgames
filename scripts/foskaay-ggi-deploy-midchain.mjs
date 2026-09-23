@@ -1,4 +1,4 @@
-// scripts/foskaay-ggi-deploy-midchain.mjs — deploy the pure midchain Generals rules to Arc.
+// scripts/foskaay-ggi-deploy-Foskaay GGI Midchain.mjs — deploy the pure Foskaay GGI Midchain Generals rules to Arc.
 //
 // GeneralsMidchain holds NO state and has NO constructor args: it is a pure rules
 // engine that the client runs for free via eth_call. It is demo code, not rail
@@ -7,7 +7,7 @@
 // SECURITY: the deployer key comes from ~/.config/gfg/arc-sponsor.json and is
 // NEVER printed, logged, or committed.
 //
-// Usage:  node scripts/foskaay-ggi-deploy-midchain.mjs
+// Usage:  node scripts/foskaay-ggi-deploy-Foskaay GGI Midchain.mjs
 import { readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';

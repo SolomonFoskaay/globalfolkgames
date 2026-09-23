@@ -5,7 +5,7 @@
 // and reports the exact USDC the Arc blockchain charges, operation by operation.
 //
 // It reads the deployer key from ~/.config/gfg/arc-sponsor.json and never prints
-// it. Addresses come from the published @foskaay/ggi-contracts data.
+// it. Addresses come from the published @foskaay/ggi-contracts-sdk data.
 //
 // Usage:  node scripts/foskaay-ggi-cost-measure.mjs
 import { readFileSync, writeFileSync } from 'fs';

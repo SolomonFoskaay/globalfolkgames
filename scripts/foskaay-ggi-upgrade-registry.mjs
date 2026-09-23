@@ -1,6 +1,6 @@
 // scripts/foskaay-ggi-upgrade-registry.mjs — UUPS upgrade of SessionRegistry.
 //
-// Adds the EVENT-BASED MIDCHAIN functions (handover/handoverMany/settle/
+// Adds the EVENT-BASED Foskaay GGI Midchain functions (handover/handoverMany/settle/
 // settleMany/midchainDigest) to the EXISTING SessionRegistry proxy. The change is
 // ADDITIVE: no storage layout change, no gap change, no version bump, no
 // migration. The proxy address stays the same and all existing data is untouched.
@@ -84,7 +84,7 @@ const read = (fn, args) => pub.readContract({ address: PROXY, abi: artifact.abi,
 
   rec.contracts.SessionRegistryImplementation = impl;
   rec.registryUpgradedAt = new Date().toISOString();
-  rec.registryUpgradeNote = 'Event-based midchain functions added (additive, no storage change). Proxy unchanged.';
+  rec.registryUpgradeNote = 'Event-based Foskaay GGI Midchain functions added (additive, no storage change). Proxy unchanged.';
   writeFileSync(recPath, JSON.stringify(rec, null, 2) + '\n');
   console.log('recorded: foskaay-ggi/deployments/arc-testnet.json');
   if (!same) process.exit(2);

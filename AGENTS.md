@@ -392,7 +392,7 @@ design). Never merge the two. Full name is **Foskaay Gasless Games
 Infrastructure**; short form **Foskaay GGI** ("Foskaay" is never shortened).
 Never call it an "ER". Spec lives in `architecture.json` module `arcv2m18`; the
 long-form note is `docs/foskaay-ggi-spec.md`; the public docs page is
-`/foskaay-ggi-docs/`.
+`/foskaay-ggi/docs/`.
 
 - **CORE = exactly 4 unopinionated contracts:** SessionRegistry, SessionState,
   Randomness, FeeVault. BatchedSettlement is an OPTIONAL separate contract, never
@@ -429,7 +429,7 @@ long-form note is `docs/foskaay-ggi-spec.md`; the public docs page is
 - **Deploy mechanics:** `forge script script/DeployGI.s.sol:DeployGI --rpc-url
   <arc> --private-key <key> --broadcast`. The forge cache/broadcast files contain
   the deploy key, so they are gitignored AND scrubbed locally after each deploy
-  (defense in depth). Packages: `@foskaay/ggi-sdk`, `@foskaay/ggi-contracts` on
+  (defense in depth). Packages: `@foskaay/ggi-sdk`, `@foskaay/ggi-contracts-sdk` on
   npm; the SDK reads the per-session fee at runtime, never hardcoded.
 - **Cost (measured, never claimed):** ~63 games/$1 unbatched on Arc testnet;
   batching is the path to hundreds-to-thousands. Always re-measure with

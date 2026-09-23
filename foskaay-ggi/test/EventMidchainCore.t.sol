@@ -9,7 +9,7 @@ interface Vm {
     function expectRevert() external;
 }
 
-/// PROOF of the event-based midchain: handover and settle write NO storage, the
+/// PROOF of the event-based Foskaay GGI Midchain: handover and settle write NO storage, the
 /// handover event itself carries the game link (no separate link tx), and settle
 /// still refuses a forged or wrong signature. Batch functions are covered too.
 contract EventMidchainCoreTest {
