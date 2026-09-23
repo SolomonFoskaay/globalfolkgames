@@ -1,10 +1,10 @@
-// scripts/foskaay-ggi-eventmidchain-session.mjs — measure the PER-SESSION midchain.
+// scripts/foskaay-ggi-eventmidchain-session.mjs — measure the PER-SESSION Foskaay GGI Midchain.
 //
 // THE DIFFERENCE FROM eventmidchain-batch.mjs:
 //   - batch.mjs puts EVERY game's handover + settle + 2 signatures on-chain
 //     (N games = N payloads), so it floors at about 1,400 games/$1.
 //   - THIS script anchors the SESSION, not each game: ONE handover for the whole
-//     session, play N games for free on the midchain, then ONE settle carrying a
+//     session, play N games for free on the Foskaay GGI Midchain, then ONE settle carrying a
 //     single Merkle root over all N final hashes and just 2 signatures. On-chain
 //     work is O(1), so per game = cost / N and it keeps dropping as N grows.
 //
@@ -78,7 +78,7 @@ function merkleRoot(leaves) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('Foskaay GGI PER-SESSION midchain (one handover + one settle for N games) -> Arc testnet');
+  console.log('Foskaay GGI PER-SESSION Foskaay GGI Midchain (one handover + one settle for N games) -> Arc testnet');
   console.log('EventMidchainCore:', EMC);
   console.log('players          :', p0.address, p1.address);
 
@@ -115,6 +115,6 @@ function merkleRoot(leaves) {
     console.log('  N=' + String(n).padEnd(4), 'handover', usdc(handover.costUsdc6).toFixed(6), ' settle', usdc(settle.costUsdc6).toFixed(6), ' TOTAL', total.toFixed(6), ' per game', perGame.toFixed(6), ' ->', perGame > 0 ? Math.floor(1 / perGame) : 'inf', 'games/$1');
   }
 
-  writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventmidchain-session-cost.json'), JSON.stringify({ measuredAt: new Date().toISOString(), mode: 'eventmidchain-per-session', moveCount, results, note: 'One handover + one settle per SESSION; N games inside are free on the midchain; the settle carries a Merkle root and 2 signatures total.', comparePerGameBatchFloor: 0.000713 }, null, 2) + '\n');
+  writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventmidchain-session-cost.json'), JSON.stringify({ measuredAt: new Date().toISOString(), mode: 'eventmidchain-per-session', moveCount, results, note: 'One handover + one settle per SESSION; N games inside are free on the Foskaay GGI Midchain; the settle carries a Merkle root and 2 signatures total.', comparePerGameBatchFloor: 0.000713 }, null, 2) + '\n');
   console.log('\nwritten: foskaay-ggi/deployments/eventmidchain-session-cost.json');
 })().catch((e) => { console.error('session test failed:', e.shortMessage || e.message || e); process.exit(1); });

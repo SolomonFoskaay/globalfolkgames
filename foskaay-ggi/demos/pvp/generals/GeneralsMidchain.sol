@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title GeneralsMidchain — the free-execution ("midchain") twin of GeneralsGame.
+/// @title GeneralsMidchain — the free-execution ("Foskaay GGI Midchain") twin of GeneralsGame.
 ///
 /// @notice THE IDEA (see foskaay-ggi-build-guide-v5.md section 9): on Arc there is
 /// no free execution layer like MagicBlock's ER, but EVM gives us the next best
@@ -14,7 +14,7 @@ pragma solidity ^0.8.24;
 /// @dev This contract holds NO state and has NO owner and NO access control: it is
 /// a pure rules engine. The on-chain truth is the session + the sealed final hash
 /// (SessionRegistry / SessionState). Anyone can replay the signed move log through
-/// `applyMove` to prove the final hash, so the midchain is verifiable, not trusted.
+/// `applyMove` to prove the final hash, so the Foskaay GGI Midchain is verifiable, not trusted.
 ///
 /// The rules are copied exactly from GeneralsGame (itself a port of MagicBlock's
 /// solana-generals), so the two twins can be read side by side.
@@ -59,7 +59,7 @@ contract GeneralsMidchain {
     /// @notice The deterministic starting board, copied exactly from their
     ///         `generate` system (all fields, four cities, one capital per seat).
     function getInitialState() public pure returns (State memory s) {
-        s.status = 2; // Playing: the midchain starts after the lobby is agreed
+        s.status = 2; // Playing: the Foskaay GGI Midchain starts after the lobby is agreed
         s.turn = 0;
         s.tick = 0;
         for (uint256 i = 0; i < 128; i++) {

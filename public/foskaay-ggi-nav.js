@@ -14,11 +14,11 @@
 
 (function () {
     var PAGES = [
-        { key: 'demos', label: '🎮 Demos', href: '/foskaay-ggi-demos/' },
-        { key: 'explorer', label: '🔎 Explorer', href: '/foskaay-ggi-explorer/' },
-        { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi-docs/' },
-        { key: 'get-started', label: '🚀 Get started', href: '/foskaay-ggi-docs/#get-started' },
-        { key: 'faq', label: '❓ FAQ and fixes', href: '/foskaay-ggi-docs/#faq' }
+        { key: 'demos', label: '🎮 Demos', href: '/foskaay-ggi/demos/' },
+        { key: 'explorer', label: '🔎 Explorer', href: '/foskaay-ggi/explorer/' },
+        { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi/docs/' },
+        { key: 'get-started', label: '🚀 Get started', href: '/foskaay-ggi/docs/#get-started' },
+        { key: 'faq', label: '❓ FAQ and fixes', href: '/foskaay-ggi/docs/#faq' }
     ];
 
     function render(cfg) {

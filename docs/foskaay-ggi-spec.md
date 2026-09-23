@@ -34,7 +34,7 @@ RETIRED as product names: "GlobalFolkGames Gasless Infrastructure" (was the shor
   discarded design and must never be used for this rail.
 
 Internal short form, only inside staff docs after the full name has appeared: **Foskaay GGI**.
-npm packages stay brand-first: `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
+npm packages stay brand-first: `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts-sdk`.
 
 ---
 
@@ -297,7 +297,7 @@ Foskaay Gasless Games Infrastructure (Foskaay GGI) must ship the same way. Consu
 
 - **`@foskaay/ggi-sdk`** (npm package): `open()`, `act()`, `dispute()`, `settle()`, plus read
   helpers. This is the one-line integration a game uses.
-- **`@foskaay/ggi-contracts`** (Solidity interfaces + deployed addresses per network): for a
+- **`@foskaay/ggi-contracts-sdk`** (Solidity interfaces + deployed addresses per network): for a
   game's own contract to call the rail directly.
 - **A per-game adapter** (small, ~50 lines) that serialises that game's state into the opaque
   session payload. Ludo has one; chess has one; an idle game has one. This is the ONLY game-specific
@@ -333,7 +333,7 @@ foskaay-ggi/          <- standalone project (own Foundry project, own contracts)
     verifiers/               <- per-game verifiers (Ludo ships first)
   packages/
     sdk/                     <- @foskaay/ggi-sdk (the one-line integration)
-    contracts/               <- @foskaay/ggi-contracts (Solidity interfaces + addresses)
+    contracts/               <- @foskaay/ggi-contracts-sdk (Solidity interfaces + addresses)
   README.md                  <- the contract for any game to plug in
 ```
 
@@ -376,7 +376,7 @@ estimate for the core: roughly 500-1,500 lines of Solidity.
 8. **Naming:** the product is **"Foskaay Gasless Games Infrastructure"** (owner 2026-09-21).
    The name sells the benefit (gasless play, cheap for the sponsor) not the mechanism. Short form
    "Foskaay GGI" is internal only, after the full name has appeared. npm packages are
-   **`@foskaay/ggi-sdk`** and **`@foskaay/ggi-contracts`**. "Batched Settlement" is
+   **`@foskaay/ggi-sdk`** and **`@foskaay/ggi-contracts-sdk`**. "Batched Settlement" is
    now one optional pattern, not the product; "Session Rails" is retired. Never call it an "ER".
 
 **Still open (answer before build):**
@@ -427,7 +427,7 @@ optional pattern, and "Session Rails" was internal jargon.
 The brand is kept whole because the full name is what a developer sees on every install, README and
 import, which is free brand distribution. It is never shortened to a monogram for strangers (a
 monogram means nothing until you are already famous). Packages are `@foskaay/ggi-sdk` and
-`@foskaay/ggi-contracts`. MagicBlock did the same: their product is not branded "MB-ER".
+`@foskaay/ggi-contracts-sdk`. MagicBlock did the same: their product is not branded "MB-ER".
 
 ---
 

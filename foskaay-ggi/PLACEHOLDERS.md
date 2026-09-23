@@ -14,7 +14,7 @@ NOT core, NOT in this contract set (OPTIONAL patterns a game may adopt, offered 
 
 test/                          - Foundry tests, written alongside each step
 packages/sdk/                  - @foskaay/ggi-sdk (built once the contracts are stable)
-packages/contracts/            - @foskaay/ggi-contracts (interfaces + deployed addresses)
+packages/contracts/            - @foskaay/ggi-contracts-sdk (interfaces + deployed addresses)
 
 CORE vs OPTIONAL, the two laws and the build order are in ../README.md
 and ../../docs/globalfolkgames-bs-spec.md. Authoritative spec: architecture.json `arcv2m18`.

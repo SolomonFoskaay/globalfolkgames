@@ -8,7 +8,7 @@
     "DEPRECATED": "Removed or replaced, kept for the record, do not build"
   },
   "current": {
-    "title": "Foskaay GGI - core, SDK, game demo, cost ladder, storage + event-based midchain",
+    "title": "Foskaay GGI - core, SDK, game demo, cost ladder, storage + event-based Foskaay GGI Midchain",
     "updated": "2026-09-23",
     "items": [
       {
@@ -44,7 +44,7 @@
         "s": "done"
       },
       {
-        "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+        "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi/demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
         "s": "done"
       },
       {
@@ -52,7 +52,7 @@
         "s": "done"
       },
       {
-        "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+        "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
         "s": "done"
       },
       {
@@ -80,7 +80,7 @@
         "s": "done"
       },
       {
-        "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+        "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
         "s": "done"
       },
       {
@@ -88,15 +88,15 @@
         "s": "done"
       },
       {
-        "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi-demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
+        "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi/demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
         "s": "done"
       },
       {
-        "t": "(3vii) Agent findings recorded: the missing midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-midchain), and arcv2m18",
+        "t": "(3vii) Agent findings recorded: the missing Foskaay GGI Midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-Foskaay GGI Midchain), and arcv2m18",
         "s": "done"
       },
       {
-        "t": "(3viii) Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
+        "t": "(3viii) Foskaay GGI Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
         "s": "done"
       },
       {
@@ -120,7 +120,7 @@
         "s": "done"
       },
       {
-        "t": "(4iv) Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
+        "t": "(4iv) Foskaay GGI Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), Foskaay GGI Midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
         "s": "done"
       },
       {
@@ -144,19 +144,19 @@
         "s": "done"
       },
       {
-        "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
+        "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the Foskaay GGI Midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
         "s": "pending"
       },
       {
-        "t": "(5vi) Event-only handover/settle prototype tested on Arc testnet: EventOnlyCore emits logs (no SSTORE) and verifies player signatures; 0.001709 USDC/match = about 585 games/1 USD (vs 81 for the core midchain, 10 for the board port); 4 tests pass",
+        "t": "(5vi) Event-only handover/settle prototype tested on Arc testnet: EventOnlyCore emits logs (no SSTORE) and verifies player signatures; 0.001709 USDC/match = about 585 games/1 USD (vs 81 for the core Foskaay GGI Midchain, 10 for the board port); 4 tests pass",
         "s": "done"
       },
       {
-        "t": "(5vii) Event-based MIDCHAIN batched test done on Arc testnet: handoverMany/settleMany put many games in one tx; per game 0.001098 (3), 0.000939 (5), 0.000820 (10), 0.000713 (100) USDC = about 910/1064/1219/1403 games per 1 USD; crosses the v5 $1/1000 target at 5 games per batch; link is inside the Handover event so 2 txs not 3",
+        "t": "(5vii) Event-based Foskaay GGI Midchain batched test done on Arc testnet: handoverMany/settleMany put many games in one tx; per game 0.001098 (3), 0.000939 (5), 0.000820 (10), 0.000713 (100) USDC = about 910/1064/1219/1403 games per 1 USD; crosses the v5 $1/1000 target at 5 games per batch; link is inside the Handover event so 2 txs not 3",
         "s": "done"
       },
       {
-        "t": "(5viii) PENDING owner decision: build the event-based midchain into CORE (UUPS logic upgrade, same address, append-only, + nullifier) and SDKs (handover/settle/signMove/verifyMidchain); batching stays optional; needs architecture.json update first",
+        "t": "(5viii) PENDING owner decision: build the event-based Foskaay GGI Midchain into CORE (UUPS logic upgrade, same address, append-only, + nullifier) and SDKs (handover/settle/signMove/verifyMidchain); batching stays optional; needs architecture.json update first",
         "s": "pending"
       },
       {
@@ -191,7 +191,7 @@
   },
   "history": [
     {
-      "title": "Foskaay GGI - core, SDK, on-chain game demo, cost proof, midchain, and the event-only floor",
+      "title": "Foskaay GGI - core, SDK, on-chain game demo, cost proof, Foskaay GGI Midchain, and the event-only floor",
       "updated": "2026-09-23",
       "items": [
         {
@@ -227,7 +227,7 @@
           "s": "done"
         },
         {
-          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi/demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
           "s": "done"
         },
         {
@@ -235,7 +235,7 @@
           "s": "done"
         },
         {
-          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
           "s": "done"
         },
         {
@@ -263,7 +263,7 @@
           "s": "done"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
           "s": "done"
         },
         {
@@ -271,15 +271,15 @@
           "s": "done"
         },
         {
-          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi-demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
+          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi/demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
           "s": "done"
         },
         {
-          "t": "(3vii) Agent findings recorded: the missing midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-midchain), and arcv2m18",
+          "t": "(3vii) Agent findings recorded: the missing Foskaay GGI Midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-Foskaay GGI Midchain), and arcv2m18",
           "s": "done"
         },
         {
-          "t": "(3viii) Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
+          "t": "(3viii) Foskaay GGI Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
           "s": "done"
         },
         {
@@ -303,7 +303,7 @@
           "s": "done"
         },
         {
-          "t": "(4iv) Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
+          "t": "(4iv) Foskaay GGI Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), Foskaay GGI Midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
           "s": "done"
         },
         {
@@ -327,11 +327,11 @@
           "s": "done"
         },
         {
-          "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
+          "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the Foskaay GGI Midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
           "s": "pending"
         },
         {
-          "t": "(5vi) Event-only handover/settle prototype tested on Arc testnet: EventOnlyCore emits logs (no SSTORE) and verifies player signatures; 0.001709 USDC/match = about 585 games/1 USD (vs 81 for the core midchain, 10 for the board port); 4 tests pass",
+          "t": "(5vi) Event-only handover/settle prototype tested on Arc testnet: EventOnlyCore emits logs (no SSTORE) and verifies player signatures; 0.001709 USDC/match = about 585 games/1 USD (vs 81 for the core Foskaay GGI Midchain, 10 for the board port); 4 tests pass",
           "s": "done"
         },
         {
@@ -365,7 +365,7 @@
       ]
     },
     {
-      "title": "Foskaay GGI - core, SDK, first on-chain game demo, cost proof, and the midchain (free play)",
+      "title": "Foskaay GGI - core, SDK, first on-chain game demo, cost proof, and the Foskaay GGI Midchain (free play)",
       "updated": "2026-09-22",
       "items": [
         {
@@ -401,7 +401,7 @@
           "s": "done"
         },
         {
-          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi/demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
           "s": "done"
         },
         {
@@ -409,7 +409,7 @@
           "s": "done"
         },
         {
-          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
           "s": "done"
         },
         {
@@ -437,7 +437,7 @@
           "s": "done"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
           "s": "done"
         },
         {
@@ -445,15 +445,15 @@
           "s": "done"
         },
         {
-          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi-demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
+          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi/demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
           "s": "done"
         },
         {
-          "t": "(3vii) Agent findings recorded: the missing midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-midchain), and arcv2m18",
+          "t": "(3vii) Agent findings recorded: the missing Foskaay GGI Midchain + the EVM tools Arc inherits we had not used (eth_call free execution, EIP-712, hash chain, EIP-7702, EIP-1153); written into the v5 build guide, the Research library (ggi-Foskaay GGI Midchain), and arcv2m18",
           "s": "done"
         },
         {
-          "t": "(3viii) Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
+          "t": "(3viii) Foskaay GGI Midchain prototype built and proven on Arc testnet: GeneralsMidchain pure rules engine + EIP-712 signed hash-chained moves via eth_call, verifier replay PASS; no core change (4 core + 1 optional stands)",
           "s": "done"
         },
         {
@@ -477,7 +477,7 @@
           "s": "done"
         },
         {
-          "t": "(4iv) Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
+          "t": "(4iv) Foskaay GGI Midchain cost measured on Arc testnet: port 0.098172/match (about 10 games/1 USD), Foskaay GGI Midchain unbatched 0.012206 (about 81), batched 0.009788 (about 102); recorded in foskaay-ggi/deployments/midchain-cost*.json",
           "s": "done"
         },
         {
@@ -501,7 +501,7 @@
           "s": "done"
         },
         {
-          "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
+          "t": "(5v) Event-only handover/settle in core (no SSTORE on the happy path, events for eth_getLogs) so the Foskaay GGI Midchain can approach the v5 target of about 1000 games/1 USD; the remaining cost is core storage writes, not moves",
           "s": "pending"
         },
         {
@@ -567,7 +567,7 @@
           "s": "done"
         },
         {
-          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi/demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
           "s": "done"
         },
         {
@@ -575,7 +575,7 @@
           "s": "done"
         },
         {
-          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
           "s": "done"
         },
         {
@@ -603,7 +603,7 @@
           "s": "done"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
           "s": "done"
         },
         {
@@ -611,7 +611,7 @@
           "s": "done"
         },
         {
-          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi-demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
+          "t": "(3vi) GeneralsGame deployed to Arc testnet 0xD674eD1f118855868b4B002F4A167C953Cc549ca; playable PvP page at /foskaay-ggi/demos/pvp/generals/ with MagicBlock graphics, moves relayed by the sponsor",
           "s": "done"
         },
         {
@@ -713,7 +713,7 @@
           "s": "done"
         },
         {
-          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi-demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
+          "t": "(1viii) RENAME DONE - GlobalFolkGames Gasless Infrastructure -> Foskaay Gasless Games Infrastructure (short: Foskaay GGI). Folder foskaay-ggi/, URL /foskaay-ggi/demos/, npm @foskaay/ggi-*. arcv2m17 (GFG-BS) left untouched. 4 core contracts redeployed to Arc testnet; live proof PASS.",
           "s": "done"
         },
         {
@@ -721,7 +721,7 @@
           "s": "pending"
         },
         {
-          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
           "s": "pending"
         },
         {
@@ -749,7 +749,7 @@
           "s": "pending"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
           "s": "pending"
         },
         {
@@ -851,7 +851,7 @@
           "s": "pending"
         },
         {
-          "t": "(2i) @foskaay/ggi-contracts - Solidity interfaces + deployed addresses per network",
+          "t": "(2i) @foskaay/ggi-contracts-sdk - Solidity interfaces + deployed addresses per network",
           "s": "pending"
         },
         {
@@ -879,7 +879,7 @@
           "s": "pending"
         },
         {
-          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi-demos/ on a phone",
+          "t": "(3iv) Ship the demo live and playable from /foskaay-ggi/demos/ on a phone",
           "s": "pending"
         },
         {
@@ -1745,7 +1745,7 @@
           "s": "done"
         },
         {
-          "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /foskaay-ggi-demos/ page created (ggi-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
+          "t": "(21xxii) DEMO PAGE WIRED (owner 2026-09-21): /foskaay-ggi/demos/ page created (ggi-demos/index.html), registered as a Vite input, added to the header drawer under Discover as BS Demos. Reuses the GFG Dynamic-powered header + footer; mobile-first modern game look; lists all SIX genre sections, Live demos are playable links and Coming soon are non-tappable cards. Page and genre folders verified in sync. Adding a demo = drop the build in demos/<genre>/ + add one entry to the DEMOS array.",
           "s": "done"
         },
         {
@@ -2492,6 +2492,6 @@
   "migrationNote": "FOCUS SHIFT (owner 2026-09-21): building Foskaay Gasless Games Infrastructure (Foskaay GGI) FIRST, as its own standalone project, because it determines how GFG itself will be rebuilt later. The old GFG-focused list is retired to history. Solana is frozen; Arc is the target.",
   "testNotes": {
     "current focus": "Build and prove Foskaay Gasless Games Infrastructure (Foskaay GGI): the 4 core contracts, the SDK, the first demo, and a published cost number. Nothing else until GI works.",
-    "what proves GI is done": "(a) a live real session opened, acted on and settled on Arc testnet; (b) a demo playable on a phone at /foskaay-ggi-demos/ with zero gas and zero popups; (c) a published per-session sponsor cost."
+    "what proves GI is done": "(a) a live real session opened, acted on and settled on Arc testnet; (b) a demo playable on a phone at /foskaay-ggi/demos/ with zero gas and zero popups; (c) a published per-session sponsor cost."
   }
 }

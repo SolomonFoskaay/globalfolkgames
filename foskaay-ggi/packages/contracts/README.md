@@ -1,4 +1,4 @@
-# @foskaay/ggi-contracts
+# @foskaay/ggi-contracts-sdk
 
 Solidity interfaces and the **published deployed addresses** for Foskaay Gasless
 Games Infrastructure (Foskaay GGI), for any game that calls the rail directly from its
@@ -12,7 +12,7 @@ own contract.
 ## Interfaces
 
 ```solidity
-import {ISessionRegistry, ISessionState, IRandomness, IFeeVault} from "@foskaay/ggi-contracts/src/IGgi.sol";
+import {ISessionRegistry, ISessionState, IRandomness, IFeeVault} from "@foskaay/ggi-contracts-sdk/src/IGgi.sol";
 ```
 
 The four core contracts, and nothing else:
@@ -29,7 +29,7 @@ The four core contracts, and nothing else:
 ## Deployed addresses (testnet and mainnet, same format)
 
 ```js
-import { testnet, mainnet, forChain } from '@foskaay/ggi-contracts';
+import { testnet, mainnet, forChain } from '@foskaay/ggi-contracts-sdk';
 
 testnet.contracts.SessionRegistry;   // Arc Testnet  (chain id 5042002)
 mainnet.contracts.SessionRegistry;   // Arc Mainnet  (chain id 5042) - null until deployed

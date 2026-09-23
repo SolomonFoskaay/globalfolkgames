@@ -1,11 +1,11 @@
-// scripts/foskaay-ggi-eventmidchain-batch.mjs — measure the EVENT-BASED MIDCHAIN, batched.
+// scripts/foskaay-ggi-eventmidchain-batch.mjs — measure the EVENT-BASED Foskaay GGI Midchain, batched.
 //
-// The event-based midchain binds the session and the game in ONE Handover event
+// The event-based Foskaay GGI Midchain binds the session and the game in ONE Handover event
 // (no separate link tx), and its batch functions hand over / settle MANY games in
 // ONE transaction. This script measures the per-game cost for N = 3, 5, 10, 100
 // games batched into a single handoverMany + settleMany pair.
 //
-// Moves are free (pure eth_call + signatures), identical to the midchain test.
+// Moves are free (pure eth_call + signatures), identical to the Foskaay GGI Midchain test.
 //
 // SECURITY: the sponsor key comes from ~/.config/gfg/arc-sponsor.json and is
 // NEVER printed, logged, or committed.
@@ -61,7 +61,7 @@ function buildMoveLog(gameIdx, moveCount) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('Foskaay GGI EVENT-BASED MIDCHAIN batch -> Arc testnet');
+  console.log('Foskaay GGI EVENT-BASED Foskaay GGI Midchain batch -> Arc testnet');
   console.log('rpc              :', RPC);
   console.log('EventMidchainCore:', EMC);
   console.log('players          :', p0.address, p1.address);

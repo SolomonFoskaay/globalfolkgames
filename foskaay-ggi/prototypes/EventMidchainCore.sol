@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title EventMidchainCore — the EVENT-BASED MIDCHAIN handover/settle.
+/// @title EventMidchainCore — the EVENT-BASED Foskaay GGI Midchain handover/settle.
 ///
-/// @notice IT IS STILL THE MIDCHAIN. The midchain is anything that is neither
+/// @notice IT IS STILL THE Foskaay GGI Midchain. The Foskaay GGI Midchain is anything that is neither
 /// fully on the base chain nor offchain: play happens off the base chain, but it
 /// is cryptographically tied to it. This contract is the EVENT-BASED form of that
 /// (the core's stored-session form is the STORAGE-BASED form). Same idea, cheaper

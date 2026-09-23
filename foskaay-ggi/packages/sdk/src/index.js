@@ -33,12 +33,12 @@ import {
 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
-// Addresses come from the PUBLISHED dependency @foskaay/ggi-contracts, not a
+// Addresses come from the PUBLISHED dependency @foskaay/ggi-contracts-sdk, not a
 // relative repo path: a relative path works in the monorepo but breaks the
 // moment the SDK is installed on its own (which is exactly how a game dev gets
 // it). Requiring the sibling package keeps one source of truth and makes the
 // published SDK self-contained.
-import ggiContracts from '@foskaay/ggi-contracts';
+import ggiContracts from '@foskaay/ggi-contracts-sdk';
 const addresses = ggiContracts.all;
 
 // ---------------------------------------------------------------- ABIs
@@ -56,7 +56,7 @@ const registryAbi = parseAbi([
   'function isSessionKeyLive(address key) view returns (bool)',
   'function setGameState(bytes32 sessionId, address stateAccount)',
   'function gameStateOf(bytes32 sessionId) view returns (address)',
-  // Event-based midchain (cheap anchor). Additive; storage-based paths above are unchanged.
+  // Event-based Foskaay GGI Midchain (cheap anchor). Additive; storage-based paths above are unchanged.
   'function handover(bytes32 sessionId, address gameLogic, bytes32 startHash, address[] players, address[] sessionKeys, uint16 randomCount)',
   'function handoverMany(bytes32[] sessionIds, address gameLogic, bytes32[] startHashes, address[][] players, address[][] sessionKeys, uint16 randomCount)',
   'function settle(bytes32 sessionId, bytes32 finalHash, bytes[] sigs, address[] signers)',
@@ -544,7 +544,7 @@ export class GgiClient {
     return got.toLowerCase() === getAddress(expectedKeyAddress).toLowerCase();
   }
 
-  // ------------------------------------------------- event-based midchain
+  // ------------------------------------------------- event-based Foskaay GGI Midchain
   // The cheap anchor: the handover event carries the session + the game link
   // (no separate link tx), and settle verifies the players' signatures on-chain.
   // Every move inside is free; only the handover and settle are transactions.

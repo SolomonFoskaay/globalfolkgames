@@ -1,4 +1,4 @@
-// scripts/foskaay-ggi-midchain-match.mjs — play the midchain Generals match on Arc testnet.
+// scripts/foskaay-ggi-midchain-match.mjs — play the Foskaay GGI Midchain Generals match on Arc testnet.
 //
 // THE POINT: every move runs through a PURE function via eth_call (free) and is
 // signed + hash-chained off-chain. Only the session endpoints touch the chain.
@@ -26,7 +26,7 @@ const rec = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'deployments
 const RPC = process.env.GFG_Arc_RPC || rec.rpc;
 const MID = rec.contracts.GeneralsMidchain;
 const REGISTRY = rec.contracts.SessionRegistry;
-if (!MID) throw new Error('GeneralsMidchain address missing; run scripts/foskaay-ggi-deploy-midchain.mjs first');
+if (!MID) throw new Error('GeneralsMidchain address missing; run scripts/foskaay-ggi-deploy-Foskaay GGI Midchain.mjs first');
 
 const artifact = JSON.parse(readFileSync(join(here, '..', 'foskaay-ggi', 'out', 'GeneralsMidchain.sol', 'GeneralsMidchain.json'), 'utf8'));
 const chain = defineChain({ id: rec.chainId, name: rec.name, nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
@@ -64,7 +64,7 @@ const MOVE_TYPES = {
   ],
 };
 
-// Play one midchain match: open on-chain, then every move free via eth_call and a
+// Play one Foskaay GGI Midchain match: open on-chain, then every move free via eth_call and a
 // silent signature. Returns the sessionId, final hash and whether the replay check
 // passed. `p0`/`p1` are the players' in-memory session keys.
 async function playMatch(p0, p1, moveCount) {
@@ -131,7 +131,7 @@ async function playMatch(p0, p1, moveCount) {
     const total = opens + links + submitCost + flushCost;
     const perMatch = total / runs.length;
     console.log('');
-    console.log('matches:', runs.length, ' moves each:', runs[0].moveCount, ' all moves free in the midchain');
+    console.log('matches:', runs.length, ' moves each:', runs[0].moveCount, ' all moves free in the Foskaay GGI Midchain');
     console.log('chain verify:', runs.every((r) => r.verified) ? 'PASS (all replays match)' : 'FAIL');
     console.log('  opens        ', opens.toFixed(6), 'USDC');
     console.log('  setGameState ', links.toFixed(6), 'USDC');
@@ -150,7 +150,7 @@ async function playMatch(p0, p1, moveCount) {
   const settle = await post('settle', { sessionId: run.sessionId, digest: run.finalHash });
   const total = run.openCost + run.linkedCost + usdc(settle.costUsdc6);
   console.log('');
-  console.log('moves in midchain (free):', run.moveCount, '  on-chain txs: 1 open + 1 setGameState + 1 settle');
+  console.log('moves in Foskaay GGI Midchain (free):', run.moveCount, '  on-chain txs: 1 open + 1 setGameState + 1 settle');
   console.log('start hash  :', run.startHash);
   console.log('final hash  :', run.finalHash);
   console.log('terminal    :', run.terminal[0], 'winner', run.terminal[1]);
@@ -164,4 +164,4 @@ async function playMatch(p0, p1, moveCount) {
   console.log('COMPARE: on-chain-board port was 0.098172 USDC per match (about 10 games per 1 USD).');
   writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'midchain-cost.json'), JSON.stringify({ measuredAt: new Date().toISOString(), mode: 'midchain-unbatched', sessionId: run.sessionId, startHash: run.startHash, finalHash: run.finalHash, moveCount: run.moveCount, verified: run.verified, terminal: { finished: run.terminal[0], winner: run.terminal[1] }, cost: { open: run.openCost, setGameState: run.linkedCost, settle: usdc(settle.costUsdc6), total, gamesPerDollar: total > 0 ? Math.floor(1 / total) : null }, compareOnChainBoardPerMatch: 0.098172 }, null, 2) + '\n');
   console.log('written: foskaay-ggi/deployments/midchain-cost.json');
-})().catch((e) => { console.error('midchain match failed:', e.shortMessage || e.message || e); process.exit(1); });
+})().catch((e) => { console.error('Foskaay GGI Midchain match failed:', e.shortMessage || e.message || e); process.exit(1); });

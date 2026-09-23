@@ -1,4 +1,4 @@
-// scripts/foskaay-ggi-deploy-eventmidchain.mjs — deploy the event-based midchain prototype to Arc.
+// scripts/foskaay-ggi-deploy-eventmidchain.mjs — deploy the event-based Foskaay GGI Midchain prototype to Arc.
 //
 // MEASUREMENT PROTOTYPE, not core. No constructor args. Public address is written
 // to the deployments record so the match script can find it.

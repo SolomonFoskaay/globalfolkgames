@@ -10,7 +10,7 @@ interface Vm {
     function expectRevert() external;
 }
 
-/// The event-based midchain added to the core: handover/handoverMany and
+/// The event-based Foskaay GGI Midchain added to the core: handover/handoverMany and
 /// settle/settleMany, additive and stateless (no stored session, no nullifier).
 /// The storage-based paths are untouched and covered by SessionRegistry.t.sol.
 contract SessionRegistryMidchainTest {

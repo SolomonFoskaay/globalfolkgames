@@ -1,12 +1,12 @@
-// @foskaay/ggi-contracts — deployed addresses, testnet + mainnet.
+// @foskaay/ggi-contracts-sdk — deployed addresses, testnet + mainnet.
 //
 // Usage (ESM):
-//   import ggiContracts from '@foskaay/ggi-contracts';
+//   import ggiContracts from '@foskaay/ggi-contracts-sdk';
 //   ggiContracts.testnet.contracts.SessionRegistry;
 //   ggiContracts.forChain(5042002).name;
 //
 // Usage (CommonJS):
-//   const ggiContracts = require('@foskaay/ggi-contracts');
+//   const ggiContracts = require('@foskaay/ggi-contracts-sdk');
 //
 // The addresses live in addresses.js, the single runtime source. addresses.json
 // holds the same values for non-JS tooling; the deploy script writes both.

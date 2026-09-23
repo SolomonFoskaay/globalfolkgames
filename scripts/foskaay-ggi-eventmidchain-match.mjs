@@ -1,12 +1,12 @@
-// scripts/foskaay-ggi-eventmidchain-match.mjs — measure the EVENT-BASED MIDCHAIN handover/settle floor.
+// scripts/foskaay-ggi-eventmidchain-match.mjs — measure the EVENT-BASED Foskaay GGI Midchain handover/settle floor.
 //
-// The midchain made moves free; the remaining cost is the core's storage writes at
+// The Foskaay GGI Midchain made moves free; the remaining cost is the core's storage writes at
 // open and settle. This script tests the v5 "event-driven cheap gas" pattern: a
 // prototype contract that emits a log instead of writing storage, and verifies the
 // players' signatures at settle. We measure handover + settle for one match and
-// compare it to the current core-based midchain.
+// compare it to the current core-based Foskaay GGI Midchain.
 //
-// The moves are still free (pure eth_call + signatures), identical to the midchain
+// The moves are still free (pure eth_call + signatures), identical to the Foskaay GGI Midchain
 // test. Only the two endpoints differ.
 //
 // SECURITY: the sponsor key comes from ~/.config/gfg/arc-sponsor.json and is
@@ -67,12 +67,12 @@ function buildMoveLog(n) {
   const me = getAddress(account.address);
   const p0 = privateKeyToAccount(generatePrivateKey());
   const p1 = privateKeyToAccount(generatePrivateKey());
-  console.log('Foskaay GGI EVENT-BASED MIDCHAIN match -> Arc testnet');
+  console.log('Foskaay GGI EVENT-BASED Foskaay GGI Midchain match -> Arc testnet');
   console.log('rpc           :', RPC);
   console.log('EventMidchainCore :', EOC);
   console.log('players       :', p0.address, p1.address);
 
-  // 1. Play the midchain moves for free (pure eth_call + signatures).
+  // 1. Play the Foskaay GGI Midchain moves for free (pure eth_call + signatures).
   let state = await ethCall('getInitialState', []);
   let prevHash = await ethCall('hashState', [state]);
   const startHash = prevHash;
@@ -84,14 +84,14 @@ function buildMoveLog(n) {
   }
   const finalHash = prevHash;
 
-  // 2. EVENT-BASED MIDCHAIN handover: one tx, emit only.
+  // 2. EVENT-BASED Foskaay GGI Midchain handover: one tx, emit only.
   const sessionId = keccak256(encodeAbiParameters(parseAbiParameters('address,uint256'), [me, BigInt(Date.now())]));
   const handover = await send({
     address: EOC, abi: eocArtifact.abi, functionName: 'handover',
     args: [sessionId, MID, startHash, [p0.address, p1.address], [p0.address, p1.address], 0], account,
   });
 
-  // 3. EVENT-BASED MIDCHAIN settle: verify both signatures on-chain, then emit only.
+  // 3. EVENT-BASED Foskaay GGI Midchain settle: verify both signatures on-chain, then emit only.
   const digest = await pub.readContract({ address: EOC, abi: eocArtifact.abi, functionName: 'settleDigest', args: [sessionId, finalHash] });
   const sig0 = await p0.sign({ hash: digest });
   const sig1 = await p1.sign({ hash: digest });
@@ -102,7 +102,7 @@ function buildMoveLog(n) {
 
   const total = usdc(handover.costUsdc6) + usdc(settle.costUsdc6);
   console.log('');
-  console.log('moves in midchain (free):', moves.length, '  on-chain txs: 1 handover + 1 settle (event-based midchain)');
+  console.log('moves in Foskaay GGI Midchain (free):', moves.length, '  on-chain txs: 1 handover + 1 settle (event-based Foskaay GGI Midchain)');
   console.log('start hash :', startHash);
   console.log('final hash :', finalHash);
   console.log('');
@@ -110,7 +110,7 @@ function buildMoveLog(n) {
   console.log('  settle  ', usdc(settle.costUsdc6).toFixed(6), 'USDC  (gas', settle.gasUsed.toString() + ')');
   console.log('  TOTAL   ', total.toFixed(6), 'USDC ->', total > 0 ? Math.floor(1 / total) : 'inf', 'games per 1 USD');
   console.log('');
-  console.log('COMPARE: core-based midchain unbatched 0.012206 USDC/match (about 81 games per 1 USD).');
+  console.log('COMPARE: core-based Foskaay GGI Midchain unbatched 0.012206 USDC/match (about 81 games per 1 USD).');
 
   writeFileSync(join(here, '..', 'foskaay-ggi', 'deployments', 'eventmidchain-cost.json'), JSON.stringify({
     measuredAt: new Date().toISOString(), mode: 'eventmidchain', moveCount: moves.length, sessionId, startHash, finalHash,
@@ -119,4 +119,4 @@ function buildMoveLog(n) {
     compareCoreMidchainPerMatch: 0.012206,
   }, null, 2) + '\n');
   console.log('written: foskaay-ggi/deployments/eventmidchain-cost.json');
-})().catch((e) => { console.error('event-based midchain match failed:', e.shortMessage || e.message || e); process.exit(1); });
+})().catch((e) => { console.error('event-based Foskaay GGI Midchain match failed:', e.shortMessage || e.message || e); process.exit(1); });

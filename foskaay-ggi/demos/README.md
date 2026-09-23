@@ -102,7 +102,7 @@ Voxies) fit later; they need extra rails (assets) to be fair demos.
 
 **Now (solo dev, one repo):** from a **path** on the existing domain:
 
-> **https://globalfolkgames.fun/foskaay-ggi-demos/**
+> **https://globalfolkgames.fun/foskaay-ggi/demos/**
 
 That page is `ggi-demos/index.html`. It reuses the normal GlobalFolkGames header (Dynamic-powered
 auth) and footer, with its own content between them. It lists every genre folder from this

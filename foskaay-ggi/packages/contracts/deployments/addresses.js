@@ -1,4 +1,4 @@
-// @foskaay/ggi-contracts — deployed addresses, testnet + mainnet.
+// @foskaay/ggi-contracts-sdk — deployed addresses, testnet + mainnet.
 //
 // This is the runtime source. addresses.json holds the same values for tooling
 // that prefers JSON; keep the two in sync (addresses.json is the canonical copy
