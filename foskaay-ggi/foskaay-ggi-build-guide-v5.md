@@ -384,3 +384,56 @@ What this proves and what it costs:
 - To make this the default for Foskaay GGI, the change is a NEW event-only handover/settle contract (or a UUPS logic upgrade of the core), plus the SDK gaining `handover`/`settle`/`signMove` helpers. That is a decision for the owner once the batched event-only number is measured.
 
 Files: `foskaay-ggi/prototypes/EventOnlyCore.sol`, `foskaay-ggi/test/EventOnlyCore.t.sol`, `scripts/ggi-eventonly-match.mjs`, `foskaay-ggi/deployments/eventonly-cost.json`. `EventOnlyCore` deployed on Arc testnet: `0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c`. 147/147 forge tests pass.
+
+### 9.9 The event-based MIDCHAIN, batched (owner-approved test, 2026-09-23)
+
+NAMING: this is still the MIDCHAIN. "Midchain" means anything that is neither fully on the base chain nor offchain: play happens off the base chain but is cryptographically tied to it. The event-based form uses an EVENT instead of STORAGE. It is NOT "offchain". (The earlier `EventOnlyCore` prototype was renamed to `EventMidchainCore` so the name matches the idea.)
+
+#### The link is solved naturally (no third transaction)
+
+In the storage-based core, a session lives in `SessionRegistry` storage, so to tie the game's board to the session we called `setGameState` as a THIRD transaction. The event-based midchain puts the link INSIDE the `Handover` event: it carries `sessionId`, `gameLogic` (the game's own contract), `startHash`, `players` and `sessionKeys`. So:
+- the session and the game are bound in the SAME event and the SAME transaction, no separate link tx (2 txs per game, not 3);
+- the GGI explorer reads `Handover` and `Settled` with `eth_getLogs` and can index by `gameLogic` or `sessionId` directly;
+- the start hash and the final hash are on-chain in those events, the final hash is signed by the players and checked on-chain with `ecrecover`, and the move log replays through the game's pure rules to that final hash. So the midchain is tamper-proof, tied to the on-chain, and provable by anyone, not "trust me bro".
+
+#### The cost ladder (measured on Arc testnet, 2026-09-23)
+
+This is the pitch table: normal direct-to-onchain, then the storage-based midchain, then the event-based midchain, batched at 3, 5, 10 and 100 games per session.
+
+| Approach | What happens | Txs per game | Cost per game | Games per 1 USD |
+| --- | --- | --- | --- | --- |
+| Direct to on-chain, no GGI | Every move is its own transaction | about 15 | 0.098172 USDC | about 10 |
+| GGI storage-based midchain, unbatched | open + link + settle per game | 3 | 0.012206 USDC | about 81 |
+| GGI storage-based midchain, batched 3 | 3 games, one window flush | 3 + flush/3 | 0.009788 USDC | about 102 |
+| GGI storage-based midchain, batched 5 | 5 games, one window flush | 3 + flush/5 | 0.009328 USDC | about 107 |
+| GGI storage-based midchain, batched 10 | 10 games, one window flush | 3 + flush/10 | 0.008981 USDC | about 111 |
+| GGI storage-based midchain, batched 100 (extrapolated) | per-game open still dominates | 3 + flush/100 | about 0.0088 USDC | about 113 |
+| GGI event-based midchain, unbatched | handover + settle per game (link in the event) | 2 | 0.001712 USDC | about 584 |
+| GGI event-based midchain, batched 3 | one handoverMany + one settleMany | 2/3 | 0.001098 USDC | about 910 |
+| GGI event-based midchain, batched 5 | one handoverMany + one settleMany | 2/5 | 0.000939 USDC | about 1,064 |
+| GGI event-based midchain, batched 10 | one handoverMany + one settleMany | 2/10 | 0.000820 USDC | about 1,219 |
+| GGI event-based midchain, batched 100 | one handoverMany + one settleMany | 2/100 | 0.000713 USDC | about 1,403 |
+
+Read it plainly:
+- The storage-based midchain cannot escape the per-game open cost (SSTORE), so batching it barely helps (102 to 113 games per 1 USD).
+- The event-based midchain removes that wall, so batching helps a lot. It crosses the v5 target of $1 per 1,000 games at just 5 games per batch, and reaches about 1,400 games per 1 USD at 100 per batch.
+
+#### Unbatched vs batched, in plain words
+
+- UNBATCHED means each game's handover and settle are sent to Arc as they happen (2 transactions). The result is on-chain immediately. Nothing waits.
+- BATCHED means many games share ONE transaction: one `handoverMany` carries many games' handovers, and one `settleMany` carries many games' settlements. It is CHEAPER because the 21k transaction base fee is shared. The trade-off is that the on-chain event for a game lands when the batch transaction lands, so the DEV chooses the cadence (for example every few seconds, or when the batch is full). It is NOT a delay in gameplay: the moves are already signed and free, and the GGI explorer can show the game from the signed move log immediately.
+- A dev can pick either. Unbatched suits anything that needs an immediate on-chain result (competitive, escrow). Batched suits idle, casual and high-volume play. The rail imposes neither.
+
+#### What the GGI explorer shows, batched or not
+
+- It reads `Handover` and `Settled` from Arc with `eth_getLogs`, and the signed move log from the relay cache (untrusted).
+- It replays the moves through the game's pure rules and checks they hash to the on-chain final hash, and that each signature recovers to the declared player. Green means the midchain is valid.
+- In a batched session, each game still emits its OWN `Handover` and `Settled` event inside the batch transaction, so the explorer can show every game individually. A user does not need to trust that it "will go onchain": the events are on-chain, and the proof is the replay. The only thing they wait for is the batch transaction itself.
+
+#### What has to change in the core and the SDKs (proposal, not built)
+
+- CORE (no new address): add the event-based `handover` / `handoverMany` / `settle` / `settleMany` to the EXISTING core via a UUPS logic upgrade (same proxy address, append-only storage). The ONE new piece of state is a nullifier mapping (sessionId => settled) so a session cannot settle twice; it consumes from the `__gap`. Storage-based sessions stay as they are, so nothing is merged and no existing data moves. This needs the owner's explicit approval and an `architecture.json` update first.
+- SDK (republish, no chain change): add `handover` / `handoverMany` / `settle` / `settleMany` / `signMove` / `verifyMidchain` helpers and the event-based ABIs. Bump `@foskaay/ggi-sdk` and `@foskaay/ggi-contracts`.
+- BATCHING STAYS OPTIONAL: the dev chooses unbatched or batched; the rail never forces a cadence.
+
+Files: `foskaay-ggi/prototypes/EventMidchainCore.sol`, `foskaay-ggi/test/EventMidchainCore.t.sol`, `scripts/ggi-deploy-eventmidchain.mjs`, `scripts/ggi-eventmidchain-match.mjs`, `scripts/ggi-eventmidchain-batch.mjs`, `foskaay-ggi/deployments/eventmidchain-cost.json` and `eventmidchain-batch-cost.json`. `EventMidchainCore` deployed on Arc testnet: `0x197DE9813bd8cF668C8C26455329C629EE9Fc63e`. 148/148 forge tests pass.
