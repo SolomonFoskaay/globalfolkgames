@@ -14,7 +14,7 @@ interface VmDeploy {
 }
 
 /// Arc testnet/deploy script for the FOUR core GlobalFolkGames Gasless Games
-/// Infrastructure (GGI) contracts, behind UUPS proxies.
+/// Infrastructure (Foskaay GGI) contracts, behind UUPS proxies.
 ///
 /// WHY PROXIES: the proxy address is PERMANENT. Upgrading public logic never
 /// moves an address, so sessions and data are never stranded (the exact mistake

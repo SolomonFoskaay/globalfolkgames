@@ -531,7 +531,7 @@
       ]
     },
     {
-      "title": "Foskaay Gasless Games Infrastructure (GGI) - core, SDK, first on-chain game demo, cost proof",
+      "title": "Foskaay Gasless Games Infrastructure (Foskaay GGI) - core, SDK, first on-chain game demo, cost proof",
       "updated": "2026-09-22",
       "items": [
         {
@@ -677,7 +677,7 @@
       ]
     },
     {
-      "title": "Foskaay Gasless Games Infrastructure (GGI) - build the core, then the first demo",
+      "title": "Foskaay Gasless Games Infrastructure (Foskaay GGI) - build the core, then the first demo",
       "updated": "2026-09-21",
       "items": [
         {
@@ -2489,9 +2489,9 @@
       ]
     }
   ],
-  "migrationNote": "FOCUS SHIFT (owner 2026-09-21): building Foskaay Gasless Games Infrastructure (GGI) FIRST, as its own standalone project, because it determines how GFG itself will be rebuilt later. The old GFG-focused list is retired to history. Solana is frozen; Arc is the target.",
+  "migrationNote": "FOCUS SHIFT (owner 2026-09-21): building Foskaay Gasless Games Infrastructure (Foskaay GGI) FIRST, as its own standalone project, because it determines how GFG itself will be rebuilt later. The old GFG-focused list is retired to history. Solana is frozen; Arc is the target.",
   "testNotes": {
-    "current focus": "Build and prove Foskaay Gasless Games Infrastructure (GGI): the 4 core contracts, the SDK, the first demo, and a published cost number. Nothing else until GI works.",
+    "current focus": "Build and prove Foskaay Gasless Games Infrastructure (Foskaay GGI): the 4 core contracts, the SDK, the first demo, and a published cost number. Nothing else until GI works.",
     "what proves GI is done": "(a) a live real session opened, acted on and settled on Arc testnet; (b) a demo playable on a phone at /ggi-demos/ with zero gas and zero popups; (c) a published per-session sponsor cost."
   }
 }

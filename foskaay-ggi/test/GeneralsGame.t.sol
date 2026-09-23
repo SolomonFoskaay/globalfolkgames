@@ -12,7 +12,7 @@ interface Vm {
 }
 
 /// PROOF of the port: the ported generals game runs fully on-chain, and every
-/// action is authorised by a live GGI session. Two players, real moves, real
+/// action is authorised by a live Foskaay GGI session. Two players, real moves, real
 /// rules, no frontend trust.
 ///
 /// The game contract lives in the demo folder (`demos/pvp/generals/`); this test

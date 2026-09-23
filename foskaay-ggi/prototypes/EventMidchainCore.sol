@@ -18,7 +18,7 @@ pragma solidity ^0.8.24;
 /// @notice THE LINK IS BUILT IN. The `Handover` event carries sessionId, the
 /// game's contract address (gameLogic), the start hash, the players and their
 /// session keys. So there is NO separate link transaction: the session and the
-/// game are bound in the same event, and the GGI explorer can index it straight
+/// game are bound in the same event, and the Foskaay GGI explorer can index it straight
 /// from eth_getLogs. That is why this form is 2 txs per game, not 3.
 ///
 /// @dev IT IS A MEASUREMENT PROTOTYPE, NOT CORE. It has NO storage, so there is

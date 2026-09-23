@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../../../src/SessionRegistry.sol";
 
-/// @title GeneralsGame — the ported on-chain game (MagicBlock solana-generals -> Arc + GGI).
+/// @title GeneralsGame — the ported on-chain game (MagicBlock solana-generals -> Arc + Foskaay GGI).
 ///
 /// This is the GAME's own contract, NOT rail core. It is a faithful port of
 /// MagicBlock's open-source `Game` component + `command`/`tick`/`finish` systems:
@@ -14,7 +14,7 @@ import {SessionRegistry} from "../../../src/SessionRegistry.sol";
 ///
 /// The only thing that changes from their version is the rail underneath:
 ///   MagicBlock: the board is delegated to the ER, executed for free.
-///   Here:       the board is bound to a GGI session; every move is authorised by
+///   Here:       the board is bound to a Foskaay GGI session; every move is authorised by
 ///               SessionRegistry.canSign(sessionId, seat, caller) and submitted by
 ///               the sponsor. Same rules, same state, gasless for the player.
 ///
@@ -30,7 +30,7 @@ contract GeneralsGame {
 
     struct GamePlayer {
         bool ready;
-        address authority;      // who may play this seat (set from the GGI session)
+        address authority;      // who may play this seat (set from the Foskaay GGI session)
         uint64 lastActionSlot;  // their last_action_slot
     }
 
@@ -49,7 +49,7 @@ contract GeneralsGame {
         GamePlayer[2] players;
         GameCell[128] cells;
         uint64 tickNextSlot;
-        bytes32 sessionId;      // the GGI session this board is played under
+        bytes32 sessionId;      // the Foskaay GGI session this board is played under
     }
 
     mapping(uint256 => Board) public boards; // boardId => board
@@ -81,7 +81,7 @@ contract GeneralsGame {
 
     // ---------------------------------------------------------------- setup
 
-    /// @notice Create the board for a GGI session. Only an authorised signer for
+    /// @notice Create the board for a Foskaay GGI session. Only an authorised signer for
     ///         seat 0 may create it, so a board can only exist inside a live
     ///         session. This is the port of "create the component".
     function createBoard(uint256 boardId, bytes32 sessionId, uint8 sizeX, uint8 sizeY) external {
@@ -108,7 +108,7 @@ contract GeneralsGame {
     }
 
     /// @notice A player joins a seat. The seat authority must already be set on
-    ///         the GGI session (ggi.setAuthority) to THAT seat; then the joiner
+    ///         the Foskaay GGI session (ggi.setAuthority) to THAT seat; then the joiner
     ///         must be its authorised signer.
     function join(uint256 boardId, uint8 playerIndex) external {
         Board storage b = boards[boardId];
@@ -293,7 +293,7 @@ contract GeneralsGame {
     // ------------------------------------------------------------- internal
 
     /// @dev The move is only valid if the caller is an authorised signer for that
-    ///      seat of the board's live GGI session. This is the port of delegation
+    ///      seat of the board's live Foskaay GGI session. This is the port of delegation
     ///      authority: the chain decides, never the frontend.
     function _authorised(uint256 boardId, uint8 playerIndex) private view returns (Board storage b) {
         b = boards[boardId];

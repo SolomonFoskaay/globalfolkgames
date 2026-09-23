@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Foskaay Gasless Games Infrastructure (GGI) Docs</title>
-    <meta property="og:title" content="Foskaay Gasless Games Infrastructure (GGI) Docs">
+    <title>Foskaay Gasless Games Infrastructure (Foskaay GGI) Docs</title>
+    <meta property="og:title" content="Foskaay Gasless Games Infrastructure (Foskaay GGI) Docs">
     <meta property="og:description" content="Add gasless play to any on-chain game: open a session, do everything inside for free, settle once. Players never pay gas and never see a wallet popup. Four small contracts, no infrastructure to run.">
     <meta property="og:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
     <meta property="og:url" content="https://globalfolkgames.fun/foskaay-ggi-docs/">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Foskaay Gasless Games Infrastructure (GGI) Docs">
+    <meta name="twitter:title" content="Foskaay Gasless Games Infrastructure (Foskaay GGI) Docs">
     <meta name="twitter:description" content="Add gasless play to any on-chain game: open a session, do everything inside for free, settle once.">
     <meta name="twitter:image" content="https://globalfolkgames.fun/media/GlobalFolkGames_banner_001.jpeg">
-    <meta name="description" content="Foskaay Gasless Games Infrastructure (GGI) documentation: add gasless play to any on-chain game on Arc. Open a session, do everything inside for free, settle once. Players pay nothing, no wallet popups, no infrastructure to run.">
+    <meta name="description" content="Foskaay Gasless Games Infrastructure (Foskaay GGI) documentation: add gasless play to any on-chain game on Arc. Open a session, do everything inside for free, settle once. Players pay nothing, no wallet popups, no infrastructure to run.">
     <link rel="stylesheet" href="/style.css">
     <style>
         .ggi-wrap { max-width: 820px; margin: 0 auto; padding: 28px 16px 72px; }
@@ -48,10 +48,10 @@
 <main class="ggi-wrap">
 
     <section class="ggi-card">
-        <div class="ggi-eyebrow">FOSKAAY GASLESS GAMES INFRASTRUCTURE (GGI)</div>
+        <div class="ggi-eyebrow">FOSKAAY GASLESS GAMES INFRASTRUCTURE (Foskaay GGI)</div>
         <h1 class="ggi-h1">Add gasless play to any on-chain game</h1>
         <p class="ggi-body">
-            Foskaay Gasless Games Infrastructure (GGI) lets a game open a <b>session</b> on-chain, do
+            Foskaay Gasless Games Infrastructure (Foskaay GGI) lets a game open a <b>session</b> on-chain, do
             everything inside for free, and settle once. Players never pay gas and never see a wallet
             popup. The game pays a small fixed fee per session instead of a fee per action, so an
             on-chain game can be as cheap to run as a normal web2 backend.
@@ -109,7 +109,7 @@
     <section class="ggi-card" id="unopinionated">
         <h2 class="ggi-h2">Built to fit your game, never the other way round</h2>
         <p class="ggi-body">
-            GGI is deliberately <b>unopinionated</b>. It gives you primitives and makes no decision for
+            Foskaay GGI is deliberately <b>unopinionated</b>. It gives you primitives and makes no decision for
             your game. It does not care how many players you have, how your data is laid out, or how
             often you settle.
         </p>
@@ -368,13 +368,13 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 <tr><td><span class="ggi-mono">Game</span> component (the shared board, one account)</td><td>The game's OWN contract storage (e.g. <span class="ggi-mono">Game</span> struct in a Solidity contract). Not rail core.</td><td>Game builds it</td></tr>
                 <tr><td><span class="ggi-mono">GamePlayer</span> (seat inside the board)</td><td>A seat struct inside the game contract (authority + score).</td><td>Game builds it</td></tr>
                 <tr><td>Systems <span class="ggi-mono">join / start / command / tick / finish</span></td><td>Solidity functions on the game contract with the SAME rules, validated on-chain.</td><td>Game builds it</td></tr>
-                <tr><td>Delegate account to the ER</td><td>Open a GGI <b>session</b> and register the game account against it.</td><td>Rail: session exists; the game-account link is the small piece to add</td></tr>
+                <tr><td>Delegate account to the ER</td><td>Open a Foskaay GGI <b>session</b> and register the game account against it.</td><td>Rail: session exists; the game-account link is the small piece to add</td></tr>
                 <tr><td>Free execute inside the ER</td><td>Player-signed actions submitted by the sponsor. Arc has no free execution, so the SPONSOR pays each write; batching cuts the count.</td><td>Rail: sponsor relay + batching (honest EVM limit)</td></tr>
                 <tr><td>Authorise a signer (delegation authority)</td><td><span class="ggi-mono">SessionRegistry.canSign(sessionId, seat, who)</span> - the game contract checks it before every move.</td><td>Rail: present and proven</td></tr>
                 <tr><td>ERC VRF</td><td><span class="ggi-mono">Randomness</span> commit-reveal, N streams.</td><td>Rail: present</td></tr>
-                <tr><td>Commit / undelegate</td><td>GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
+                <tr><td>Commit / undelegate</td><td>Foskaay GGI <b>settle</b> (seal digest, reveal seed) and optional batch flush.</td><td>Rail: present</td></tr>
                 <tr><td>Session + commit fees</td><td><span class="ggi-mono">FeeVault</span> per-session fee.</td><td>Rail: present</td></tr>
-                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public GGI <a href="/ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
+                <tr><td>Two RPCs (base + ER) and its own explorer</td><td>One Arc RPC, plus the public Foskaay GGI <a href="/ggi-explorer/">Explorer</a> (the ER's own explorer exists because base explorers cannot see ER transactions; ours exists for the same reason).</td><td>Rail: present</td></tr>
                 <tr><td><span class="ggi-mono">@magicblock-labs/bolt-sdk</span> (contract side) + <span class="ggi-mono">ephemeral-rollups-sdk</span> (client side)</td><td><span class="ggi-mono">@foskaay/ggi-contracts</span> (contract side) + <span class="ggi-mono">@foskaay/ggi-sdk</span> (client side).</td><td>Published</td></tr>
             </tbody>
         </table>
@@ -386,7 +386,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
             <li><b>The authorisation hook already exists.</b> <span class="ggi-mono">canSign</span> is
                 the equivalent of delegation authority, and a game contract can use it today.</li>
             <li><b>The session-to-game link (added):</b> MagicBlock can tell you which accounts are
-                delegated for a game. GGI now does the same thing in one line: when a game opens a
+                delegated for a game. Foskaay GGI now does the same thing in one line: when a game opens a
                 session it can register its own state account address against that session. The rail
                 stores the address as an opaque value, it never learns what it is, and any reader
                 (including the <a href="/ggi-explorer/">Explorer</a>) can look up which game account
@@ -414,7 +414,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
         <table class="ggi-table">
             <thead><tr><th>Step</th><th>MagicBlock (their code)</th><th>Foskaay GGI (our port)</th></tr></thead>
             <tbody>
-                <tr><td>Create the board</td><td><span class="ggi-mono">AddEntity</span> + <span class="ggi-mono">InitializeComponent(Game)</span> with <span class="ggi-mono">status=Generate</span></td><td>Deploy/initialize the game's own <span class="ggi-mono">Game</span> contract account. No GGI call yet.</td></tr>
+                <tr><td>Create the board</td><td><span class="ggi-mono">AddEntity</span> + <span class="ggi-mono">InitializeComponent(Game)</span> with <span class="ggi-mono">status=Generate</span></td><td>Deploy/initialize the game's own <span class="ggi-mono">Game</span> contract account. No Foskaay GGI call yet.</td></tr>
                 <tr><td>Make it live</td><td><span class="ggi-mono">createDelegateInstruction</span> (delegate the component to the ER)</td><td>Sponsor opens a session: <span class="ggi-mono">ggi.open({ participants: 2, ttlSecs, seeds })</span>, then <span class="ggi-mono">ggi.setGameState(sessionId, boardAddress)</span>. Same idea: the board is now owned by a live session.</td></tr>
                 <tr><td>Generate the map</td><td>system <span class="ggi-mono">generate</span></td><td>Game contract function <span class="ggi-mono">generate()</span>, gated by <span class="ggi-mono">registry.canSign(sessionId, seat, caller)</span>.</td></tr>
                 <tr><td>Lobby</td><td><span class="ggi-mono">status = Lobby</span></td><td>Same field, same meaning.</td></tr>
@@ -423,7 +423,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
                 <tr><td>Start</td><td>system <span class="ggi-mono">start</span> sets <span class="ggi-mono">status = Playing</span></td><td>Same, gated by <span class="ggi-mono">canSign</span>.</td></tr>
                 <tr><td>The move</td><td>system <span class="ggi-mono">command</span> (adjacency, ownership, strength, invade math)</td><td>Game function <span class="ggi-mono">command(...)</span> with the SAME rules, gated by <span class="ggi-mono">canSign</span>. In unbatched mode the sponsor anchors it on-chain per action; in batched mode it rolls into a window.</td></tr>
                 <tr><td>The clock</td><td>system <span class="ggi-mono">tick</span> (strength grows over time)</td><td>Game function <span class="ggi-mono">tick()</span>, PERMISSIONLESS (anyone may call it), or a batched periodic write. Never a cron server.</td></tr>
-                <tr><td>Finish</td><td>system <span class="ggi-mono">finish</span> sets <span class="ggi-mono">status = Finished</span></td><td>Game function <span class="ggi-mono">finish()</span>, then GGI settles: <span class="ggi-mono">ggi.settle(sessionId, { digest, seeds })</span> seals the result, reveals the seed and charges the one session fee.</td></tr>
+                <tr><td>Finish</td><td>system <span class="ggi-mono">finish</span> sets <span class="ggi-mono">status = Finished</span></td><td>Game function <span class="ggi-mono">finish()</span>, then Foskaay GGI settles: <span class="ggi-mono">ggi.settle(sessionId, { digest, seeds })</span> seals the result, reveals the seed and charges the one session fee.</td></tr>
                 <tr><td>Settle / commit back</td><td>commit + undelegate</td><td><span class="ggi-mono">ggi.settle(...)</span> for one match, or the optional <span class="ggi-mono">BatchedSettlement</span> window for many.</td></tr>
                 <tr><td>Read the game</td><td>subscribe to the component on the ER, decode</td><td>Read the game's board account from Arc (or decode the session's anchored actions). The frontend only renders; it owns nothing.</td></tr>
             </tbody>
@@ -440,8 +440,8 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
 
         <div class="ggi-note good">
             <b>Why this port is the right test.</b> If the game contract can hold the board, check
-            <span class="ggi-mono">canSign</span> for every move, and settle through GGI with real
-            measured unbatched and batched costs, then GGI is proven as the Arc equivalent of the rail
+            <span class="ggi-mono">canSign</span> for every move, and settle through Foskaay GGI with real
+            measured unbatched and batched costs, then Foskaay GGI is proven as the Arc equivalent of the rail
             their sample uses. Anything the port cannot express is a real gap we fix in core, optional,
             or the packages, and we will know exactly where.
         </div>
@@ -520,7 +520,7 @@ await ggi.settle(sessionId, { digest: state.digest, seeds: [mySeed] });</code></
     </section>
 
     <div class="ggi-tiny" style="text-align:center; margin-top: 18px;">
-        Foskaay Gasless Games Infrastructure (GGI). Built by Foskaay for GlobalFolkGames and for any
+        Foskaay Gasless Games Infrastructure (Foskaay GGI). Built by Foskaay for GlobalFolkGames and for any
         game that wants gasless play on Arc.
     </div>
 

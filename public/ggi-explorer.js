@@ -1,5 +1,5 @@
 // public/ggi-explorer.js
-// Reads-only GGI explorer helpers. NO writes, NO keys, NO backend: every value on
+// Reads-only Foskaay GGI explorer helpers. NO writes, NO keys, NO backend: every value on
 // the explorer comes from the Arc contracts + RPC directly, which is the point
 // (a dev or a grant reviewer can verify the claim without trusting us).
 //

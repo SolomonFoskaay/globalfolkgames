@@ -17,7 +17,7 @@ function forChain(chainId) {
   const id = Number(chainId);
   if (id === addresses.testnet.chainId) return addresses.testnet;
   if (id === addresses.mainnet.chainId) return addresses.mainnet;
-  throw new Error('GGI: no deployment for chain id ' + id);
+  throw new Error('Foskaay GGI: no deployment for chain id ' + id);
 }
 
 function isDeployed(chainId, contractName) {

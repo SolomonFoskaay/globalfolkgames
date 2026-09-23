@@ -3,7 +3,7 @@
 Add **gasless play** to any on-chain game on Arc. Open a session, do everything
 inside for free, settle once. Players never pay gas and never see a wallet popup.
 
-This package is the **Foskaay Gasless Games Infrastructure (GGI)** client: the
+This package is the **Foskaay Gasless Games Infrastructure (Foskaay GGI)** client: the
 one-line integration. Installing it is the whole setup; there is no fork and no
 contract to copy.
 

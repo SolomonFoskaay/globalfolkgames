@@ -1,4 +1,4 @@
-// @foskaay/ggi-sdk — Foskaay Gasless Games Infrastructure (GGI) client.
+// @foskaay/ggi-sdk — Foskaay Gasless Games Infrastructure (Foskaay GGI) client.
 //
 // WHAT THIS IS: the one-line integration that makes any on-chain game gasless.
 // A game opens a SESSION, plays inside for free (signed actions, no chain writes,
@@ -95,7 +95,7 @@ const erc20Abi = parseAbi([
 
 function networkConfig(network) {
   const net = addresses[network];
-  if (!net) throw new Error('GGI: unknown network "' + network + '". Use "testnet" or "mainnet".');
+  if (!net) throw new Error('Foskaay GGI: unknown network "' + network + '". Use "testnet" or "mainnet".');
   return net;
 }
 
@@ -156,14 +156,14 @@ export class GgiClient {
   }
 
   requireWallet() {
-    if (!this.walletClient) throw new Error('GGI: a walletClient is required for write calls.');
-    if (!this.deployed) throw new Error('GGI: contracts are not deployed on ' + this.network + ' yet.');
+    if (!this.walletClient) throw new Error('Foskaay GGI: a walletClient is required for write calls.');
+    if (!this.deployed) throw new Error('Foskaay GGI: contracts are not deployed on ' + this.network + ' yet.');
   }
 
   async write(req) {
     const hash = await this.walletClient.writeContract(req);
     const rc = await this.publicClient.waitForTransactionReceipt({ hash });
-    if (rc.status !== 'success') throw new Error('GGI: transaction reverted ' + hash);
+    if (rc.status !== 'success') throw new Error('Foskaay GGI: transaction reverted ' + hash);
     return rc;
   }
 
@@ -346,7 +346,7 @@ export class GgiClient {
       }
       if (!anyAuthority) {
         throw new Error(
-          'GGI: this session has no seat authority, so it cannot be settled. ' +
+          'Foskaay GGI: this session has no seat authority, so it cannot be settled. ' +
           'Call setAuthority(sessionId, seat, signer) first, or pass { authorities } to open().'
         );
       }
@@ -416,7 +416,7 @@ export class GgiClient {
 
   // ------------------------------------------------------------ DISPUTE (optional)
 
-  /// The optional dispute path. GGI core has no dispute instruction on purpose:
+  /// The optional dispute path. Foskaay GGI core has no dispute instruction on purpose:
   /// a dispute is a game-level concern. This helper records the signed reveal
   /// locally and hands it to YOUR verifier; a game that carries money ships a
   /// verifier (an optional pattern), and a free game needs none.
@@ -517,7 +517,7 @@ export class GgiClient {
   /// Returns the signature hex, ready to store with your off-chain log.
   async signAction(key, signThis) {
     const pk = typeof key === 'string' ? key : key && key.privateKey;
-    if (!pk) throw new Error('GGI: signAction needs a session key from createSessionKey().');
+    if (!pk) throw new Error('Foskaay GGI: signAction needs a session key from createSessionKey().');
     const acct = privateKeyToAccount(pk);
     return acct.signMessage({ message: signThis });
   }

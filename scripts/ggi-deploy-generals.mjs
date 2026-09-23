@@ -4,7 +4,7 @@
 // solana-generals board). It is NOT rail core and it is NOT behind a proxy: it is
 // demo/example code, deployed once, and used by the PvP demo. It is constructed
 // with the permanent SessionRegistry proxy address so its moves are authorised by
-// live GGI sessions.
+// live Foskaay GGI sessions.
 //
 // SECURITY: the deployer key comes from ~/.config/gfg/arc-sponsor.json and is
 // NEVER printed, logged, or committed. Public values come from

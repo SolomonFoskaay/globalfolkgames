@@ -160,7 +160,10 @@ Always `git fetch origin` before comparing to main (local main is stale).
   build dependency) and in `foskaay-ggi/deployments/arc-testnet.json`.
 
 ### Cost (MEASURED, never claimed)
-- On-chain-board port (GeneralsGame): 0.098172 USDC/match, about 10 games/$1.
+- Direct to on-chain, no Foskaay GGI (100 moves + setup): about 0.2444 USDC/game,
+  about 4 games/$1. Derived from the measured 0.00212 USDC per move plus about
+  0.032 USDC setup (the board port's short-match total was 0.098172). Most games
+  run 60 to 100+ moves, so this is the realistic direct cost.
 - Storage midchain unbatched: 0.012206 USDC/match, about 81 games/$1.
 - Storage midchain batched: about 0.0090 to 0.0098 USDC/match, about 102 to 113
   games/$1 (flat under batching because each game still pays a per-game SSTORE open).
@@ -184,7 +187,7 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
 ### The authoritative build spec is IN THE DOCS
 `foskaay-ggi-docs/index.html`, section `#demos`, subsections:
 - "The model (get this right or everything drifts)"
-- "The port, name for name" (MagicBlock concept -> GGI equivalent table)
+- "The port, name for name" (MagicBlock concept -> Foskaay GGI equivalent table)
 - "The ported game, a-z (this is the build spec)" (step table + copied rules)
 **The build follows this spec. If the build must differ, UPDATE THE DOCS FIRST.**
 
@@ -230,7 +233,7 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   `EventMidchainCore.t.sol` (5 tests). It is still the MIDCHAIN (neither fully on
   base nor offchain; event-based, not offchain). The game link is INSIDE the
   `Handover` event, so no separate `setGameState` tx (2 txs per game, not 3), and
-  the GGI explorer indexes it from `eth_getLogs`. It adds `handoverMany`/
+  the Foskaay GGI explorer indexes it from `eth_getLogs`. It adds `handoverMany`/
   `settleMany` so MANY games share ONE transaction. Measured per game: unbatched
   0.001712 USDC (about 584 games/$1); batched 3 = 0.001098 (about 910); batched 5 =
   0.000939 (about 1,064); batched 10 = 0.000820 (about 1,219); batched 100 =
@@ -287,7 +290,7 @@ with real graphics, as the first demo. We are porting MagicBlock's open-source
   game to the session needed a separate `setGameState` tx (3 txs per game).
 - Event-based midchain: the `Handover` event carries `sessionId`, `gameLogic`,
   `startHash`, `players`, `sessionKeys`. The link is IN the event, same tx (2 txs).
-  The GGI explorer reads `Handover` + `Settled` via `eth_getLogs`, replays the
+  The Foskaay GGI explorer reads `Handover` + `Settled` via `eth_getLogs`, replays the
   signed move log through the game's pure rules, checks it hashes to the on-chain
   final hash and that each signature recovers to the declared player. So the
   midchain is tamper-proof, tied to the on-chain, and provable by anyone. In a

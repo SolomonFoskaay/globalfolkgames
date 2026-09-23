@@ -8,7 +8,7 @@
 // in every bundler and Node version without import-assertion syntax.
 
 export const addresses = {
-  note: 'PUBLIC deployed addresses for Foskaay Gasless Games Infrastructure (GGI). Addresses and endpoints only, safe to serve. Never put secrets here.',
+  note: 'PUBLIC deployed addresses for Foskaay Gasless Games Infrastructure (Foskaay GGI). Addresses and endpoints only, safe to serve. Never put secrets here.',
   testnet: {
     name: 'Arc Testnet',
     chainId: 5042002,

@@ -1,7 +1,7 @@
 # @foskaay/ggi-contracts
 
 Solidity interfaces and the **published deployed addresses** for Foskaay Gasless
-Games Infrastructure (GGI), for any game that calls the rail directly from its
+Games Infrastructure (Foskaay GGI), for any game that calls the rail directly from its
 own contract.
 
 - Overview: **/foskaay-ggi-docs**
