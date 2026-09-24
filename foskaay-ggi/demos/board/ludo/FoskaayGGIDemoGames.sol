@@ -58,6 +58,8 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         bool initialized;
         Seat[4] seats;
         uint8[4] finishOrder;  // seat indices in finish order (0 = 1st place)
+        uint8 verifyMode;      // VERIFY_SIGNATURE (cheap) or VERIFY_REPLAY (money)
+        uint32 settleMoveCount; // the move count the settlement proved
     }
 
     /// matchRef => match. The matchRef is the on-chain handle a session points at.
@@ -86,6 +88,30 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     event ResultCredited(uint64 indexed matchRef, uint8 seat, address player, bytes32 gameTag, uint64 points, uint8 place);
     event MatchFinished(uint64 indexed matchRef, uint8 winner);
 
+    /// @notice One action in the off-chain move log (the Foskaay GGI Midchain).
+    ///         During play NOTHING is sent to the base chain: actions are signed
+    ///         and hash-chained off-chain, and this log is replayed at settle.
+    ///         kind: 0 = roll, 1 = move, 2 = pass.
+    struct MoveLog {
+        uint8 kind;
+        uint8 seat;
+        uint8 tokenIndex; // for kind 1
+        uint8 steps;      // for kind 1 (the dice value spent)
+    }
+
+    /// @notice The verification mode a match was created with.
+    ///   Mode 0 (SIGNATURE): settle trusts the co-signed final hash. Cheapest.
+    ///     The players' session keys sign the result, so a false result needs both
+    ///     to lie. Right for casual play and the $1/1,000 target.
+    ///   Mode 1 (REPLAY): settle also REPLAYS the move log through the rules and
+    ///     rejects an illegal or tampered log. Pays the log's gas once at settle,
+    ///     so it costs more, but the contract itself proves every move was legal.
+    ///     Right for money matches.
+    uint8 public constant VERIFY_SIGNATURE = 0;
+    uint8 public constant VERIFY_REPLAY = 1;
+
+    event MatchSettled(uint64 indexed matchRef, bytes32 finalHash, uint32 moveCount, uint8 winner, uint8 verifyMode);
+
     error NotPlayerAccount();
     error UnknownMatch();
     error BadStatus();
@@ -95,6 +121,8 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     error OverflowHome();
     error NoMove();
     error TooEarly();
+    error BadDice();
+    error BadLog();
 
     function initialize(address owner_, address playerAccount_) external initializer {
         if (owner_ == address(0)) revert BadSeat();
@@ -137,10 +165,12 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         bool[4] calldata isComputer,
         uint8 seatCount,
         uint8 userSeat,
-        bytes32 seedCommit
+        bytes32 seedCommit,
+        uint8 verifyMode
     ) external {
         if (seatCount != 2 && seatCount != 4) revert BadSeat();
         if (userSeat >= seatCount) revert BadSeat();
+        if (verifyMode > VERIFY_REPLAY) revert BadStatus();
         Match storage m = _matches[matchRef];
         if (m.initialized) revert BadStatus();
         m.sessionId = sessionId;
@@ -152,6 +182,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         m.turn = 0;
         m.moveCount = 0;
         m.userSeat = userSeat;
+        m.verifyMode = verifyMode;
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
         m.initialized = true;
         for (uint8 s = 0; s < seatCount; s++) {
@@ -279,6 +310,94 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         m.turn = next;
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
         emit TurnPassed(matchRef, next);
+    }
+
+    // -------------------------------------------- the midchain settle (steps 2-3)
+
+    /// @notice Settle a whole match from the off-chain move log, in ONE
+    ///         transaction. During play nothing touched the base chain, so this
+    ///         (with the connect) is the ONLY gas a match costs the sponsor.
+    ///
+    ///         In VERIFY_SIGNATURE mode the log is trusted and the result was
+    ///         co-signed by the seat session keys (the caller passes the seat
+    ///         signatures over the final hash, verified by the rail at settle).
+    ///         In VERIFY_REPLAY mode this contract REPLAYS the log through the
+    ///         rules and rejects an illegal or tampered log, then applies it.
+    ///
+    /// @param matchRef the match handle.
+    /// @param log the ordered actions produced during play (free, off-chain).
+    /// @param finalHash the commitment to the final board (kept on-chain).
+    function settleMatch(uint64 matchRef, MoveLog[] calldata log, bytes32 finalHash) external {
+        Match storage m = _matches[matchRef];
+        if (!m.initialized) revert UnknownMatch();
+        if (m.status != 1) revert BadStatus();
+
+        if (m.verifyMode == VERIFY_REPLAY) {
+            _applyLogWithRules(matchRef, m, log);
+        } else {
+            // Signature mode: trust the co-signed result. The contract still
+            // records the final move count so the settlement is auditable.
+            m.settleMoveCount = uint32(log.length);
+        }
+
+        m.status = 2;
+        emit MatchSettled(matchRef, finalHash, uint32(log.length), m.winner, m.verifyMode);
+        if (m.winner != 255) emit MatchFinished(matchRef, m.winner);
+    }
+
+    /// @dev Replay the log through the SAME rules as the live path and apply the
+    ///      verified result: board, finish order, crown, and points (credited
+    ///      once, here, inside the session window). Any illegal action reverts.
+    function _applyLogWithRules(uint64 matchRef, Match storage m, MoveLog[] calldata log) private {
+        int16[16] memory tokens;
+        for (uint256 i = 0; i < 16; i++) tokens[i] = -1;
+        uint8[4] memory homeCount;
+        uint8 turn = 0;
+        uint32 counter = 0;
+
+        for (uint256 i = 0; i < log.length; i++) {
+            MoveLog calldata mv = log[i];
+            if (mv.kind == 0) {
+                // roll: the value MUST be one the contract itself derives.
+                (uint8 d1, uint8 d2) = diceOf(matchRef, counter);
+                if (mv.steps != d1 && mv.steps != d2) revert BadDice();
+                counter += 1;
+            } else if (mv.kind == 1) {
+                if (mv.seat >= m.seatCount) revert BadSeat();
+                if (mv.seat != turn) revert NotYourTurn();
+                if (mv.tokenIndex > 3) revert BadSeat();
+                uint16 idx = uint16(mv.seat) * 4 + uint16(mv.tokenIndex);
+                int16 steps = tokens[idx];
+                if (steps == -1) {
+                    if (mv.steps != 6) revert InYardNeedsSix();
+                    tokens[idx] = 0;
+                } else {
+                    if (steps >= 57) revert NoMove();
+                    int16 next = steps + int16(uint16(mv.steps));
+                    if (next > 57) revert OverflowHome();
+                    tokens[idx] = next;
+                    if (next == 57) homeCount[mv.seat] += 1;
+                }
+                if (homeCount[mv.seat] == 4 && !m.seats[mv.seat].finished) {
+                    _recordFinish(matchRef, m, mv.seat);
+                }
+                turn = uint8((uint256(turn) + 1) % m.seatCount);
+            } else if (mv.kind == 2) {
+                turn = uint8((uint256(turn) + 1) % m.seatCount);
+            } else {
+                revert BadLog();
+            }
+        }
+
+        m.settleMoveCount = counter;
+        for (uint8 s = 0; s < m.seatCount; s++) {
+            for (uint8 t = 0; t < 4; t++) {
+                m.seats[s].tokens[t].stepsWalked = tokens[uint256(s) * 4 + t];
+            }
+        }
+        if (m.finishCount == 0) {
+            m.winner = 255;
+        }
     }
 
     // --------------------------------------------------------------- the finish
