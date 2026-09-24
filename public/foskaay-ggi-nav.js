@@ -19,6 +19,7 @@
         { key: 'explorer', label: '🔎 Explorer', href: '/foskaay-ggi/explorer/' },
         { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi/docs/' },
         { key: 'designing', label: '🧠 Designing a game', href: '/foskaay-ggi/docs/#designing' },
+        { key: 'settle-modes', label: '⚖️ Settle modes', href: '/foskaay-ggi/docs/#settle-modes' },
         { key: 'upgradeable', label: '🔧 Upgradeable?', href: '/foskaay-ggi/docs/#upgradeable' },
         { key: 'get-started', label: '🚀 Get started', href: '/foskaay-ggi/docs/#get-started' },
         { key: 'faq', label: '❓ FAQ and fixes', href: '/foskaay-ggi/docs/#faq' }
