@@ -66,6 +66,8 @@ export default defineConfig({
         competitions: './competitions/index.html',
         games: './games/index.html',
         'foskaay-ggi-demos': './foskaay-ggi/demos/index.html',
+        'foskaay-ggi-demos-board-ludo': './foskaay-ggi/demos/board/ludo/index.html',
+        'foskaay-ggi-home': './foskaay-ggi/index.html',
         'foskaay-ggi-explorer': './foskaay-ggi/explorer/index.html',
         'foskaay-ggi-docs': './foskaay-ggi/docs/index.html',
         game: './games/game.html',

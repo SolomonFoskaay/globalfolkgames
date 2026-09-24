@@ -14,6 +14,7 @@
 
 (function () {
     var PAGES = [
+        { key: 'home', label: '⚡ Overview', href: '/foskaay-ggi/' },
         { key: 'demos', label: '🎮 Demos', href: '/foskaay-ggi/demos/' },
         { key: 'explorer', label: '🔎 Explorer', href: '/foskaay-ggi/explorer/' },
         { key: 'docs', label: '📖 Docs', href: '/foskaay-ggi/docs/' },

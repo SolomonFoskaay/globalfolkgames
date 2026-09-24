@@ -35,7 +35,30 @@ const CHAIN_ID = 5042002;
 const ADDR = {
   SessionRegistry: '0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE',
   FeeVault: '0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39',
+  // The Ludo demo's OWN contracts (not rail core). The game holds the rules and
+  // the match; the player holds the points. Both UUPS, deployed once.
+  FoskaayGGIDemoGames: '0xEF1fFa009aDAEa87B68b36980849F814F930753b',
+  FoskaayGGIDemoPlayer: '0x5b287337907b3fE9401274D870DebBe090ab174c',
 };
+
+const demoGamesAbi = parseAbi([
+  'function createMatch(uint64 matchRef, bytes32 sessionId, bytes32 gameTag, address[4] players, bool[4] isComputer, uint8 seatCount, uint8 userSeat, bytes32 seedCommit)',
+  'function roll(uint64 matchRef) returns (uint8 dice1, uint8 dice2)',
+  'function move(uint64 matchRef, uint8 seat, uint8 tokenIndex, uint8 steps)',
+  'function captureAt(uint64 matchRef, uint8 seat, uint8 tokenIndex)',
+  'function pass(uint64 matchRef)',
+  'function enforceTimeout(uint64 matchRef)',
+  'function diceOf(uint64 matchRef, uint32 counter) view returns (uint8 dice1, uint8 dice2)',
+  'function matchStatus(uint64 matchRef) view returns (uint8 status, uint8 turn, uint8 winner, uint32 moveCount)',
+  'function boardOf(uint64 matchRef) view returns (int16[16])',
+  'function crownedSeat(uint64 matchRef) view returns (uint8)',
+  'function finishOrderOf(uint64 matchRef) view returns (uint8[4] order, uint8 count)',
+  'function tokenOf(uint64 matchRef, uint8 seat, uint8 tokenIndex) view returns (int16)',
+]);
+const demoPlayerAbi = parseAbi([
+  'function pointsOf(address player, bytes32 gameTag) view returns (uint64 pureLifetime, uint64 spendable)',
+  'function recordOf(address player, bytes32 gameTag) view returns (uint32 wins, uint32 played)',
+]);
 
 const registryAbi = parseAbi([
   'function handover(bytes32 sessionId, address gameLogic, bytes32 startHash, bytes32 seedCommit, address[] players, address[] sessionKeys, uint16 randomCount) payable',
@@ -89,6 +112,9 @@ async function send(wallet, pub, req) {
 }
 
 const ZERO32 = '0x' + '00'.repeat(32);
+/// The canonical game tag for the Ludo demo. ONE definition so createMatch and
+/// the points read can never drift (a drift is what made points read as zero).
+const LUDO_TAG = keccak256(toBytes('ludo'));
 const usdc18 = (x) => Number(x || 0) / 1e18;
 const usdc18To6 = (x) => BigInt(x) / 1_000_000_000_000n;
 
@@ -150,6 +176,123 @@ async function doHandover(body) {
   return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
 }
 
+// ---------------------------------------------------------------- Ludo demo
+
+// A stable seed commitment for a match: keccak of a server-chosen secret. The
+// dice are derived on-chain from this, so the value is the contract's, never the
+// browser's. The seed is stored per matchRef so the settle reveal can match it.
+const demoSeeds = new Map();
+
+function demoSessionId(body) {
+  return body.sessionId || keccak256(encodeAbiParameters(parseAbiParameters('address,uint256'), [clients().account.address, BigInt(Date.now())]));
+}
+
+/// Create a Ludo match in a live session. Returns the matchRef, sessionId and
+/// the REAL gas cost. The sponsor is a seat (the computer/human opponent).
+async function doDemoCreate(body) {
+  const { account, pub, wallet } = clients();
+  const sessionId = demoSessionId(body);
+  const matchRef = BigInt(body.matchRef || Date.now());
+  const gameTag = LUDO_TAG;
+  const user = body.user || account.address;           // the logged-in user's wallet
+  const seatCount = Number(body.seatCount || 2);
+  const userSeat = Number(body.userSeat || 0);
+
+  const players = [account.address, account.address, account.address, account.address];
+  players[userSeat] = user;
+  const isComputer = [true, true, true, true];
+  isComputer[userSeat] = false;
+  const seed = keccak256(toBytes('foskaay-ggi-demo-' + matchRef + '-' + Date.now()));
+  const seedCommit = keccak256(toBytes(seed));
+  demoSeeds.set(String(matchRef), seed);
+
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'createMatch',
+    args: [matchRef, sessionId, gameTag, players, isComputer, seatCount, userSeat, seedCommit], account,
+  });
+  return { matchRef: String(matchRef), sessionId, userSeat, tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// Roll the dice for the seat on turn (the value is the contract's).
+async function doDemoRoll(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'roll',
+    args: [BigInt(body.matchRef)], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// Apply a move (the rules are enforced in the contract).
+async function doDemoMove(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'move',
+    args: [BigInt(body.matchRef), Number(body.seat), Number(body.tokenIndex), Number(body.steps)], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// Resolve a capture after a move.
+async function doDemoCapture(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'captureAt',
+    args: [BigInt(body.matchRef), Number(body.seat), Number(body.tokenIndex)], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// Pass the turn (no usable move).
+async function doDemoPass(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'pass',
+    args: [BigInt(body.matchRef)], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// Advance a turn whose timer expired (permissionless).
+async function doDemoTimeout(body) {
+  const { account, pub, wallet } = clients();
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'enforceTimeout',
+    args: [BigInt(body.matchRef)], account,
+  });
+  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+}
+
+/// READ the whole board in one call: status, turn, tokens, crown, finish order,
+/// and the user's points. No key needed, costs nothing.
+async function doDemoBoard(body) {
+  const { pub } = clients();
+  const matchRef = BigInt(body.matchRef);
+  const [status, turn, winner, moveCount] = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'matchStatus', args: [matchRef] });
+  const tokens = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'boardOf', args: [matchRef] });
+  const crowned = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'crownedSeat', args: [matchRef] });
+  const finish = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'finishOrderOf', args: [matchRef] });
+  const out = {
+    status: Number(status), turn: Number(turn), winner: Number(winner), moveCount: Number(moveCount),
+    tokens: Array.from(tokens).map((t) => Number(t)),
+    crownedSeat: Number(crowned),
+    finishOrder: Array.from(finish[0]).map((x) => Number(x)),
+    finishCount: Number(finish[1]),
+  };
+  if (body.user) {
+    const [pure, spendable] = await pub.readContract({ address: ADDR.FoskaayGGIDemoPlayer, abi: demoPlayerAbi, functionName: 'pointsOf', args: [body.user, LUDO_TAG] });
+    out.userPoints = { lifetime: pure.toString(), spendable: spendable.toString() };
+  }
+  return out;
+}
+
+/// READ the two dice the CONTRACT produced for a counter (free, no key).
+async function doDemoDice(body) {
+  const { pub } = clients();
+  const [dice1, dice2] = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'diceOf', args: [BigInt(body.matchRef), Number(body.counter)] });
+  return { dice1: Number(dice1), dice2: Number(dice2) };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
   let body = req.body;
@@ -161,9 +304,23 @@ export default async function handler(req, res) {
       case 'midchainHandover': out = await doMidchainHandover(body); break;
       case 'midchainSettle': out = await doMidchainSettle(body); break;
       case 'handover': out = await doHandover(body); break;
+      case 'demoCreate': out = await doDemoCreate(body); break;
+      case 'demoRoll': out = await doDemoRoll(body); break;
+      case 'demoMove': out = await doDemoMove(body); break;
+      case 'demoCapture': out = await doDemoCapture(body); break;
+      case 'demoPass': out = await doDemoPass(body); break;
+      case 'demoTimeout': out = await doDemoTimeout(body); break;
+      case 'demoBoard': out = await doDemoBoard(body); break;
+      case 'demoDice': out = await doDemoDice(body); break;
       case 'sponsorAddress': {
         const { account } = clients();
-        out = { address: account.address, sessionRegistry: ADDR.SessionRegistry, feeVault: ADDR.FeeVault };
+        out = {
+          address: account.address,
+          sessionRegistry: ADDR.SessionRegistry,
+          feeVault: ADDR.FeeVault,
+          demoGames: ADDR.FoskaayGGIDemoGames,
+          demoPlayer: ADDR.FoskaayGGIDemoPlayer,
+        };
         break;
       }
       default: res.status(400).json({ error: 'unknown action' }); return;
