@@ -5,8 +5,8 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
 import {FeeVault} from "../src/FeeVault.sol";
-import {FoskaayGGIDemoGames} from "../demos/ludo/FoskaayGGIDemoGames.sol";
-import {FoskaayGGIDemoPlayer} from "../demos/ludo/FoskaayGGIDemoPlayer.sol";
+import {FoskaayGGIDemoGames} from "../demos/board/ludo/FoskaayGGIDemoGames.sol";
+import {FoskaayGGIDemoPlayer} from "../demos/board/ludo/FoskaayGGIDemoPlayer.sol";
 
 /// Shared test helpers: deploy each contract BEHIND a proxy, exactly as
 /// production does, and call initialize. Tests must go through the proxy so they

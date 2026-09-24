@@ -31,11 +31,11 @@
         ludo: {
             gameTag: 'ludo',
             // Ranked rewards by position, 1-indexed, per mode (players length).
-            // 4P graduated: 1st=100 / 2nd=50 / 3rd=10 / 4th=0. The game auto-ends
+            // 4P graduated: 1st=100 / 2nd=50 / 3rd=25 / 4th=0. The game auto-ends
             // once 3 winners emerge, so the last seat earns nothing. 2P: the
             // game auto-ends the moment 1st emerges, so 2nd earns nothing too.
             positions: {
-                4: { 1: 100, 2: 50, 3: 10, 4: 0 },
+                4: { 1: 100, 2: 50, 3: 25, 4: 0 },
                 2: { 1: 100, 2: 0 },
             },
             reasons: { win1st: 1, win2nd: 2, win3rd: 3 },

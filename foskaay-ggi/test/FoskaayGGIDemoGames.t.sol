@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {FoskaayGGIDemoGames} from "../demos/ludo/FoskaayGGIDemoGames.sol";
-import {FoskaayGGIDemoPlayer} from "../demos/ludo/FoskaayGGIDemoPlayer.sol";
+import {FoskaayGGIDemoGames} from "../demos/board/ludo/FoskaayGGIDemoGames.sol";
+import {FoskaayGGIDemoPlayer} from "../demos/board/ludo/FoskaayGGIDemoPlayer.sol";
 import {Deploy} from "./Deploy.sol";
 
 interface Vm {
