@@ -182,6 +182,81 @@
         </div>
     </section>
 
+    <section class="ggi-card" id="settle-modes">
+        <h2 class="ggi-h2">Two ways to settle a match, and when to use each</h2>
+        <p class="ggi-body">
+            When a game settles a match, it has to answer one question: who proves that nobody cheated
+            during play? There are two honest answers, and your game picks one per match. Both are always
+            cheaper than the old way of sending every move to the chain.
+        </p>
+
+        <div class="ggi-h3">The old, expensive way (for comparison)</div>
+        <p class="ggi-body">
+            If every move is its own transaction, a hundred-move match is a hundred transactions. On Arc
+            that measured about <b>0.00041 USDC of gas per move</b>, so a hundred moves is about
+            <b>0.041 USDC per match</b> (about 24 games per 1 USDC). The player pays nothing, but the game
+            operator pays all of it, and it grows with every move.
+        </p>
+
+        <div class="ggi-h3">Mode 1: signature settle (the cheap, default one)</div>
+        <p class="ggi-body">
+            The players' session keys sign the final result off-chain, and the chain verifies those
+            signatures at settle. It does <b>not</b> replay the rules; it trusts the co-signed result. A
+            false result would need <b>both players to lie</b>, which is fine for casual play, free play,
+            leaderboards and a demo.
+        </p>
+        <ul class="ggi-list">
+            <li><b>One settle transaction</b> no matter how many moves. A hundred moves still settles in one.</li>
+            <li><b>Cheapest, and flat.</b> Measured about <b>0.0016 USDC per match</b> all-in (connect plus settle, moves free).</li>
+            <li><b>Best for:</b> casual and free play, a ranking or points ladder, a demo, anything where both players have no reason to fake the result.</li>
+        </ul>
+
+        <div class="ggi-h3">Mode 2: replay settle (the strict one, for money)</div>
+        <p class="ggi-body">
+            The contract takes the signed move log and <b>replays every move through the rules</b> at
+            settle. An illegal move, a wrong die or a tampered log makes the settle revert. Nobody has to
+            trust the players: the contract itself proves the match was legal.
+        </p>
+        <ul class="ggi-list">
+            <li><b>Still ONE transaction.</b> The hundred moves are replayed inside a single settle, not sent one by one.</li>
+            <li><b>Costs a bit more than signature mode</b> because the settle does the replay work, but you still save every per-move transaction.</li>
+            <li><b>Best for:</b> money matches, prizes, competitions with strangers, anything where a fake result must be impossible even if both seats wanted to fake it.</li>
+        </ul>
+
+        <div class="ggi-h3">The saving, in plain USDC (a hundred-move match)</div>
+        <div class="research-table-wrap">
+        <table class="ggi-table">
+            <thead><tr><th>How you settle a 100-move match</th><th>Transactions on chain</th><th>Approx cost per match</th><th>Games per 1 USDC</th></tr></thead>
+            <tbody>
+                <tr><td>Every move its own transaction (old way)</td><td>100</td><td>about 0.041 USDC</td><td>about 24</td></tr>
+                <tr><td>Signature settle (mode 1)</td><td>2 (connect + settle)</td><td>about 0.0016 USDC</td><td>about 600</td></tr>
+                <tr><td>Replay settle (mode 2)</td><td>2 (connect + settle, replay inside)</td><td>a little more than mode 1</td><td>still hundreds</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="ggi-body">
+            Read it as a dev would: the old way spends a transaction per move. Both new modes spend
+            <b>two</b> transactions for the whole match. So a hundred-move match goes from 100 transactions
+            to 2, meaning <b>98 fewer transactions</b> for the same result. Signature mode is the cheapest;
+            replay mode is a small amount more and buys you a contract that checks every move itself.
+        </p>
+
+        <div class="ggi-h3">How a dev knows which one a match used</div>
+        <p class="ggi-body">
+            It is not a hidden setting. Your game chooses the mode once, at match creation, and the
+            contract stores it and can be read afterwards. So a player, a judge or an explorer can always
+            see which mode a match used. A dev can support both and let the game decide per match: for
+            example, a friendly game uses signature mode, and a paid entry uses replay mode.
+        </p>
+
+        <div class="ggi-note good">
+            <b>Beginner summary.</b> Send every move to the chain and you pay for every move. Let the moves
+            run inside the session and settle once, and you pay for one connect and one settle. Then choose
+            who proves it: the players co-sign (cheap, trust both), or the contract replays the moves
+            (a little more, trust nobody). Same two transactions for a hundred moves either way.
+        </div>
+    </section>
+
     <section class="ggi-card" id="upgradeable">
         <h2 class="ggi-h2">Should your game contract be upgradeable?</h2>
         <p class="ggi-body">
