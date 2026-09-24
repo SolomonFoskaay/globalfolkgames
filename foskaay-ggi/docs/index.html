@@ -193,8 +193,8 @@
         <div class="ggi-h3">The old, expensive way (for comparison)</div>
         <p class="ggi-body">
             If every move is its own transaction, a hundred-move match is a hundred transactions. On Arc
-            that measured about <b>0.00041 USDC of gas per move</b>, so a hundred moves is about
-            <b>0.041 USDC per match</b> (about 24 games per 1 USDC). The player pays nothing, but the game
+            that measured about <b>0.00069 USDC of gas per move</b>, so a hundred moves is about
+            <b>0.069 USDC per match</b> (about 14 games per 1 USDC). The player pays nothing, but the game
             operator pays all of it, and it grows with every move.
         </p>
 
@@ -228,7 +228,7 @@
         <table class="ggi-table">
             <thead><tr><th>How you settle a 100-move match</th><th>Transactions on chain</th><th>Approx cost per match</th><th>Games per 1 USDC</th></tr></thead>
             <tbody>
-                <tr><td>Every move its own transaction (old way)</td><td>100</td><td>about 0.041 USDC</td><td>about 24</td></tr>
+                <tr><td>Every move its own transaction (old way)</td><td>100</td><td>about 0.069 USDC</td><td>about 14</td></tr>
                 <tr><td>Signature settle (mode 1)</td><td>2 (connect + settle)</td><td>about 0.0016 USDC</td><td>about 600</td></tr>
                 <tr><td>Replay settle (mode 2)</td><td>2 (connect + settle, replay inside)</td><td>a little more than mode 1</td><td>still hundreds</td></tr>
             </tbody>

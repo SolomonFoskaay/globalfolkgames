@@ -26,11 +26,14 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts/access/OwnableUpgradea
 contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // ---------------------------------------------------------------- Ludo data
 
-    /// Ludo board: 4 seats, 4 tokens each. Movement is measured in `stepsWalked`
-    /// along the common path (0..52) then the home lane (53..57). 57 = home.
-    /// -1 = in the home yard (not yet released).
+    /// Ludo token, copied from ludo-lab's model:
+    ///   pathIndex:  -1 = in the home yard, 0..51 = on the common path, -2 = in
+    ///               the home lane (past the last common cell).
+    ///   stepsWalked: 0..57 total steps taken. 57 = the absolute home center.
+    /// Home == stepsWalked >= 57 (the token is then off the board).
     struct Token {
-        int16 stepsWalked; // -1 in yard, 0..57 on the path/home lane, 57 = home
+        int16 pathIndex;
+        int16 stepsWalked;
     }
 
     struct Seat {
@@ -60,6 +63,9 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         uint8[4] finishOrder;  // seat indices in finish order (0 = 1st place)
         uint8 verifyMode;      // VERIFY_SIGNATURE (cheap) or VERIFY_REPLAY (money)
         uint32 settleMoveCount; // the move count the settlement proved
+        uint8 die1;            // the first die of the current roll (0 = no roll pending)
+        uint8 die2;            // the second die (0 = spent or no roll pending)
+        uint8 doubleSixes;     // consecutive double-sixes this turn ("Shoki" bonus, max 3)
     }
 
     /// matchRef => match. The matchRef is the on-chain handle a session points at.
@@ -69,7 +75,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     address public playerAccount;
 
     /// Turn timer length in seconds for new matches.
-    uint64 public turnSeconds = 30;
+    uint64 public turnSeconds = 45;
 
     /// Layout marker. Bump only on a layout change.
     uint8 public version;
@@ -129,7 +135,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         __Ownable_init(owner_);
         playerAccount = playerAccount_;
         // Field initializers do NOT run behind a proxy, so defaults are set here.
-        turnSeconds = 30;
+        turnSeconds = 45;
     }
 
     constructor() {
@@ -189,7 +195,7 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
             m.seats[s].player = players[s];
             m.seats[s].isComputer = isComputer[s];
             for (uint8 t = 0; t < 4; t++) {
-                m.seats[s].tokens[t] = Token({stepsWalked: -1});
+                m.seats[s].tokens[t] = Token({pathIndex: -1, stepsWalked: -1});
             }
         }
         emit MatchCreated(matchRef, sessionId, seatCount, gameTag);
@@ -210,24 +216,38 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         dice2 = uint8((uint256(b) % 6) + 1);
     }
 
-    /// @notice Roll the dice for the seat on turn. Records the value and resets
-    ///         the turn timer. Permissionless within the turn (see _authorisedSeat).
+    /// @notice Roll the TWO dice for the seat on turn (ludo-lab: two dice, each
+    ///         spent on its own move). Records both, gives the "Shoki" bonus on a
+    ///         double six (max 3 in a row), and resets the turn timer.
     function roll(uint64 matchRef) external returns (uint8 dice1, uint8 dice2) {
         Match storage m = _matches[matchRef];
         if (!m.initialized) revert UnknownMatch();
         if (m.status != 1) revert BadStatus();
         _requireTurn(m);
+        if (m.die1 != 0 || m.die2 != 0) revert BadStatus(); // one pending roll at a time
         (dice1, dice2) = diceOf(matchRef, m.moveCount);
         m.moveCount += 1;
+        m.die1 = dice1;
+        m.die2 = dice2;
+        if (dice1 == 6 && dice2 == 6) {
+            m.doubleSixes += 1;  // bonus roll loaded (the mover keeps the turn)
+        } else {
+            m.doubleSixes = 0;
+        }
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
         emit DiceRolled(matchRef, m.turn, dice1, dice2);
     }
 
     // ---------------------------------------------------------------- the move
 
-    /// @notice Move one of the seat's tokens. The rules are enforced HERE.
-    /// @param tokenIndex 0..3 within the seat.
-    /// @param steps the dice value being spent (must equal a rolled die, see roll).
+    /// @notice Move one of the seat's tokens by ONE of the two rolled dice.
+    ///         The rules are enforced HERE, copied from ludo-lab's
+    ///         processTokenMovementExecution + isTokenMovable:
+    ///           - the die spent must be one of the two on the current roll;
+    ///           - a token in the yard needs a six to be released to its start;
+    ///           - a token on the path needs stepsWalked + die <= 57;
+    ///           - reaching 57 sends it home (off the board), and a capture
+    ///             (see captureAt) also removes the capturing token.
     function move(uint64 matchRef, uint8 seat, uint8 tokenIndex, uint8 steps) external {
         Match storage m = _matches[matchRef];
         if (!m.initialized) revert UnknownMatch();
@@ -237,6 +257,15 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (tokenIndex > 3) revert BadSeat();
         if (steps == 0 || steps > 6) revert NoMove();
 
+        // The die must be one of the two on the current roll, and is then spent.
+        if (m.die1 == steps) {
+            m.die1 = 0;
+        } else if (m.die2 == steps) {
+            m.die2 = 0;
+        } else {
+            revert BadDice();
+        }
+
         Token storage tk = m.seats[seat].tokens[tokenIndex];
         int16 fromStep = tk.stepsWalked;
 
@@ -244,29 +273,35 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
             // In the yard: only a six releases the token onto its start cell.
             if (steps != 6) revert InYardNeedsSix();
             tk.stepsWalked = 0;
+            tk.pathIndex = 0;
         } else {
             if (tk.stepsWalked >= 57) revert NoMove(); // already home
             int16 next = tk.stepsWalked + int16(uint16(steps));
-            if (next > 57) revert OverflowHome(); // exact count required into home
+            if (next > 57) revert OverflowHome(); // the real rule: cannot exceed 57
             tk.stepsWalked = next;
+            if (next >= 52) {
+                tk.pathIndex = -2; // entered the home lane
+            } else {
+                tk.pathIndex = int16((uint16(tk.pathIndex) + steps) % 52);
+            }
         }
 
-        if (tk.stepsWalked == 57) m.seats[seat].tokensHome += 1;
+        if (tk.stepsWalked >= 57 && fromStep < 57) m.seats[seat].tokensHome += 1;
 
         emit MoveApplied(matchRef, seat, tokenIndex, fromStep, tk.stepsWalked);
 
-        // A seat finishes when all four tokens are home. Record its place and,
-        // if it is the user's seat, credit points BY POSITION. The crown is set
-        // here, on-chain, for the 1st-place seat.
-        if (m.seats[seat].tokensHome == 4 && !m.seats[seat].finished) {
-            _recordFinish(matchRef, m, seat);
-        }
+        // A seat finishes when all four tokens are off the board. The contract
+        // also finishes a seat on a capture (the capturing token exits), which is
+        // the second full way to win that ludo-lab has.
+        _maybeFinishSeat(matchRef, m, seat);
     }
 
-    /// @notice Capture: if the moving seat lands exactly on an opponent token on
-    ///         the common path, the opponent token returns to its yard. Call after
-    ///         `move`. Positions are compared by `stepsWalked` (0..51 is the common
-    ///         path; 52+ is the home lane, which is safe).
+    /// @notice Capture ("pe"), copied from ludo-lab's checkCaptureMechanic:
+    ///           - only on the common path (not the yard, not the home lane);
+    ///           - the opponent token returns to its yard;
+    ///           - the CAPTURING token ALSO completes and exits the board (its
+    ///             second way to finish, which ludo-lab has).
+    ///         Call right after the move that landed on the opponent.
     function captureAt(uint64 matchRef, uint8 seat, uint8 tokenIndex) external {
         Match storage m = _matches[matchRef];
         if (!m.initialized) revert UnknownMatch();
@@ -274,29 +309,58 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         Token storage tk = m.seats[seat].tokens[tokenIndex];
         int16 pos = tk.stepsWalked;
         if (pos < 0 || pos > 51) return; // yard or home lane: no capture
-        // Start cells are safe.
-        if (_isStartCell(seat, pos)) return;
+        if (_isStartCell(seat, pos)) return; // the 4 start cells are safe
+        bool captured = false;
         for (uint8 s = 0; s < m.seatCount; s++) {
             if (s == seat) continue;
             for (uint8 t = 0; t < 4; t++) {
                 Token storage o = m.seats[s].tokens[t];
                 if (o.stepsWalked == pos) {
                     o.stepsWalked = -1; // "pe": sent back to the yard
+                    o.pathIndex = -1;
+                    captured = true;
                     emit TokenCaptured(matchRef, seat, s);
                 }
             }
         }
+        if (captured) {
+            // The capturing token completes the circuit and exits the board.
+            tk.stepsWalked = 57;
+            tk.pathIndex = -2;
+            m.seats[seat].tokensHome += 1;
+            _maybeFinishSeat(matchRef, m, seat);
+        }
     }
 
-    /// @notice Pass the turn (no usable move, or the turn timer expired).
+    /// @dev A seat finishes when all four tokens are off the board (>= 57). The
+    ///      contract records the place and, for the user seat, credits points.
+    function _maybeFinishSeat(uint64 matchRef, Match storage m, uint8 seat) private {
+        if (m.seats[seat].tokensHome >= 4 && !m.seats[seat].finished) {
+            _recordFinish(matchRef, m, seat);
+        }
+    }
+
+    /// @notice Pass the turn when there is no usable move (both dice spent, or no
+    ///         legal move). Clears the pending roll. A double-six keeps the turn
+    ///         instead (the bonus), so this is only called when the mover is done.
     function pass(uint64 matchRef) external {
         Match storage m = _matches[matchRef];
         if (!m.initialized) revert UnknownMatch();
         if (m.status != 1) revert BadStatus();
-        uint8 next = uint8((uint256(m.turn) + 1) % m.seatCount);
-        m.turn = next;
+        // "Shoki": an unspent double-six keeps the turn for the bonus roll.
+        if (m.doubleSixes > 0 && m.doubleSixes < 3 && m.die1 == 0 && m.die2 == 0) {
+            m.die1 = 0;
+            m.die2 = 0;
+            m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
+            emit TurnPassed(matchRef, m.turn); // same seat rolls again
+            return;
+        }
+        m.die1 = 0;
+        m.die2 = 0;
+        m.doubleSixes = 0;
+        m.turn = _nextActiveSeat(m, m.turn);
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
-        emit TurnPassed(matchRef, next);
+        emit TurnPassed(matchRef, m.turn);
     }
 
     /// @notice Anyone may call after the turn timer expires to move play on. There
@@ -306,10 +370,24 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (!m.initialized) revert UnknownMatch();
         if (m.status != 1) revert BadStatus();
         if (block.timestamp < m.turnEndsAt) revert TooEarly();
-        uint8 next = uint8((uint256(m.turn) + 1) % m.seatCount);
+        m.die1 = 0;
+        m.die2 = 0;
+        m.doubleSixes = 0;
+        uint8 next = _nextActiveSeat(m, m.turn);
         m.turn = next;
         m.turnEndsAt = uint64(block.timestamp) + turnSeconds;
         emit TurnPassed(matchRef, next);
+    }
+
+    /// @dev The next seat that has not finished (finished seats are auto-skipped,
+    ///      exactly as ludo-lab auto-passes a seat with all tokens home).
+    function _nextActiveSeat(Match storage m, uint8 from) private view returns (uint8) {
+        uint8 n = m.seatCount;
+        for (uint8 i = 1; i <= n; i++) {
+            uint8 cand = uint8((uint256(from) + i) % n);
+            if (!m.seats[cand].finished) return cand;
+        }
+        return from;
     }
 
     // -------------------------------------------- the midchain settle (steps 2-3)
@@ -349,41 +427,75 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
     ///      verified result: board, finish order, crown, and points (credited
     ///      once, here, inside the session window). Any illegal action reverts.
     function _applyLogWithRules(uint64 matchRef, Match storage m, MoveLog[] calldata log) private {
-        int16[16] memory tokens;
-        for (uint256 i = 0; i < 16; i++) tokens[i] = -1;
+        int16[16] memory steps;      // stepsWalked per token
+        int16[16] memory pathIdx;    // pathIndex per token
+        for (uint256 i = 0; i < 16; i++) { steps[i] = -1; pathIdx[i] = -1; }
         uint8[4] memory homeCount;
         uint8 turn = 0;
         uint32 counter = 0;
+        uint8 dieA = 0;
+        uint8 dieB = 0;
 
         for (uint256 i = 0; i < log.length; i++) {
             MoveLog calldata mv = log[i];
             if (mv.kind == 0) {
-                // roll: the value MUST be one the contract itself derives.
+                // roll: the pair MUST be the exact dice the contract derives.
                 (uint8 d1, uint8 d2) = diceOf(matchRef, counter);
-                if (mv.steps != d1 && mv.steps != d2) revert BadDice();
+                if (mv.seat != turn) revert NotYourTurn();
+                if (mv.tokenIndex != d1 || mv.steps != d2) revert BadDice();
+                dieA = d1;
+                dieB = d2;
                 counter += 1;
             } else if (mv.kind == 1) {
-                if (mv.seat >= m.seatCount) revert BadSeat();
                 if (mv.seat != turn) revert NotYourTurn();
                 if (mv.tokenIndex > 3) revert BadSeat();
+                // spend one of the two dice
+                if (dieA == mv.steps) dieA = 0;
+                else if (dieB == mv.steps) dieB = 0;
+                else revert BadDice();
+
                 uint16 idx = uint16(mv.seat) * 4 + uint16(mv.tokenIndex);
-                int16 steps = tokens[idx];
-                if (steps == -1) {
+                if (steps[idx] == -1) {
                     if (mv.steps != 6) revert InYardNeedsSix();
-                    tokens[idx] = 0;
+                    steps[idx] = 0;
+                    pathIdx[idx] = 0;
                 } else {
-                    if (steps >= 57) revert NoMove();
-                    int16 next = steps + int16(uint16(mv.steps));
+                    if (steps[idx] >= 57) revert NoMove();
+                    int16 next = steps[idx] + int16(uint16(mv.steps));
                     if (next > 57) revert OverflowHome();
-                    tokens[idx] = next;
-                    if (next == 57) homeCount[mv.seat] += 1;
+                    steps[idx] = next;
+                    if (next >= 52) pathIdx[idx] = -2;
+                    else pathIdx[idx] = int16((uint16(pathIdx[idx]) + mv.steps) % 52);
                 }
-                if (homeCount[mv.seat] == 4 && !m.seats[mv.seat].finished) {
+                if (steps[idx] >= 57) homeCount[mv.seat] += 1;
+
+                // Capture ("pe"): opponent on the same common cell returns to its
+                // yard, and the capturing token exits the board.
+                int16 pos = steps[idx];
+                if (pos >= 0 && pos <= 51 && !_isStartCell(mv.seat, pos)) {
+                    for (uint8 s = 0; s < m.seatCount; s++) {
+                        if (s == mv.seat) continue;
+                        for (uint8 t = 0; t < 4; t++) {
+                            uint16 oi = uint16(s) * 4 + uint16(t);
+                            if (steps[oi] == pos) {
+                                steps[oi] = -1;
+                                pathIdx[oi] = -1;
+                                // capturing token completes and exits
+                                steps[idx] = 57;
+                                pathIdx[idx] = -2;
+                                homeCount[mv.seat] += 1;
+                            }
+                        }
+                    }
+                }
+
+                if (homeCount[mv.seat] >= 4 && !m.seats[mv.seat].finished) {
                     _recordFinish(matchRef, m, mv.seat);
                 }
-                turn = uint8((uint256(turn) + 1) % m.seatCount);
+                // kind 1 does NOT advance the turn: the mover may spend the other
+                // die first. The explicit pass (kind 2) ends the turn.
             } else if (mv.kind == 2) {
-                turn = uint8((uint256(turn) + 1) % m.seatCount);
+                turn = _nextTurnReplay(m, turn);
             } else {
                 revert BadLog();
             }
@@ -392,12 +504,23 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         m.settleMoveCount = counter;
         for (uint8 s = 0; s < m.seatCount; s++) {
             for (uint8 t = 0; t < 4; t++) {
-                m.seats[s].tokens[t].stepsWalked = tokens[uint256(s) * 4 + t];
+                m.seats[s].tokens[t].stepsWalked = steps[uint256(s) * 4 + t];
+                m.seats[s].tokens[t].pathIndex = pathIdx[uint256(s) * 4 + t];
             }
         }
         if (m.finishCount == 0) {
             m.winner = 255;
         }
+    }
+
+    /// @dev The next seat in the replay that has not finished.
+    function _nextTurnReplay(Match storage m, uint8 from) private view returns (uint8) {
+        uint8 n = m.seatCount;
+        for (uint8 i = 1; i <= n; i++) {
+            uint8 cand = uint8((uint256(from) + i) % n);
+            if (!m.seats[cand].finished) return cand;
+        }
+        return from;
     }
 
     // --------------------------------------------------------------- the finish
