@@ -23,6 +23,7 @@ contract SessionRegistryTest {
     uint256 constant PK0 = 0xA11CE;
     uint256 constant PK1 = 0xB0B;
     bytes32 constant SID = keccak256("session-1");
+    bytes32 constant SEED = keccak256("reveal-me");
 
     SessionRegistry reg;
     FeeVault vault;
@@ -43,7 +44,7 @@ contract SessionRegistryTest {
     }
 
     function _connect() internal {
-        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
+        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), keccak256(abi.encodePacked(SEED)), _players(), _players(), 1);
     }
 
     function _sigs(bytes32 digest) internal pure returns (bytes[] memory sigs) {
@@ -66,14 +67,34 @@ contract SessionRegistryTest {
     function testSettleRefusedWhenNotPaid() public {
         bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
         vm.expectRevert(SessionRegistry.FeeNotPaid.selector);
-        reg.settle(SID, bytes32("final"), bytes32("seed"), _sigs(digest), _players());
+        reg.settle(SID, bytes32("final"), SEED, _sigs(digest), _players());
     }
 
     function testSettleVerifiesSignatures() public {
         _connect();
         bytes32 finalHash = bytes32("final");
         bytes32 digest = reg.midchainDigest(SID, finalHash);
-        reg.settle(SID, finalHash, bytes32("seed"), _sigs(digest), _players());
+        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
+        require(reg.revealed(SID), "session marked settled");
+    }
+
+    function testSettleRejectsWrongSeedReveal() public {
+        // The committed seed is keccak(SEED); revealing a different value must
+        // revert, so a dev cannot pick a winning seed after seeing play.
+        _connect();
+        bytes32 finalHash = bytes32("final");
+        bytes32 digest = reg.midchainDigest(SID, finalHash);
+        vm.expectRevert(SessionRegistry.BadReveal.selector);
+        reg.settle(SID, finalHash, bytes32("not-the-seed"), _sigs(digest), _players());
+    }
+
+    function testSettleCannotRunTwice() public {
+        _connect();
+        bytes32 finalHash = bytes32("final");
+        bytes32 digest = reg.midchainDigest(SID, finalHash);
+        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
+        vm.expectRevert(SessionRegistry.AlreadySettled.selector);
+        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
     }
 
     function testSettleRejectsForgedSignature() public {
@@ -86,14 +107,14 @@ contract SessionRegistryTest {
         sigs[0] = abi.encodePacked(r0, s0, v0);
         sigs[1] = abi.encodePacked(r1, s1, v1);
         vm.expectRevert();
-        reg.settle(SID, finalHash, bytes32("seed"), sigs, _players());
+        reg.settle(SID, finalHash, SEED, sigs, _players());
     }
 
     function testSettleRejectsWrongFinalHash() public {
         _connect();
         bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
         vm.expectRevert();
-        reg.settle(SID, bytes32("other"), bytes32("seed"), _sigs(digest), _players());
+        reg.settle(SID, bytes32("other"), SEED, _sigs(digest), _players());
     }
 
     function testRandomnessIsFreePureAndDeterministic() public view {

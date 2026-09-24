@@ -40,9 +40,22 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// Layout marker. 0 on the first deployed layout; bump only on a layout change.
     uint8 public version;
 
+    /// sessionId => the committed randomness seed, recorded at connect. This one
+    /// slot is the session's "connected" marker AND the seed commitment, so:
+    ///   - settle can prove the revealed seed is the one committed at connect
+    ///     (no picking a winning seed after seeing play), and
+    ///   - a session that never connected has a zero commit, so it can never
+    ///     settle (the fee cannot be bypassed).
+    /// APPEND-ONLY: this consumed one slot from __gap (20 -> 19).
+    mapping(bytes32 => bytes32) public seedCommits;
+
+    /// sessionId => settled. Guards against settling the same session twice.
+    /// APPEND-ONLY: consumed a second slot from __gap (19 -> 18).
+    mapping(bytes32 => bool) public revealed;
+
     /// Reserved slots for future variables. Consume from the top, shrink by the
     /// same count. DO NOT reorder or remove.
-    uint256[20] private __gap;
+    uint256[18] private __gap;
 
     /// The connect event. It carries the game link (gameLogic) and the committed
     /// randomness seed, so no separate link transaction is needed and the Foskaay
@@ -68,6 +81,8 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     error BadSignature();
     error BadInput();
     error ZeroAddress();
+    error BadReveal();
+    error AlreadySettled();
 
     /// @notice Initialize the proxy.
     /// @param owner_ the upgrade/config owner (the project owner).
@@ -111,6 +126,8 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint16 randomCount
     ) external payable {
         if (players.length == 0 || players.length != sessionKeys.length) revert BadInput();
+        if (seedCommits[sessionId] != bytes32(0)) revert BadInput(); // already connected
+        seedCommits[sessionId] = seedCommit == bytes32(0) ? bytes32(uint256(1)) : seedCommit;
         IFeeVault(feeVault).deposit{value: msg.value}(sessionId);
         emit Handover(sessionId, gameLogic, startHash, seedCommit, players, sessionKeys, randomCount, msg.sender);
     }
@@ -121,18 +138,34 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bytes32[] calldata sessionIds,
         address gameLogic,
         bytes32[] calldata startHashes,
-        bytes32[] calldata seedCommits,
+        bytes32[] calldata seedCommitList,
         address[][] calldata players,
         address[][] calldata sessionKeys,
         uint16 randomCount
     ) external payable {
         uint256 n = sessionIds.length;
-        if (n == 0 || n != startHashes.length || n != seedCommits.length || n != players.length || n != sessionKeys.length) revert BadInput();
+        if (n == 0 || n != startHashes.length || n != seedCommitList.length || n != players.length || n != sessionKeys.length) revert BadInput();
         IFeeVault(feeVault).depositMany{value: msg.value}(sessionIds);
         for (uint256 i = 0; i < n; i++) {
-            if (players[i].length == 0 || players[i].length != sessionKeys[i].length) revert BadInput();
-            emit Handover(sessionIds[i], gameLogic, startHashes[i], seedCommits[i], players[i], sessionKeys[i], randomCount, msg.sender);
+            _connectOne(sessionIds[i], startHashes[i], seedCommitList[i], players[i], sessionKeys[i], gameLogic, randomCount);
         }
+    }
+
+    /// @dev One batch item, factored out so the batch loop stays within the EVM
+    ///      stack limit.
+    function _connectOne(
+        bytes32 sessionId,
+        bytes32 startHash,
+        bytes32 seedCommit_,
+        address[] calldata players,
+        address[] calldata sessionKeys,
+        address gameLogic,
+        uint16 randomCount
+    ) private {
+        if (players.length == 0 || players.length != sessionKeys.length) revert BadInput();
+        if (seedCommits[sessionId] != bytes32(0)) revert BadInput();
+        seedCommits[sessionId] = seedCommit_ == bytes32(0) ? bytes32(uint256(1)) : seedCommit_;
+        emit Handover(sessionId, gameLogic, startHash, seedCommit_, players, sessionKeys, randomCount, msg.sender);
     }
 
     // -------------------------------------------------------------- settle
@@ -201,6 +234,17 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         address[] calldata signers
     ) private {
         if (!IFeeVault(feeVault).paid(sessionId)) revert FeeNotPaid();
+        bytes32 commit = seedCommits[sessionId];
+        if (commit == bytes32(0)) revert FeeNotPaid();     // never connected
+        if (revealed[sessionId]) revert AlreadySettled();  // settle once
+        // Prove the revealed seed is the one committed at connect. A seed of zero
+        // means "no randomness declared", so the reveal must also be zero. A
+        // non-zero commit must match keccak(seedReveal).
+        if (commit != bytes32(uint256(1))) {
+            if (keccak256(abi.encodePacked(seedReveal)) != commit) revert BadReveal();
+        } else if (seedReveal != bytes32(0)) {
+            revert BadReveal();
+        }
         uint256 n = signers.length;
         if (n == 0 || n != sigs.length) revert BadInput();
         bytes32 digest = midchainDigest(sessionId, finalHash);
@@ -208,6 +252,7 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             // OpenZeppelin ECDSA.recover rejects malleable/malformed signatures.
             if (ECDSA.recover(digest, sigs[i]) != signers[i]) revert BadSignature();
         }
+        revealed[sessionId] = true;
         emit Settled(sessionId, finalHash, seedReveal, msg.sender);
     }
 }
