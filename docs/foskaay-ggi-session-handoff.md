@@ -120,10 +120,9 @@ Always `git fetch origin` before comparing to main (local main is stale).
 - Randomness     `0x6DD15cf4d4E2D29dd4AA871d6fd012221212B38b`
 - FeeVault       `0x4cf542791faeb683f878bd3d119683e0C02F9905`
 - BatchedSettlement `0x5831E31789cAD85Dd263Ec78D73D8289FDc523c4`
-- Demo/game contracts (NOT core, plain, deployed for the PvP demo):
-  - GeneralsGame (on-chain-board port) `0xD674eD1f118855868b4B002F4A167C953Cc549ca`
-  - GeneralsMidchain (pure rules engine, free via eth_call) `0x67E2508459Ef1d786C93b30Df7FC922198b0D0b2`
-  - EventOnlyCore (event-only handover/settle prototype) `0xB32353bBC6eD2E2b6292aFfaB9F71e81de47968c`
+- Demo/game contracts (NOT core): the Ludo demo pair (see `arc-testnet.json`).
+  The early Generals demo and the event-only/event-midchain prototype contracts
+  were removed from the project on the owner's instruction.
 - RPC `https://rpc.testnet.arc.io`; USDC (ERC-20 view, 6dp)
   `0x3600000000000000000000000000000000000000`. Addresses live in
   `foskaay-ggi/deployments/arc-testnet.json` and
@@ -177,11 +176,9 @@ Always `git fetch origin` before comparing to main (local main is stale).
   N=10 = 5,841, N=100 = **58,411 games/$1**. This is the headline tier. Why per-game
   floors but per-session does not: per-game puts each game's payload + 2 signatures
   on-chain (about 28,000 gas/game irreducible); per-session puts ONE root on-chain.
-- Recorded in `foskaay-ggi/deployments/`: `generals-cost.json`, `midchain-cost.json`,
-  `midchain-cost-batched.json`, `eventmidchain-cost.json`, `eventmidchain-batch-cost.json`,
-  `eventmidchain-session-cost.json`.
-- Re-measure with `node scripts/foskaay-ggi-midchain-match.mjs`,
-  `node scripts/foskaay-ggi-eventmidchain-match.mjs`, `node scripts/foskaay-ggi-eventmidchain-batch.mjs`.
+- Early prototype cost runs (Generals, storage/event-only/event-midchain) were
+  removed from `foskaay-ggi/deployments/` on the owner's instruction. Their
+  scripts were removed too. The only game cost we track now is the Ludo demo.
 
 ---
 

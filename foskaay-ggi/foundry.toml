@@ -10,11 +10,10 @@
 src = "src"
 out = "out"
 test = "test"
-# demos/ holds real games built on the rail (e.g. demos/pvp/generals/). A game's
-# contract is not part of the deployable core/optional set in src/; it compiles
-# and is tested through the standard test/ suite, which imports the game. Foundry
-# has a single test path, so the game lives in its demo folder and its test lives
-# in test/.
+# demos/ holds real games built on the rail (demos/board/ludo/ = the Ludo demo).
+# A game's contract is not part of the deployable core set in src/; it compiles
+# through the standard test/ suite, which imports the game. Foundry has a single
+# test path, so the game lives in its demo folder and its test lives in test/.
 script = "script"
 libs = ["lib"]
 solc_version = "0.8.24"
