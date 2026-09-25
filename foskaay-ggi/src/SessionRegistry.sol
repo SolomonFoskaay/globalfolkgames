@@ -6,60 +6,65 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeab
 import {OwnableUpgradeable} from "@openzeppelin/contracts/access/OwnableUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-/// @title SessionRegistry — Foskaay Gasless Games Infrastructure (Foskaay GGI), core 1 of 2.
+/// @title SessionRegistry — the SINGLE core of Foskaay GGI.
 ///
-/// @notice The room a game plays in. It connects a session (paying the fee), lets
-/// every move run off the base chain for free, and settles the result. It knows
-/// NOTHING about any game: no board, token, position, seat or dice. The game's
-/// state is opaque bytes the rail never parses.
+/// @notice ONE contract (the FeeVault is merged in; there is no second core).
+/// A game connects once (paying the fee, which is transferred straight to the
+/// destination), plays every move for free, and settles once. It knows NOTHING
+/// about any game: no board, token, seat or dice. The game state is opaque bytes.
 ///
-/// @notice THE MIDCHAIN (a set of tools inside Foskaay GGI, not a separate
-/// product): a pure function runs for free via eth_call. So `random`/`randomN`
-/// are pure and free, exactly like moves, lives and timers: the game derives its
-/// randomness from the session's committed seed and a counter, at no extra cost
-/// and with no separate randomness contract.
+/// @notice THE MIDCHAIN: `random`/`randomN` are pure, so dice, cards and loot
+/// cost nothing via eth_call. Moves run in the GAME's own pure functions via
+/// eth_call, signed with the session keys into a hash chain; only handover and
+/// settle are real transactions (2 per session, not 200).
 ///
-/// @notice FEE ENFORCEMENT: `handover` is payable and forwards the fee to the
-/// FeeVault in the SAME transaction, so a session cannot start without paying.
-/// `settle` refuses unless the FeeVault recorded that session as paid. The fee is
-/// therefore inside the function a dev must call, and cannot be skipped.
+/// @notice FEE, UNBYPASSABLE: `handover` is payable and requires exactly the fee,
+/// forwarding it to `destination` in the SAME transaction. The ONE storage write
+/// at connect (`commitments[sessionId]`) is BOTH the paid flag and the committed
+/// randomness/participant commitment, so a session cannot start unpaid and cannot
+/// be settled unless it connected.
 ///
-/// @dev OPENZEPPELIN ONLY: upgradeability (UUPS + Initializable + Ownable) and
-///      signature recovery (ECDSA) are the audited OpenZeppelin implementations.
-///      ECDSA.recover rejects malleable and malformed signatures, so a tampered
-///      settlement cannot pass.
+/// @dev OPENZEPPELIN ONLY: UUPS + Initializable + Ownable for upgrades, ECDSA for
+///      signature recovery (rejects malleable/malformed signatures).
 ///
 /// @dev UPGRADEABLE (UUPS). Storage is APPEND-ONLY: new variables go at the top of
-///      `__gap`, which shrinks by the same number of slots. `version` marks layout
-///      changes. `initialize` replaces the constructor; the implementation is
-///      `_disableInitializers()` so it can never be used directly.
+///      `__gap`, which shrinks by the same count. `version` marks layout changes.
+///
+/// @dev GAS TARGET: connect ~50k gas + settle ~35k gas + the fee = about $1/1000
+///      at Arc mainnet gas (5-10 Gwei) unbatched; `handoverMany`/`settleMany`
+///      amortize the 21k base tx and go well under $1/1000.
 contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
-    /// The FeeVault that collects the per-session fee. Set once at initialize.
-    address public feeVault;
+    /// Where the fee goes (the project treasury). A direct transfer, no vault.
+    address public destination;
 
-    /// Layout marker. 0 on the first deployed layout; bump only on a layout change.
+    /// Fee for a single (unbatched) session, in native USDC wei (Arc USDC is 18dp).
+    uint256 public fee;
+
+    /// Fee for a session inside `handoverMany` (the batched tier, cheaper).
+    uint256 public feeBatch;
+
+    /// Monotonic session counter. Emitted in Handover for off-chain indexing.
+    uint64 public sessionCounter;
+
+    /// sessionId => commitment = keccak256(abi.encode(seedCommit, players, sessionKeys)).
+    /// A NON-ZERO value means "paid and connected". It binds the randomness
+    /// commitment AND the exact player/session-key set, so:
+    ///   - settle can prove the revealed seed is the one committed at connect, and
+    ///   - a stranger cannot settle with their own key (the signer set is bound).
+    mapping(bytes32 => bytes32) public commitments;
+
+    /// sessionId => settled. Blocks a second settle of the same session.
+    mapping(bytes32 => bool) public settled;
+
+    /// Layout marker. Bump only on a layout change.
     uint8 public version;
-
-    /// sessionId => the committed randomness seed, recorded at connect. This one
-    /// slot is the session's "connected" marker AND the seed commitment, so:
-    ///   - settle can prove the revealed seed is the one committed at connect
-    ///     (no picking a winning seed after seeing play), and
-    ///   - a session that never connected has a zero commit, so it can never
-    ///     settle (the fee cannot be bypassed).
-    /// APPEND-ONLY: this consumed one slot from __gap (20 -> 19).
-    mapping(bytes32 => bytes32) public seedCommits;
-
-    /// sessionId => settled. Guards against settling the same session twice.
-    /// APPEND-ONLY: consumed a second slot from __gap (19 -> 18).
-    mapping(bytes32 => bool) public revealed;
 
     /// Reserved slots for future variables. Consume from the top, shrink by the
     /// same count. DO NOT reorder or remove.
-    uint256[18] private __gap;
+    uint256[20] private __gap;
 
-    /// The connect event. It carries the game link (gameLogic) and the committed
-    /// randomness seed, so no separate link transaction is needed and the Foskaay
-    /// GGI Explorer can index it straight from eth_getLogs.
+    /// The connect event. Carries the game link and committed seed so the Explorer
+    /// can index it from eth_getLogs with no backend and no extra tx.
     event Handover(
         bytes32 indexed sessionId,
         address indexed gameLogic,
@@ -68,30 +73,39 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         address[] players,
         address[] sessionKeys,
         uint16 randomCount,
-        address indexed payer
+        address indexed payer,
+        uint64 counter
     );
 
-    /// The settle event. `finalHash` may be one game's final hash or a whole
-    /// session's Merkle root; `seedReveal` opens the committed seed.
+    /// The settle event. `finalHash` commits to the whole game (board AND points);
+    /// `seedReveal` opens the seed committed at connect.
     event Settled(bytes32 indexed sessionId, bytes32 finalHash, bytes32 seedReveal, address indexed payer);
+    event FeeSet(uint256 fee);
+    event FeeBatchSet(uint256 feeBatch);
+    event DestinationSet(address destination);
 
-    event FeeVaultSet(address feeVault);
-
+    error BadFee();
+    error BadInput();
     error FeeNotPaid();
     error BadSignature();
-    error BadInput();
-    error ZeroAddress();
     error BadReveal();
     error AlreadySettled();
+    error ZeroAddress();
+    error TransferFailed();
 
     /// @notice Initialize the proxy.
     /// @param owner_ the upgrade/config owner (the project owner).
-    /// @param feeVault_ the FeeVault that collects the per-session fee.
-    function initialize(address owner_, address feeVault_) external initializer {
-        if (owner_ == address(0)) revert ZeroAddress();
+    /// @param destination_ where fees are sent (the treasury).
+    /// @param fee_ unbatched fee (native USDC wei). Batched defaults to the same.
+    function initialize(address owner_, address destination_, uint256 fee_) external initializer {
+        if (owner_ == address(0) || destination_ == address(0)) revert ZeroAddress();
         __Ownable_init(owner_);
-        feeVault = feeVault_;
-        emit FeeVaultSet(feeVault_);
+        destination = destination_;
+        fee = fee_;
+        feeBatch = fee_;
+        emit DestinationSet(destination_);
+        emit FeeSet(fee_);
+        emit FeeBatchSet(fee_);
     }
 
     /// @dev The implementation contract can never be used directly.
@@ -103,19 +117,26 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     ///      before mainnet.
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /// @notice Point at the FeeVault (owner only). Kept settable so a future
-    ///         FeeVault upgrade, if it ever needs a new address, is config not code.
-    function setFeeVault(address feeVault_) external onlyOwner {
-        if (feeVault_ == address(0)) revert ZeroAddress();
-        feeVault = feeVault_;
-        emit FeeVaultSet(feeVault_);
+    function setFee(uint256 fee_) external onlyOwner {
+        fee = fee_;
+        emit FeeSet(fee_);
+    }
+
+    function setFeeBatch(uint256 feeBatch_) external onlyOwner {
+        feeBatch = feeBatch_;
+        emit FeeBatchSet(feeBatch_);
+    }
+
+    function setDestination(address destination_) external onlyOwner {
+        if (destination_ == address(0)) revert ZeroAddress();
+        destination = destination_;
+        emit DestinationSet(destination_);
     }
 
     // ------------------------------------------------------------- connect
 
-    /// @notice Connect a session and pay the fee. `msg.value` must equal the
-    ///         FeeVault's current fee; it is forwarded to the FeeVault in this
-    ///         same transaction, so the session cannot start unpaid.
+    /// @notice Connect a session and pay the fee. `msg.value` must equal `fee`.
+    ///         The fee is forwarded to `destination` in this same transaction.
     function handover(
         bytes32 sessionId,
         address gameLogic,
@@ -126,92 +147,117 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint16 randomCount
     ) external payable {
         if (players.length == 0 || players.length != sessionKeys.length) revert BadInput();
-        if (seedCommits[sessionId] != bytes32(0)) revert BadInput(); // already connected
-        seedCommits[sessionId] = seedCommit == bytes32(0) ? bytes32(uint256(1)) : seedCommit;
-        IFeeVault(feeVault).deposit{value: msg.value}(sessionId);
-        emit Handover(sessionId, gameLogic, startHash, seedCommit, players, sessionKeys, randomCount, msg.sender);
+        if (msg.value != fee) revert BadFee();
+        if (commitments[sessionId] != bytes32(0)) revert BadInput(); // already connected
+        commitments[sessionId] = _commitment(seedCommit, players, sessionKeys);
+        sessionCounter += 1;
+        _pay(msg.value);
+        emit Handover(sessionId, gameLogic, startHash, seedCommit, players, sessionKeys, randomCount, msg.sender, sessionCounter);
     }
 
-    /// @notice Connect MANY sessions in ONE transaction. `msg.value` must equal
-    ///         fee x count. One transaction keeps the cost down when batching.
+    /// @notice Connect MANY sessions in ONE transaction at the batched fee.
     function handoverMany(
         bytes32[] calldata sessionIds,
         address gameLogic,
         bytes32[] calldata startHashes,
-        bytes32[] calldata seedCommitList,
+        bytes32[] calldata seedCommits_,
         address[][] calldata players,
         address[][] calldata sessionKeys,
         uint16 randomCount
     ) external payable {
         uint256 n = sessionIds.length;
-        if (n == 0 || n != startHashes.length || n != seedCommitList.length || n != players.length || n != sessionKeys.length) revert BadInput();
-        IFeeVault(feeVault).depositMany{value: msg.value}(sessionIds);
+        if (n == 0 || n != startHashes.length || n != seedCommits_.length || n != players.length || n != sessionKeys.length) revert BadInput();
+        if (msg.value != feeBatch * n) revert BadFee();
         for (uint256 i = 0; i < n; i++) {
-            _connectOne(sessionIds[i], startHashes[i], seedCommitList[i], players[i], sessionKeys[i], gameLogic, randomCount);
+            if (players[i].length == 0 || players[i].length != sessionKeys[i].length) revert BadInput();
+            if (commitments[sessionIds[i]] != bytes32(0)) revert BadInput();
+            commitments[sessionIds[i]] = _commitment(seedCommits_[i], players[i], sessionKeys[i]);
+            emit Handover(sessionIds[i], gameLogic, startHashes[i], seedCommits_[i], players[i], sessionKeys[i], randomCount, msg.sender, sessionCounter + uint64(i));
         }
-    }
-
-    /// @dev One batch item, factored out so the batch loop stays within the EVM
-    ///      stack limit.
-    function _connectOne(
-        bytes32 sessionId,
-        bytes32 startHash,
-        bytes32 seedCommit_,
-        address[] calldata players,
-        address[] calldata sessionKeys,
-        address gameLogic,
-        uint16 randomCount
-    ) private {
-        if (players.length == 0 || players.length != sessionKeys.length) revert BadInput();
-        if (seedCommits[sessionId] != bytes32(0)) revert BadInput();
-        seedCommits[sessionId] = seedCommit_ == bytes32(0) ? bytes32(uint256(1)) : seedCommit_;
-        emit Handover(sessionId, gameLogic, startHash, seedCommit_, players, sessionKeys, randomCount, msg.sender);
+        sessionCounter += uint64(n);
+        _pay(msg.value);
     }
 
     // -------------------------------------------------------------- settle
 
-    /// @notice Settle ONE session: every declared signer must have signed
-    ///         (sessionId, finalHash), and the session must have been paid at
-    ///         connect. Emits the result and reveals the seed.
+    /// @notice Settle one session. Requires: it connected (paid), the revealed
+    ///         seed matches the commitment, it is not already settled, and every
+    ///         declared session key signed (sessionId, finalHash). Emits the
+    ///         result; the game's points are inside `finalHash` (midchain), so no
+    ///         extra storage is written for them.
     function settle(
         bytes32 sessionId,
         bytes32 finalHash,
         bytes32 seedReveal,
+        address[] calldata players,
+        address[] calldata sessionKeys,
         bytes[] calldata sigs,
         address[] calldata signers
     ) external {
-        _settleOne(sessionId, finalHash, seedReveal, sigs, signers);
+        _settleOne(sessionId, finalHash, seedReveal, players, sessionKeys, sigs, signers);
     }
 
-    /// @notice Settle MANY sessions in ONE transaction (the per-session batch:
-    ///         one settle covers all the games inside a session via a Merkle root).
+    /// @notice Settle MANY sessions in ONE transaction (batched cadence).
     function settleMany(
         bytes32[] calldata sessionIds,
         bytes32[] calldata finalHashes,
         bytes32[] calldata seedReveals,
+        address[][] calldata players,
+        address[][] calldata sessionKeys,
         bytes[][] calldata sigs,
         address[][] calldata signers
     ) external {
         uint256 n = sessionIds.length;
-        if (n == 0 || n != finalHashes.length || n != seedReveals.length || n != sigs.length || n != signers.length) revert BadInput();
+        if (n == 0 || n != finalHashes.length || n != seedReveals.length || n != players.length || n != sessionKeys.length || n != sigs.length || n != signers.length) revert BadInput();
         for (uint256 i = 0; i < n; i++) {
-            _settleOne(sessionIds[i], finalHashes[i], seedReveals[i], sigs[i], signers[i]);
+            _settleOne(sessionIds[i], finalHashes[i], seedReveals[i], players[i], sessionKeys[i], sigs[i], signers[i]);
         }
+    }
+
+    /// @dev One settle, factored out so settleMany stays within the stack limit.
+    function _settleOne(
+        bytes32 sessionId,
+        bytes32 finalHash,
+        bytes32 seedReveal,
+        address[] calldata players,
+        address[] calldata sessionKeys,
+        bytes[] calldata sigs,
+        address[] calldata signers
+    ) private {
+        bytes32 stored = commitments[sessionId];
+        if (stored == bytes32(0)) revert FeeNotPaid();      // never connected / unpaid
+        // Rebuild the commitment from the reveal + the exact participant sets.
+        bytes32 seedCommit = keccak256(abi.encodePacked(seedReveal));
+        if (_commitment(seedCommit, players, sessionKeys) != stored) revert BadReveal();
+        if (settled[sessionId]) revert AlreadySettled();
+        uint256 n = signers.length;
+        if (n == 0 || n != sigs.length) revert BadInput();
+        bytes32 digest = midchainDigest(sessionId, finalHash);
+        for (uint256 i = 0; i < n; i++) {
+            // OpenZeppelin ECDSA.recover rejects malleable/malformed signatures.
+            if (ECDSA.recover(digest, sigs[i]) != signers[i]) revert BadSignature();
+        }
+        settled[sessionId] = true;
+        emit Settled(sessionId, finalHash, seedReveal, msg.sender);
     }
 
     // ---------------------------------------------------------------- reads
 
-    /// @notice The exact digest a participant signs to authorise a settlement.
-    ///         Bound to this contract and chain, so a signature cannot be replayed
-    ///         elsewhere. Read it via eth_call so a client never guesses.
+    /// @notice The exact digest a session key signs to authorise a settlement.
+    ///         Bound to this contract and chain, so it cannot be replayed.
     function midchainDigest(bytes32 sessionId, bytes32 finalHash) public view returns (bytes32) {
         return keccak256(abi.encodePacked("FoskaayGGI", block.chainid, address(this), sessionId, finalHash));
     }
 
+    /// @notice True once a session connected and paid.
+    function isPaid(bytes32 sessionId) external view returns (bool) {
+        return commitments[sessionId] != bytes32(0);
+    }
+
     // ------------------------------------------------------- free randomness
 
-    /// @notice One free random seed: keccak(seed, counter). Pure, so it costs
-    ///         nothing via eth_call. The game derives dice/cards/loot from it.
+    /// @notice One free random seed: keccak(seed, counter). Pure, costs nothing
+    ///         via eth_call. The game derives dice/cards/loot from it.
     function random(bytes32 seed, uint256 counter) public pure returns (bytes32) {
         return keccak256(abi.encode(seed, counter));
     }
@@ -226,41 +272,12 @@ contract SessionRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     // ------------------------------------------------------------- internal
 
-    function _settleOne(
-        bytes32 sessionId,
-        bytes32 finalHash,
-        bytes32 seedReveal,
-        bytes[] calldata sigs,
-        address[] calldata signers
-    ) private {
-        if (!IFeeVault(feeVault).paid(sessionId)) revert FeeNotPaid();
-        bytes32 commit = seedCommits[sessionId];
-        if (commit == bytes32(0)) revert FeeNotPaid();     // never connected
-        if (revealed[sessionId]) revert AlreadySettled();  // settle once
-        // Prove the revealed seed is the one committed at connect. A seed of zero
-        // means "no randomness declared", so the reveal must also be zero. A
-        // non-zero commit must match keccak(seedReveal).
-        if (commit != bytes32(uint256(1))) {
-            if (keccak256(abi.encodePacked(seedReveal)) != commit) revert BadReveal();
-        } else if (seedReveal != bytes32(0)) {
-            revert BadReveal();
-        }
-        uint256 n = signers.length;
-        if (n == 0 || n != sigs.length) revert BadInput();
-        bytes32 digest = midchainDigest(sessionId, finalHash);
-        for (uint256 i = 0; i < n; i++) {
-            // OpenZeppelin ECDSA.recover rejects malleable/malformed signatures.
-            if (ECDSA.recover(digest, sigs[i]) != signers[i]) revert BadSignature();
-        }
-        revealed[sessionId] = true;
-        emit Settled(sessionId, finalHash, seedReveal, msg.sender);
+    function _commitment(bytes32 seedCommit, address[] calldata players, address[] calldata sessionKeys) private pure returns (bytes32) {
+        return keccak256(abi.encode(seedCommit, players, sessionKeys));
     }
-}
 
-/// @dev The FeeVault surface this contract calls. Declared here so the core stays
-///      decoupled from the FeeVault implementation.
-interface IFeeVault {
-    function deposit(bytes32 sessionId) external payable;
-    function depositMany(bytes32[] calldata sessionIds) external payable;
-    function paid(bytes32 sessionId) external view returns (bool);
+    function _pay(uint256 amount) private {
+        (bool ok, ) = payable(destination).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+    }
 }

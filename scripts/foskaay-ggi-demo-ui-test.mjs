@@ -78,7 +78,7 @@ async function evaluate(ws, expr) {
     await sleep(1000);
     connected = await evaluate(ws, `!!window.GFG_LUDO.board()`);
   }
-  const started = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({match:!!b, turn:b&&b.turn, tokens:b&&b.stepsWalked, status:document.getElementById('ld-status').textContent.slice(0,90)});})()`);
+  const started = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({match:!!b, turn:b&&b.turn, tokens:b&&b.steps, status:document.getElementById('ld-status').textContent.slice(0,90)});})()`);
   console.log('after New match (connected=' + connected + '):', started);
 
   // Roll via the bridge (the same call the centre tap makes), then wait for the
@@ -93,7 +93,7 @@ async function evaluate(ws, expr) {
   console.log('after roll (diceShown=' + diceShown + '):', rolled);
 
   await sleep(8000);
-  const moved = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({tokens:b&&b.stepsWalked, status:document.getElementById('ld-status').textContent.slice(0,90), gas:document.getElementById('ld-cost').textContent});})()`);
+  const moved = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({tokens:b&&b.steps, status:document.getElementById('ld-status').textContent.slice(0,90), gas:document.getElementById('ld-cost').textContent});})()`);
   console.log('after a few turns:', moved);
 
   // If it is the user's turn with a legal move, tap a yard token on the canvas
@@ -111,9 +111,9 @@ async function evaluate(ws, expr) {
     })()`);
     for (let i = 0; i < 20 && !tokenReleased; i++) {
       await sleep(700);
-      tokenReleased = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return !!(b && b.stepsWalked[0] >= 0);})()`);
+      tokenReleased = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return !!(b && b.steps[0] >= 0);})()`);
     }
-    const afterMove = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({tokens:b&&b.stepsWalked, gas:document.getElementById('ld-cost').textContent});})()`);
+    const afterMove = await evaluate(ws, `(function(){var b=window.GFG_LUDO.board();return JSON.stringify({tokens:b&&b.steps, gas:document.getElementById('ld-cost').textContent});})()`);
     console.log('after token tap (tokenReleased=' + tokenReleased + '):', afterMove);
   } else {
     console.log('after a few turns: no 6 this roll, no token to tap (flow still verified)');
