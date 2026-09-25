@@ -7,20 +7,17 @@
   "deployedAt": "2026-09-22T04:06:51.469Z",
   "deployer": "0xAd0A4348C7202E44e96c3FAE1cBB0B645dD86EB4",
   "contracts": {
-    "SessionRegistry": "0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE",
-    "FeeVault": "0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39",
-    "FoskaayGGIDemoGames": "0xEF1fFa009aDAEa87B68b36980849F814F930753b",
-    "FoskaayGGIDemoPlayer": "0x5b287337907b3fE9401274D870DebBe090ab174c"
+    "SessionRegistry": "0x9f078527082b3bCc7c00e27f7C53D31CF1D17A85",
+    "FoskaayGGILudo": "0xc3Dd1243B74373Bc015Fd305727E729785B41C08"
   },
   "upgradeable": true,
   "pattern": "UUPS proxy (ERC1967). Proxy addresses are permanent.",
   "registryUpgradedAt": "2026-09-23T03:59:50.272Z",
   "registryUpgradeNote": "Event-based Foskaay GGI Midchain functions added (additive, no storage change). Proxy unchanged.",
   "cleanCoreDeployedAt": "2026-09-23T06:59:41.464Z",
-  "coreNote": "CLEAN 2-contract core (SessionRegistry + FeeVault), UUPS proxies, wired. Old 4+1 proxies abandoned (no real data). Fee 0.001 native USDC/session.",
+  "coreNote": "v7 SINGLE core: SessionRegistry with FeeVault merged in, UUPS proxy, fee 0.0004 unbatched / 0.0002 batched (native USDC 18dp). Ludo is a pure contract (no proxy).",
   "implementations": {
-    "SessionRegistry": "0x3cE48a010B17ef038E45F43e5f4cAef6358aA049",
-    "FeeVault": "0x13800e1dd0319622a1Ac4Dc2D4896F3DcabA58fc"
+    "SessionRegistry": "0x7c26fee3284Afd17A021d6663297Cb9027Fb1a1D"
   },
   "demoDeployedAt": "2026-09-24T15:05:23.630Z",
   "demoNote": "Ludo demo: FoskaayGGIDemoGames (all demo games, gameTag ludo) + FoskaayGGIDemoPlayer (one player account, per-game point buckets). Both UUPS, OZ-only, wired.",
@@ -29,5 +26,7 @@
     "FoskaayGGIDemoPlayer": "0x4b3660D6C9b180E14c280e0e3353b6fD6F0B877C"
   },
   "demoUpgradedAt": "2026-09-25T11:21:20.057Z",
-  "demoUpgradeNote": "In-place UUPS upgrade of the permanent demo proxies (same addresses). Top-level layout unchanged."
+  "demoUpgradeNote": "In-place UUPS upgrade of the permanent demo proxies (same addresses). Top-level layout unchanged.",
+  "coreV7DeployedAt": "2026-09-25T14:37:25.609Z",
+  "ludoDeployedAt": "2026-09-25T14:37:25.609Z"
 }

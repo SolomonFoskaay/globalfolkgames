@@ -1,11 +1,13 @@
 // Foskaay GGI Ludo demo bridge.
 //
-// Connects the ludo-lab board/dice skin to the Foskaay GGI Midchain relay and
-// the on-chain contract. The CONTRACT is the only rules engine: the make-believe
-// "board state" here is always the contract's own replay of the move log
-// (previewLog). The move log lives in MEMORY ONLY (never localStorage), travels
-// with each request, and is re-verified on-chain at settle. Nothing is trusted
-// on this page; it only draws what the contract returns.
+// Connects the ludo-lab board/dice skin to the Foskaay GGI Midchain. The GAME is
+// a pure contract (FoskaayGGILudo): every roll and move runs via eth_call for
+// free, and the relay hash-chains and signs each new state. Only the connect
+// (handover + fee) and the settle are transactions. There is no replay.
+//
+// The board shown here is ALWAYS the contract's own decoded state (bytes on
+// chain, rendered here). Nothing is invented on this page and nothing is stored
+// in localStorage.
 (function () {
     'use strict';
 
@@ -13,10 +15,8 @@
     var COLOR_OF = ['green', 'yellow', 'blue', 'red'];
     var SEAT_OF = { green: 0, yellow: 1, blue: 2, red: 3 };
 
-    // ---- demo state (in memory; the contract is the truth) ----
-    var LOG = [];
-    var REF = null, SID = null, USER = null, USERSEAT = 0, SEATS = 2;
-    var BOARD = null;
+    var SID = null, USER = null, USERSEAT = 0, SEATS = 2;
+    var VIEW = null;
     var pendingDice = [];
     var busy = false;
 
@@ -38,17 +38,16 @@
     window.gfgRemoteTurn = function () { return false; };
     window.getActiveSeats = function () { return COLOR_OF.slice(0, SEATS); };
     window.getPlayerRank = function (color) {
-        if (!BOARD || !BOARD.finishOrder) return 0;
-        var i = BOARD.finishOrder.indexOf(SEAT_OF[color]);
-        return i >= 0 ? i + 1 : 0;
+        if (!VIEW || !VIEW.order) return 0;
+        var fc = VIEW.finishCount || 0;
+        for (var i = 0; i < fc; i++) {
+            if (VIEW.order[i] === SEAT_OF[color]) return i + 1;
+        }
+        return 0;
     };
-    // physics.js calls this when the tumble settles; the dice values are already
-    // the contract's, so there is nothing left to score here.
-    window.finalizeDiceScores = function () {};
+    window.finalizeDiceScores = function () {}; // dice values are already the chain's
 
-    // ---- UI hook (the page defines window.gfgLudoUI before loading this) ----
     function ui() { return window.gfgLudoUI || {}; }
-    function setStatus(s) { if (ui().status) ui().status(s); }
     function setPrompt(s) { if (ui().prompt) ui().prompt(s); }
 
     function relay(action, extra) {
@@ -78,14 +77,15 @@
         return COMMON_PATH[abs];
     }
 
-    // Paint the contract board into the skin's token model, then redraw.
-    function applyBoard(board) {
-        BOARD = board;
+    // Paint the contract board (decoded bytes) into the skin's token model.
+    function applyBoard(view) {
+        VIEW = view;
+        SEATS = view.seatCount;
         var t = window.tokens;
         for (var s = 0; s < 4; s++) {
             var color = COLOR_OF[s];
             for (var i = 0; i < 4; i++) {
-                var steps = board.stepsWalked[s * 4 + i];
+                var steps = view.steps[s * 4 + i];
                 var tok = t[color][i];
                 if (steps < 0) {
                     tok.stepsWalked = 0;
@@ -94,27 +94,22 @@
                     tok.r = HOME_YARDS[color][i].r;
                 } else {
                     tok.stepsWalked = steps;
-                    tok.pathIndex = steps >= 57 ? -2 : board.pathIndex[s * 4 + i];
+                    tok.pathIndex = steps >= 57 ? -2 : ((SEAT_OF[color] * 13 + steps) % 52);
                     var cr = tokenCR(s, steps);
                     tok.c = cr.c;
                     tok.r = cr.r;
                 }
             }
         }
-        window.currentTurn = COLOR_OF[board.turn] || 'green';
-        window.matchOver = isMatchDone(board);
+        window.currentTurn = COLOR_OF[view.turn] || 'green';
+        window.matchOver = !!view.matchOver;
         if (typeof drawLudoLayout === 'function') drawLudoLayout();
-    }
-
-    function isMatchDone(board) {
-        if (!board) return false;
-        var need = SEATS === 2 ? 1 : 3;
-        return board.finishCount >= need;
+        if (typeof window.ensureBoardAnimationLoop === 'function') window.ensureBoardAnimationLoop();
     }
 
     function hasLegalMove(seat, dice) {
         for (var i = 0; i < 4; i++) {
-            var steps = BOARD.stepsWalked[seat * 4 + i];
+            var steps = VIEW.steps[seat * 4 + i];
             for (var d = 0; d < dice.length; d++) {
                 var val = dice[d];
                 if (steps < 0) { if (val === 6) return true; }
@@ -124,46 +119,31 @@
         return false;
     }
 
-    function chooseToken(seat, val) {
-        for (var i = 0; i < 4; i++) {
-            var steps = BOARD.stepsWalked[seat * 4 + i];
-            if (steps < 0) { if (val === 6) return i; }
-            else if (steps < 57 && steps + val <= 57) return i;
-        }
-        return -1;
-    }
-
     // ---- the turn flow ----
 
     function beginTurn() {
-        if (!BOARD) return;
-        if (isMatchDone(BOARD)) { settle(); return; }
+        if (!VIEW) return;
+        if (VIEW.matchOver) { settle(); return; }
         window.setupConfigurationLocked = true;
         window.isDiceRolled = false;
         window.currentTurnMoves = [];
         if (typeof drawLudoLayout === 'function') drawLudoLayout();
-        if (BOARD.turn === USERSEAT) {
-            setPrompt('Your turn: tap the centre of the board to roll.');
-        } else {
-            setPrompt(COLOR_OF[BOARD.turn] + ' is playing...');
-            setTimeout(rollCurrent, 800);
-        }
+        if (typeof window.ensureBoardAnimationLoop === 'function') window.ensureBoardAnimationLoop();
+        if (VIEW.turn === USERSEAT) setPrompt('Your turn: tap the centre of the board to roll.');
+        else { setPrompt(COLOR_OF[VIEW.turn] + ' is playing...'); setTimeout(rollCurrent, 800); }
     }
 
     async function rollCurrent() {
-        if (busy || !BOARD) return;
+        if (busy || !VIEW) return;
         busy = true;
         try {
-            var r = await relay('demoRoll', { matchRef: REF, log: LOG });
-            LOG = r.log;
+            var r = await relay('demoRoll', { sessionId: SID });
+            applyBoard(r.view);
             pendingDice = [r.dice1, r.dice2];
             window.currentTurnMoves = [r.dice1, r.dice2];
             window.isDiceRolled = true;
-            applyBoard(r.board);
-            if (ui().log) ui().log('Rolled <b>' + r.dice1 + '</b> and <b>' + r.dice2 + '</b> (on-chain dice)', 0);
+            if (ui().log) ui().log('Rolled <b>' + r.dice1 + '</b> and <b>' + r.dice2 + '</b> (on-chain dice, free)', 0);
             if (typeof window.showDiceTumble === 'function') window.showDiceTumble(r.dice1, r.dice2);
-            else if (typeof window.showRemoteDice === 'function') window.showRemoteDice(r.dice1, r.dice2);
-            setPrompt(COLOR_OF[r.board.turn] + ' rolled ' + r.dice1 + ' and ' + r.dice2 + '.');
             setTimeout(afterDiceWindow, 3600);
         } catch (e) {
             setPrompt('Roll failed: ' + e.message);
@@ -178,7 +158,8 @@
         window.isDiceRolled = true;
         if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
         if (typeof drawLudoLayout === 'function') drawLudoLayout();
-        if (BOARD.turn !== USERSEAT) {
+        if (typeof window.ensureBoardAnimationLoop === 'function') window.ensureBoardAnimationLoop();
+        if (VIEW.turn !== USERSEAT) {
             setTimeout(computerPlay, 700);
         } else if (!hasLegalMove(USERSEAT, pendingDice)) {
             setTimeout(passTurn, 900);
@@ -188,9 +169,9 @@
     }
 
     async function userMove(tokenIndex) {
-        if (busy || !BOARD || BOARD.turn !== USERSEAT) return;
+        if (busy || !VIEW || VIEW.turn !== USERSEAT) return;
         var seat = USERSEAT;
-        var steps = BOARD.stepsWalked[seat * 4 + tokenIndex];
+        var steps = VIEW.steps[seat * 4 + tokenIndex];
         var pick = -1;
         for (var d = 0; d < pendingDice.length; d++) {
             var val = pendingDice[d];
@@ -201,37 +182,38 @@
         var die = pendingDice[pick];
         busy = true;
         try {
-            var r = await relay('demoMove', { matchRef: REF, log: LOG, seat: seat, tokenIndex: tokenIndex, steps: die });
-            LOG = r.log;
+            var r = await relay('demoMove', { sessionId: SID, seat: seat, tokenIndex: tokenIndex, value: die });
             pendingDice.splice(pick, 1);
-            window.currentTurnMoves = pendingDice.slice();
-            applyBoard(r.board);
-            if (ui().log) ui().log('You moved token ' + (tokenIndex + 1) + ' by ' + die, 0);
+            applyBoard(r.view);
+            if (ui().log) ui().log('You moved token ' + (tokenIndex + 1) + ' by ' + die + ' (free)', 0);
             if (pendingDice.length && hasLegalMove(seat, pendingDice)) {
                 setPrompt('Tap another token to use your second dice, or press Pass.');
             } else {
                 setTimeout(passTurn, 500);
             }
         } catch (e) {
-            setPrompt('Move rejected by the contract: ' + e.message);
+            setPrompt('Move rejected: ' + e.message);
         } finally {
             busy = false;
         }
     }
 
     async function computerPlay() {
-        if (busy || !BOARD) return;
+        if (busy || !VIEW) return;
         busy = true;
         try {
-            var seat = BOARD.turn;
+            var seat = VIEW.turn;
             for (var d = 0; d < pendingDice.length; d++) {
                 var val = pendingDice[d];
-                var t = chooseToken(seat, val);
+                var t = -1;
+                for (var i = 0; i < 4; i++) {
+                    var s = VIEW.steps[seat * 4 + i];
+                    if (s < 0) { if (val === 6) { t = i; break; } }
+                    else if (s < 57 && s + val <= 57) { t = i; break; }
+                }
                 if (t < 0) continue;
-                var r = await relay('demoMove', { matchRef: REF, log: LOG, seat: seat, tokenIndex: t, steps: val });
-                LOG = r.log;
-                pendingDice.splice(d, 1); d--;
-                applyBoard(r.board);
+                var r = await relay('demoMove', { sessionId: SID, seat: seat, tokenIndex: t, value: val });
+                applyBoard(r.view);
             }
             setTimeout(passTurn, 500);
         } catch (e) {
@@ -242,15 +224,14 @@
     }
 
     async function passTurn() {
-        if (busy || !BOARD) return;
+        if (busy || !VIEW) return;
         busy = true;
         try {
-            var r = await relay('demoPass', { matchRef: REF, log: LOG });
-            LOG = r.log;
+            var r = await relay('demoPass', { sessionId: SID });
             pendingDice = [];
             window.currentTurnMoves = [];
             window.isDiceRolled = false;
-            applyBoard(r.board);
+            applyBoard(r.view);
             beginTurn();
         } catch (e) {
             setPrompt('Pass failed: ' + e.message);
@@ -260,18 +241,17 @@
     }
 
     async function settle() {
-        if (busy || !REF) return;
+        if (busy || !SID) return;
         busy = true;
         setPrompt('Match finished. Sealing the result on-chain...');
         try {
-            var r = await relay('demoSettle', { matchRef: REF, log: LOG, sessionId: SID });
-            if (ui().log) ui().log('Settled on-chain: result sealed, tampering rejected', r.costUsdc6);
-            if (ui().gas) ui().gas(r.costUsdc6, 'settled');
-            var b = await relay('demoBoard', { matchRef: REF, log: LOG, user: USER });
-            applyBoard(b.board);
-            var won = b.board.finishOrder && b.board.finishOrder[0] === USERSEAT;
+            var r = await relay('demoSettle', { sessionId: SID });
+            if (ui().log) ui().log('Settled on-chain: result sealed', r.costUsdc6);
+            if (ui().gas) ui().gas(r.costUsdc6, 'sealed');
+            if (ui().tx) ui().tx(r.tx, 'settled');
+            var won = VIEW.order && VIEW.order[0] === USERSEAT;
             setPrompt(won ? 'Sealed. You won the crown.' : 'Sealed. The match is over.');
-            if (ui().onSettled) ui().onSettled(won);
+            if (ui().onSettled) ui().onSettled(won, r.tx);
         } catch (e) {
             setPrompt('Settle failed: ' + e.message);
         } finally {
@@ -281,12 +261,12 @@
 
     // board.js's centre tap calls this for the roll control.
     window.rollDiceEngine = function () {
-        if (!BOARD || BOARD.turn !== USERSEAT || window.isDiceRolled) return;
+        if (!VIEW || VIEW.turn !== USERSEAT || window.isDiceRolled) return;
         rollCurrent();
     };
 
     function onCanvasClick(ev) {
-        if (!BOARD || BOARD.turn !== USERSEAT || window.displayDiceOnBoard || busy) return;
+        if (!VIEW || VIEW.turn !== USERSEAT || window.displayDiceOnBoard || busy) return;
         var canvas = document.getElementById('ludoCanvas');
         if (!canvas) return;
         var rect = canvas.getBoundingClientRect();
@@ -296,18 +276,18 @@
         var cell = canvas.width / 15;
         var col = Math.floor(x / cell), row = Math.floor(y / cell);
         for (var i = 0; i < 4; i++) {
-            var steps = BOARD.stepsWalked[USERSEAT * 4 + i];
+            var steps = VIEW.steps[USERSEAT * 4 + i];
             var pos = steps < 0 ? HOME_YARDS[COLOR_OF[USERSEAT]][i] : tokenCR(USERSEAT, steps);
             if (!pos) continue;
             if (pos.c === col && pos.r === row) { userMove(i); return; }
         }
     }
 
-    // Start a fresh match: connect on the rail + create the match (one step).
+    // Start a fresh match: connect on the rail + hand over the game (one step).
     async function start(seatCount, userSeat) {
         if (busy) return null;
         busy = true;
-        LOG = []; pendingDice = []; BOARD = null;
+        VIEW = null; pendingDice = [];
         SEATS = seatCount; USERSEAT = userSeat;
         for (var s = 0; s < 4; s++) {
             var c = COLOR_OF[s];
@@ -320,13 +300,13 @@
         try {
             var info = await relay('sponsorAddress');
             USER = info.address;
-            var created = await relay('demoCreate', { seatCount: seatCount, userSeat: userSeat, user: USER, verifyMode: 1 });
-            REF = created.matchRef;
+            var created = await relay('demoCreate', { seatCount: seatCount, userSeat: userSeat, user: USER });
             SID = created.sessionId;
-            applyBoard(created.board);
-            if (ui().log) ui().log('Session connected on-chain (fee paid) + match created', created.costUsdc6);
+            applyBoard(created.view);
+            if (ui().log) ui().log('Session connected on-chain (fee paid, one transaction)', created.costUsdc6);
             if (ui().gas) ui().gas(created.costUsdc6, 'connected');
-            if (ui().ids) ui().ids(SID, REF);
+            if (ui().ids) ui().ids(SID, '');
+            if (ui().tx) ui().tx(created.connectTx, 'connected');
             beginTurn();
             return created;
         } catch (e) {
@@ -337,13 +317,15 @@
         }
     }
 
-    // Wrap the board draw so the CSS-3D dice stay in sync every redraw.
+    // Keep the CSS-3D dice in sync on every redraw, and keep the blink loop alive
+    // (that is what makes movable tokens and the centre die pulse).
     function wrapDraw() {
         if (typeof window.drawLudoLayout !== 'function') return;
         var orig = window.drawLudoLayout;
         window.drawLudoLayout = function () {
             try { orig(); } catch (e) {}
             if (typeof renderPhysicalDiceCubes === 'function') { try { renderPhysicalDiceCubes(); } catch (e) {} }
+            if (typeof window.ensureBoardAnimationLoop === 'function') { try { window.ensureBoardAnimationLoop(); } catch (e) {} }
         };
     }
 
@@ -352,7 +334,8 @@
         pass: passTurn,
         settle: settle,
         userSeat: function () { return USERSEAT; },
-        board: function () { return BOARD; }
+        board: function () { return VIEW; },
+        sessionId: function () { return SID; }
     };
 
     document.addEventListener('DOMContentLoaded', function () {

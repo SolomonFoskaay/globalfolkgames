@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {SessionRegistry} from "../src/SessionRegistry.sol";
-import {FeeVault} from "../src/FeeVault.sol";
 import {Deploy} from "./Deploy.sol";
 
 interface Vm {
@@ -14,24 +13,27 @@ interface Vm {
     function addr(uint256) external pure returns (address);
 }
 
-/// The clean core: connect (fee enforced), free randomness, settle (signatures
-/// verified with OpenZeppelin ECDSA). Storage-based paths are gone.
+/// The single core (v7): connect pays the fee straight to the destination and the
+/// ONE storage write is both the paid flag and the seed/participant commitment.
+/// Free randomness, settle by session-key signatures. There is no FeeVault.
 contract SessionRegistryTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    uint256 constant FEE = 1e15; // 0.001 native USDC (18 decimals)
+    uint256 constant FEE = 4e14; // 0.0004 native USDC (18 decimals)
+    uint256 constant FEE_BATCH = 2e14; // 0.0002
     uint256 constant PK0 = 0xA11CE;
     uint256 constant PK1 = 0xB0B;
+    address constant DEST = address(0xBEEF);
     bytes32 constant SID = keccak256("session-1");
     bytes32 constant SEED = keccak256("reveal-me");
 
     SessionRegistry reg;
-    FeeVault vault;
     address p0;
     address p1;
 
     function setUp() public {
-        (reg, vault) = Deploy.core(address(this), address(0xBEEF), FEE);
+        reg = Deploy.registry(address(this), DEST, FEE);
+        reg.setFeeBatch(FEE_BATCH);
         vm.deal(address(this), 100 ether);
         p0 = vm.addr(PK0);
         p1 = vm.addr(PK1);
@@ -43,114 +45,154 @@ contract SessionRegistryTest {
         a[1] = p1;
     }
 
-    function _connect() internal {
-        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), keccak256(abi.encodePacked(SEED)), _players(), _players(), 1);
+    function _keys() internal view returns (address[] memory a) {
+        return _players();
     }
 
-    function _sigs(bytes32 digest) internal pure returns (bytes[] memory sigs) {
-        sigs = new bytes[](2);
-        (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(PK0, digest);
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(PK1, digest);
-        sigs[0] = abi.encodePacked(r0, s0, v0);
-        sigs[1] = abi.encodePacked(r1, s1, v1);
+    function _commit() internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(SEED));
     }
 
-    function testHandoverRequiresTheExactFee() public {
-        vm.expectRevert(FeeVault.BadFee.selector);
-        reg.handover{value: FEE - 1}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
-
-        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), bytes32("seed"), _players(), _players(), 1);
-        require(vault.paid(SID), "session recorded as paid");
-        require(vault.collected() == FEE, "fee collected");
+    function _handover() internal {
+        reg.handover{value: FEE}(SID, address(0x1234), bytes32("start"), _commit(), _players(), _keys(), 2);
     }
 
-    function testSettleRefusedWhenNotPaid() public {
-        bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
-        vm.expectRevert(SessionRegistry.FeeNotPaid.selector);
-        reg.settle(SID, bytes32("final"), SEED, _sigs(digest), _players());
+    function _sig(uint256 pk) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, reg.midchainDigest(SID, bytes32("final")));
+        return abi.encodePacked(r, s, v);
     }
 
-    function testSettleVerifiesSignatures() public {
-        _connect();
-        bytes32 finalHash = bytes32("final");
-        bytes32 digest = reg.midchainDigest(SID, finalHash);
-        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
-        require(reg.revealed(SID), "session marked settled");
+    function _sigs() internal view returns (bytes[] memory s) {
+        s = new bytes[](2);
+        s[0] = _sig(PK0);
+        s[1] = _sig(PK1);
     }
 
-    function testSettleRejectsWrongSeedReveal() public {
-        // The committed seed is keccak(SEED); revealing a different value must
-        // revert, so a dev cannot pick a winning seed after seeing play.
-        _connect();
-        bytes32 finalHash = bytes32("final");
-        bytes32 digest = reg.midchainDigest(SID, finalHash);
+    function testHandoverPaysFeeAndMarksPaid() public {
+        uint256 before = DEST.balance;
+        _handover();
+        require(DEST.balance == before + FEE, "fee forwarded to destination");
+        require(reg.isPaid(SID), "session marked paid");
+        require(reg.sessionCounter() == 1, "counter");
+        require(reg.commitments(SID) != bytes32(0), "commitment stored");
+    }
+
+    function testHandoverWrongFeeReverts() public {
+        vm.expectRevert(SessionRegistry.BadFee.selector);
+        reg.handover{value: FEE - 1}(SID, address(0x1234), bytes32("start"), _commit(), _players(), _keys(), 2);
+    }
+
+    function testDoubleHandoverReverts() public {
+        _handover();
+        vm.expectRevert(SessionRegistry.BadInput.selector);
+        _handover();
+    }
+
+    function testSettleVerifiesSeedAndSignatures() public {
+        _handover();
+        reg.settle(SID, bytes32("final"), SEED, _players(), _keys(), _sigs(), _keys());
+        require(reg.settled(SID), "settled");
+    }
+
+    function testSettleWrongSeedReverts() public {
+        _handover();
+        bytes[] memory s = _sigs();
         vm.expectRevert(SessionRegistry.BadReveal.selector);
-        reg.settle(SID, finalHash, bytes32("not-the-seed"), _sigs(digest), _players());
+        reg.settle(SID, bytes32("final"), keccak256("other"), _players(), _keys(), s, _keys());
     }
 
-    function testSettleCannotRunTwice() public {
-        _connect();
-        bytes32 finalHash = bytes32("final");
-        bytes32 digest = reg.midchainDigest(SID, finalHash);
-        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
+    function testSettleWrongSignerReverts() public {
+        _handover();
+        bytes[] memory s = _sigs();
+        s[1] = _sig(PK0); // signer set expects p1 here
+        vm.expectRevert(SessionRegistry.BadSignature.selector);
+        reg.settle(SID, bytes32("final"), SEED, _players(), _keys(), s, _keys());
+    }
+
+    function testSettleUnpaidReverts() public {
+        bytes[] memory s = _sigs();
+        vm.expectRevert(SessionRegistry.FeeNotPaid.selector);
+        reg.settle(SID, bytes32("final"), SEED, _players(), _keys(), s, _keys());
+    }
+
+    function testSettleTwiceReverts() public {
+        _handover();
+        bytes[] memory s = _sigs();
+        reg.settle(SID, bytes32("final"), SEED, _players(), _keys(), s, _keys());
         vm.expectRevert(SessionRegistry.AlreadySettled.selector);
-        reg.settle(SID, finalHash, SEED, _sigs(digest), _players());
+        reg.settle(SID, bytes32("final"), SEED, _players(), _keys(), s, _keys());
     }
 
-    function testSettleRejectsForgedSignature() public {
-        _connect();
-        bytes32 finalHash = bytes32("final");
-        bytes32 digest = reg.midchainDigest(SID, finalHash);
-        bytes[] memory sigs = new bytes[](2);
-        (uint8 v0, bytes32 r0, bytes32 s0) = vm.sign(0xDEAD, digest); // stranger
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(PK1, digest);
-        sigs[0] = abi.encodePacked(r0, s0, v0);
-        sigs[1] = abi.encodePacked(r1, s1, v1);
-        vm.expectRevert();
-        reg.settle(SID, finalHash, SEED, sigs, _players());
+    function testSettleCannotBindDifferentKeys() public {
+        // A stranger cannot settle with their own session keys: the commitment
+        // binds the exact player/session-key set from handover.
+        _handover();
+        bytes[] memory s = _sigs();
+        address[] memory fake = new address[](2);
+        fake[0] = address(0xDEAD);
+        fake[1] = address(0xBEEF);
+        vm.expectRevert(SessionRegistry.BadReveal.selector);
+        reg.settle(SID, bytes32("final"), SEED, _players(), fake, s, _keys());
     }
 
-    function testSettleRejectsWrongFinalHash() public {
-        _connect();
-        bytes32 digest = reg.midchainDigest(SID, bytes32("final"));
-        vm.expectRevert();
-        reg.settle(SID, bytes32("other"), SEED, _sigs(digest), _players());
+    function testRandomIsDeterministicAndFree() public {
+        bytes32 a = reg.random(SEED, 1);
+        bytes32 b = reg.random(SEED, 1);
+        require(a == b, "deterministic");
+        bytes32[] memory n = reg.randomN(SEED, 1, 2);
+        require(n[0] != n[1], "independent streams");
+        require(reg.random(SEED, 2) != a, "counter changes the seed");
     }
 
-    function testRandomnessIsFreePureAndDeterministic() public view {
-        bytes32 a = reg.random(bytes32("seed"), 1);
-        bytes32 b = reg.random(bytes32("seed"), 1);
-        require(a == b, "same input, same output");
-        require(a != reg.random(bytes32("seed"), 2), "counter changes the seed");
-        bytes32[] memory ns = reg.randomN(bytes32("seed"), 1, 3);
-        require(ns.length == 3 && ns[0] != ns[1] && ns[1] != ns[2], "N distinct seeds");
-    }
-
-    function testHandoverManyChargesPerSession() public {
-        bytes32[] memory ids = new bytes32[](3);
-        bytes32[] memory starts = new bytes32[](3);
-        bytes32[] memory seeds = new bytes32[](3);
-        address[][] memory players = new address[][](3);
-        for (uint256 i = 0; i < 3; i++) {
-            ids[i] = keccak256(abi.encodePacked("s", i));
-            starts[i] = keccak256(abi.encodePacked("start", i));
-            seeds[i] = keccak256(abi.encodePacked("seed", i));
+    function testHandoverManyAndSettleMany() public {
+        bytes32[] memory ids = new bytes32[](2);
+        ids[0] = keccak256("s-a");
+        ids[1] = keccak256("s-b");
+        bytes32[] memory startHashes = new bytes32[](2);
+        bytes32[] memory commits = new bytes32[](2);
+        address[][] memory players = new address[][](2);
+        address[][] memory keys = new address[][](2);
+        for (uint256 i = 0; i < 2; i++) {
+            commits[i] = _commit();
             players[i] = _players();
+            keys[i] = _keys();
         }
-        vm.expectRevert(FeeVault.BadFee.selector);
-        reg.handoverMany{value: FEE * 2}(ids, address(0x1234), starts, seeds, players, players, 1);
+        uint256 before = DEST.balance;
+        reg.handoverMany{value: FEE_BATCH * 2}(ids, address(0x1234), startHashes, commits, players, keys, 2);
+        require(DEST.balance == before + FEE_BATCH * 2, "batched fee forwarded");
 
-        reg.handoverMany{value: FEE * 3}(ids, address(0x1234), starts, seeds, players, players, 1);
-        require(vault.paid(ids[0]) && vault.paid(ids[1]) && vault.paid(ids[2]), "all paid");
-        require(vault.collected() == FEE * 3, "collected 3 fees");
+        bytes32[] memory finals = new bytes32[](2);
+        bytes32[] memory reveals = new bytes32[](2);
+        bytes[][] memory sigs = new bytes[][](2);
+        address[][] memory signers = new address[][](2);
+        for (uint256 i = 0; i < 2; i++) {
+            reveals[i] = SEED;
+            signers[i] = _keys();
+            bytes[] memory one = new bytes[](1);
+            one[0] = _sigFor(ids[i], PK0);
+            sigs[i] = one;
+            address[] memory oneSigner = new address[](1);
+            oneSigner[0] = p0;
+            signers[i] = oneSigner;
+        }
+        reg.settleMany(ids, finals, reveals, players, keys, sigs, signers);
+        require(reg.settled(ids[0]) && reg.settled(ids[1]), "both settled");
     }
 
-    function testUpgradeKeepsAddressAndData() public {
-        address before = address(reg);
-        address vaultBefore = reg.feeVault();
-        SessionRegistry impl = new SessionRegistry();
-        reg.upgradeToAndCall(address(impl), "");
-        require(address(reg) == before, "proxy address unchanged");
-        require(reg.feeVault() == vaultBefore, "feeVault preserved");
+    function _sigFor(bytes32 id, uint256 pk) internal view returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, reg.midchainDigest(id, bytes32(0)));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function testOnlyOwnerSetters() public {
+        vm.prank(p0);
+        vm.expectRevert();
+        reg.setFee(1);
+        reg.setFee(123);
+        require(reg.fee() == 123, "fee set");
+        reg.setFeeBatch(45);
+        require(reg.feeBatch() == 45, "batch fee set");
+        reg.setDestination(address(0xCAFE));
+        require(reg.destination() == address(0xCAFE), "destination set");
     }
 }

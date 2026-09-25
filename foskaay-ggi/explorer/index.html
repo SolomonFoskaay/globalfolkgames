@@ -57,6 +57,7 @@
         </p>
         <div class="gx-tabs">
             <div class="gx-tab active" data-tab="session">Session</div>
+            <div class="gx-tab" data-tab="midchain">Midchain</div>
             <div class="gx-tab" data-tab="proof">Proof</div>
             <div class="gx-tab" data-tab="limits">Honest limits</div>
         </div>
@@ -107,6 +108,34 @@
         </div>
     </section>
 
+    <!-- ============================ MIDCHAIN =========================== -->
+    <section id="gx-tab-midchain" class="gx-hide">
+        <div class="gx-card">
+            <h2 class="gx-h2">Midchain moves (gasless, off-base, verifiable)</h2>
+            <p class="gx-body">
+                Inside a session, every move runs through the PURE game contract for free and is signed
+                by the session key into a hash chain. Paste a session id to load its published move log
+                and check the chain ends at the on-chain settled final hash.
+            </p>
+            <input id="gx-m-session" class="gx-input" placeholder="session id 0x..." style="margin-bottom:8px;">
+            <button class="gx-btn" id="gx-verify">Verify midchain</button>
+            <div id="gx-m-status" class="gx-tiny" style="margin-top:8px;"></div>
+            <div id="gx-m-result" class="gx-hide" style="margin-top:10px;">
+                <div class="gx-note good" id="gx-m-proof"></div>
+                <div id="gx-moves-list" class="gx-mono" style="margin-top:8px; max-height: 320px; overflow:auto;"></div>
+            </div>
+        </div>
+        <div class="gx-card">
+            <h2 class="gx-h2">The pure game</h2>
+            <div class="gx-row"><span class="k">Game contract (no storage)</span><span class="v gx-mono" id="gx-m-ludo"></span></div>
+            <div class="gx-note">
+                The game is a PURE function: the board and the points live in compact bytes the contract
+                returns (no images on-chain). Because it is pure, the whole match runs with free calls;
+                only the connect and the settle are transactions.
+            </div>
+        </div>
+    </section>
+
     <!-- ============================ PROOF ============================= -->
     <section id="gx-tab-proof" class="gx-hide">
         <div class="gx-card">
@@ -122,13 +151,13 @@
         </div>
 
         <div class="gx-card">
-            <h2 class="gx-h2">FeeVault state</h2>
+            <h2 class="gx-h2">Core state (single contract, fee built in)</h2>
             <div class="gx-row"><span class="k">Per-session fee</span><span class="v" id="gx-fv-fee"></span></div>
-            <div class="gx-row"><span class="k">Collected (withdrawable)</span><span class="v" id="gx-fv-collected"></span></div>
             <div class="gx-row"><span class="k">Destination</span><span class="v gx-mono" id="gx-fv-dest"></span></div>
             <div class="gx-note">
                 The fee is charged at connect and required before a session can settle, so it cannot be
-                skipped on the official core.
+                skipped on the official core. It is a direct transfer to the destination; there is no
+                separate vault.
             </div>
         </div>
     </section>
@@ -165,7 +194,7 @@
         t.addEventListener('click', function () {
             document.querySelectorAll('.gx-tab').forEach(function (x) { x.classList.remove('active'); });
             t.classList.add('active');
-            ['session', 'proof', 'limits'].forEach(function (name) {
+            ['session', 'midchain', 'proof', 'limits'].forEach(function (name) {
                 var el = document.getElementById('gx-tab-' + name);
                 if (el) el.classList.toggle('gx-hide', name !== t.getAttribute('data-tab'));
             });
@@ -228,13 +257,41 @@
             .catch(function (e) { out.textContent = 'Could not read: ' + (e.message || e); });
     });
 
-    // Proof tab: FeeVault state
+    // Midchain tab: verify the signed move log against the on-chain anchor.
+    document.getElementById('gx-m-ludo').textContent = X.NET.contracts.FoskaayGGILudo;
+    document.getElementById('gx-verify').addEventListener('click', function () {
+        var id = document.getElementById('gx-m-session').value.trim();
+        var status = document.getElementById('gx-m-status');
+        if (!/^0x[0-9a-fA-F]{64}$/.test(id)) { status.textContent = 'Enter a 0x + 64 hex session id.'; return; }
+        status.textContent = 'Verifying...';
+        X.verifyChain(id).then(function (r) {
+            document.getElementById('gx-m-result').classList.remove('gx-hide');
+            document.getElementById('gx-m-proof').innerHTML = pill(r.ok, 'VERIFIED', 'NOT VERIFIED') + ' ' + r.reason;
+            var list = document.getElementById('gx-moves-list');
+            list.innerHTML = r.moves.length ? r.moves.map(function (m, i) {
+                return (i + 1) + '. kind=' + m.kind + ' seat=' + m.seat + ' token=' + m.tokenIndex + ' value=' + m.value + '<br>  newHash ' + short(m.newHash);
+            }).join('<br>') : 'No moves published.';
+            status.textContent = r.hasLog ? (r.moves.length + ' moves loaded.') : 'No move log for this session (the relay keeps it in memory and may have restarted).';
+        }).catch(function (e) { status.textContent = 'Could not verify: ' + (e.message || e); });
+    });
+
+    // Proof tab: core state (single contract, fee built in)
     (function () {
-        X.callView(X.NET.contracts.FeeVault, 'fee()').then(function (hex) { document.getElementById('gx-fv-fee').textContent = usdc18(BigInt(hex)); }).catch(function () {});
-        X.callView(X.NET.contracts.FeeVault, 'collected()').then(function (hex) { document.getElementById('gx-fv-collected').textContent = usdc18(BigInt(hex)); }).catch(function () {});
-        X.callView(X.NET.contracts.FeeVault, 'destination()').then(function (hex) {
+        X.callView(X.NET.contracts.SessionRegistry, 'fee()').then(function (hex) { document.getElementById('gx-fv-fee').textContent = usdc18(BigInt(hex)); }).catch(function () {});
+        X.callView(X.NET.contracts.SessionRegistry, 'destination()').then(function (hex) {
             document.getElementById('gx-fv-dest').textContent = hex && hex !== '0x' ? ('0x' + hex.slice(26)) : '-';
         }).catch(function () {});
+    })();
+
+    // Prefill from ?session= (used by the Ludo page's Explorer link).
+    (function () {
+        var q = new URLSearchParams(location.search).get('session');
+        if (q && /^0x[0-9a-fA-F]{64}$/.test(q)) {
+            document.getElementById('gx-session-input').value = q;
+            document.getElementById('gx-d-session').value = q;
+            document.getElementById('gx-m-session').value = q;
+            document.getElementById('gx-load').click();
+        }
     })();
 </script>
 </body>

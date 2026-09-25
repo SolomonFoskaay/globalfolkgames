@@ -3,9 +3,10 @@
 // value on the explorer comes from the Arc contracts + RPC directly, which is the
 // point (a dev or a grant reviewer can verify the claim without trusting us).
 //
-// The clean 2-contract core has NO on-chain session storage. A session is proven
-// by its EVENTS: Handover (connect) and Settled (result), both on SessionRegistry,
-// plus the fee state on FeeVault. This file reads those events with eth_getLogs.
+// The core has no per-session storage beyond the commitment, so a session is
+// proven by its EVENTS: Handover (connect) and Settled (result), on the single
+// SessionRegistry, plus the midchain move log (signed, hash-chained) when the
+// game publishes it. This file reads those with eth_getLogs and the relay.
 (function () {
     'use strict';
 
@@ -15,26 +16,27 @@
         rpc: 'https://rpc.testnet.arc.io',
         explorer: 'https://explorer.testnet.arc.io',
         usdc: '0x3600000000000000000000000000000000000000',
+        relay: '/api/foskaay-ggi-sponsor',
         contracts: {
-            SessionRegistry: '0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE',
-            FeeVault: '0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39'
+            SessionRegistry: '0x9f078527082b3bCc7c00e27f7C53D31CF1D17A85',
+            FoskaayGGILudo: '0xc3Dd1243B74373Bc015Fd305727E729785B41C08'
         }
     };
 
     // Event topic0 hashes (keccak of the event signature). Recomputed with
     // `cast keccak "<signature>"`. If an event signature ever changes, recompute.
     var TOPIC = {
-        Handover: '0xc69c4b768b98598156326b0b2d4e43b9003425598e82882635dbf28e4fcf3cf6',
+        Handover: '0xb111092a842748e6a1a5b34c24137f21e0ddf21a5caa8db5a885bdb5574209e1',
         Settled: '0x12e9909fa20d454f1d832410840022a48385ad716d10570278d043c3a15b6595'
     };
 
     // Precomputed view selectors, pinned so the page needs no crypto library.
     var SELECTORS = {
-        'paid(bytes32)': '0xadd89bb2',
+        'isPaid(bytes32)': '0xfeef6640',
         'fee()': '0xddca3f43',
-        'collected()': '0x84bcefd4',
         'destination()': '0xb269681d',
-        'midchainDigest(bytes32,bytes32)': '0x00918792'
+        'midchainDigest(bytes32,bytes32)': '0x00918792',
+        'commitments(bytes32)': '0x839df945'
     };
 
     function rpc(method, params) {
@@ -73,15 +75,17 @@
     function numFromWord(hexWord) { return BigInt('0x' + hexWord); }
     function boolFromHex(hex) { return hex && hex !== '0x' && BigInt(hex) !== 0n; }
 
-    // Non-indexed Handover data: startHash, seedCommit, players[], sessionKeys[], randomCount
+    // Non-indexed Handover data: startHash, seedCommit, players[], sessionKeys[],
+    // randomCount, counter.
     function decodeHandover(data) {
-        if (!data || data.length < 2 + 5 * 64) return null;
+        if (!data || data.length < 2 + 6 * 64) return null;
         return {
             startHash: bytes32FromWord(w(data, 0)),
             seedCommit: bytes32FromWord(w(data, 1)),
             players: readAddrArray(data, Number(numFromWord(w(data, 2)))),
             sessionKeys: readAddrArray(data, Number(numFromWord(w(data, 3)))),
-            randomCount: Number(numFromWord(w(data, 4)))
+            randomCount: Number(numFromWord(w(data, 4))),
+            counter: numFromWord(w(data, 5)).toString()
         };
     }
 
@@ -114,10 +118,9 @@
         return Promise.all([
             getLogs(C.SessionRegistry, TOPIC.Handover, sessionId).catch(function () { return []; }),
             getLogs(C.SessionRegistry, TOPIC.Settled, sessionId).catch(function () { return []; }),
-            callView(C.FeeVault, 'paid(bytes32)', idArg).catch(function () { return '0x'; }),
-            callView(C.FeeVault, 'fee()').catch(function () { return '0x'; }),
-            callView(C.FeeVault, 'collected()').catch(function () { return '0x'; }),
-            callView(C.FeeVault, 'destination()').catch(function () { return '0x'; })
+            callView(C.SessionRegistry, 'isPaid(bytes32)', idArg).catch(function () { return '0x'; }),
+            callView(C.SessionRegistry, 'fee()').catch(function () { return '0x'; }),
+            callView(C.SessionRegistry, 'destination()').catch(function () { return '0x'; })
         ]).then(function (r) {
             var hLog = r[0][0], sLog = r[1][0];
             var handover = null, settled = null;
@@ -128,7 +131,7 @@
                     payer: hLog.topics[3] ? addrFromTopic(hLog.topics[3]) : null,
                     startHash: d.startHash, seedCommit: d.seedCommit,
                     players: d.players || [], sessionKeys: d.sessionKeys || [],
-                    randomCount: d.randomCount || 0,
+                    randomCount: d.randomCount || 0, counter: d.counter,
                     block: Number(BigInt(hLog.blockNumber)),
                     tx: hLog.transactionHash
                 };
@@ -149,9 +152,46 @@
                 settled: settled,
                 paid: boolFromHex(r[2]),
                 fee: numFromWord(r[3] || '0x0'),
-                collected: numFromWord(r[4] || '0x0'),
-                destination: r[5] && r[5] !== '0x' ? addrFromWord(r[5].slice(2)) : null
+                destination: r[4] && r[4] !== '0x' ? addrFromWord(r[4].slice(2)) : null
             };
+        });
+    }
+
+    // The published, signed move log for a session (untrusted cache; the anchor is
+    // the on-chain final hash).
+    function loadMoves(sessionId) {
+        return fetch(NET.relay, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'demoMoves', sessionId: sessionId })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+            return (j && j.ok) ? j : { found: false };
+        }).catch(function () { return { found: false }; });
+    }
+
+    /// Verify the midchain: every move links to the previous hash and the LAST
+    /// move's hash equals the on-chain settled final hash. A tampered move breaks
+    /// the chain and cannot match the on-chain anchor.
+    function verifyChain(sessionId) {
+        return Promise.all([loadSession(sessionId), loadMoves(sessionId)]).then(function (r) {
+            var session = r[0], log = r[1];
+            var out = { sessionId: sessionId, hasLog: !!log.found, moves: (log && log.moves) || [], ok: false, reason: '', settled: session.settled };
+            if (!log.found) { out.reason = 'No published move log for this session.'; return out; }
+            var prev = log.startHash;
+            for (var i = 0; i < out.moves.length; i++) {
+                var m = out.moves[i];
+                if (m.prevHash && prev && m.prevHash !== prev) { out.reason = 'Hash chain breaks at move ' + (i + 1) + '.'; return out; }
+                prev = m.newHash;
+            }
+            if (session.settled && session.settled.finalHash && prev && session.settled.finalHash !== prev) {
+                out.reason = 'The last move does not match the on-chain final hash.';
+                return out;
+            }
+            out.ok = true;
+            out.reason = session.settled
+                ? 'Every move links to the next and the chain ends at the on-chain settled final hash.'
+                : 'Every move links to the next. Settle to anchor the chain on-chain.';
+            return out;
         });
     }
 
@@ -167,6 +207,8 @@
         rpc: rpc,
         callView: callView,
         loadSession: loadSession,
+        loadMoves: loadMoves,
+        verifyChain: verifyChain,
         midchainDigest: midchainDigest,
         decodeHandover: decodeHandover,
         decodeSettled: decodeSettled
