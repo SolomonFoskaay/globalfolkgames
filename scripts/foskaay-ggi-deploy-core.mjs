@@ -79,11 +79,11 @@ async function deploy(name, args = []) {
   console.log('  deploy cost    :', formatUnits(before - after, 6), 'USDC');
   console.log('');
 
-  rec.contracts = {
+  rec.contracts = Object.assign({}, rec.contracts, {
     SessionRegistry: reg.address,
     FeeVault: vault.address,
-    GeneralsMidchain: rec.contracts.GeneralsMidchain, // the game's pure rules contract (kept)
-  };
+  });
+  delete rec.contracts.GeneralsMidchain;
   rec.cleanCoreDeployedAt = new Date().toISOString();
   rec.coreNote = 'CLEAN 2-contract core (SessionRegistry + FeeVault), UUPS proxies, wired. Old 4+1 proxies abandoned (no real data). Fee 0.001 native USDC/session.';
   rec.implementations = { SessionRegistry: regImpl.address, FeeVault: fvImpl.address };
