@@ -27,10 +27,12 @@
     "SessionRegistry": "0x3cE48a010B17ef038E45F43e5f4cAef6358aA049",
     "FeeVault": "0x13800e1dd0319622a1Ac4Dc2D4896F3DcabA58fc"
   },
-  "demoDeployedAt": "2026-09-23T10:52:40.897Z",
+  "demoDeployedAt": "2026-09-24T15:05:23.630Z",
   "demoNote": "Ludo demo: FoskaayGGIDemoGames (all demo games, gameTag ludo) + FoskaayGGIDemoPlayer (one player account, per-game point buckets). Both UUPS, OZ-only, wired.",
   "demoImplementations": {
-    "FoskaayGGIDemoGames": "0x6732BD41dB45Bf9cd40dEA13433EE78958aCC008",
-    "FoskaayGGIDemoPlayer": "0x034170c20d530E198D559C663FDBef34DecFFb1C"
-  }
+    "FoskaayGGIDemoGames": "0xdE1828f8011b210A98390d4B471C12222fC30816",
+    "FoskaayGGIDemoPlayer": "0x4b3660D6C9b180E14c280e0e3353b6fD6F0B877C"
+  },
+  "demoUpgradedAt": "2026-09-25T11:21:20.057Z",
+  "demoUpgradeNote": "In-place UUPS upgrade of the permanent demo proxies (same addresses). Top-level layout unchanged."
 }

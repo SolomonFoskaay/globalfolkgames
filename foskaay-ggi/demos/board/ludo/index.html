@@ -12,6 +12,7 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/foskaay-ggi-assets/ludo-lab/board.css">
     <style>
         .ld-wrap { max-width: 900px; margin: 0 auto; padding: 0 0 80px; }
         .ld-hero { padding: 26px 16px 20px; text-align: center; background: radial-gradient(900px 260px at 15% -10%, rgba(243,156,18,0.22), transparent 60%), radial-gradient(900px 300px at 88% 0%, rgba(155,89,182,0.22), transparent 60%), linear-gradient(180deg,#101018,#0f0f13); border-bottom: 1px solid rgba(255,255,255,0.07); }
@@ -29,7 +30,6 @@
         .ld-status b { color: #fff; }
         .ld-muted { color: #8f8fa0; font-size: 0.78rem; line-height: 1.5; word-break: break-all; }
         .ld-board-host { display: flex; justify-content: center; }
-        #ld-canvas { border: 2px solid rgba(255,255,255,0.25); border-radius: 10px; background: #f7f7fb; max-width: 100%; touch-action: manipulation; }
         .ld-legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; font-size: 0.76rem; color: #b9b9c6; }
         .ld-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
         .ld-meter-bar { height: 10px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; }
@@ -40,6 +40,8 @@
         .ld-log div { font-size: 0.75rem; color: #9a9aa8; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.06); }
         .ld-log b { color: #dcdce6; }
         .ld-err { color: #ff8080; font-size: 0.82rem; }
+        #ld-persistent { display: flex; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #cfcfe0; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px; width: 100%; justify-content: space-around; border: 1px solid rgba(255,255,255,0.08); box-sizing: border-box; margin-top: 10px; }
+        #ld-persistent span { color: #fff; }
         .ld-faq details { border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
         .ld-faq summary { cursor: pointer; padding: 12px 14px; font-weight: 800; color: #fff; font-size: 0.9rem; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
         .ld-faq summary::-webkit-details-marker { display: none; }
@@ -56,15 +58,15 @@
     <section class="ld-hero">
         <span class="ld-eyebrow">FOSKAAY GGI DEMO</span>
         <h1 class="ld-h1">Ludo, <span class="grad">fully on-chain</span></h1>
-        <p class="ld-sub">A Ludo match on Foskaay Gasless Games Infrastructure. The contract owns the rules, the dice, the crown and the points. The player pays nothing; the sponsor covers a tiny amount. This page only displays what the chain says.</p>
+        <p class="ld-sub">A Ludo match on Foskaay Gasless Games Infrastructure. The contract owns the rules, the dice, the crown and the points. During play every move runs free inside the Foskaay GGI Midchain, and only the connect and the settle are transactions. The sponsor pays those two, never you. This page only displays what the chain says.</p>
     </section>
 
     <div class="ld-body">
         <div class="ld-panel">
             <div class="ld-row">
                 <button class="ld-btn primary" id="ld-new">New match</button>
-                <button class="ld-btn" id="ld-roll" disabled>Roll dice</button>
-                <button class="ld-btn" id="ld-settle" disabled>Settle session</button>
+                <button class="ld-btn" id="ld-pass" disabled>Pass</button>
+                <button class="ld-btn" id="ld-settle" disabled>Settle</button>
                 <label class="ld-muted" style="margin-left:auto">Players
                     <select id="ld-seats" class="ld-btn" style="padding:8px 10px">
                         <option value="2" selected>2</option>
@@ -72,7 +74,7 @@
                     </select>
                 </label>
             </div>
-            <div class="ld-status" id="ld-status" style="margin-top:12px">Press New match to connect a session and start.</div>
+            <div class="ld-status" id="ld-status" style="margin-top:12px">Press New match to connect a session and start. You are seat 0.</div>
             <div class="ld-muted" id="ld-ids" style="margin-top:6px"></div>
         </div>
 
@@ -83,22 +85,31 @@
             </div>
             <div class="ld-meter-bar"><div class="ld-meter-fill" id="ld-meter-fill"></div></div>
             <div class="ld-meter-num">
-                <span>This session: <span class="ld-cost" id="ld-cost">0.000000 USDC</span></span>
+                <span>This match: <span class="ld-cost" id="ld-cost">0.000000 USDC</span></span>
                 <span id="ld-meter-state">idle</span>
             </div>
-            <p class="ld-muted" style="margin-top:8px">Watch it when a match starts: it moves at connect and settle, and stays still while you play, because every move runs free inside the session.</p>
+            <p class="ld-muted" style="margin-top:8px">Watch it when a match starts: it moves at connect and at settle, and stays still while you play, because every roll and every move runs free inside the Foskaay GGI Midchain.</p>
         </div>
 
         <div class="ld-panel">
-            <div class="ld-board-host"><canvas id="ld-canvas" width="600" height="600"></canvas></div>
+            <div class="ld-board-host">
+                <div id="board-frame">
+                    <canvas id="ludoCanvas" width="600" height="600"></canvas>
+                </div>
+            </div>
+            <div id="ld-persistent">
+                <div>Dice One: <span id="val-d1">-</span></div>
+                <div>Dice Two: <span id="val-d2">-</span></div>
+                <div style="color:#f87818;font-weight:bold;"><span id="val-total">Total: -</span></div>
+            </div>
             <div class="ld-legend">
                 <span><span class="ld-dot" style="background:#2ecc71"></span>Green</span>
                 <span><span class="ld-dot" style="background:#f1c40f"></span>Yellow</span>
                 <span><span class="ld-dot" style="background:#3498db"></span>Blue</span>
                 <span><span class="ld-dot" style="background:#e74c3c"></span>Red</span>
-                <span><span class="ld-dot" style="background:#7a5cff"></span>You (seat 0)</span>
+                <span>You are seat 0 (green)</span>
             </div>
-            <p class="ld-muted" style="margin-top:10px">Tap one of your tokens to move it. The board is drawn from the chain: the contract holds every token's position, decides the dice and the crown.</p>
+            <p class="ld-muted" style="margin-top:10px">Tap the centre of the board to roll (it blinks on your turn, like ludo-lab). Then tap a blinking token to move it. The board is drawn from the chain: the contract holds every token's position, decides the dice and the crown.</p>
         </div>
 
         <div class="ld-panel">
@@ -118,202 +129,76 @@
 </main>
 
 <script src="/global_header.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/paths.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/board.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/physics.js"></script>
 <script>
 (function () {
-    var RELAY = '/api/foskaay-ggi-sponsor';
-    var GRID = 15, START_INDEX = [0, 13, 26, 39];
-    var COLORS = ['#2ecc71', '#f1c40f', '#3498db', '#e74c3c'];
-    var COMMON_PATH = [
-        {c:1,r:6},{c:2,r:6},{c:3,r:6},{c:4,r:6},{c:5,r:6},{c:6,r:5},{c:6,r:4},{c:6,r:3},{c:6,r:2},{c:6,r:1},{c:6,r:0},{c:7,r:0},
-        {c:8,r:0},{c:8,r:1},{c:8,r:2},{c:8,r:3},{c:8,r:4},{c:8,r:5},{c:9,r:6},{c:10,r:6},{c:11,r:6},{c:12,r:6},{c:13,r:6},{c:14,r:6},{c:14,r:7},
-        {c:14,r:8},{c:13,r:8},{c:12,r:8},{c:11,r:8},{c:10,r:8},{c:9,r:8},{c:8,r:9},{c:8,r:10},{c:8,r:11},{c:8,r:12},{c:8,r:13},{c:8,r:14},{c:7,r:14},
-        {c:6,r:14},{c:6,r:13},{c:6,r:12},{c:6,r:11},{c:6,r:10},{c:6,r:9},{c:5,r:8},{c:4,r:8},{c:3,r:8},{c:2,r:8},{c:1,r:8},{c:0,r:8},{c:0,r:7},{c:0,r:6}
-    ];
-    var HOME_YARDS = [[{c:2,r:2},{c:3,r:2},{c:2,r:3},{c:3,r:3}],[{c:11,r:2},{c:12,r:2},{c:11,r:3},{c:12,r:3}],[{c:11,r:11},{c:12,r:11},{c:11,r:12},{c:12,r:12}],[{c:2,r:11},{c:3,r:11},{c:2,r:12},{c:3,r:12}]];
-
     var el = {
-        newBtn: document.getElementById('ld-new'), rollBtn: document.getElementById('ld-roll'),
+        newBtn: document.getElementById('ld-new'), passBtn: document.getElementById('ld-pass'),
         settleBtn: document.getElementById('ld-settle'), seats: document.getElementById('ld-seats'),
         status: document.getElementById('ld-status'), ids: document.getElementById('ld-ids'),
         cost: document.getElementById('ld-cost'), meterFill: document.getElementById('ld-meter-fill'),
         meterState: document.getElementById('ld-meter-state'), tx: document.getElementById('ld-tx'),
-        log: document.getElementById('ld-log'), canvas: document.getElementById('ld-canvas'), faq: document.getElementById('ld-faq')
+        log: document.getElementById('ld-log'), faq: document.getElementById('ld-faq')
     };
-    var ctx = el.canvas.getContext('2d');
-    var S = { matchRef: null, sessionId: null, board: null, roll: null, busy: false, total: 0, user: null, gameTag: null };
-
+    var total = 0;
     function usdc(x) { return Number(x || 0) / 1e6; }
     function fmt(x) { return x.toFixed(6) + ' USDC'; }
     function short(h) { return h ? (h.slice(0, 10) + '...' + h.slice(-6)) : ''; }
-    function log(msg, cost) {
-        var d = document.createElement('div');
-        d.innerHTML = '<b>' + msg + '</b>' + (cost != null ? ' <span class="ld-cost">' + fmt(usdc(cost)) + '</span>' : '');
-        el.log.insertBefore(d, el.log.firstChild);
-        while (el.log.childNodes.length > 60) el.log.removeChild(el.log.lastChild);
-    }
-    function addCost(cost, state) {
-        S.total += usdc(cost);
-        el.cost.textContent = fmt(S.total);
-        if (state) el.meterState.textContent = state;
-        el.meterFill.style.width = Math.min(100, (S.total / 0.01) * 100) + '%';
-    }
-    async function post(action, body) {
-        var res = await fetch(RELAY, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ action: action }, body || {})) });
-        var json = await res.json();
-        if (!json.ok) throw new Error(json.error || ('relay error ' + res.status));
-        return json;
-    }
 
-    function draw() {
-        var size = el.canvas.width, cell = size / GRID;
-        ctx.clearRect(0, 0, size, size);
-        ctx.fillStyle = '#f7f7fb'; ctx.fillRect(0, 0, size, size);
-        ctx.strokeStyle = '#2f2f3a'; ctx.lineWidth = 2;
-        for (var r = 0; r < GRID; r++) for (var c = 0; c < GRID; c++) ctx.strokeRect(c * cell, r * cell, cell, cell);
-        for (var s = 0; s < 4; s++) {
-            HOME_YARDS[s].forEach(function (h) { ctx.fillStyle = COLORS[s]; ctx.globalAlpha = 0.35; ctx.fillRect(h.c * cell, h.r * cell, cell, cell); ctx.globalAlpha = 1; });
+    // The bridge talks to the page only through this object.
+    window.gfgLudoUI = {
+        status: function (s) { el.status.innerHTML = s; },
+        prompt: function (s) { el.status.innerHTML = s; },
+        log: function (msg, cost) {
+            var d = document.createElement('div');
+            d.innerHTML = '<b>' + msg + '</b>' + (cost ? ' <span class="ld-cost">' + fmt(usdc(cost)) + '</span>' : '');
+            el.log.insertBefore(d, el.log.firstChild);
+            while (el.log.childNodes.length > 60) el.log.removeChild(el.log.lastChild);
+        },
+        gas: function (cost, state) {
+            total += usdc(cost);
+            el.cost.textContent = fmt(total);
+            if (state) el.meterState.textContent = state;
+            el.meterFill.style.width = Math.min(100, (total / 0.05) * 100) + '%';
+        },
+        ids: function (sessionId, matchRef) {
+            el.ids.textContent = 'Session ' + short(sessionId) + '  |  match ' + matchRef;
+            el.settleBtn.disabled = false;
+            el.passBtn.disabled = false;
+        },
+        onSettled: function () {
+            el.settleBtn.disabled = true;
+            el.passBtn.disabled = true;
+            el.meterState.textContent = 'sealed';
         }
-        ctx.fillStyle = '#7a5cff'; ctx.globalAlpha = 0.25; ctx.fillRect(6 * cell, 6 * cell, 3 * cell, 3 * cell); ctx.globalAlpha = 1;
-        if (!S.board) return;
-        for (var seat = 0; seat < 4; seat++) for (var t = 0; t < 4; t++) {
-            var steps = S.board.tokens[seat * 4 + t];
-            var pos;
-            if (steps === -1) pos = HOME_YARDS[seat][t];
-            else if (steps >= 52) pos = { c: 7, r: 7 };
-            else pos = COMMON_PATH[(START_INDEX[seat] + steps) % 52];
-            var x = pos.c * cell, y = pos.r * cell;
-            ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.34, 0, Math.PI * 2);
-            ctx.fillStyle = COLORS[seat]; ctx.fill();
-            if (seat === 0) { ctx.lineWidth = 3; ctx.strokeStyle = '#7a5cff'; ctx.stroke(); }
-            ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.floor(cell * 0.5) + 'px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(String(t + 1), x + cell / 2, y + cell / 2);
-        }
-        if (S.board.crownedSeat >= 0 && S.board.crownedSeat < 4) {
-            ctx.font = Math.floor(cell * 1.4) + 'px sans-serif';
-            ctx.fillText('\u265B', 7.5 * cell, 1.5 * cell);
-        }
-    }
-
-    function statusLine() {
-        if (!S.board) { el.status.textContent = 'Press New match to connect a session and start.'; return; }
-        if (S.board.status === 2) { el.status.innerHTML = '<b>Finished.</b> ' + (S.board.winner === 0 ? 'You won the crown.' : 'The opponent won.') + ' Settle to seal the result on-chain.'; return; }
-        if (S.board.turn === 0) el.status.innerHTML = (S.roll ? ('<b>You rolled ' + S.roll[0] + ' and ' + S.roll[1] + '.</b> Tap a token.') : '<b>Your turn.</b> Press Roll dice.');
-        else el.status.innerHTML = '<b>Opponent is thinking...</b>';
-    }
-    function setBusy(b) {
-        S.busy = b;
-        el.newBtn.disabled = b;
-        el.rollBtn.disabled = b || !S.board || S.board.status !== 1 || S.board.turn !== 0;
-        el.settleBtn.disabled = b || !S.sessionId;
-    }
-    async function refresh() {
-        if (!S.matchRef) return;
-        var b = await post('demoBoard', { matchRef: S.matchRef, user: S.user });
-        S.board = b; draw(); statusLine();
-        el.ids.textContent = 'Session ' + short(S.sessionId) + (b.userPoints ? '  |  your points: ' + b.userPoints.spendable : '');
-    }
+    };
 
     el.newBtn.addEventListener('click', async function () {
-        setBusy(true);
-        S.total = 0; S.roll = null; el.cost.textContent = fmt(0); el.meterFill.style.width = '0%'; el.log.innerHTML = ''; el.tx.textContent = '';
+        el.newBtn.disabled = true;
+        total = 0; el.cost.textContent = fmt(0); el.meterFill.style.width = '0%'; el.log.innerHTML = ''; el.tx.textContent = '';
+        el.settleBtn.disabled = true; el.passBtn.disabled = true;
         try {
-            var info = await post('sponsorAddress');
-            S.user = info.address;
-            addCost(0, 'connecting');
-            var conn = await post('midchainHandover', { gameLogic: info.demoGames, players: [info.address, info.address], sessionKeys: [info.address, info.address], randomCount: 2 });
-            S.sessionId = conn.sessionId;
-            addCost(conn.costUsdc6, 'connected (fee paid)');
-            log('Session connected on-chain (fee paid here)', conn.costUsdc6);
-            var c = await post('demoCreate', { user: S.user, seatCount: Number(el.seats.value), userSeat: 0 });
-            S.matchRef = c.matchRef;
-            addCost(c.costUsdc6, 'match created');
-            log('Match created on-chain', c.costUsdc6);
-            el.tx.textContent = 'tx ' + short(c.tx);
-            await refresh();
-            el.meterState.textContent = 'playing';
-        } catch (e) { log('<span class="ld-err">Start failed: ' + e.message + '</span>'); }
-        finally { setBusy(false); }
+            var created = await window.GFG_LUDO.start(Number(el.seats.value), 0);
+            if (created) { el.tx.textContent = 'tx ' + short(created.tx); el.meterState.textContent = 'playing'; }
+        } finally { el.newBtn.disabled = false; }
     });
 
-    el.rollBtn.addEventListener('click', async function () {
-        setBusy(true);
-        try {
-            var r = await post('demoRoll', { matchRef: S.matchRef });
-            addCost(r.costUsdc6, 'rolled');
-            log('Dice rolled on-chain', r.costUsdc6);
-            el.tx.textContent = 'tx ' + short(r.tx);
-            await refresh();
-            try { var d = await post('demoDice', { matchRef: S.matchRef, counter: S.board.moveCount - 1 }); S.roll = [d.dice1, d.dice2]; } catch (_) { S.roll = null; }
-            statusLine();
-        } catch (e) { log('<span class="ld-err">Roll failed: ' + e.message + '</span>'); }
-        finally { setBusy(false); }
-    });
-
-    el.canvas.addEventListener('click', async function (ev) {
-        if (!S.board || S.board.status !== 1 || S.board.turn !== 0 || S.busy) return;
-        var rect = el.canvas.getBoundingClientRect(), cell = el.canvas.width / GRID;
-        var cx = ((ev.clientX - rect.left) / rect.width) * GRID, cy = ((ev.clientY - rect.top) / rect.height) * GRID;
-        var best = -1, bestD = 999;
-        for (var t = 0; t < 4; t++) {
-            var steps = S.board.tokens[t], pos;
-            if (steps === -1) pos = HOME_YARDS[0][t];
-            else if (steps >= 52) pos = { c: 7, r: 7 };
-            else pos = COMMON_PATH[(START_INDEX[0] + steps) % 52];
-            var dx = (pos.c + 0.5) - cx, dy = (pos.r + 0.5) - cy, d = Math.sqrt(dx * dx + dy * dy);
-            if (d < bestD) { bestD = d; best = t; }
-        }
-        if (best < 0 || bestD > 1.2) return;
-        var value = 6;
-        if (S.board.tokens[best] !== -1 && S.roll) value = Math.max(S.roll[0], S.roll[1]);
-        setBusy(true);
-        try {
-            var r = await post('demoMove', { matchRef: S.matchRef, seat: 0, tokenIndex: best, steps: value });
-            addCost(r.costUsdc6, 'playing');
-            log('Moved token ' + (best + 1) + ' on-chain', r.costUsdc6);
-            el.tx.textContent = 'tx ' + short(r.tx);
-            await refresh();
-            setTimeout(computerTurn, 1200);
-        } catch (e) { log('<span class="ld-err">' + e.message + '</span>'); }
-        finally { setBusy(false); }
-    });
-
-    async function computerTurn() {
-        if (!S.board || S.board.status !== 1 || S.board.turn !== 1) return;
-        try {
-            var r = await post('demoRoll', { matchRef: S.matchRef }); addCost(r.costUsdc6, 'computer rolling'); await refresh();
-            for (var t = 0; t < 4; t++) {
-                var steps = S.board.tokens[4 + t];
-                if (steps === -1 || steps >= 57) continue;
-                var mv = await post('demoMove', { matchRef: S.matchRef, seat: 1, tokenIndex: t, steps: 6 }); addCost(mv.costUsdc6, 'computer moved'); break;
-            }
-            await post('demoPass', { matchRef: S.matchRef });
-            await refresh();
-        } catch (e) { log('<span class="ld-err">computer: ' + e.message + '</span>'); }
-    }
-
-    el.settleBtn.addEventListener('click', async function () {
-        setBusy(true);
-        try {
-            var r = await post('midchainSettle', { sessionId: S.sessionId, finalHash: '0x' + Array.from({ length: 64 }, function (_, i) { return (i % 16).toString(16); }).join('') });
-            addCost(r.costUsdc6, 'settled');
-            log('Session settled on-chain (result sealed)', r.costUsdc6);
-            el.tx.textContent = 'tx ' + short(r.tx);
-            S.sessionId = null;
-        } catch (e) { log('<span class="ld-err">Settle failed: ' + e.message + '</span>'); }
-        finally { setBusy(false); }
-    });
+    el.passBtn.addEventListener('click', function () { window.GFG_LUDO.pass(); });
+    el.settleBtn.addEventListener('click', function () { window.GFG_LUDO.settle(); });
 
     var E = 'https://explorer.testnet.arc.io/address/';
     var FAQ = [
-        { q: 'Is this really an on-chain game?', a: 'Yes. The rules, the dice, the turn timer, the computer opponent, the finish order and the points all live in the contracts. This page only draws what the chain returns.' },
+        { q: 'Is this really an on-chain game?', a: 'Yes. The rules, the dice, the finish order and the points all live in the contracts. The page only draws what the chain returns. During play the moves run free inside the Foskaay GGI Midchain, and the contract re-verifies the whole move log at settle, so a tampered log is rejected.' },
+        { q: 'What exactly is the Foskaay GGI Midchain, and how is it not "off-chain"?', a: 'The Midchain is a connected layer the contract owns. Every move is applied by the contract\'s own rules and settles on-chain in one transaction at the end. A tampered move log is rejected on-chain, so nobody can fake a result. That is why it is not the same as a private off-chain database.' },
         { q: 'Where are the deployed contracts, and how do I verify them?', a: 'Arc Testnet. Games contract: <a href="' + E + '0xEF1fFa009aDAEa87B68b36980849F814F930753b" target="_blank" rel="noopener">0xEF1fFa009aDAEa87B68b36980849F814F930753b</a>. Player account: <a href="' + E + '0x5b287337907b3fE9401274D870DebBe090ab174c" target="_blank" rel="noopener">0x5b287337907b3fE9401274D870DebBe090ab174c</a>. Rail: <a href="' + E + '0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE" target="_blank" rel="noopener">0xb0A5A2D316bEEd2f75786cb60bfa2256C52281eE</a> (SessionRegistry) and <a href="' + E + '0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39" target="_blank" rel="noopener">0x9EE0b4c1622C5f2B7710b1fe4Ec2Be86833aDe39</a> (FeeVault).' },
-        { q: 'How much does it cost to deploy a game like this?', a: 'This Ludo pair (games + player, both upgradeable) cost <b>0.093032 USDC</b> on Arc testnet. The rail (SessionRegistry + FeeVault) cost <b>0.081352 USDC</b>. One-time, in USDC, not a volatile token.' },
-        { q: 'What does a match cost, and who pays?', a: 'The player pays nothing. The sponsor pays only the connect and the settle. Moves, dice, the computer opponent, the timer and the points are meant to run free inside the session. Watch the meter: it moves at connect and settle.' },
+        { q: 'How much does it cost to deploy a game like this?', a: 'This Ludo pair (games + player, both upgradeable) cost <b>0.093032 USDC</b> to deploy on Arc testnet, and upgrading it in place later cost about <b>0.09 USDC</b> while keeping the exact same addresses. The rail (SessionRegistry + FeeVault) cost <b>0.081352 USDC</b>. One-time, in USDC, not a volatile token.' },
+        { q: 'What does a match cost, and who pays?', a: 'The player pays nothing. The sponsor pays only the connect (about <b>0.0125 USDC</b>, including the session fee) and the settle (about <b>0.0119 USDC</b>). Every roll and every move in between is free inside the Foskaay GGI Midchain. Watch the meter: it moves at connect and at settle and stays still while you play.' },
         { q: 'How do the points work?', a: 'Points are earned by finishing position and credited to the player account at the moment the match ends. Only the logged-in user is credited. 4 players: 1st 100, 2nd 50, 3rd 25, 4th 0. 2 players: 1st 100, 2nd 0. A computer win earns zero points.' },
         { q: 'How is the crown decided?', a: 'The crown is on-chain state. When a player finishes 1st the contract records the finish order and marks that seat crowned. This page draws the crown wherever the contract says it sits.' },
         { q: 'Why only two contracts?', a: 'One games contract holds every demo game (chosen by tag) and one player account holds everything about a player across all of them. That keeps the accounts lifted into a session at two, however many games you add.' },
-        { q: 'Where do the dice come from?', a: 'From the contract. A seed is committed at connect and the dice value is derived from it on-chain. The page never invents a number.' },
+        { q: 'Where do the dice come from?', a: 'From the contract. A seed is committed at connect and the dice value is derived from it on-chain. The page never invents a number; it only shows what the contract derives.' },
         { q: 'Does this use the main platform modules?', a: 'No. The demo is self contained: its own games contract and its own player account. It does not touch the main economy, so it can move to its own repo later.' }
     ];
     FAQ.forEach(function (f) {
@@ -321,11 +206,9 @@
         d.innerHTML = '<summary>' + f.q + '</summary><div class="ld-a">' + f.a + '</div>';
         el.faq.appendChild(d);
     });
-
-    window.addEventListener('resize', draw);
-    draw();
 })();
 </script>
+<script src="/foskaay-ggi-assets/ludo-lab/bridge.js"></script>
 <script src="/dash-nav.js"></script>
 <script src="/foskaay-ggi-nav.js"></script>
 <script>
