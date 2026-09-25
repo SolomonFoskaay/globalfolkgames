@@ -199,8 +199,40 @@ contract FoskaayGGIDemoGamesTest {
         games.settleMatch(REF, log, bytes32("final"));
     }
 
-    /// @dev Play a full valid Ludo match for `seat` OFF-CHAIN by reading the real
-    ///      dice the contract derives, and return the log. This is exactly what a
+    function testPreviewLogMatchesSettleOnAValidLog() public {
+        // The relay renders the board by asking the contract (previewLog); settle
+        // re-verifies the identical log. They MUST agree, and preview must not
+        // write anything (the contract stays the only rules engine).
+        games.createMatch(REF, SID, LUDO, _players(), _computer(), 2, 0, bytes32("seed"), 1);
+        FoskaayGGIDemoGames.MoveLog[] memory log = _playValidMatchOffchain(0);
+
+        (int16[16] memory steps, , uint8[4] memory home, uint8 turn, uint8 winner, , ) = games.previewLog(REF, log);
+        (uint8 statusAfterPreview, , , ) = games.matchStatus(REF);
+        require(statusAfterPreview == 1, "previewLog must not write state");
+        require(turn < 2, "preview returns a valid next seat");
+        require(winner == 255, "no finisher in this short log");
+
+        games.settleMatch(REF, log, bytes32("final"));
+        int16[16] memory settled = games.boardOf(REF);
+        for (uint256 i = 0; i < 16; i++) {
+            require(steps[i] == settled[i], "preview board equals settled board");
+        }
+        for (uint8 s = 0; s < 2; s++) {
+            (, , uint8 tokensHome) = games.seatOf(REF, s);
+            require(home[s] == tokensHome, "preview home equals settled home");
+        }
+    }
+
+    function testPreviewLogRejectsATamperedDice() public {
+        games.createMatch(REF, SID, LUDO, _players(), _computer(), 2, 0, bytes32("seed"), 1);
+        FoskaayGGIDemoGames.MoveLog[] memory log = _playValidMatchOffchain(0);
+        (uint8 d1, ) = games.diceOf(REF, 0);
+        log[0].steps = d1 == 1 ? 2 : 1;
+        vm.expectRevert();
+        games.previewLog(REF, log);
+    }
+
+    /// @dev Play a full valid Ludo match for `seat` OFF-CHAIN by reading the real    ///      dice the contract derives, and return the log. This is exactly what a
     ///      relay does during play (no transactions), then hands to settle.
     function _playValidMatchOffchain(uint8 seat) internal view returns (FoskaayGGIDemoGames.MoveLog[] memory) {
         // Build a SHORT valid log in the real two-dice format: a few turns of

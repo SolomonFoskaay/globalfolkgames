@@ -69,7 +69,7 @@ async function deploy(name, args = []) {
   const turnSeconds = await read(games.address, gamesImpl.abi, 'turnSeconds');
   console.log('\nverify: games.playerAccount =', playerOnGames, '| player.gameContract =', gamesOnPlayer, '| turnSeconds =', turnSeconds.toString());
   if (getAddress(playerOnGames) !== player.address || getAddress(gamesOnPlayer) !== games.address) throw new Error('wiring mismatch');
-  if (turnSeconds !== 30n) throw new Error('turnSeconds default not set (proxy initializer trap)');
+  if (turnSeconds !== 45n) throw new Error('turnSeconds default not set (proxy initializer trap)');
 
   const after = await bal(me);
   console.log('=== COST SUMMARY (for mainnet prep) ===');

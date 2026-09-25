@@ -42,7 +42,9 @@ const ADDR = {
 };
 
 const demoGamesAbi = parseAbi([
-  'function createMatch(uint64 matchRef, bytes32 sessionId, bytes32 gameTag, address[4] players, bool[4] isComputer, uint8 seatCount, uint8 userSeat, bytes32 seedCommit)',
+  'function createMatch(uint64 matchRef, bytes32 sessionId, bytes32 gameTag, address[4] players, bool[4] isComputer, uint8 seatCount, uint8 userSeat, bytes32 seedCommit, uint8 verifyMode)',
+  'function settleMatch(uint64 matchRef, (uint8 kind, uint8 seat, uint8 tokenIndex, uint8 steps)[] log, bytes32 finalHash)',
+  'function previewLog(uint64 matchRef, (uint8 kind, uint8 seat, uint8 tokenIndex, uint8 steps)[] log) view returns (int16[16] stepsWalked, int16[16] pathIndex, uint8[4] homeCount, uint8 turn, uint8 winner, uint8[4] finishOrder, uint8 finishCount)',
   'function roll(uint64 matchRef) returns (uint8 dice1, uint8 dice2)',
   'function move(uint64 matchRef, uint8 seat, uint8 tokenIndex, uint8 steps)',
   'function captureAt(uint64 matchRef, uint8 seat, uint8 tokenIndex)',
@@ -177,120 +179,174 @@ async function doHandover(body) {
 }
 
 // ---------------------------------------------------------------- Ludo demo
-
-// A stable seed commitment for a match: keccak of a server-chosen secret. The
-// dice are derived on-chain from this, so the value is the contract's, never the
-// browser's. The seed is stored per matchRef so the settle reveal can match it.
-const demoSeeds = new Map();
+//
+// THE FOSKAAY GGI MIDCHAIN MODEL. During play NO transaction is sent for a move.
+// The move log travels WITH the request, and the CONTRACT is the only rules
+// engine: the relay asks the contract's `previewLog` view (a free eth_call) to
+// replay the log and return the board. An illegal or tampered log reverts there,
+// exactly as `settleMatch` rejects it on-chain. So the relay holds NO truth and
+// NO state (safe on serverless), and only two things are transactions:
+//   1. demoCreate : connect the session (pay the fee) + create the match
+//   2. demoSettle : settle the match from the log (one tx, tampering rejected)
+// The log is transported by the caller, never stored server-side, never in
+// localStorage; it is the same input the contract verifies at settle.
 
 function demoSessionId(body) {
   return body.sessionId || keccak256(encodeAbiParameters(parseAbiParameters('address,uint256'), [clients().account.address, BigInt(Date.now())]));
 }
 
-/// Create a Ludo match in a live session. Returns the matchRef, sessionId and
-/// the REAL gas cost. The sponsor is a seat (the computer/human opponent).
+/// Normalize the transported move log to [kind, seat, tokenIndex, steps] tuples.
+function moveLog(body) {
+  const raw = Array.isArray(body.log) ? body.log : [];
+  return raw.map((x) => (Array.isArray(x)
+    ? [Number(x[0]), Number(x[1]), Number(x[2]), Number(x[3])]
+    : [Number(x.kind), Number(x.seat), Number(x.tokenIndex), Number(x.steps)]));
+}
+
+/// Ask the CONTRACT to replay the log and return the board. This is the single
+/// rules engine; the relay only transports the result. Reverts on an illegal log.
+async function preview(matchRef, log) {
+  const { pub } = clients();
+  const [steps, path, home, turn, winner, finishOrder, finishCount] = await pub.readContract({
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'previewLog',
+    args: [BigInt(matchRef), log],
+  });
+  return {
+    stepsWalked: steps.map((x) => Number(x)),
+    pathIndex: path.map((x) => Number(x)),
+    home: home.map((x) => Number(x)),
+    turn: Number(turn),
+    winner: Number(winner),
+    finishOrder: finishOrder.map((x) => Number(x)),
+    finishCount: Number(finishCount),
+  };
+}
+
+/// Create the match and CONNECT the session (two on-chain calls, ONE user step):
+/// the rail handover pays the fee and registers the session, then createMatch
+/// stores the match. This is the ONLY connect; every move after is free.
 async function doDemoCreate(body) {
   const { account, pub, wallet } = clients();
   const sessionId = demoSessionId(body);
   const matchRef = BigInt(body.matchRef || Date.now());
   const gameTag = LUDO_TAG;
-  const user = body.user || account.address;           // the logged-in user's wallet
+  const user = body.user || account.address;
   const seatCount = Number(body.seatCount || 2);
   const userSeat = Number(body.userSeat || 0);
-
+  const verifyMode = Number(body.verifyMode || 0); // 0 signature, 1 replay
   const players = [account.address, account.address, account.address, account.address];
   players[userSeat] = user;
   const isComputer = [true, true, true, true];
   isComputer[userSeat] = false;
   const seed = keccak256(toBytes('foskaay-ggi-demo-' + matchRef + '-' + Date.now()));
   const seedCommit = keccak256(toBytes(seed));
-  demoSeeds.set(String(matchRef), seed);
 
+  const seatPlayers = players.slice(0, seatCount);
+  const seatKeys = players.slice(0, seatCount);
+
+  // 1. CONNECT the session on the rail: pay the fee, register the session.
+  const fee = await feeNative(pub, account);
+  const ho = await send(wallet, pub, {
+    address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'handover',
+    args: [sessionId, ADDR.FoskaayGGIDemoGames, ZERO32, seedCommit, seatPlayers, seatKeys, 2],
+    value: fee, account,
+  });
+
+  // 2. Create the match on the game contract (rule state only).
   const r = await send(wallet, pub, {
     address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'createMatch',
-    args: [matchRef, sessionId, gameTag, players, isComputer, seatCount, userSeat, seedCommit], account,
+    args: [matchRef, sessionId, gameTag, players, isComputer, seatCount, userSeat, seedCommit, verifyMode], account,
   });
-  return { matchRef: String(matchRef), sessionId, userSeat, tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+  const board = await preview(matchRef, []);
+  const total = BigInt(r.costUsdc6) + ho.costUsdc6 + usdc18To6(fee);
+  return { matchRef: String(matchRef), sessionId, userSeat, verifyMode, board, tx: r.hash, connectTx: ho.hash, costUsdc6: total.toString() };
 }
 
-/// Roll the dice for the seat on turn (the value is the contract's).
+/// ROLL: free. The dice come from the CONTRACT (eth_call); nothing is sent.
 async function doDemoRoll(body) {
-  const { account, pub, wallet } = clients();
-  const r = await send(wallet, pub, {
-    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'roll',
-    args: [BigInt(body.matchRef)], account,
-  });
-  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+  const { pub } = clients();
+  const matchRef = BigInt(body.matchRef);
+  const log = moveLog(body);
+  const counter = log.filter((x) => x[0] === 0).length;
+  const [d1, d2] = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'diceOf', args: [matchRef, counter] });
+  const before = await preview(matchRef, log);
+  log.push([0, before.turn, Number(d1), Number(d2)]);
+  const board = await preview(matchRef, log);
+  return { dice1: Number(d1), dice2: Number(d2), turn: before.turn, board, log, costUsdc6: '0', gasless: true };
 }
 
-/// Apply a move (the rules are enforced in the contract).
+/// MOVE: free. The CONTRACT validates it by replay; an illegal move reverts.
 async function doDemoMove(body) {
-  const { account, pub, wallet } = clients();
-  const r = await send(wallet, pub, {
-    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'move',
-    args: [BigInt(body.matchRef), Number(body.seat), Number(body.tokenIndex), Number(body.steps)], account,
-  });
-  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+  const matchRef = BigInt(body.matchRef);
+  const log = moveLog(body);
+  log.push([1, Number(body.seat), Number(body.tokenIndex), Number(body.steps)]);
+  const board = await preview(matchRef, log); // reverts if illegal
+  return { board, log, costUsdc6: '0', gasless: true };
 }
 
-/// Resolve a capture after a move.
-async function doDemoCapture(body) {
-  const { account, pub, wallet } = clients();
-  const r = await send(wallet, pub, {
-    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'captureAt',
-    args: [BigInt(body.matchRef), Number(body.seat), Number(body.tokenIndex)], account,
-  });
-  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
-}
-
-/// Pass the turn (no usable move).
+/// PASS: free. Ends the turn (the contract skips finished seats).
 async function doDemoPass(body) {
-  const { account, pub, wallet } = clients();
-  const r = await send(wallet, pub, {
-    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'pass',
-    args: [BigInt(body.matchRef)], account,
-  });
-  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
+  const matchRef = BigInt(body.matchRef);
+  const log = moveLog(body);
+  const before = await preview(matchRef, log);
+  log.push([2, before.turn, 0, 0]);
+  const board = await preview(matchRef, log);
+  return { turn: board.turn, board, log, costUsdc6: '0', gasless: true };
 }
 
-/// Advance a turn whose timer expired (permissionless).
-async function doDemoTimeout(body) {
-  const { account, pub, wallet } = clients();
-  const r = await send(wallet, pub, {
-    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'enforceTimeout',
-    args: [BigInt(body.matchRef)], account,
-  });
-  return { tx: r.hash, costUsdc6: r.costUsdc6.toString() };
-}
-
-/// READ the whole board in one call: status, turn, tokens, crown, finish order,
-/// and the user's points. No key needed, costs nothing.
+/// READ the board (free). The board IS the contract's replay of the log.
 async function doDemoBoard(body) {
   const { pub } = clients();
   const matchRef = BigInt(body.matchRef);
-  const [status, turn, winner, moveCount] = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'matchStatus', args: [matchRef] });
-  const tokens = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'boardOf', args: [matchRef] });
-  const crowned = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'crownedSeat', args: [matchRef] });
-  const finish = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'finishOrderOf', args: [matchRef] });
-  const out = {
-    status: Number(status), turn: Number(turn), winner: Number(winner), moveCount: Number(moveCount),
-    tokens: Array.from(tokens).map((t) => Number(t)),
-    crownedSeat: Number(crowned),
-    finishOrder: Array.from(finish[0]).map((x) => Number(x)),
-    finishCount: Number(finish[1]),
-  };
-  if (body.user) {
-    const [pure, spendable] = await pub.readContract({ address: ADDR.FoskaayGGIDemoPlayer, abi: demoPlayerAbi, functionName: 'pointsOf', args: [body.user, LUDO_TAG] });
-    out.userPoints = { lifetime: pure.toString(), spendable: spendable.toString() };
+  const log = moveLog(body);
+  const board = await preview(matchRef, log);
+  let crownedSeat = 255;
+  try { crownedSeat = Number(await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'crownedSeat', args: [matchRef] })); } catch (_) {}
+  const out = { turn: board.turn, tokens: board.stepsWalked, home: board.home, board, winner: board.winner, crown: crownedSeat, settled: crownedSeat !== 255 };
+  const user = body.user;
+  if (user) {
+    try {
+      const [pure, spendable] = await pub.readContract({ address: ADDR.FoskaayGGIDemoPlayer, abi: demoPlayerAbi, functionName: 'pointsOf', args: [user, LUDO_TAG] });
+      out.userPoints = { lifetime: pure.toString(), spendable: spendable.toString() };
+    } catch (_) {}
   }
   return out;
 }
 
-/// READ the two dice the CONTRACT produced for a counter (free, no key).
+/// READ the two dice the contract derives for a counter (free, no key).
 async function doDemoDice(body) {
   const { pub } = clients();
   const [dice1, dice2] = await pub.readContract({ address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'diceOf', args: [BigInt(body.matchRef), Number(body.counter)] });
   return { dice1: Number(dice1), dice2: Number(dice2) };
+}
+
+/// SETTLE: the second and LAST transaction. Seals the match on the game contract
+/// by replaying the log (tampering rejected) and, when a sessionId is supplied,
+/// seals the rail session too. After this nothing is open.
+async function doDemoSettle(body) {
+  const { account, pub, wallet } = clients();
+  const matchRef = BigInt(body.matchRef);
+  const log = moveLog(body);
+  const finalHash = keccak256(toBytes(JSON.stringify(log)));
+
+  // 1. Seal the match: re-verify the whole log on-chain and credit points.
+  const r = await send(wallet, pub, {
+    address: ADDR.FoskaayGGIDemoGames, abi: demoGamesAbi, functionName: 'settleMatch',
+    args: [matchRef, log, finalHash], account,
+  });
+  let railCost = 0n;
+  let railTx = null;
+  if (body.sessionId) {
+    // 2. Seal the rail session (sponsor is the declared signer).
+    const digest = await pub.readContract({ address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'midchainDigest', args: [body.sessionId, finalHash] });
+    const signature = await account.sign({ hash: digest });
+    const rr = await send(wallet, pub, {
+      address: ADDR.SessionRegistry, abi: registryAbi, functionName: 'settle',
+      args: [body.sessionId, finalHash, ZERO32, [signature], [account.address]], account,
+    });
+    railCost = rr.costUsdc6; railTx = rr.hash;
+  }
+  return { tx: r.hash, railTx, finalHash, costUsdc6: (r.costUsdc6 + railCost).toString() };
 }
 
 export default async function handler(req, res) {
@@ -307,11 +363,10 @@ export default async function handler(req, res) {
       case 'demoCreate': out = await doDemoCreate(body); break;
       case 'demoRoll': out = await doDemoRoll(body); break;
       case 'demoMove': out = await doDemoMove(body); break;
-      case 'demoCapture': out = await doDemoCapture(body); break;
       case 'demoPass': out = await doDemoPass(body); break;
-      case 'demoTimeout': out = await doDemoTimeout(body); break;
       case 'demoBoard': out = await doDemoBoard(body); break;
       case 'demoDice': out = await doDemoDice(body); break;
+      case 'demoSettle': out = await doDemoSettle(body); break;
       case 'sponsorAddress': {
         const { account } = clients();
         out = {

@@ -423,11 +423,108 @@ contract FoskaayGGIDemoGames is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (m.winner != 255) emit MatchFinished(matchRef, m.winner);
     }
 
+    /// @notice Replay a move log through the SAME rules and return the resulting
+    ///         board WITHOUT writing anything. This keeps the CONTRACT the only
+    ///         rules engine: a relay/session can render a board by asking this
+    ///         view, and `settleMatch` re-verifies the identical log on-chain.
+    ///         An illegal or tampered log reverts here exactly as it would settle.
+    /// @return stepsWalked per token (16), pathIndex per token (16), tokens home
+    ///         per seat (4), the next seat to play, the winner (255 = none), the
+    ///         finish order and how many seats have finished.
+    function previewLog(uint64 matchRef, MoveLog[] calldata log)
+        external
+        view
+        returns (
+            int16[16] memory stepsWalked,
+            int16[16] memory pathIndex,
+            uint8[4] memory homeCount,
+            uint8 turn,
+            uint8 winner,
+            uint8[4] memory finishOrder,
+            uint8 finishCount
+        )
+    {
+        Match storage m = _matches[matchRef];
+        if (!m.initialized) revert UnknownMatch();
+        for (uint256 i = 0; i < 16; i++) { stepsWalked[i] = -1; pathIndex[i] = -1; }
+        bool[4] memory finished;
+        uint8 fturn = 0;
+        uint32 counter = 0;
+        uint8 dieA = 0;
+        uint8 dieB = 0;
+
+        for (uint256 i = 0; i < log.length; i++) {
+            MoveLog calldata mv = log[i];
+            if (mv.kind == 0) {
+                (uint8 d1, uint8 d2) = diceOf(matchRef, counter);
+                if (mv.seat != fturn) revert NotYourTurn();
+                if (mv.tokenIndex != d1 || mv.steps != d2) revert BadDice();
+                dieA = d1;
+                dieB = d2;
+                counter += 1;
+            } else if (mv.kind == 1) {
+                if (mv.seat != fturn) revert NotYourTurn();
+                if (mv.tokenIndex > 3) revert BadSeat();
+                if (dieA == mv.steps) dieA = 0;
+                else if (dieB == mv.steps) dieB = 0;
+                else revert BadDice();
+
+                uint16 idx = uint16(mv.seat) * 4 + uint16(mv.tokenIndex);
+                if (stepsWalked[idx] == -1) {
+                    if (mv.steps != 6) revert InYardNeedsSix();
+                    stepsWalked[idx] = 0;
+                    pathIndex[idx] = 0;
+                } else {
+                    if (stepsWalked[idx] >= 57) revert NoMove();
+                    int16 next = stepsWalked[idx] + int16(uint16(mv.steps));
+                    if (next > 57) revert OverflowHome();
+                    stepsWalked[idx] = next;
+                    if (next >= 52) pathIndex[idx] = -2;
+                    else pathIndex[idx] = int16((uint16(pathIndex[idx]) + mv.steps) % 52);
+                }
+                if (stepsWalked[idx] >= 57) homeCount[mv.seat] += 1;
+
+                int16 pos = stepsWalked[idx];
+                if (pos >= 0 && pos <= 51 && !_isStartCell(mv.seat, pos)) {
+                    for (uint8 s = 0; s < m.seatCount; s++) {
+                        if (s == mv.seat) continue;
+                        for (uint8 t = 0; t < 4; t++) {
+                            uint16 oi = uint16(s) * 4 + uint16(t);
+                            if (stepsWalked[oi] == pos) {
+                                stepsWalked[oi] = -1;
+                                pathIndex[oi] = -1;
+                                stepsWalked[idx] = 57;
+                                pathIndex[idx] = -2;
+                                homeCount[mv.seat] += 1;
+                            }
+                        }
+                    }
+                }
+
+                if (homeCount[mv.seat] >= 4 && !finished[mv.seat]) {
+                    finished[mv.seat] = true;
+                    finishOrder[finishCount] = mv.seat;
+                    finishCount += 1;
+                }
+            } else if (mv.kind == 2) {
+                uint8 n = m.seatCount;
+                for (uint8 k = 1; k <= n; k++) {
+                    uint8 cand = uint8((uint256(fturn) + k) % n);
+                    if (!finished[cand]) { fturn = cand; break; }
+                }
+            } else {
+                revert BadLog();
+            }
+        }
+
+        turn = fturn;
+        winner = finishCount > 0 ? finishOrder[0] : 255;
+    }
+
     /// @dev Replay the log through the SAME rules as the live path and apply the
     ///      verified result: board, finish order, crown, and points (credited
     ///      once, here, inside the session window). Any illegal action reverts.
-    function _applyLogWithRules(uint64 matchRef, Match storage m, MoveLog[] calldata log) private {
-        int16[16] memory steps;      // stepsWalked per token
+    function _applyLogWithRules(uint64 matchRef, Match storage m, MoveLog[] calldata log) private {        int16[16] memory steps;      // stepsWalked per token
         int16[16] memory pathIdx;    // pathIndex per token
         for (uint256 i = 0; i < 16; i++) { steps[i] = -1; pathIdx[i] = -1; }
         uint8[4] memory homeCount;
