@@ -6,6 +6,10 @@
       "emoji": "🎲",
       "status": "live",
       "play": "/games/ludo-lab/",
+      "plays": [
+        { "label": "Play Ludo-Lab (Solana)", "href": "/games/ludo-lab/" },
+        { "label": "Play Ludo-mp (Arc testnet)", "href": "/games/ludo-mp/" }
+      ],
       "origins": [
         {
           "country": "India",

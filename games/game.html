@@ -65,9 +65,15 @@
             if (g.howToPlay) {
                 document.getElementById('game-howto').textContent = g.howToPlay;
             }
-            document.getElementById('game-cta').innerHTML = g.status === 'live'
-                ? '<a class="launch-btn onchain" style="width:100%; text-align:center; text-decoration:none;" href="' + esc(g.play || '/games/') + '">Play now</a>'
-                : '<p style="color:#888; font-size:0.85rem;">This native game is being readied. The arena opens soon.</p>';
+            if (g.status !== 'live') {
+                document.getElementById('game-cta').innerHTML = '<p style="color:#888; font-size:0.85rem;">This native game is being readied. The arena opens soon.</p>';
+            } else if (Array.isArray(g.plays) && g.plays.length) {
+                document.getElementById('game-cta').innerHTML = g.plays.map(function (p) {
+                    return '<a class="launch-btn onchain" style="width:100%; text-align:center; text-decoration:none; display:block; margin-bottom:8px;" href="' + esc(p.href) + '">' + esc(p.label) + '</a>';
+                }).join('');
+            } else {
+                document.getElementById('game-cta').innerHTML = '<a class="launch-btn onchain" style="width:100%; text-align:center; text-decoration:none;" href="' + esc(g.play || '/games/') + '">Play now</a>';
+            }
         });
     </script>
 </body>

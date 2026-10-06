@@ -819,26 +819,33 @@ topic. Use everyday analogies, short sentences, and avoid unexplained jargon.
   2. Verify no private keys, keypair JSON, mnemonics, service_role keys, JWTs, API tokens, or `.env` values are in the diff.
   3. ANY hit = HARD STOP. Never commit/push. Scrub or ask the owner.
   4. **Deploy-safety preflight (HARD RULE, enforced every push):** run `npm run build` (must be green) and `node --check` every changed script/serverless module. Confirm `git ls-files | grep programs/target` is EMPTY (no Rust build artifacts committed; committed `programs/` is source + Cargo only) so Vercel never bloats or chokes. Confirm only ONE serverless function exists: `api/` must contain ONLY `index.mjs` (see Serverless rule). If the owner reports a Vercel deploy failure, DO NOT assume; get the deployment id from the owner and inspect `npx vercel inspect <dpl_id> --logs` (needs a VERCEL token) or ask them to paste the deploy logs, then fix the root cause before the next push.
+  5. **Release flow (HARD RULE, updated 2026-10-06):** after the commit, push the CURRENT branch, open a PR to `main`, then merge it (see the release-flow HARD RULE below). NEVER hardcode the branch name (`osv1Arc`): resolve the current branch at runtime (`git rev-parse --abbrev-ref HEAD`, or `git push origin HEAD`), so switching to another branch later never causes confusion.
 - **Serverless rule (Vercel):** Hobby plan caps functions at 12. The whole `/api` surface is a SINGLE function: `api/index.mjs` dispatches by request path to handler modules under `api_handlers/`. NEVER add a new file directly under `api/` (that is a second function and would break deploys). New endpoints = add a module under `api_handlers/` and register it in the `routes` map in `api/index.mjs`. Local dev uses `scripts/relay-server.mjs` (same routes) and is unaffected.
 - **No cron / no external automation (HARD RULE):** NEVER introduce Vercel cron jobs, scheduled workflows, or Supabase-triggered automation to move game/economy state. Everything that automated (affiliate monthly settlement, competition window rolls, payouts) is run MANUALLY by the owner: an admin dashboard button or a local script (`node scripts/...`). Paid/subscription flows stay manual-on-chain like today. If a task would need a cron/scheduler to work, STOP and tell the owner that route is being proposed (they may decline); it is never added silently.
 - **No new platform/stack without telling the owner:** before introducing any new backing service, dependency, or infra (e.g. a scheduler, queue, external API), explicitly state in the plan that it is a NEW dependency and get approval. The current stack is fixed: Solana/Anchor + MagicBlock ER (gasless), Vite, Node, Vercel (one function), dynamic-auth, Supabase (backup/restore only, never live truth).
 - **Never amend a pushed commit without explicit owner approval.** If the commit is already on the remote, make a new commit instead.
-- **Open-source branches + PR-only merges (HARD RULE, updated 2026-09-18):** the
-  repo is public and `main` is protected. There are now TWO rails:
+- **Open-source branches (HARD RULE, updated 2026-10-06):** the repo is public.
+  There are TWO rails:
   - **Solana (FROZEN):** the `osv1` branch is the known-good Solana build and is
     frozen (no new features). The immutable fallback is the tag
     `solana-working-2026-09-18`. Do not develop on `osv1` anymore.
-  - **Arc (ACTIVE):** all work now happens on the `osv1Arc` branch. The agent
-    commits and pushes to `osv1Arc` ONLY. The OWNER creates the pull request
-    from `osv1Arc` to `main` and approves it to go live. Never commit or push
-    directly to `main`, and never open a pull request unless the owner asks.
-    Keep using `osv1Arc` until the owner explicitly starts a new line.
+  - **Arc (ACTIVE):** work happens on a working branch (currently `osv1Arc`).
+    The agent commits and pushes to the CURRENT branch only.
   Only ONE chain is live in production at a time (a game needs a single home for
   points, tiers and the backer NFT), so never run Solana and Arc in production
   together, and never give a user two wallets.
-- **Always ask before pushing or opening a PR (HARD RULE):** after committing,
-  the agent MUST ASK the owner before `git push` and before opening a pull
-  request. Do not push or open a PR automatically; confirm first, every time.
+- **Release flow — current branch, PR to main, merge (HARD RULE, updated
+  2026-10-06):** the standard preflight for every release is:
+  0. Commit on the CURRENT branch. NEVER hardcode a branch name (`osv1Arc`);
+     always resolve the current branch (`git rev-parse --abbrev-ref HEAD`), so a
+     future branch switch (new line of work) never causes confusion.
+  1. `git push origin HEAD` (pushes the current branch; no hardcoded name).
+  2. Create a pull request into `main` (`gh pr create --base main --head
+     <current-branch>`).
+  3. Merge the PR into `main` (`gh pr merge <number> --merge`).
+  A DIRECT push to `main` is FORBIDDEN unless the owner explicitly approves it
+  in that turn. The sanctioned path to `main` is always the PR + merge above.
+  Do not open a PR to a base other than `main` unless the owner asks.
 - **The novel earn feature is a headline differentiator (do not bury it):**
   gamers earn the way creators do. A share (about 30%) of each month's premium
   memberships goes to the gamers who join the Member Cup and qualify. It is
