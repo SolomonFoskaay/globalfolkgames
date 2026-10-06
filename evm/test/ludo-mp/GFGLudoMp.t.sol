@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {GFGGames} from "../src/GFGGames.sol";
-import {GFGPlayers} from "../src/GFGPlayers.sol";
+import {GFGGames} from "../../src/ludo-mp/GFGGames.sol";
+import {GFGPlayers} from "../../src/ludo-mp/GFGPlayers.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 interface VmMp {

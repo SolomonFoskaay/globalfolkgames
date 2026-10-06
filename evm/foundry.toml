@@ -1,14 +1,25 @@
-# evm/foundry.toml — Arc rail (arcv2m16) Phase 0.
+# evm/foundry.toml — the HOME for all GFG EVM/Solidity (chain-separated from
+# Solana). Two groups live here:
+#   - Arc rail (arcv2m16/17): GameRegistry, MatchSettlement, PlayerCore, Randomness
+#   - ludo-mp (Foskaay GGI multiplayer, Arc testnet): src/ludo-mp, test/ludo-mp
 # Local-only for now: compile + test with no chain, no cost, no secrets.
+#   forge build        (from evm/)
+#   forge test         (runs BOTH suites)
 [profile.default]
 src = "src"
 out = "out"
 test = "test"
 script = "script"
-libs = []
+libs = ["lib"]
 solc_version = "0.8.24"
 optimizer = true
 optimizer_runs = 200
+# via_ir resolves "stack too deep" on the ludo-mp settle helpers (many params).
+via_ir = true
+
+remappings = [
+    "@openzeppelin/contracts/=lib/vendored-openzeppelin/contracts/",
+]
 
 # Arc endpoints (public, no secret). Mainnet added only when we get there.
 [rpc_endpoints]
