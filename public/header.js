@@ -74,7 +74,7 @@
                     { label: 'Forum', href: '/forum/', match: 'forum' },
                     { label: 'Support', href: '/support/', match: 'support' },
                     { label: 'Contact', href: '/contact/', match: 'contact' },
-                    { label: '🎮 Foskaay GGI Demos', href: '/foskaay-ggi/demos/', match: 'ggi' }
+                    { label: '🎮 Ludo Multiplayer (Arc test)', href: '/games/ludo-mp/', match: 'ludo-mp' }
                 ]
             },
             {
