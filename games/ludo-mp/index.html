@@ -183,7 +183,7 @@
     var FAQ = [
         { q: 'Is this really an on-chain game?', a: 'Yes. The rules, the dice, the board and the points live in the game contract as compact BYTES (no images on-chain); this page only renders what the chain returns. During play every roll and every move runs through the contract for free, and the result is settled on-chain in one transaction.' },
         { q: 'How is multiplayer different from single-player?', a: 'The rules are identical. The session holds N real players plus N session keys instead of one human plus house seats. The relay runs each move through the contract and signs the move log, but it cannot settle alone: the winner device signs automatically and the relay seals it, so the loser does nothing and the game never waits on them. Solo test plays you against relay-signed computer seats that earn nothing. Single-player sessions and multiplayer sessions never meet.' },
-        { q: 'Where are the deployed contracts?', a: 'Testnet only for now, all permanent upgradeable proxies. Core <a href="' + E + CORE + '" target="_blank" rel="noopener">' + CORE + '</a>. Game <a href="' + E + GAME + '" target="_blank" rel="noopener">' + GAME + '</a>. Player <a href="' + E + PLAYER + '" target="_blank" rel="noopener">' + PLAYER + '</a>. Every match also links its own connect and settle transactions in the session bar above the board, and the <a href="/explorer/" target="_blank" rel="noopener">Foskaay GGI Explorer</a> verifies any session.' },
+        { q: 'Where are the deployed contracts?', a: 'Testnet only for now, all permanent upgradeable proxies. Core <a href="' + E + CORE + '" target="_blank" rel="noopener">' + CORE + '</a>. Game <a href="' + E + GAME + '" target="_blank" rel="noopener">' + GAME + '</a>. Player <a href="' + E + PLAYER + '" target="_blank" rel="noopener">' + PLAYER + '</a>. Every match also links its own connect and settle transactions in the session bar above the board, and the <a href="https://foskaayggi.globalfolkgames.fun/explorer/" target="_blank" rel="noopener">Foskaay GGI Explorer</a> verifies any session.' },
         { q: 'What does it cost to run?', a: 'Your players pay nothing. What you pay as a developer is a cheap per-session fee (base plus per-account times 2 plus per-game), charged once at connect. Nothing inside the session is charged.' },
         { q: 'How do the points work?', a: 'Points live INSIDE the game state, so they are credited for free as the match plays and cost nothing extra at settle. 4 players: 1st 100, 2nd 50, 3rd 25, 4th 0. 2 players: 1st 100, 2nd 0. Every seat that earns is credited, not just seat 0.' },
         { q: 'Where do the dice come from?', a: 'From the core. A seed is committed at connect; the dice come from the core pure randomN(seed, counter). The page never invents a number; it only shows what the contract derives.' },
@@ -222,7 +222,7 @@
         },
         ids: function (sessionId) {
             $('mp-ids').innerHTML = 'Session ' + sh(sessionId) +
-                '  |  <a href="/explorer/?session=' + sessionId + '" target="_blank" rel="noopener" style="color:#f39c12">open in Explorer</a>' +
+                '  |  <a href="https://foskaayggi.globalfolkgames.fun/explorer/?session=' + sessionId + '" target="_blank" rel="noopener" style="color:#f39c12">open in Explorer</a>' +
                 '  |  <a href="/games/ludo-mp/?game=' + sessionId + '" target="_blank" rel="noopener" style="color:#f39c12">share this session</a>';
         },
         tx: function (hash, label) {

@@ -1,5 +1,6 @@
 out/
 cache/
 broadcast/
-lib/
 .env
+# NOTE: lib/ is intentionally NOT ignored so the vendored OpenZeppelin contracts
+# (lib/vendored-openzeppelin) are committed and the ludo-mp tests build anywhere.
