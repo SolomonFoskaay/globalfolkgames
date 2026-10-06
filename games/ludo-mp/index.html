@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ludo multiplayer testnet (Foskaay GGI) | GlobalFolkGames</title>
+    <meta name="description" content="Multiplayer Ludo on Foskaay Gasless Games Infrastructure, Arc testnet only. Real players, one session, free moves inside, settle once. This page only displays what the chain says.">
+    <meta property="og:title" content="Ludo multiplayer testnet (Foskaay GGI)">
+    <meta property="og:description" content="Multiplayer Ludo on Foskaay GGI, Arc testnet only. The contract owns the game; the page only displays.">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/foskaay-ggi-assets/ludo-lab/board.css">
+    <style>
+        .ld-wrap { max-width: 900px; margin: 0 auto; padding: 0 0 80px; }
+        .ld-hero { padding: 26px 16px 20px; text-align: center; background: radial-gradient(900px 260px at 15% -10%, rgba(243,156,18,0.22), transparent 60%), radial-gradient(900px 300px at 88% 0%, rgba(155,89,182,0.22), transparent 60%), linear-gradient(180deg,#101018,#0f0f13); border-bottom: 1px solid rgba(255,255,255,0.07); }
+        .ld-eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; color: #f39c12; border: 1px solid rgba(243,156,18,0.4); background: rgba(243,156,18,0.08); border-radius: 999px; padding: 5px 12px; margin-bottom: 12px; }
+        .ld-h1 { margin: 0 0 8px; font-size: 1.6rem; color: #fff; }
+        .ld-h1 .grad { background: linear-gradient(135deg,#f39c12,#9b59b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .ld-sub { margin: 0 auto; max-width: 640px; color: #b9b9c6; font-size: 0.9rem; line-height: 1.6; }
+        .ld-body { padding: 16px 14px 0; }
+        .ld-panel { background: linear-gradient(180deg,#191922,#15151c); border: 1px solid rgba(255,255,255,0.09); border-radius: 16px; padding: 14px; margin-bottom: 14px; }
+        .ld-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .ld-btn { appearance: none; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #fff; font-weight: 800; font-size: 0.84rem; border-radius: 12px; padding: 10px 14px; cursor: pointer; }
+        .ld-btn.primary { background: linear-gradient(135deg,#f39c12,#9b59b6); border-color: transparent; }
+        .ld-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .ld-status { color: #dcdce6; font-size: 0.9rem; line-height: 1.5; }
+        .ld-muted { color: #8f8fa0; font-size: 0.78rem; line-height: 1.5; word-break: break-all; }
+        .ld-board-host { display: flex; justify-content: center; }
+        .ld-legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; font-size: 0.76rem; color: #b9b9c6; }
+        .ld-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+        .ld-log { max-height: 150px; overflow-y: auto; margin-top: 8px; }
+        .ld-log div { font-size: 0.75rem; color: #9a9aa8; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.06); }
+        .ld-log b { color: #dcdce6; }
+        .ld-faq details { border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+        .ld-faq summary { cursor: pointer; padding: 12px 14px; font-weight: 800; color: #fff; font-size: 0.9rem; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+        .ld-faq summary::-webkit-details-marker { display: none; }
+        .ld-faq summary::after { content: '+'; color: #f39c12; font-weight: 900; }
+        .ld-faq details[open] summary::after { content: '-'; }
+        .ld-faq .ld-a { padding: 0 14px 12px; color: #b9b9c6; font-size: 0.84rem; line-height: 1.65; }
+        .ld-faq .ld-a a { color: #f39c12; }
+        .ld-faq .ld-a code { color: #cfe8ff; font-size: 0.78rem; word-break: break-all; }
+        .ld-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: #cfe8ff; word-break: break-all; }
+        .mode-btn.active { background: linear-gradient(135deg,#f39c12,#9b59b6); border-color: transparent; }
+        .setup-slots-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .setup-slot { flex: 1 1 21%; min-width: 120px; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px; text-align: center; }
+        .setup-slot .seat-toggle { width: 100%; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-weight: 800; font-size: 0.8rem; border-radius: 9px; padding: 8px 4px; cursor: pointer; }
+        .setup-slot.off { opacity: 0.45; }
+        .setup-slot .seat-status { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; margin-top: 6px; color: #8f8fa0; }
+        .setup-slot .seat-who { display: block; font-size: 0.72rem; margin-top: 4px; color: #b9b9c6; word-break: break-all; min-height: 1.1em; }
+        .setup-slot .seat-you { margin-top: 6px; font-size: 0.72rem; font-weight: 800; border-radius: 999px; border: 1px solid #f39c12; background: transparent; color: #f39c12; padding: 4px 10px; cursor: pointer; }
+        .setup-slot .seat-you.me { background: linear-gradient(135deg,#f39c12,#9b59b6); color: #111; border-color: transparent; }
+    </style>
+</head>
+<body>
+
+<main class="ld-wrap">
+    <section class="ld-hero">
+        <span class="ld-eyebrow">FOSKAAY GGI MULTIPLAYER TESTNET</span>
+        <h1 class="ld-h1">Ludo multiplayer, <span class="grad">fully on-chain</span></h1>
+    </section>
+
+    <div class="ld-body">
+        <div class="ld-panel" id="mp-panel-controls">
+            <div class="ld-row">
+                <button class="ld-btn primary" id="mp-new">Start multiplayer match</button>
+                <button class="ld-btn" id="mp-join">Join with code</button>
+                <span class="ld-muted">Players</span>
+                <button class="ld-btn mode-btn active" id="mp-mode-2p">2</button>
+                <button class="ld-btn mode-btn" id="mp-mode-4p">4</button>
+            </div>
+            <div class="ld-muted" id="mp-action-status" style="margin-top:8px;min-height:1.1em"></div>
+        </div>
+
+        <div class="ld-panel" id="mp-panel-seats">
+            <b style="color:#fff;font-size:0.9rem">Seats</b>
+            <div class="setup-slots-row" id="mp-slots">
+                <div class="setup-slot" data-q="green">
+                    <button class="seat-toggle" style="color:#2ecc71">GREEN</button>
+                    <span class="seat-status">ACTIVE</span>
+                    <span class="seat-who"></span>
+                    <button class="seat-you">Sit here</button>
+                </div>
+                <div class="setup-slot" data-q="yellow">
+                    <button class="seat-toggle" style="color:#f1c40f">YELLOW</button>
+                    <span class="seat-status">INACTIVE</span>
+                    <span class="seat-who"></span>
+                    <button class="seat-you">Sit here</button>
+                </div>
+                <div class="setup-slot" data-q="blue">
+                    <button class="seat-toggle" style="color:#3498db">BLUE</button>
+                    <span class="seat-status">INACTIVE</span>
+                    <span class="seat-who"></span>
+                    <button class="seat-you">Sit here</button>
+                </div>
+                <div class="setup-slot" data-q="red">
+                    <button class="seat-toggle" style="color:#e74c3c">RED</button>
+                    <span class="seat-status">ACTIVE</span>
+                    <span class="seat-who"></span>
+                    <button class="seat-you">Sit here</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="ld-panel" id="mp-panel-lobby">
+            <div class="ld-row" style="margin-top:0;margin-bottom:10px">
+                <label class="ld-muted"><input type="checkbox" id="mp-solo"> Solo test (computer seats)</label>
+            </div>
+            <div class="ld-muted" id="mp-lobby">No lobby yet.</div>
+            <div class="ld-muted" style="margin-top:8px">Session link to share: <span class="ld-addr" id="mp-code">appears after Start</span></div>
+            <div class="ld-muted" style="margin-top:6px" id="mp-points">Your ludo-mp points: <b style="color:#f39c12">0</b> (sign in)</div>
+        </div>
+
+        <div class="ld-panel" id="mp-panel-join">
+            <b style="color:#fff;font-size:0.9rem">Join: one tap</b>
+            <p class="ld-muted" style="margin:6px 0 10px">Open the shared link and tap a free color seat above, or paste link or code here and press Join. Filled seats are locked. Your seat key is created silently and only its address travels.</p>
+            <div class="ld-row">
+                <input id="mp-code-in" class="ld-btn" style="flex:1;min-width:200px" placeholder="paste session link or code">
+                <button class="ld-btn primary" id="mp-join-go">Join</button>
+            </div>
+        </div>
+
+        <div class="ld-panel">
+            <div class="ld-board-host">
+                <div id="board-frame">
+                    <canvas id="ludoCanvas" width="600" height="600"></canvas>
+                </div>
+            </div>
+            <div class="ld-legend">
+                <span><span class="ld-dot" style="background:#2ecc71"></span>Green</span>
+                <span><span class="ld-dot" style="background:#f1c40f"></span>Yellow</span>
+                <span><span class="ld-dot" style="background:#3498db"></span>Blue</span>
+                <span><span class="ld-dot" style="background:#e74c3c"></span>Red</span>
+                <span>Your seat shows as you. Opponents join by link or code.</span>
+            </div>
+            <div class="ld-status" id="mp-status" style="margin:10px 0 2px">Press Start for a solo test, or open a lobby and share the link.</div>
+            <p class="ld-muted" style="margin:6px 0 0">Tap the centre of the board to roll on your turn, then tap a blinking token to move it.</p>
+        </div>
+
+        <div class="ld-panel">
+            <div class="ld-row" style="justify-content:space-between;align-items:center;gap:8px">
+                <b style="color:#fff;font-size:0.9rem" id="mp-turn">No match yet</b>
+                <span style="color:#fff;font-size:0.8rem;font-weight:800;background:#7838f8;border:1px solid rgba(155,89,182,0.7);border-radius:8px;padding:1px 8px;white-space:nowrap" id="mp-countdown">00m:00s:000ms</span>
+            </div>
+            <div class="ld-row" style="margin-top:8px;gap:14px;align-items:center">
+                <span class="ld-muted">Dice1: <b style="color:#fff" id="mp-d1">-</b></span>
+                <span class="ld-muted">Dice2: <b style="color:#fff" id="mp-d2">-</b></span>
+                <span class="ld-muted" id="mp-cardpts">Points <b style="color:#f39c12">0</b></span>
+            </div>
+            <div class="ld-row" style="margin-top:8px;gap:10px;align-items:center;flex-wrap:wrap">
+                <button class="ld-btn" id="mp-begin" disabled>Start match</button>
+                <a class="ld-btn" id="mp-newmatch" href="/games/ludo-mp/" style="display:none;text-decoration:none">＋ New match</a>
+                <button class="ld-btn" id="mp-copy">Copy session link</button>
+                <span class="ld-muted" id="mp-ids"></span>
+            </div>
+        </div>
+
+        <div class="ld-panel">
+            <div class="ld-row" style="justify-content:space-between">
+                <b style="color:#fff;font-size:0.9rem">On-chain activity</b>
+                <span class="ld-muted" id="mp-tx"></span>
+            </div>
+            <div class="ld-log" id="mp-log"></div>
+        </div>
+
+        <div class="ld-panel">
+            <h2 style="color:#fff;font-size:1.05rem;margin:0 0 4px">Demo FAQ (for developers)</h2>
+            <p class="ld-muted" style="margin:0 0 10px">Tap any question.</p>
+            <div class="ld-faq" id="mp-faq"></div>
+        </div>
+    </div>
+</main>
+
+<script src="/global_header.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/paths.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/board.js"></script>
+<script src="/foskaay-ggi-assets/ludo-lab/physics.js"></script>
+<script>
+(function () {
+    var E = 'https://explorer.testnet.arc.io/address/';
+    var CORE = '0x793785CE66992211B7c60dFCf0318869678D33a4';
+    var GAME = '0x1016B29A147a9b2f84ecF3ca31Ac825A01Af2a22';
+    var PLAYER = '0xE85fC6f002830E10bd446668A72236Bd952F6834';
+    var FAQ = [
+        { q: 'Is this really an on-chain game?', a: 'Yes. The rules, the dice, the board and the points live in the game contract as compact BYTES (no images on-chain); this page only renders what the chain returns. During play every roll and every move runs through the contract for free, and the result is settled on-chain in one transaction.' },
+        { q: 'How is multiplayer different from single-player?', a: 'The rules are identical. The session holds N real players plus N session keys instead of one human plus house seats. The relay runs each move through the contract and signs the move log, but it cannot settle alone: the winner device signs automatically and the relay seals it, so the loser does nothing and the game never waits on them. Solo test plays you against relay-signed computer seats that earn nothing. Single-player sessions and multiplayer sessions never meet.' },
+        { q: 'Where are the deployed contracts?', a: 'Testnet only for now, all permanent upgradeable proxies. Core <a href="' + E + CORE + '" target="_blank" rel="noopener">' + CORE + '</a>. Game <a href="' + E + GAME + '" target="_blank" rel="noopener">' + GAME + '</a>. Player <a href="' + E + PLAYER + '" target="_blank" rel="noopener">' + PLAYER + '</a>. Every match also links its own connect and settle transactions in the session bar above the board, and the <a href="/explorer/" target="_blank" rel="noopener">Foskaay GGI Explorer</a> verifies any session.' },
+        { q: 'What does it cost to run?', a: 'Your players pay nothing. What you pay as a developer is a cheap per-session fee (base plus per-account times 2 plus per-game), charged once at connect. Nothing inside the session is charged.' },
+        { q: 'How do the points work?', a: 'Points live INSIDE the game state, so they are credited for free as the match plays and cost nothing extra at settle. 4 players: 1st 100, 2nd 50, 3rd 25, 4th 0. 2 players: 1st 100, 2nd 0. Every seat that earns is credited, not just seat 0.' },
+        { q: 'Where do the dice come from?', a: 'From the core. A seed is committed at connect; the dice come from the core pure randomN(seed, counter). The page never invents a number; it only shows what the contract derives.' },
+        { q: 'Which network is this demo running on?', a: 'Arc testnet (chain 5042002) only. The single-player demo runs on mainnet; this multiplayer build stays here until it is proven, then mainnet is a separate decision.' }
+    ];
+    var host = document.getElementById('mp-faq');
+    FAQ.forEach(function (f) {
+        var d = document.createElement('details');
+        d.innerHTML = '<summary>' + f.q + '</summary><div class="ld-a">' + f.a + '</div>';
+        host.appendChild(d);
+    });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@foskaay/ggi-sdk@0.2.6/dist/ggi-sdk.browser.js"></script>
+<script type="module">import './bridge-mp.js';</script>
+<script>
+(function () {
+    'use strict';
+    // Any uncaught page error lands inline (never silent, never popup).
+    window.addEventListener('error', function (e) {
+        var el = document.getElementById('mp-status');
+        if (el && e && e.message) el.innerHTML = 'Error: <b>' + e.message.slice(0, 160) + '</b>';
+    });
+    function $(id) { return document.getElementById(id); }
+    function sh(h) { return h ? (h.slice(0, 10) + '...' + h.slice(-6)) : ''; }
+
+    window.gfgLudoUI = {
+        status: function (s) { $('mp-status').innerHTML = s; },
+        prompt: function (s) { $('mp-status').innerHTML = s; },
+        log: function (msg, cost) {
+            var d = document.createElement('div');
+            d.innerHTML = '<b>' + msg + '</b>';
+            var log = $('mp-log');
+            log.insertBefore(d, log.firstChild);
+            while (log.childNodes.length > 60) log.removeChild(log.lastChild);
+        },
+        ids: function (sessionId) {
+            $('mp-ids').innerHTML = 'Session ' + sh(sessionId) +
+                '  |  <a href="/explorer/?session=' + sessionId + '" target="_blank" rel="noopener" style="color:#f39c12">open in Explorer</a>' +
+                '  |  <a href="/games/ludo-mp/?game=' + sessionId + '" target="_blank" rel="noopener" style="color:#f39c12">share this session</a>';
+        },
+        tx: function (hash, label) {
+            if (!hash) return;
+            $('mp-tx').innerHTML = '<a href="https://explorer.testnet.arc.io/tx/' + hash + '" target="_blank" rel="noopener" style="color:#f39c12">' + (label || 'tx') + ' ' + sh(hash) + '</a>';
+        },
+        onSettled: function () { updatePoints(); },
+        sessionLost: function () {}
+    };
+
+    function updatePoints() {
+        var evm = (typeof window.getDynamicEvmWallet === 'function') ? window.getDynamicEvmWallet() : null;
+        if (!evm) return;
+        fetch('/api/foskaay-ggi-sponsor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'mpPoints', player: evm }) })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (j && j.points != null) {
+                    $('mp-points').innerHTML = 'Your ludo-mp points: <b style="color:#f39c12">' + j.points + '</b>';
+                    var cp = $('mp-cardpts');
+                    if (cp) cp.innerHTML = 'Points <b style="color:#f39c12">' + j.points + '</b>';
+                }
+            })
+            .catch(function () {});
+    }
+    window.updatePoints = updatePoints;
+    function bridge() { return window.GFG_MP || null; }
+    $('mp-mode-2p').addEventListener('click', function () { var g = bridge(); if (g) g.setMode(2); });
+    $('mp-mode-4p').addEventListener('click', function () { var g = bridge(); if (g) g.setMode(4); });
+    document.querySelectorAll('#mp-slots .setup-slot').forEach(function (slot) {
+        var q = slot.getAttribute('data-q');
+        var tg = slot.querySelector('.seat-toggle');
+        if (tg) tg.addEventListener('click', function () { var g = bridge(); if (g) g.toggleQuad(q); });
+        var you = slot.querySelector('.seat-you');
+        if (you) you.addEventListener('click', function () { var g = bridge(); if (g) g.claimYou(q); });
+    });
+
+    $('mp-new').addEventListener('click', async function () {
+        if (!window.GFG_MP) { $('mp-status').innerHTML = 'Game engine still loading, tap again in a second.'; return; }
+        busyBtn('mp-new', 'Starting...');
+        try { await window.GFG_MP.start(0, $('mp-solo').checked); }
+        finally { busyBtn('mp-new', 'Start multiplayer match'); }
+    });
+    function busyBtn(id, label) {
+        var b = $(id);
+        if (!b) return;
+        if (label == null) { b.disabled = false; return; }
+        if (!b.dataset.label) b.dataset.label = b.textContent;
+        if (label === false) { b.textContent = b.dataset.label; b.disabled = false; return; }
+        b.textContent = label;
+        b.disabled = true;
+    }
+    $('mp-join').addEventListener('click', function () {
+        var el = $('mp-code-in');
+        if (el) el.focus();
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+    });
+    var copyBtn = $('mp-copy');
+    if (copyBtn) copyBtn.addEventListener('click', function () {
+        var sid = (window.GFG_MP && window.GFG_MP.sessionId && window.GFG_MP.sessionId()) || '';
+        if (!sid) { alert('Start or join a match first'); return; }
+        var link = location.origin + '/games/ludo-mp/?game=' + sid;
+        var done = function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy session link'; }, 2000); };
+        var manual = function () { $('mp-status').innerHTML = 'Copy this link: <b>' + link + '</b>'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done).catch(manual);
+        else manual();
+    });
+    $('mp-join-go').addEventListener('click', async function () {
+        var code = ($('mp-code-in').value || '').trim();
+        if (!code) return;
+        // Accept a full shared link or a bare session id.
+        var m = code.match(/game=([^&#]+)/);
+        if (m) code = m[1];
+        var evm = (typeof window.getDynamicEvmWallet === 'function') ? window.getDynamicEvmWallet() : null;
+        if (!window.GFG_MP) { $('mp-status').innerHTML = 'Game engine still loading, tap again in a second.'; return; }
+        busyBtn('mp-join-go', 'Joining...');
+        try {
+            var r = await window.GFG_MP.rejoin(code, evm, '');
+            if (r && !r.ok) $('mp-status').innerHTML = 'Join: <b>' + ((r && r.reason) || 'failed, tap again') + '</b>';
+        } finally {
+            busyBtn('mp-join-go', false);
+        }
+    });
+    $('mp-begin').addEventListener('click', async function () {
+        if (!window.GFG_MP || !window.GFG_MP.begin) return;
+        busyBtn('mp-begin', 'Starting...');
+        try { await window.GFG_MP.begin(); }
+        finally { busyBtn('mp-begin', false); }
+    });
+
+    function resumeFromQuery() {
+        var q = new URLSearchParams(location.search).get('game');
+        if (!q) return;
+        // Session mode: this page shows ONLY this game (status, board, turn
+        // card). Creating happens on the clean page via New match below.
+        ['mp-panel-controls', 'mp-panel-lobby', 'mp-panel-join'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        var nm = document.getElementById('mp-newmatch');
+        if (nm) nm.style.display = '';
+        var attempt = function () {
+            var evm = (typeof window.getDynamicEvmWallet === 'function') ? window.getDynamicEvmWallet() : null;
+            if (!evm || !window.GFG_MP) return;
+            window.GFG_MP.rejoin(q, evm).then(function (r) {
+                if (!(r && r.ok)) $('mp-status').innerHTML = 'Join: <b>' + ((r && r.reason) || 'unavailable') + '</b>';
+            });
+        };
+        try { window.addEventListener('gfg:auth-changed', attempt, false); } catch (e) {}
+        setTimeout(attempt, 1200);
+    }
+    try { window.addEventListener('gfg:auth-changed', updatePoints, false); } catch (e) {}
+    setTimeout(function () { try { if (window.GFG_MP && window.GFG_MP.renderMatrix) window.GFG_MP.renderMatrix(); } catch (e) {} }, 900);
+    if (document.readyState !== 'loading') { resumeFromQuery(); }
+    else document.addEventListener('DOMContentLoaded', resumeFromQuery);
+})();
+</script>
+</body>
+</html>
